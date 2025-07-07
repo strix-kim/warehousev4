@@ -1,0 +1,38 @@
+---
+goal: >
+  Модульная архитектура MVP для управления оборудованием, планирования мероприятий и отчётности. Фокус — feature-sliced design, покрытие всех ролей, интеграция с Supabase.
+context:
+  user_roles:
+    - video_engineer: создаёт мероприятия, управляет точками монтажа, формирует списки оборудования
+    - technician: работает с техникой, управляет мероприятиями (без удаления)
+    - manager: полный доступ, включая удаление оборудования
+    - admin: администрирование пользователей и ролей, все права
+  entities: [users, equipment, event, mount_point, report]
+architecture:
+  modules:
+    - auth: LoginForm.vue, useAuth.js, authApi.js
+    - equipment: EquipmentTable.vue, EquipmentEditor.vue, useEquipmentList.js, equipmentApi.js
+    - event: EventForm.vue, EventList.vue, useEventFlow.js, eventApi.js
+    - mountPoint: MountPointEditor.vue, MountPointCard.vue, useMountPoints.js, mountPointApi.js
+    - report: ReportViewer.vue, reportApi.js
+    - user: UserProfile.vue, UserList.vue, userApi.js
+    - shared: Button.vue, Modal.vue, Table.vue, Input.vue, DatePicker.vue, utils, httpClient.js
+  api:
+    - POST   /auth/login
+    - GET    /users/me
+    - GET    /users
+    - PATCH  /users/:id
+    - GET    /equipment
+    - POST   /equipment
+    - PATCH  /equipment/:id
+    - DELETE /equipment/:id *(только manager, admin)*
+    - GET    /events
+    - POST   /events
+    - PATCH  /events/:id
+    - GET    /events/:id
+    - GET    /mount-points?event_id=
+    - POST   /mount-points
+    - PATCH  /mount-points/:id
+    - GET    /reports?event_id=
+    - POST   /reports/generate
+attention: []

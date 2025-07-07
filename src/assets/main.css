@@ -1,0 +1,33 @@
+/*
+  Основной файл стилей проекта warehousev4.
+  Здесь подключается Tailwind CSS v4 через @import "tailwindcss"; — это единственный обязательный импорт для работы всех утилит и кастомных тем.
+  Все кастомизации (цвета, брейкпоинты, шрифты и т.д.) теперь делаются через блок @theme {...} прямо в этом файле.
+  Не используйте директивы @tailwind base; @tailwind components; @tailwind utilities; — они устарели и не поддерживаются в v4.
+  Подробнее: https://tailwindcss.com/docs/installation
+*/
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+/* Основной шрифт для всего проекта */
+html, body, .font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+/*
+  Минималистичный SVG-паттерн (сеточка) для фона приложения.
+  Цвет линии — чуть светлее основного фона, чтобы не отвлекал от контента.
+  Паттерн повторяется по всей области, не мешает восприятию UI.
+*/
+body {
+  @apply bg-gray-900 text-white;
+  background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='0' y='0' width='40' height='40' fill='none'/%3E%3Cpath d='M 40 0 L 0 0 0 40' stroke='%23333' stroke-width='0.5'/%3E%3C/svg%3E");
+  background-size: 40px 40px;
+  background-repeat: repeat;
+}
+
+@theme {
+  --font-display: "Inter", "sans-serif";
+  --color-brand: oklch(0.8 0.15 250);
+  /* Здесь можно добавить свои переменные для темы */
+} 

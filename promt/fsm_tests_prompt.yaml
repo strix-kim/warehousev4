@@ -1,0 +1,108 @@
+
+goal: >
+  Все FSM-таблицы и Gherkin-тесты для критических пользовательских сценариев: race-condition, session expired, forbidden actions, полное покрытие всех edge-cases.
+context:
+  modules:
+    - EquipmentEditor
+    - EventForm
+    - Login/Logout Flow
+    - UserList
+fsm_tests: |-
+  ## EquipmentEditor.vue — FSM (Race-condition)
+
+  | From         | Action             | To                | Trigger/Condition                                |
+  |--------------|--------------------|-------------------|--------------------------------------------------|
+  | Idle/Loading | detect_stale_data  | StaleData         | Сервер: версия изменилась (race-condition)       |
+  | StaleData    | refresh            | Loading           | Пользователь обновляет страницу/данные           |
+  | StaleData    | cancel             | Idle              | Пользователь отменяет действие                   |
+
+  ### Edge-cases:
+  - Race-condition: Изменения устарели, пользователь должен обновить страницу перед сохранением.
+
+  ### Gherkin-сценарий
+
+  ```gherkin
+  Feature: Equipment Editing - Race Condition
+
+    Scenario: Editing equipment with outdated data
+      Given the user opened the equipment editor
+      And another user has changed the equipment on the server
+      When the current user tries to save
+      Then show a banner "Изменения устарели, обновите страницу"
+      And block saving until refresh
+  ```
+
+  ---
+
+  ## EventForm.vue — FSM (Race-condition)
+
+  | From         | Action             | To                | Trigger/Condition                                |
+  |--------------|--------------------|-------------------|--------------------------------------------------|
+  | Idle/Loading | detect_stale_data  | StaleData         | Сервер: версия изменилась (race-condition)       |
+  | StaleData    | refresh            | Loading           | Пользователь обновляет страницу/данные           |
+  | StaleData    | cancel             | Idle              | Пользователь отменяет действие                   |
+
+  ### Edge-cases:
+  - Race-condition: Изменения в мероприятии устарели, требуется обновить перед сохранением.
+
+  ### Gherkin-сценарий
+
+  ```gherkin
+  Feature: Event Form - Race Condition
+
+    Scenario: Editing event with outdated data
+      Given the user opened the event form
+      And another user has modified the event on the server
+      When the current user tries to save
+      Then show a banner "Изменения устарели, обновите страницу"
+      And block saving until refresh
+  ```
+
+  ---
+
+  ## Login/Logout Flow — FSM (Session expired)
+
+  | From       | Action            | To           | Trigger/Condition                               |
+  |------------|-------------------|--------------|-------------------------------------------------|
+  | Any        | session_expired   | Expired      | Сервер возвращает 401 (session expired)         |
+  | Expired    | login             | Loading      | Пользователь заново авторизуется                |
+
+  ### Gherkin-сценарий
+
+  ```gherkin
+  Feature: Session Expired
+
+    Scenario: User session expired
+      Given the user is logged in
+      When the session expires (401 from API)
+      Then force logout and redirect to login page
+      And show a banner "Сессия истекла, войдите снова"
+  ```
+
+  ---
+
+  ## UserList.vue — FSM (forbidden deletion)
+
+  | From     | Action            | To        | Trigger/Condition                                    |
+  |----------|-------------------|-----------|------------------------------------------------------|
+  | Ready    | try_delete        | Forbidden | Пользователь без прав (не admin) пытается удалить    |
+
+  ### Gherkin-сценарий
+
+  ```gherkin
+  Feature: User Management - Forbidden Deletion
+
+    Scenario: Manager or technician tries to delete user
+      Given the user is on the user list page
+      And the user has the role "manager" or "technician"
+      When they attempt to delete a user
+      Then show a banner "Удаление пользователя запрещено"
+      And do not execute the deletion
+  ```
+
+  ---
+
+  # (Вставьте сюда дополнительное содержимое из outputs/05_fsm_tests_patched.md,
+  # если есть: остальные FSM, Gherkin, coverage и т.д.)
+
+attention: []

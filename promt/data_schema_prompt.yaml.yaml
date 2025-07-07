@@ -1,0 +1,373 @@
+---
+goal: >
+  Полная схема данных для Supabase/Postgres с строгими RLS-политиками и покрытием RBAC.
+context:
+  entities:
+    - users: id, name, email, role, shifts_count
+    - equipment: id, model, brand, serial_number, quantity, status, location, category, subcategory, tech_description, description
+    - event: id, name, organizer, location, description, technical_task, photos, setup_date, start_date, end_date, teardown_date, mount_points_count, responsible_engineers
+    - mount_point: id, event_id, name, responsible_engineers, equipment_plan, equipment_final, equipment_fact
+    - report: id, event_id, generated_at, content
+schema:
+  sql: |-
+    -- Таблица пользователей
+    create table users (
+      id uuid primary key default gen_random_uuid(),
+      name varchar(100) not null,
+      email varchar(120) not null unique,
+      role varchar(32) not null check (role in ('video_engineer', 'technician', 'manager', 'admin')),
+      shifts_count integer not null default 0
+    );
+
+    -- Таблица оборудования
+    create table equipment (
+      id uuid primary key default gen_random_uuid(),
+      model varchar(120) not null,
+      brand varchar(80) not null,
+      serial_number varchar(64) not null unique,
+      quantity integer not null,
+      status varchar(20) not null check (status in ('operational', 'broken', 'in_repair')),
+      location varchar(120) not null,
+      category varchar(80) not null,
+      subcategory varchar(80) not null,
+      tech_description text,
+      description text
+    );
+
+    -- Таблица мероприятий
+    create table event (
+      id uuid primary key default gen_random_uuid(),
+      name varchar(120) not null,
+      organizer varchar(120) not null,
+      location varchar(120) not null,
+      description text,
+      technical_task text,
+      photos text[] default '{}',
+      setup_date date,
+      start_date date,
+      end_date date,
+      teardown_date date,
+      mount_points_count integer not null default 0,
+      responsible_engineers uuid[] not null
+    );
+
+    -- Таблица точек монтажа
+    create table mount_point (
+      id uuid primary key default gen_random_uuid(),
+      event_id uuid not null references event(id) on delete cascade,
+      name varchar(120) not null,
+      responsible_engineers uuid[] not null,
+      equipment_plan uuid[] not null,
+      equipment_final uuid[] not null,
+      equipment_fact uuid[] not null
+    );
+
+    -- Таблица отчётов
+    create table report (
+      id uuid primary key default gen_random_uuid(),
+      event_id uuid not null references event(id) on delete cascade,
+      generated_at timestamp with time zone not null default now(),
+      content jsonb not null
+    );
+
+    -- Включаем RLS для всех таблиц
+    alter table users enable row level security;
+    alter table equipment enable row level security;
+    alter table event enable row level security;
+    alter table mount_point enable row level security;
+    alter table report enable row level security;
+
+    -- RLS policies: USERS
+    create policy "Users can view own profile" on users
+      for select using (auth.uid() = id);
+    create policy "Admins can manage users" on users
+      for all using (exists (select 1 from users as u where u.id = auth.uid() and u.role = 'admin'));
+
+    -- RLS policies: EQUIPMENT
+    create policy "All authenticated can read equipment" on equipment
+      for select using (auth.uid() is not null);
+    create policy "Engineers/Technicians can insert/update" on equipment
+      for insert, update using (
+        exists (select 1 from users as u where u.id = auth.uid() and u.role in ('video_engineer', 'technician', 'manager', 'admin'))
+      );
+    create policy "Manager/Admin can delete equipment" on equipment
+      for delete using (
+        exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin'))
+      );
+
+    -- RLS policies: EVENT
+    create policy "Engineers can manage own events" on event
+      for all using (
+        auth.uid() = ANY(responsible_engineers)
+        or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin'))
+      );
+
+    -- RLS policies: MOUNT_POINT
+    create policy "Engineers can manage mount_points of their events" on mount_point
+      for all using (
+        exists (
+          select 1 from event e
+          where e.id = event_id
+            and (auth.uid() = ANY(e.responsible_engineers)
+            or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
+        )
+      );
+
+    -- RLS policies: REPORT
+    create policy "Access reports by event permission" on report
+      for all using (
+        exists (
+          select 1 from event e
+          where e.id = event_id
+            and (auth.uid() = ANY(e.responsible_engineers)
+            or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
+        )
+      );
+  json_schema: |-
+    {
+      "users": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "video_engineer",
+              "technician",
+              "manager",
+              "admin"
+            ]
+          },
+          "shifts_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "role",
+          "shifts_count"
+        ]
+      },
+      "equipment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "brand": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "serial_number": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "operational",
+              "broken",
+              "in_repair"
+            ]
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "category": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "subcategory": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "tech_description": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "model",
+          "brand",
+          "serial_number",
+          "quantity",
+          "status",
+          "location",
+          "category",
+          "subcategory"
+        ]
+      },
+      "event": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "organizer": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string"
+          },
+          "technical_task": {
+            "type": "string"
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "setup_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "teardown_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "mount_points_count": {
+            "type": "integer"
+          },
+          "responsible_engineers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "organizer",
+          "location",
+          "mount_points_count",
+          "responsible_engineers"
+        ]
+      },
+      "mount_point": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "responsible_engineers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "equipment_plan": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "equipment_final": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "equipment_fact": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "event_id",
+          "name",
+          "responsible_engineers",
+          "equipment_plan",
+          "equipment_final",
+          "equipment_fact"
+        ]
+      },
+      "report": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "content": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "event_id",
+          "generated_at",
+          "content"
+        ]
+      }
+    }
+attention: []

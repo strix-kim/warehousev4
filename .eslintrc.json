@@ -1,0 +1,27 @@
+{
+  // Конфигурация ESLint для Vue 3 + Composition API + script setup
+  "env": {
+    "browser": true,
+    "es2021": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:vue/vue3-recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "sourceType": "module"
+  },
+  "plugins": [
+    "vue"
+  ],
+  "rules": {
+    // Пример: запрещаем неиспользуемые переменные
+    "no-unused-vars": "warn",
+    // Пример: рекомендуем использовать const там, где возможно
+    "prefer-const": "warn",
+    // Пример: строгий стиль для компонентов Vue
+    "vue/multi-word-component-names": "off", // разрешаем односоставные имена файлов
+    "vue/no-mutating-props": "error"
+  }
+} 
