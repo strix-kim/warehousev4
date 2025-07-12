@@ -85,7 +85,7 @@ function goToReport(reportId) {
           v-for="report in reports"
           :key="report.id"
           @click="goToReport(report.id)"
-          class="cursor-pointer bg-white/90 hover:bg-white transition rounded-2xl p-6 shadow border border-gray-200 flex flex-col gap-2 group focus:outline-none focus:ring-2 focus:ring-purple-400"
+          class="cursor-pointer bg-white rounded-2xl border border-gray-200 p-6 shadow-sm transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-purple-400"
           tabindex="0"
           :aria-label="`Отчёт по мероприятию ${getEventName(report)}`"
         >
@@ -105,12 +105,3 @@ function goToReport(reportId) {
     </div>
   </div>
 </template>
-
-<!--
-  reports-page.vue — современный production шаблон
-  - Градиентный фон на всю страницу, breadcrumbs, крупный заголовок
-  - Состояния: загрузка, ошибка, пусто
-  - Сетка карточек отчётов (адаптивно)
-  - Только просмотр, без CRUD
-  - Только Tailwind CSS, accessibility, подробные комментарии
---> 
