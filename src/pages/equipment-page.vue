@@ -19,6 +19,7 @@ import Button from '@/shared/ui/atoms/Button.vue'
 import EmptyState from '@/shared/ui/templates/EmptyState.vue'
 import ErrorState from '@/shared/ui/templates/ErrorState.vue'
 import Spinner from '@/shared/ui/atoms/Spinner.vue'
+import Icon from '@/shared/ui/atoms/Icon.vue'
 
 // Инициализация store
 const equipmentStore = useEquipmentStore()
@@ -200,6 +201,26 @@ onMounted(async () => {
 
     <!-- Основной контейнер -->
     <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- Breadcrumbs -->
+      <nav class="flex mb-6" aria-label="Breadcrumb">
+        <ol class="inline-flex items-center space-x-1 md:space-x-3">
+          <li>
+            <button
+              @click="$router.push('/')"
+              class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+            >
+              <Icon name="ArrowLeft" set="lucide" size="sm" />
+              На главную
+            </button>
+          </li>
+          <li aria-current="page">
+            <div class="inline-flex items-center gap-2">
+              <Icon name="ChevronRight" set="lucide" size="sm" class="text-gray-400" />
+              <span class="text-sm font-medium text-gray-500">Оборудование</span>
+            </div>
+          </li>
+        </ol>
+      </nav>
       <!-- Заголовок страницы -->
       <div class="mb-8">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
