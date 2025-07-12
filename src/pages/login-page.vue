@@ -84,26 +84,20 @@ const isFormValid = computed(() => {
 </script>
 
 <template>
-  <!-- Современная страница логина со светлой темой -->
-  <div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-    <!-- Логотип и заголовок -->
-    <div class="sm:mx-auto sm:w-full sm:max-w-md">
-      <div class="flex justify-center">
-        <div class="flex items-center gap-3">
-          <span class="text-4xl">📦</span>
-          <h1 class="text-2xl font-bold text-gray-900">Argo Media</h1>
-        </div>
+  <!-- Современная страница логина: фирменная svg-иконка, центрирование, без лишнего скролла -->
+  <div class="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div class="w-full max-w-md space-y-8">
+      <!-- Логотип и заголовок -->
+      <div class="flex flex-col items-center">
+        <!-- Фирменная box-иконка (lucide) -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-12 h-12 mb-2 text-blue-500"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>
+        <h1 class="text-2xl font-bold text-gray-900">Argo Media</h1>
+        <h2 class="mt-4 text-center text-3xl font-bold text-gray-900">Вход в систему</h2>
+        <p class="mt-2 text-center text-sm text-gray-600">
+          Управление видеооборудованием и мероприятиями
+        </p>
       </div>
-      <h2 class="mt-6 text-center text-3xl font-bold text-gray-900">
-        Вход в систему
-      </h2>
-      <p class="mt-2 text-center text-sm text-gray-600">
-        Управление видеооборудованием и мероприятиями
-      </p>
-    </div>
-
-    <!-- Форма входа -->
-    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+      <!-- Форма входа -->
       <div class="bg-white py-8 px-4 shadow-sm rounded-xl border border-gray-200 sm:px-10">
         <form class="space-y-6" @submit.prevent="handleLogin">
           <!-- Поле email -->
@@ -119,7 +113,6 @@ const isFormValid = computed(() => {
               :variant="error && error.includes('email') ? 'error' : 'default'"
             />
           </FormField>
-
           <!-- Поле пароля -->
           <FormField label="Пароль" id="password">
             <Input
@@ -133,7 +126,6 @@ const isFormValid = computed(() => {
               :variant="error && error.includes('пароль') ? 'error' : 'default'"
             />
           </FormField>
-
           <!-- Состояния ошибок -->
           <OfflineState 
             v-if="!isOnline" 
@@ -141,14 +133,12 @@ const isFormValid = computed(() => {
             description="Проверьте подключение и попробуйте снова"
             class="mb-4"
           />
-          
           <ErrorState 
             v-else-if="error" 
             :message="error"
             description="Проверьте правильность введенных данных"
             class="mb-4"
           />
-
           <!-- Кнопка входа -->
           <Button
             type="submit"
@@ -159,7 +149,6 @@ const isFormValid = computed(() => {
             class="w-full"
           />
         </form>
-
         <!-- Дополнительная информация -->
         <div class="mt-6">
           <div class="text-center">
