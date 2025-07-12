@@ -84,6 +84,178 @@ export async function fetchEquipmentsPaged({ page = 1, limit = 40, search = '', 
 }
 
 /**
+ * Получить подсказки для автодополнения поиска
+ * @param {string} query - поисковый запрос
+ * @param {number} limit - максимальное количество подсказок
+ * @returns {Object} { data, error } - массив уникальных названий и брендов
+ */
+export async function fetchEquipmentSuggestions(query, limit = 10) {
+  if (!query || query.length < 2) {
+    return { data: [], error: null }
+  }
+
+  try {
+    // Получаем уникальные модели и бренды для автодополнения
+    const { data: models, error: modelsError } = await supabase
+      .from('equipments')
+      .select('model')
+      .ilike('model', `%${query}%`)
+      .limit(limit)
+
+    const { data: brands, error: brandsError } = await supabase
+      .from('equipments')
+      .select('brand')
+      .ilike('brand', `%${query}%`)
+      .limit(limit)
+
+    if (modelsError || brandsError) {
+      throw modelsError || brandsError
+    }
+
+    // Объединяем и удаляем дубликаты
+    const suggestions = [
+      ...models.map(item => ({ type: 'model', value: item.model })),
+      ...brands.map(item => ({ type: 'brand', value: item.brand }))
+    ]
+      .filter(item => item.value && item.value.toLowerCase().includes(query.toLowerCase()))
+      .reduce((unique, item) => {
+        if (!unique.find(u => u.value === item.value)) {
+          unique.push(item)
+        }
+        return unique
+      }, [])
+      .slice(0, limit)
+
+    return { data: suggestions, error: null }
+  } catch (error) {
+    return { data: [], error }
+  }
+}
+
+/**
+ * Получить уникальные категории из базы данных
+ * @returns {Object} { data, error } - массив уникальных категорий
+ */
+export async function fetchEquipmentCategories() {
+  try {
+    const { data, error } = await supabase
+      .from('equipments')
+      .select('category')
+      .not('category', 'is', null)
+
+    if (error) throw error
+
+    // Получаем уникальные категории
+    const uniqueCategories = [...new Set(data.map(item => item.category))]
+      .filter(Boolean)
+      .sort()
+
+    return { data: uniqueCategories, error: null }
+  } catch (error) {
+    return { data: [], error }
+  }
+}
+
+/**
+ * Получить подкатегории для выбранной категории
+ * @param {string} category - выбранная категория
+ * @returns {Object} { data, error } - массив подкатегорий для категории
+ */
+export async function fetchEquipmentSubcategories(category) {
+  if (!category) {
+    return { data: [], error: null }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('equipments')
+      .select('subcategory')
+      .eq('category', category)
+      .not('subcategory', 'is', null)
+
+    if (error) throw error
+
+    // Получаем уникальные подкатегории для данной категории
+    const uniqueSubcategories = [...new Set(data.map(item => item.subcategory))]
+      .filter(Boolean)
+      .sort()
+
+    return { data: uniqueSubcategories, error: null }
+  } catch (error) {
+    return { data: [], error }
+  }
+}
+
+/**
+ * Получить статистику по оборудованию для дашборда
+ * @returns {Object} { total, byStatus, byCategory, error }
+ */
+export async function fetchEquipmentStats() {
+  try {
+    // Общее количество
+    const { count: total, error: totalError } = await supabase
+      .from('equipments')
+      .select('*', { count: 'exact', head: true })
+
+    if (totalError) throw totalError
+
+    // По статусам
+    const { data: statusData, error: statusError } = await supabase
+      .from('equipments')
+      .select('status')
+
+    if (statusError) throw statusError
+
+    const byStatus = statusData.reduce((acc, item) => {
+      acc[item.status] = (acc[item.status] || 0) + 1
+      return acc
+    }, {})
+
+    // По категориям
+    const { data: categoryData, error: categoryError } = await supabase
+      .from('equipments')
+      .select('category')
+
+    if (categoryError) throw categoryError
+
+    const byCategory = categoryData.reduce((acc, item) => {
+      if (item.category) {
+        acc[item.category] = (acc[item.category] || 0) + 1
+      }
+      return acc
+    }, {})
+
+    return { total, byStatus, byCategory, error: null }
+  } catch (error) {
+    return { total: 0, byStatus: {}, byCategory: {}, error }
+  }
+}
+
+/**
+ * Получить уникальные локации из базы данных
+ * @returns {Object} { data, error } - массив уникальных локаций
+ */
+export async function fetchEquipmentLocations() {
+  try {
+    const { data, error } = await supabase
+      .from('equipments')
+      .select('location')
+      .not('location', 'is', null)
+
+    if (error) throw error
+
+    // Получаем уникальные локации
+    const uniqueLocations = [...new Set(data.map(item => item.location))]
+      .filter(Boolean)
+      .sort()
+
+    return { data: uniqueLocations, error: null }
+  } catch (error) {
+    return { data: [], error }
+  }
+}
+
+/**
  * Получить список оборудования (fetchEquipment, совместимый экспорт)
  */
 export async function fetchEquipment() {

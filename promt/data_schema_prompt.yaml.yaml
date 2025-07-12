@@ -4,10 +4,10 @@ goal: >
 context:
   entities:
     - users: id, name, email, role, shifts_count
-    - equipment: id, model, brand, serial_number, quantity, status, location, category, subcategory, tech_description, description
-    - event: id, name, organizer, location, description, technical_task, photos, setup_date, start_date, end_date, teardown_date, mount_points_count, responsible_engineers
-    - mount_point: id, event_id, name, responsible_engineers, equipment_plan, equipment_final, equipment_fact
-    - report: id, event_id, generated_at, content
+    - equipments: id, model, brand, serial_number, quantity, status, location, category, subcategory, tech_description, description
+    - events: id, name, organizer, location, description, technical_task, photos, setup_date, start_date, end_date, teardown_date, mount_points_count, responsible_engineers, is_archived, created_at
+    - mount_points: id, event_id, name, responsible_engineers, equipment_plan, equipment_final, equipment_fact
+    - reports: id, event_id, generated_at, content
 schema:
   sql: |-
     -- Таблица пользователей
@@ -16,11 +16,13 @@ schema:
       name varchar(100) not null,
       email varchar(120) not null unique,
       role varchar(32) not null check (role in ('video_engineer', 'technician', 'manager', 'admin')),
-      shifts_count integer not null default 0
+      shifts_count integer not null default 0,
+      created_at timestamp with time zone default now(),
+      updated_at timestamp with time zone default now()
     );
 
-    -- Таблица оборудования
-    create table equipment (
+    -- Таблица оборудования (исправлено название: equipments)
+    create table equipments (
       id uuid primary key default gen_random_uuid(),
       model varchar(120) not null,
       brand varchar(80) not null,
@@ -31,11 +33,13 @@ schema:
       category varchar(80) not null,
       subcategory varchar(80) not null,
       tech_description text,
-      description text
+      description text,
+      created_at timestamp with time zone default now(),
+      updated_at timestamp with time zone default now()
     );
 
-    -- Таблица мероприятий
-    create table event (
+    -- Таблица мероприятий (исправлено название: events, добавлены поля)
+    create table events (
       id uuid primary key default gen_random_uuid(),
       name varchar(120) not null,
       organizer varchar(120) not null,
@@ -48,34 +52,40 @@ schema:
       end_date date,
       teardown_date date,
       mount_points_count integer not null default 0,
-      responsible_engineers uuid[] not null
+      responsible_engineers uuid[] not null,
+      is_archived boolean not null default false,
+      created_at timestamp with time zone default now(),
+      updated_at timestamp with time zone default now()
     );
 
-    -- Таблица точек монтажа
-    create table mount_point (
+    -- Таблица точек монтажа (исправлено название: mount_points)
+    create table mount_points (
       id uuid primary key default gen_random_uuid(),
-      event_id uuid not null references event(id) on delete cascade,
+      event_id uuid not null references events(id) on delete cascade,
       name varchar(120) not null,
       responsible_engineers uuid[] not null,
       equipment_plan uuid[] not null,
       equipment_final uuid[] not null,
-      equipment_fact uuid[] not null
+      equipment_fact uuid[] not null,
+      created_at timestamp with time zone default now(),
+      updated_at timestamp with time zone default now()
     );
 
-    -- Таблица отчётов
-    create table report (
+    -- Таблица отчётов (исправлено название: reports)
+    create table reports (
       id uuid primary key default gen_random_uuid(),
-      event_id uuid not null references event(id) on delete cascade,
+      event_id uuid not null references events(id) on delete cascade,
       generated_at timestamp with time zone not null default now(),
-      content jsonb not null
+      content jsonb not null,
+      created_at timestamp with time zone default now()
     );
 
     -- Включаем RLS для всех таблиц
     alter table users enable row level security;
-    alter table equipment enable row level security;
-    alter table event enable row level security;
-    alter table mount_point enable row level security;
-    alter table report enable row level security;
+    alter table equipments enable row level security;
+    alter table events enable row level security;
+    alter table mount_points enable row level security;
+    alter table reports enable row level security;
 
     -- RLS policies: USERS
     create policy "Users can view own profile" on users
@@ -83,41 +93,41 @@ schema:
     create policy "Admins can manage users" on users
       for all using (exists (select 1 from users as u where u.id = auth.uid() and u.role = 'admin'));
 
-    -- RLS policies: EQUIPMENT
-    create policy "All authenticated can read equipment" on equipment
+    -- RLS policies: EQUIPMENTS
+    create policy "All authenticated can read equipments" on equipments
       for select using (auth.uid() is not null);
-    create policy "Engineers/Technicians can insert/update" on equipment
+    create policy "Engineers/Technicians can insert/update" on equipments
       for insert, update using (
         exists (select 1 from users as u where u.id = auth.uid() and u.role in ('video_engineer', 'technician', 'manager', 'admin'))
       );
-    create policy "Manager/Admin can delete equipment" on equipment
+    create policy "Manager/Admin can delete equipments" on equipments
       for delete using (
         exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin'))
       );
 
-    -- RLS policies: EVENT
-    create policy "Engineers can manage own events" on event
+    -- RLS policies: EVENTS
+    create policy "Engineers can manage own events" on events
       for all using (
         auth.uid() = ANY(responsible_engineers)
         or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin'))
       );
 
-    -- RLS policies: MOUNT_POINT
-    create policy "Engineers can manage mount_points of their events" on mount_point
+    -- RLS policies: MOUNT_POINTS
+    create policy "Engineers can manage mount_points of their events" on mount_points
       for all using (
         exists (
-          select 1 from event e
+          select 1 from events e
           where e.id = event_id
             and (auth.uid() = ANY(e.responsible_engineers)
             or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
         )
       );
 
-    -- RLS policies: REPORT
-    create policy "Access reports by event permission" on report
+    -- RLS policies: REPORTS
+    create policy "Access reports by event permission" on reports
       for all using (
         exists (
-          select 1 from event e
+          select 1 from events e
           where e.id = event_id
             and (auth.uid() = ANY(e.responsible_engineers)
             or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
@@ -151,6 +161,14 @@ schema:
           },
           "shifts_count": {
             "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -161,7 +179,7 @@ schema:
           "shifts_count"
         ]
       },
-      "equipment": {
+      "equipments": {
         "type": "object",
         "properties": {
           "id": {
@@ -208,6 +226,14 @@ schema:
           },
           "description": {
             "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -222,7 +248,7 @@ schema:
           "subcategory"
         ]
       },
-      "event": {
+      "events": {
         "type": "object",
         "properties": {
           "id": {
@@ -278,6 +304,17 @@ schema:
               "type": "string",
               "format": "uuid"
             }
+          },
+          "is_archived": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -286,10 +323,11 @@ schema:
           "organizer",
           "location",
           "mount_points_count",
-          "responsible_engineers"
+          "responsible_engineers",
+          "is_archived"
         ]
       },
-      "mount_point": {
+      "mount_points": {
         "type": "object",
         "properties": {
           "id": {
@@ -331,6 +369,14 @@ schema:
               "type": "string",
               "format": "uuid"
             }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -343,7 +389,7 @@ schema:
           "equipment_fact"
         ]
       },
-      "report": {
+      "reports": {
         "type": "object",
         "properties": {
           "id": {
@@ -360,6 +406,10 @@ schema:
           },
           "content": {
             "type": "object"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [

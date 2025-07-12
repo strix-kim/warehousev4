@@ -1,10 +1,18 @@
 <script setup>
-// Страница пользователей теперь использует Pinia store useUserStore для централизованного состояния
+/**
+ * users-page.vue — современная страница пользователей (только просмотр)
+ * Фирменный стиль: градиентный фон, breadcrumbs, крупный заголовок, адаптивная сетка
+ * Использует Pinia, Tailwind CSS, feature-sliced архитектуру
+ * Все состояния: загрузка, ошибка, пусто
+ */
 import { onMounted } from 'vue'
 import { useUserStore } from '@/stores/user-store'
 import { storeToRefs } from 'pinia'
-import Spinner from '@/components/Spinner.vue'
-import UserCard from '@/components/UserCard.vue'
+import Spinner from '@/shared/ui/atoms/Spinner.vue'
+import UserCard from '@/features/users/components/UserCard.vue'
+import EmptyState from '@/shared/ui/templates/EmptyState.vue'
+import ErrorState from '@/shared/ui/templates/ErrorState.vue'
+import Icon from '@/shared/ui/atoms/Icon.vue'
 
 const userStore = useUserStore()
 const { users, loading: isLoading, error: hasError } = storeToRefs(userStore)
@@ -15,33 +23,60 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-white py-10 px-2 md:px-4" style="background: #f8fafc url('data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='0' y='0' width='40' height='40' fill='none'/%3E%3Cpath d='M 40 0 L 0 0 0 40' stroke='%23e5e7eb' stroke-width='1'/%3E%3C/svg%3E'); background-size: 40px 40px; background-repeat: repeat;" >
-    <div class="max-w-6xl mx-auto">
-      <h1 class="text-3xl font-extrabold mb-10 text-gray-900">Пользователи</h1>
-      <!-- Skeleton loading -->
+  <!-- Градиентный фон на всю ширину и высоту окна -->
+  <div class="fixed inset-0 min-h-screen min-w-full bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 -z-10"></div>
+  <div class="relative z-10">
+    <div class="max-w-7xl mx-auto py-10 px-2 md:px-4 min-h-screen flex flex-col">
+      <!-- Breadcrumbs -->
+      <nav class="flex mb-6" aria-label="Breadcrumb">
+        <ol class="inline-flex items-center space-x-1 md:space-x-3">
+          <li>
+            <button
+              @click="$router.push('/')"
+              class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+            >
+              <Icon name="ArrowLeft" set="lucide" size="sm" />
+              На главную
+            </button>
+          </li>
+          <li aria-current="page">
+            <div class="inline-flex items-center gap-2">
+              <Icon name="ChevronRight" set="lucide" size="sm" class="text-gray-400" />
+              <span class="text-sm font-medium text-gray-500">Пользователи</span>
+            </div>
+          </li>
+        </ol>
+      </nav>
+
+      <!-- Хедер: заголовок -->
+      <div class="flex items-center gap-3 mb-8">
+        <Icon name="Users" set="lucide" size="lg" class="text-blue-600" />
+        <h1 class="text-3xl font-bold text-gray-900">Пользователи</h1>
+      </div>
+
+      <!-- Состояния -->
       <div v-if="isLoading" class="flex justify-center items-center py-16">
-        <Spinner />
+        <Spinner size="lg" />
       </div>
-      <!-- Error state -->
-      <div v-else-if="hasError" class="text-red-600 text-center mb-6 font-semibold">
-        Ошибка: {{ hasError.message || hasError }}
-      </div>
-      <!-- Empty state -->
-      <div v-else-if="users.length === 0" class="text-gray-400 text-center py-16 text-lg">Нет пользователей</div>
-      <!-- Production-сетка пользователей -->
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
-        <UserCard v-for="user in users" :key="user.id" :user="user" />
+      <ErrorState v-else-if="hasError" :message="hasError" @retry="userStore.loadUsers()" />
+      <EmptyState v-else-if="users.length === 0" title="Нет пользователей" description="Пользователи ещё не добавлены." />
+
+      <!-- Сетка пользователей -->
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-8">
+        <UserCard
+          v-for="user in users"
+          :key="user.id"
+          :user="user"
+        />
       </div>
     </div>
   </div>
 </template>
 
-<!--
-  Production-редизайн страницы пользователей:
-  - Белый фон, строгий крупный заголовок, максимальная читаемость.
-  - Сетка из атомарных карточек UserCard (адаптивно: 1/2/3 колонки).
-  - Skeleton loading, empty, error state — production-ready.
-  - Только Tailwind, никаких кастомных стилей.
-  - Подробные комментарии объясняют intent и архитектурную роль.
-  Edge-cases: если нет пользователей — empty state, если ошибка — error state.
+<!-- 
+  users-page.vue — только просмотр
+  - Градиентный фон, breadcrumbs, крупный заголовок
+  - Состояния: загрузка, ошибка, пусто
+  - Сетка карточек UserCard (адаптивно)
+  - Только Tailwind CSS, accessibility, подробные комментарии
 --> 

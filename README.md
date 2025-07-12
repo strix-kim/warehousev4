@@ -1,8 +1,9 @@
 # Warehouse v4 — Production-ready Vue 3 + Supabase
 
 ## Архитектура и структура
-- Feature-sliced: `src/app`, `src/pages`, `src/features`, `src/entities`, `src/shared`, `src/components`
+- Feature-sliced: `src/app`, `src/pages`, `src/features`, `src/entities`, `src/shared`
 - Production-стандарты: Vite, Pinia, Tailwind CSS v4, Supabase, RLS, RBAC
+- Весь UI строится на компонентах из `src/shared/ui` (UI Kit, атомарный дизайн)
 - Все бизнес-логика и доступ — только через сервисы/хуки, никаких прямых запросов из UI
 
 ## Роли пользователей
@@ -33,6 +34,7 @@
 - Подробные комментарии на русском языке во всех хуках, сервисах, компонентах
 - Все компоненты и хуки — только именованные экспорты
 - Строгая структура feature-sliced
+- Все UI-компоненты — только из `src/shared/ui` (atoms, molecules, organisms, templates)
 
 ## Чек-лист для тестирования (ручное и автоматическое)
 - [ ] CRUD для всех сущностей (users, equipments, events, mount_points, reports)

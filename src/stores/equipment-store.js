@@ -21,7 +21,7 @@ export const useEquipmentStore = defineStore('equipment', {
       location: ''
     },
     page: 1,
-    limit: 40,
+    limit: 30,
     total: 0,
   }),
 
@@ -85,12 +85,21 @@ export const useEquipmentStore = defineStore('equipment', {
       this.loading = true
       this.error = null
       try {
-        const { error } = await addEquipment(data)
-        if (error) throw error
+        const result = await addEquipment(data)
+        
+        if (result.error) {
+          this.error = result.error
+          return { success: false, error: result.error }
+        }
+        
+        // Перезагружаем список оборудования
         await this.loadEquipments()
+        
+        return { success: true, data: result.data }
       } catch (e) {
-        this.error = e.message || 'Ошибка добавления оборудования'
-        throw e
+        const errorMessage = e.message || 'Ошибка добавления оборудования'
+        this.error = errorMessage
+        return { success: false, error: errorMessage }
       } finally {
         this.loading = false
       }
@@ -103,12 +112,20 @@ export const useEquipmentStore = defineStore('equipment', {
       this.loading = true
       this.error = null
       try {
-        const { error } = await updateEquipment(id, updates)
-        if (error) throw error
+        const result = await updateEquipment(id, updates)
+        if (result.error) {
+          this.error = result.error
+          return { success: false, error: result.error }
+        }
+        
+        // Перезагружаем список оборудования
         await this.loadEquipments()
+        
+        return { success: true, data: result.data }
       } catch (e) {
-        this.error = e.message || 'Ошибка обновления оборудования'
-        throw e
+        const errorMessage = e.message || 'Ошибка обновления оборудования'
+        this.error = errorMessage
+        return { success: false, error: errorMessage }
       } finally {
         this.loading = false
       }

@@ -1,102 +1,268 @@
 <template>
   <!--
-    EventEditor.vue — production-ready модальное окно для добавления/редактирования мероприятия.
-    Использует Modal.vue, Button.vue, Spinner.vue, useUsers.js, eventApi.js.
-    Все поля, edge-cases, loading/error, glassmorphism, минимализм, адаптивность, accessibility.
+    EventEditor.vue — современное модальное окно для добавления/редактирования мероприятия
+    МИГРИРОВАНО: полностью переписан на Tailwind CSS, синяя цветовая схема
+    Архитектурная роль: форма редактирования мероприятий, интегрирована с дизайн-системой
+    Поддерживает: валидацию, loading состояния, accessibility, responsive design
   -->
-  <Modal v-model="modalValue" size="lg" :title="isEdit ? 'Редактировать мероприятие' : 'Создать мероприятие'">
-    <form @submit.prevent="handleSubmit" class="editor-form" autocomplete="off">
-      <div class="editor-fields">
-        <!-- Название -->
-        <div class="editor-field">
-          <label for="name">Название *</label>
-          <input id="name" v-model="form.name" required class="editor-input" placeholder="Название мероприятия" aria-label="Название мероприятия" />
+  <Modal 
+    v-model="modalValue" 
+    size="lg"
+  >
+    <template #header>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-lg">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="text-blue-600 stroke-current stroke-2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+          </svg>
         </div>
-        <!-- Организатор -->
-        <div class="editor-field">
-          <label for="organizer">Организатор *</label>
-          <input id="organizer" v-model="form.organizer" required class="editor-input" placeholder="Организатор" aria-label="Организатор" />
-        </div>
-        <!-- Локация -->
-        <div class="editor-field">
-          <label for="location">Локация *</label>
-          <input id="location" v-model="form.location" required class="editor-input" placeholder="Локация" aria-label="Локация" />
-        </div>
-        <!-- Дата начала мероприятия -->
-        <div class="editor-field">
-          <label for="start_date">Дата начала *</label>
-          <input id="start_date" v-model="form.start_date" type="date" required class="editor-input" aria-label="Дата начала мероприятия" />
-        </div>
-        <!-- Дата начала монтажа -->
-        <div class="editor-field">
-          <label for="setup_date">Дата начала монтажа</label>
-          <input id="setup_date" v-model="form.setup_date" type="date" class="editor-input" aria-label="Дата начала монтажа" />
-        </div>
-        <!-- Дата окончания мероприятия -->
-        <div class="editor-field">
-          <label for="end_date">Дата окончания</label>
-          <input id="end_date" v-model="form.end_date" type="date" class="editor-input" aria-label="Дата окончания мероприятия" />
-        </div>
-        <!-- Дата окончания демонтажа -->
-        <div class="editor-field">
-          <label for="teardown_date">Дата окончания демонтажа</label>
-          <input id="teardown_date" v-model="form.teardown_date" type="date" class="editor-input" aria-label="Дата окончания демонтажа" />
-        </div>
+        <h2 class="text-xl font-semibold text-gray-900 font-mono tracking-wide">
+          {{ isEdit ? 'Редактировать мероприятие' : 'Создать мероприятие' }}
+        </h2>
       </div>
-      <div class="editor-fields">
-        <!-- Описание -->
-        <div class="editor-field editor-field-wide">
-          <label for="description">Описание</label>
-          <textarea id="description" v-model="form.description" rows="2" class="editor-input" placeholder="Описание мероприятия" aria-label="Описание мероприятия"></textarea>
+    </template>
+
+    <template #default>
+      <form @submit.prevent="handleSubmit" class="space-y-6">
+        <!-- Основная информация -->
+        <div class="py-5 border-b border-gray-100">
+          <h3 class="text-base font-semibold text-gray-900 mb-4 font-mono tracking-wide">Основная информация</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Название мероприятия -->
+            <div class="md:col-span-2">
+              <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
+                Название мероприятия *
+              </label>
+              <input
+                id="name"
+                v-model="form.name"
+                required
+                type="text"
+                placeholder="Название мероприятия"
+                class="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 bg-white transition-colors duration-200 placeholder:text-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                aria-label="Название мероприятия"
+              />
+            </div>
+            
+            <!-- Организатор -->
+            <div>
+              <label for="organizer" class="block text-sm font-medium text-gray-700 mb-2">
+                Организатор *
+              </label>
+              <input
+                id="organizer"
+                v-model="form.organizer"
+                required
+                type="text"
+                placeholder="Название организации"
+                class="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 bg-white transition-colors duration-200 placeholder:text-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                aria-label="Организатор"
+              />
+            </div>
+            
+            <!-- Локация -->
+            <div>
+              <label for="location" class="block text-sm font-medium text-gray-700 mb-2">
+                Локация *
+              </label>
+              <input
+                id="location"
+                v-model="form.location"
+                required
+                type="text"
+                placeholder="Место проведения"
+                class="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 bg-white transition-colors duration-200 placeholder:text-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                aria-label="Локация"
+              />
+            </div>
+          </div>
         </div>
-        <!-- Техническое задание -->
-        <div class="editor-field editor-field-wide">
-          <label for="technical_task">Техническое задание</label>
-          <textarea id="technical_task" v-model="form.technical_task" rows="2" class="editor-input" placeholder="Техническое задание" aria-label="Техническое задание"></textarea>
+        
+        <!-- Календарный план -->
+        <div class="py-5 border-b border-gray-100">
+          <h3 class="text-base font-semibold text-gray-900 mb-4 font-mono tracking-wide">Календарный план</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Дата начала мероприятия -->
+            <div>
+              <label for="start_date" class="block text-sm font-medium text-gray-700 mb-2">
+                Дата начала мероприятия *
+              </label>
+              <input
+                id="start_date"
+                v-model="form.start_date"
+                required
+                type="date"
+                class="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 bg-white transition-colors duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                aria-label="Дата начала мероприятия"
+              />
+            </div>
+            
+            <!-- Дата окончания мероприятия -->
+            <div>
+              <label for="end_date" class="block text-sm font-medium text-gray-700 mb-2">
+                Дата окончания мероприятия
+              </label>
+              <input
+                id="end_date"
+                v-model="form.end_date"
+                type="date"
+                class="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 bg-white transition-colors duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                aria-label="Дата окончания мероприятия"
+              />
+            </div>
+            
+            <!-- Дата начала монтажа -->
+            <div>
+              <label for="setup_date" class="block text-sm font-medium text-gray-700 mb-2">
+                Дата начала монтажа
+              </label>
+              <input
+                id="setup_date"
+                v-model="form.setup_date"
+                type="date"
+                class="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 bg-white transition-colors duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                aria-label="Дата начала монтажа"
+              />
+              <p class="text-xs text-gray-500 mt-1">Когда начинается подготовка</p>
+            </div>
+            
+            <!-- Дата окончания демонтажа -->
+            <div>
+              <label for="teardown_date" class="block text-sm font-medium text-gray-700 mb-2">
+                Дата окончания демонтажа
+              </label>
+              <input
+                id="teardown_date"
+                v-model="form.teardown_date"
+                type="date"
+                class="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 bg-white transition-colors duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                aria-label="Дата окончания демонтажа"
+              />
+              <p class="text-xs text-gray-500 mt-1">Когда завершается разборка</p>
+            </div>
+          </div>
         </div>
-      </div>
-      <!-- Ответственные инженеры -->
-      <div class="editor-fields">
-        <div class="editor-field editor-field-wide">
-          <label>Ответственные инженеры</label>
-          <div class="editor-checkbox-list" role="group" aria-label="Ответственные инженеры">
-            <div v-if="isUsersLoading" class="editor-checkbox-loading"><Spinner /></div>
-            <div v-else class="editor-checkbox-scroll">
-              <label v-for="u in users" :key="u.id" class="editor-checkbox-item">
+        
+        <!-- Дополнительная информация -->
+        <div class="py-5 border-b border-gray-100">
+          <h3 class="text-base font-semibold text-gray-900 mb-4 font-mono tracking-wide">Дополнительная информация</h3>
+          <div class="space-y-4">
+            <!-- Описание -->
+            <div>
+              <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
+                Описание мероприятия
+              </label>
+              <textarea
+                id="description"
+                v-model="form.description"
+                rows="3"
+                placeholder="Краткое описание мероприятия, его цели и особенности..."
+                class="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm leading-relaxed text-gray-900 bg-white transition-colors duration-200 resize-vertical placeholder:text-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                aria-label="Описание мероприятия"
+              ></textarea>
+            </div>
+            
+            <!-- Техническое задание -->
+            <div>
+              <label for="technical_task" class="block text-sm font-medium text-gray-700 mb-2">
+                Техническое задание
+              </label>
+              <textarea
+                id="technical_task"
+                v-model="form.technical_task"
+                rows="4"
+                placeholder="Технические требования, особенности оборудования, требования к звуку, видео..."
+                class="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm leading-relaxed text-gray-900 bg-white transition-colors duration-200 resize-vertical placeholder:text-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                aria-label="Техническое задание"
+              ></textarea>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Ответственные инженеры -->
+        <div class="py-5">
+          <h3 class="text-base font-semibold text-gray-900 mb-4 font-mono tracking-wide">Ответственные инженеры</h3>
+          <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <div v-if="isUsersLoading" class="flex items-center justify-center py-8">
+              <Spinner class="h-6 w-6 text-blue-600" />
+              <span class="ml-2 text-gray-600">Загрузка списка инженеров...</span>
+            </div>
+            <div v-else-if="users.length === 0" class="text-center py-8 text-gray-500">
+              Список инженеров пуст
+            </div>
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
+              <label 
+                v-for="user in users" 
+                :key="user.id"
+                class="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg cursor-pointer transition-colors duration-200 hover:border-blue-500 hover:shadow-sm"
+              >
                 <input
                   type="checkbox"
-                  :value="u.id"
+                  :value="user.id"
                   v-model="form.responsible_engineers"
-                  class="editor-checkbox"
-                  :aria-label="`Инженер ${u.name}`"
+                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  :aria-label="`Инженер ${user.name}`"
                 />
-                <span>{{ u.name }} <span class="editor-checkbox-role">({{ u.role }})</span></span>
+                <div class="flex-1 min-w-0">
+                  <span class="text-sm font-medium text-gray-900">{{ user.name }}</span>
+                  <span class="text-xs text-gray-500 ml-2">({{ user.role }})</span>
+                </div>
               </label>
             </div>
           </div>
         </div>
-      </div>
-      <div v-if="hasError" class="editor-error">{{ hasError }}</div>
-      <div class="editor-actions">
-        <Button type="button" @click="onClose" class="editor-btn secondary">Отмена</Button>
-        <Button type="submit" :disabled="isLoading" class="editor-btn">
-          <span v-if="isLoading" class="editor-btn-spinner"></span>
-          {{ isEdit ? 'Сохранить' : 'Создать' }}
-        </Button>
-      </div>
-    </form>
+        
+        <!-- Ошибка -->
+        <div v-if="hasError" class="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span class="text-sm font-medium text-red-800">{{ hasError }}</span>
+          </div>
+        </div>
+        
+        <!-- Действия -->
+        <div class="flex flex-col sm:flex-row gap-3 justify-end pt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            size="lg"
+            @click="onClose"
+            class="sm:w-auto w-full"
+          >
+            Отмена
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            :loading="isLoading"
+            :disabled="isLoading"
+            class="sm:w-auto w-full"
+          >
+            {{ isEdit ? 'Сохранить изменения' : 'Создать мероприятие' }}
+          </Button>
+        </div>
+      </form>
+    </template>
   </Modal>
 </template>
 
 <script setup>
-// EventEditor.vue — production-ready форма для добавления/редактирования мероприятия
-// Все бизнес-правила, edge-cases, loading/error, ролевые ограничения, подробные комментарии
+/**
+ * EventEditor — современная форма для добавления/редактирования мероприятия
+ * МИГРИРОВАНО: полностью переписан на Tailwind CSS с синей цветовой схемой
+ * Все бизнес-правила, edge-cases, loading/error, ролевые ограничения, подробные комментарии
+ */
 import { ref, computed, watch, defineEmits, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user-store'
 import { storeToRefs } from 'pinia'
-import Button from '@/components/Button.vue'
-import Spinner from '@/components/Spinner.vue'
-import Modal from '@/components/Modal.vue'
+import Button from '@/shared/ui/atoms/Button.vue'
+import Spinner from '@/shared/ui/atoms/Spinner.vue'
+import Modal from '@/shared/ui/molecules/Modal.vue'
 import { addEvent, updateEvent } from './eventApi'
 
 // Пропсы: event (для редактирования), visible (v-model), onSubmit, onClose
@@ -172,6 +338,24 @@ function validate() {
   return null
 }
 
+/**
+ * Подготавливает данные формы для отправки в API
+ * Очищает пустые строки для полей дат, чтобы избежать ошибок PostgreSQL
+ */
+function prepareFormData() {
+  const data = { ...form.value }
+  
+  // Очищаем пустые строки для полей дат - PostgreSQL не принимает пустые строки для типа date
+  const dateFields = ['setup_date', 'start_date', 'end_date', 'teardown_date']
+  dateFields.forEach(field => {
+    if (data[field] === '') {
+      data[field] = null
+    }
+  })
+  
+  return data
+}
+
 async function handleSubmit() {
   const err = validate()
   if (err) {
@@ -181,10 +365,11 @@ async function handleSubmit() {
   isLoading.value = true
   hasError.value = null
   try {
+    const formData = prepareFormData()
     if (isEdit.value) {
-      await updateEvent(props.event.id, { ...form.value })
+      await updateEvent(props.event.id, formData)
     } else {
-      await addEvent({ ...form.value })
+      await addEvent(formData)
     }
     if (props.onSubmit) props.onSubmit()
   } catch (e) {
@@ -193,207 +378,4 @@ async function handleSubmit() {
     isLoading.value = false
   }
 }
-</script>
-
-<style scoped>
-/*
-  editor-form, editor-input, editor-btn, editor-title, editor-field, editor-error, editor-actions — production-ready UI для модального окна EventEditor.
-  Чистый CSS, без Tailwind-утилит. Единый стиль с EquipmentEditor, фирменный tech/minimal, адаптивность, accessibility.
-*/
-.editor-form {
-  width: 100%;
-  margin: 0 auto;
-  padding: 32px 24px 24px 24px;
-  background: rgba(255,255,255,0.98);
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  box-shadow: 0 4px 32px 0 rgba(16,16,16,0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  overflow-y: auto;
-  max-height: 70vh;
-  color: #1f2937;
-  font-family: 'JetBrains Mono', monospace;
-}
-.editor-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px 24px;
-  margin-bottom: 0;
-}
-.editor-field {
-  flex: 1 1 220px;
-  min-width: 180px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.editor-field-wide {
-  flex: 1 1 100%;
-  min-width: 100%;
-}
-.editor-input {
-  height: 44px;
-  min-height: 44px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.95);
-  font-size: 16px;
-  font-family: 'JetBrains Mono', monospace;
-  padding: 0 16px;
-  transition: box-shadow 0.2s, border-color 0.2s;
-  color: #1f2937;
-  outline: none;
-  resize: none;
-}
-.editor-input:focus {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 2px #fecaca;
-}
-.editor-input:disabled {
-  opacity: 0.5;
-  background: #f3f4f6;
-  color: #9ca3af;
-  cursor: not-allowed;
-}
-.editor-input[rows] {
-  /* Увеличено вертикальное пространство для textarea (Описание, Техническое задание) */
-  height: auto;
-  min-height: 140px;
-  padding-top: 18px;
-  padding-bottom: 18px;
-}
-.editor-checkbox-list {
-  margin-top: 2px;
-  max-width: 100%;
-}
-.editor-checkbox-scroll {
-  /* Увеличено пространство для списка инженеров */
-  max-height: 260px;
-  overflow-y: auto;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  background: #fafbfc;
-  padding: 18px 16px;
-}
-.editor-checkbox-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  margin-bottom: 4px;
-  cursor: pointer;
-  user-select: none;
-}
-.editor-checkbox-role {
-  color: #9ca3af;
-  font-size: 13px;
-}
-.editor-checkbox {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  border: 1.5px solid #e5e7eb;
-  accent-color: #ef4444;
-  transition: border-color 0.2s;
-}
-.editor-checkbox:focus {
-  border-color: #ef4444;
-  outline: 2px solid #fecaca;
-}
-.editor-checkbox-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 48px;
-}
-.editor-error {
-  color: #ef4444;
-  text-align: center;
-  font-weight: 600;
-  margin: 10px 0 0 0;
-  font-size: 15px;
-}
-.editor-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-top: 28px;
-  flex-wrap: wrap;
-}
-.editor-btn {
-  height: 44px;
-  min-width: 120px;
-  border-radius: 8px;
-  font-size: 16px;
-  font-family: 'JetBrains Mono', monospace;
-  background: #ef4444;
-  color: #fff;
-  border: none;
-  transition: background 0.2s;
-  cursor: pointer;
-  padding: 0 28px;
-  font-weight: 600;
-  box-shadow: 0 1px 4px 0 rgba(16,16,16,0.04);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-.editor-btn:hover {
-  background: #dc2626;
-}
-.editor-btn.secondary {
-  background: #f3f4f6;
-  color: #1f2937;
-}
-.editor-btn.secondary:hover {
-  background: #e5e7eb;
-}
-.editor-btn-spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid #fff;
-  border-top: 2px solid #ef4444;
-  border-radius: 50%;
-  margin-right: 10px;
-  animation: spin 0.7s linear infinite;
-  display: inline-block;
-}
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-@media (max-width: 700px) {
-  .editor-form {
-    max-width: 98vw;
-    padding: 18px 6vw 18px 6vw;
-  }
-  .editor-fields {
-    gap: 14px 0;
-  }
-  .editor-field, .editor-field-wide {
-    min-width: 100%;
-    flex: 1 1 100%;
-  }
-  .editor-actions {
-    flex-direction: column;
-    gap: 10px;
-    align-items: stretch;
-  }
-  .editor-btn, .editor-btn.secondary {
-    width: 100%;
-    min-width: 0;
-  }
-}
-</style>
-
-<!--
-  Production-ready EventEditor.vue:
-  - Все поля схемы, edge-cases, loading/error, адаптивность, glassmorphism
-  - Использует Modal.vue, Button.vue, Spinner.vue, useUsers.js, eventApi.js
-  - Не делает прямых запросов к Supabase, только через сервис
-  - Поддержка ответственных инженеров, валидация, подробные комментарии
-  - Ролевые ограничения реализуются на уровне родителя/хука
---> 
+</script> 

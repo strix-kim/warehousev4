@@ -1,178 +1,199 @@
 goal: >
-  Полное покрытие UI-состояний всех ключевых экранов и edge-cases (ошибки, offline, RLS, stale, forbidden), согласовано с архитектурой и ролями.
+  Полное покрытие UI-состояний всех ключевых экранов и edge-cases (ошибки, offline, RLS, stale, forbidden), согласовано с текущей архитектурой проекта.
 context:
   screens:
-    - LoginForm
-    - EquipmentTable
-    - EquipmentEditor
-    - EventList
-    - EventDetails
-    - EventForm
-    - MountPointCard
-    - MountPointEditor
-    - ReportsList
-    - ReportViewer
-    - UserProfile
-    - UserList
+    - login-page
+    - equipment-page (EquipmentTable + EquipmentDetailsModal)
+    - events-page (EventList + EventTabs + EventGrid)
+    - event-details-page (EventDetails)
+    - mount-point-create-page
+    - mount-point-details-page
+    - reports-page
+    - report-details-page
+    - users-page
+    - home-page
+  components:
+    shared_ui:
+      atoms: [Button, Icon, Input, Spinner]
+      molecules: [Card, FormField, Modal, TableRow]
+      organisms: [Navbar, Table, UserCard]
+      templates: [EmptyState, ErrorState, ForbiddenState, Layout, OfflineState]
+    features:
+      equipment: [EquipmentTable, EquipmentDetailsModal, EquipmentFormModal, EquipmentFilters, EquipmentSearchInput]
+      event: [EventList, EventDetails, EventEditor, EventFormModal, EventTabs, EventGrid, EventCard]
 ui_states: |-
-  # UI States Coverage Map
+  # UI States Coverage Map - Обновлено для warehousev4
 
-  ## 1. LoginForm.vue
+  ## 1. login-page.vue
 
   | Screen     | State      | Trigger                   | UI/Description                                 | User Actions               |
   |------------|------------|---------------------------|------------------------------------------------|----------------------------|
-  | LoginForm  | Idle       | Открытие страницы         | Форма логина                                   | Ввести email/пароль, Войти |
-  | LoginForm  | Loading    | submit /auth/login        | Кнопка disabled, спиннер                       | -                          |
-  | LoginForm  | Error401   | 401 от /auth/login        | “Неверный логин или пароль” (баннер)           | Повторить попытку          |
-  | LoginForm  | Error500   | 500 от /auth/login        | “Ошибка сервера” (баннер)                      | Повторить попытку          |
-  | LoginForm  | Success    | 200 OK                    | Редирект на Dashboard                          | -                          |
-  | LoginForm  | Offline    | Нет сети                  | “Нет соединения”, disabled actions              | -                          |
+  | LoginPage  | Idle       | Открытие страницы         | Форма логина                                   | Ввести email/пароль, Войти |
+  | LoginPage  | Loading    | submit /auth/login        | Button с loading state, Spinner                | -                          |
+  | LoginPage  | Error401   | 401 от /auth/login        | "Неверный логин или пароль" (ErrorState)       | Повторить попытку          |
+  | LoginPage  | Error500   | 500 от /auth/login        | "Ошибка сервера" (ErrorState)                  | Retry кнопка               |
+  | LoginPage  | Success    | 200 OK                    | Редирект на /equipment                         | -                          |
+  | LoginPage  | Offline    | Нет сети                  | OfflineState компонент                         | -                          |
 
   ---
 
-  ## 2. EquipmentPage.vue / EquipmentTable.vue
+  ## 2. equipment-page.vue + EquipmentTable.vue
 
   | Screen        | State         | Trigger                          | UI/Description                                | User Actions                           |
   |---------------|--------------|-----------------------------------|-----------------------------------------------|----------------------------------------|
-  | EquipmentList | Loading      | GET /equipment (pending)          | Skeleton-строки, спиннер                      | -                                      |
-  | EquipmentList | Ready        | 200 OK, items > 0                 | Таблица оборудования, фильтры                  | Редактировать, распределить, удалить*  |
-  | EquipmentList | Empty        | 200 OK, []                        | “Нет оборудования” + иконка                   | Добавить (если admin, manager)         |
-  | EquipmentList | Error500     | 500 от /equipment                 | Красный баннер, кнопка Retry                  | Retry                                  |
-  | EquipmentList | Forbidden    | 403 (RLS/RBAC)                    | “Нет доступа”, заблокировать UI               | Войти/сменить пользователя             |
-  | EquipmentList | Offline      | Нет сети                          | “Нет соединения”, кешированная таблица        | -                                      |
-  | EquipmentList | Stale        | Устаревшие данные                 | Баннер: “Показаны устаревшие данные”          | Обновить                               |
-  | EquipmentList | NoPermission | Нет доступа по роли               | Серый баннер: “Ограничен функционал”          | -                                      |
-
-  *Удаление — только для manager, admin.
+  | EquipmentPage | Loading      | GET /equipments (pending)         | Spinner, skeleton rows в Table                | -                                      |
+  | EquipmentPage | Ready        | 200 OK, items > 0                 | EquipmentTable + EquipmentFilters             | Просмотр, редактирование, создание    |
+  | EquipmentPage | Empty        | 200 OK, []                        | EmptyState с "Добавить оборудование"          | Создать (если manager/admin)           |
+  | EquipmentPage | Error500     | 500 от /equipments                | ErrorState с Retry кнопкой                    | Retry                                  |
+  | EquipmentPage | Forbidden    | 403 (RLS/RBAC)                    | ForbiddenState                                | Войти/сменить пользователя             |
+  | EquipmentPage | Offline      | Нет сети                          | OfflineState                                  | -                                      |
+  | EquipmentPage | Stale        | Устаревшие данные                 | Баннер: "Показаны устаревшие данные"          | Обновить                               |
 
   ---
 
-  ## 3. EquipmentEditor.vue
+  ## 3. EquipmentDetailsModal.vue
 
   | Screen            | State      | Trigger                      | UI/Description                                | User Actions                 |
   |-------------------|------------|------------------------------|-----------------------------------------------|------------------------------|
-  | EquipmentEditor   | Idle       | Открытие формы               | Форма для ввода/редактирования                | Заполнить, сохранить, отменить|
-  | EquipmentEditor   | Loading    | submit (pending)             | Disabled кнопки, спиннер                      | -                            |
-  | EquipmentEditor   | Success    | 200 OK (save)                | “Сохранено” (баннер)                          | Закрыть, вернуться к списку  |
-  | EquipmentEditor   | Error400   | Ошибка валидации             | Подсветка полей, сообщения                    | Исправить                    |
-  | EquipmentEditor   | Error500   | 500 от API                   | Красный баннер, Retry                         | Retry, отменить              |
-  | EquipmentEditor   | Forbidden  | 403 (RBAC)                   | “Нет доступа”                                 | Войти/сменить пользователя   |
-  | EquipmentEditor   | Offline    | Нет сети                     | “Изменения не сохранены” (баннер)             | Сохранить локально (если возможно) |
+  | EquipmentModal    | Loading    | Открытие модального окна     | Spinner в Modal                               | -                            |
+  | EquipmentModal    | Ready      | Данные загружены             | Детали оборудования, кнопки действий          | Редактировать, закрыть       |
+  | EquipmentModal    | Error404   | Оборудование не найдено      | ErrorState в Modal                            | Закрыть                      |
+  | EquipmentModal    | Forbidden  | 403 (RBAC)                   | ForbiddenState в Modal                        | Закрыть                      |
 
   ---
 
-  ## 4. EventsPage.vue / EventList.vue
+  ## 4. events-page.vue + EventList.vue + EventGrid.vue
 
   | Screen      | State       | Trigger                       | UI/Description                                   | User Actions              |
   |-------------|-------------|-------------------------------|--------------------------------------------------|---------------------------|
-  | EventList   | Loading     | GET /events (pending)         | Skeleton-строки, спиннер                         | -                         |
-  | EventList   | Ready       | 200 OK, events > 0            | Список мероприятий, фильтры                      | Открыть, редактировать    |
-  | EventList   | Empty       | 200 OK, []                    | “Нет мероприятий”, иконка                        | Добавить (если разрешено) |
-  | EventList   | Error500    | 500 от API                    | Красный баннер, Retry                            | Retry                     |
-  | EventList   | Forbidden   | 403 (RBAC/RLS)                | “Нет доступа”, блокировка UI                     | Войти/сменить пользователя|
-  | EventList   | Offline     | Нет сети                      | Оффлайн-режим                                    | -                         |
-  | EventList   | Stale       | Данные не обновились          | “Показаны устаревшие данные” (баннер)            | Обновить                  |
+  | EventsPage  | Loading     | GET /events (pending)         | Spinner, skeleton cards в EventGrid             | -                         |
+  | EventsPage  | Ready       | 200 OK, events > 0            | EventTabs + EventGrid с EventCard               | Просмотр, создание        |
+  | EventsPage  | Empty       | 200 OK, []                    | EmptyState с "Создать мероприятие"              | Создать (если разрешено)  |
+  | EventsPage  | Error500    | 500 от API                    | ErrorState с Retry                              | Retry                     |
+  | EventsPage  | Forbidden   | 403 (RBAC/RLS)                | ForbiddenState                                  | Войти/сменить пользователя|
+  | EventsPage  | Offline     | Нет сети                      | OfflineState                                    | -                         |
+  | EventsPage  | Stale       | Данные не обновились          | "Показаны устаревшие данные" (баннер)           | Обновить                  |
 
   ---
 
-  ## 5. EventDetailsPage.vue
+  ## 5. EventDetails.vue
 
   | Screen         | State     | Trigger                        | UI/Description                                      | User Actions                  |
   |----------------|-----------|------------------------------- |-----------------------------------------------------|-------------------------------|
-  | EventDetails   | Loading   | GET /events/:id (pending)      | Skeleton-карточки, спиннер                          | -                             |
-  | EventDetails   | Ready     | 200 OK                         | Карточка события, точки монтажа                     | Редактировать (по роли), отчёты|
-  | EventDetails   | Error404  | 404                            | “Мероприятие не найдено”                            | Вернуться к списку            |
-  | EventDetails   | Error500  | 500                            | “Ошибка сервера” (баннер)                           | Retry                         |
-  | EventDetails   | Forbidden | 403 (RBAC/RLS)                 | “Нет доступа”, блокировка                           | Войти/сменить пользователя    |
-  | EventDetails   | Offline   | Нет сети                       | Кешированная карточка, “Нет соединения”             | -                             |
+  | EventDetails   | Loading   | GET /events/:id (pending)      | Spinner, skeleton карточки                          | -                             |
+  | EventDetails   | Ready     | 200 OK                         | Полная карточка события, точки монтажа              | Редактировать, архивировать   |
+  | EventDetails   | Error404  | 404                            | ErrorState "Мероприятие не найдено"                | Вернуться к списку            |
+  | EventDetails   | Error500  | 500                            | ErrorState с Retry                                  | Retry                         |
+  | EventDetails   | Forbidden | 403 (RBAC/RLS)                 | ForbiddenState                                      | Войти/сменить пользователя    |
+  | EventDetails   | Offline   | Нет сети                       | OfflineState                                        | -                             |
 
   ---
 
-  ## 6. EventForm.vue
+  ## 6. EventFormModal.vue
 
   | Screen      | State      | Trigger                        | UI/Description                                  | User Actions                  |
   |-------------|------------|------------------------------- |-------------------------------------------------|-------------------------------|
-  | EventForm   | Idle       | Открытие формы                 | Форма создания/редактирования                   | Заполнить, сохранить, отменить|
-  | EventForm   | Loading    | submit (pending)               | Disabled кнопки, спиннер                        | -                             |
-  | EventForm   | Error400   | Ошибка валидации               | Подсветка ошибок, сообщения                     | Исправить                     |
-  | EventForm   | Error500   | 500 от API                     | Красный баннер, Retry                           | Retry, отменить               |
-  | EventForm   | Success    | 200 OK (save)                  | “Мероприятие сохранено”                         | Закрыть, вернуться            |
-  | EventForm   | Forbidden  | 403 (RBAC/RLS)                 | “Нет доступа”                                   | Войти/сменить пользователя    |
-  | EventForm   | Offline    | Нет сети                       | “Изменения не сохранены” (баннер)               | Сохранить локально            |
+  | EventForm   | Idle       | Открытие Modal                 | Форма создания/редактирования в Modal          | Заполнить, сохранить, отменить|
+  | EventForm   | Loading    | submit (pending)               | Button с loading, disabled поля                 | -                             |
+  | EventForm   | Error400   | Ошибка валидации               | Подсветка ошибок в FormField                   | Исправить                     |
+  | EventForm   | Error500   | 500 от API                     | ErrorState в Modal                              | Retry, отменить               |
+  | EventForm   | Success    | 200 OK (save)                  | Modal закрывается, обновляется список           | -                             |
+  | EventForm   | Forbidden  | 403 (RBAC/RLS)                 | ForbiddenState в Modal                          | Закрыть                       |
 
   ---
 
-  ## 7. MountPointCard.vue / MountPointEditor.vue
+  ## 7. mount-point-create-page.vue
 
   | Screen             | State      | Trigger                        | UI/Description                                  | User Actions                     |
   |--------------------|------------|------------------------------- |-------------------------------------------------|----------------------------------|
-  | MountPointList     | Loading    | GET /mount-points (pending)    | Skeleton-список, спиннер                        | -                                |
-  | MountPointList     | Ready      | 200 OK, mount points > 0       | Список/карточки точек монтажа                   | Открыть, редактировать           |
-  | MountPointList     | Empty      | 200 OK, []                     | “Нет точек монтажа”, иконка                     | Добавить (если по роли)          |
-  | MountPointList     | Error500   | 500 от API                     | “Ошибка сервера” (баннер), Retry                | Retry                            |
-  | MountPointList     | Forbidden  | 403 (RBAC/RLS)                 | “Нет доступа”                                   | Войти/сменить пользователя       |
-  | MountPointList     | Offline    | Нет сети                       | Оффлайн, “Нет соединения”                       | -                                |
+  | MountPointCreate   | Loading    | GET event info (pending)       | Spinner на странице                             | -                                |
+  | MountPointCreate   | Ready      | Event загружен                 | Форма создания точки монтажа                    | Заполнить, сохранить             |
+  | MountPointCreate   | Error404   | Event не найден                | ErrorState с кнопкой "К списку"                 | Вернуться к events               |
+  | MountPointCreate   | Forbidden  | 403 (RBAC/RLS)                 | ForbiddenState                                  | Войти/сменить пользователя       |
 
   ---
 
-  ## 8. ReportsPage.vue / ReportViewer.vue
+  ## 8. mount-point-details-page.vue
+
+  | Screen             | State      | Trigger                        | UI/Description                                  | User Actions                     |
+  |--------------------|------------|------------------------------- |-------------------------------------------------|----------------------------------|
+  | MountPointDetails  | Loading    | GET mount-point (pending)      | Spinner на странице                             | -                                |
+  | MountPointDetails  | Ready      | Данные загружены               | Детали точки, список оборудования               | Редактировать, добавить технику  |
+  | MountPointDetails  | Error404   | Точка не найдена               | ErrorState                                      | Вернуться к событию              |
+  | MountPointDetails  | Forbidden  | 403 (RBAC/RLS)                 | ForbiddenState                                  | Войти/сменить пользователя       |
+
+  ---
+
+  ## 9. reports-page.vue
 
   | Screen         | State      | Trigger                        | UI/Description                                 | User Actions                    |
   |----------------|------------|------------------------------- |------------------------------------------------|---------------------------------|
-  | ReportsList    | Loading    | GET /reports (pending)         | Skeleton-список, спиннер                       | -                               |
-  | ReportsList    | Ready      | 200 OK, reports > 0            | Список отчётов                                 | Открыть                         |
-  | ReportsList    | Empty      | 200 OK, []                     | “Нет отчётов”                                  | -                               |
-  | ReportsList    | Error500   | 500 от API                     | “Ошибка сервера” (баннер)                      | Retry                           |
-  | ReportsList    | Forbidden  | 403 (RBAC/RLS)                 | “Нет доступа”                                  | Войти/сменить пользователя      |
-  | ReportsList    | Offline    | Нет сети                       | Оффлайн, “Нет соединения”                       | -                               |
-  | ReportViewer   | Loading    | GET /reports/:id (pending)     | Skeleton, спиннер                              | -                               |
-  | ReportViewer   | Ready      | 200 OK                         | Превью отчёта, “Скачать PDF”                   | Скачать, вернуться к списку     |
-  | ReportViewer   | Error404   | 404                            | “Отчёт не найден”                              | Вернуться к списку              |
-  | ReportViewer   | Error500   | 500 от API                     | “Ошибка сервера” (баннер), Retry               | Retry                           |
-  | ReportViewer   | Forbidden  | 403 (RBAC/RLS)                 | “Нет доступа”                                  | Войти/сменить пользователя      |
-  | ReportViewer   | Offline    | Нет сети                       | “Нет соединения”                               | -                               |
+  | ReportsPage    | Loading    | GET /reports (pending)         | Spinner, skeleton список                       | -                               |
+  | ReportsPage    | Ready      | 200 OK, reports > 0            | Table с отчётами                               | Открыть, скачать               |
+  | ReportsPage    | Empty      | 200 OK, []                     | EmptyState "Нет отчётов"                       | -                               |
+  | ReportsPage    | Error500   | 500 от API                     | ErrorState с Retry                             | Retry                           |
+  | ReportsPage    | Forbidden  | 403 (RBAC/RLS)                 | ForbiddenState                                 | Войти/сменить пользователя      |
+  | ReportsPage    | Offline    | Нет сети                       | OfflineState                                   | -                               |
 
   ---
 
-  ## 9. UserProfilePage.vue / UserProfile.vue
-
-  | Screen       | State      | Trigger                     | UI/Description                                | User Actions               |
-  |--------------|------------|-----------------------------|-----------------------------------------------|----------------------------|
-  | UserProfile  | Loading    | GET /users/me (pending)     | Skeleton-профиль, спиннер                     | -                          |
-  | UserProfile  | Ready      | 200 OK                      | Карточка профиля, список смен                 | Редактировать (по роли)    |
-  | UserProfile  | Error500   | 500 от API                  | “Ошибка сервера” (баннер)                     | Retry                      |
-  | UserProfile  | Forbidden  | 403 (RBAC/RLS)              | “Нет доступа”                                 | Войти/сменить пользователя |
-  | UserProfile  | Offline    | Нет сети                    | Оффлайн-профиль, “Нет соединения”             | -                          |
-
-  ---
-
-  ## 10. UserList.vue
+  ## 10. users-page.vue
 
   | Screen    | State      | Trigger                     | UI/Description                                 | User Actions                       |
   |-----------|------------|-----------------------------|------------------------------------------------|------------------------------------|
-  | UserList  | Loading    | GET /users (pending)        | Skeleton-таблица, спиннер                      | -                                  |
-  | UserList  | Ready      | 200 OK, users > 0           | Таблица пользователей, фильтры                  | Добавить, редактировать, удалить   |
-  | UserList  | Empty      | 200 OK, []                  | “Нет пользователей”                            | Добавить                          |
-  | UserList  | Error500   | 500 от API                  | “Ошибка сервера” (баннер)                      | Retry                              |
-  | UserList  | Forbidden  | 403 (RBAC/RLS)              | “Нет доступа”                                  | Войти/сменить пользователя         |
-  | UserList  | Offline    | Нет сети                    | Оффлайн, “Нет соединения”                      | -                                  |
+  | UsersPage | Loading    | GET /users (pending)        | Spinner, skeleton Table                        | -                                  |
+  | UsersPage | Ready      | 200 OK, users > 0           | Table пользователей                            | Добавить, редактировать, удалить   |
+  | UsersPage | Empty      | 200 OK, []                  | EmptyState "Нет пользователей"                 | Добавить (если admin)             |
+  | UsersPage | Error500   | 500 от API                  | ErrorState с Retry                             | Retry                              |
+  | UsersPage | Forbidden  | 403 (RBAC/RLS)              | ForbiddenState                                 | Войти/сменить пользователя         |
+  | UsersPage | Offline    | Нет сети                    | OfflineState                                   | -                                  |
+
+  ---
+
+  ## 11. home-page.vue
+
+  | Screen    | State      | Trigger                     | UI/Description                                 | User Actions                       |
+  |-----------|------------|-----------------------------|------------------------------------------------|------------------------------------|
+  | HomePage  | Loading    | GET dashboard data          | Spinner, skeleton cards                        | -                                  |
+  | HomePage  | Ready      | Данные загружены            | Дашборд с метриками и быстрыми действиями      | Навигация по разделам              |
+  | HomePage  | Offline    | Нет сети                    | OfflineState                                   | -                                  |
 
   ---
 
   ## Edge-cases & Общие состояния
 
-  - **Race-condition:** Изменения устарели — “Изменения устарели, обновите страницу”.
-  - **Session expired:** “Сессия истекла” — переход на Login.
-  - **Permission denied:** Disabled actions, поясняющий баннер.
-  - **Pending:** Долгие операции — индикатор прогресса.
-  - **Mobile:** Лаконичные empty/error/loader, адаптивность.
+  - **Race-condition:** Изменения устарели — "Изменения устарели, обновите страницу" (stale state).
+  - **Session expired (401):** Автоматический редирект на login-page.
+  - **Permission denied (403):** ForbiddenState компонент с объяснением.
+  - **Pending operations:** Button с loading состоянием, Spinner для длительных операций.
+  - **Network offline:** OfflineState компонент для всех страниц.
+  - **Validation errors:** Подсветка полей в FormField компонентах.
 
   ---
 
-  ## Ролевые ограничения
+  ## Ролевые ограничения (в UI компонентах)
 
-  - **video_engineer:** Нет доступа к удалению оборудования/пользователей.
-  - **technician:** Нет удаления оборудования.
-  - **manager:** Может удалять оборудование.
-  - **admin:** Все функции и пользователи.
+  - **video_engineer:** Видит кнопки создания/редактирования мероприятий, но НЕ видит удаление оборудования.
+  - **technician:** Видит кнопки создания оборудования, но НЕ видит удаление.
+  - **manager:** Видит кнопки удаления оборудования.
+  - **admin:** Видит все функции + управление пользователями.
+
+  Все ограничения дублируются на уровне RLS политик в Supabase.
+
+  ---
+
+  ## Компоненты UI для реализации состояний
+
+  ### Shared UI Templates:
+  - **EmptyState.vue** — пустые состояния с иконкой и CTA
+  - **ErrorState.vue** — ошибки с Retry кнопкой
+  - **ForbiddenState.vue** — нет доступа (403)
+  - **OfflineState.vue** — работа без интернета
+  - **Layout.vue** — общий layout с Navbar
+
+  ### Shared UI Atoms/Molecules:
+  - **Button.vue** — поддержка loading состояния
+  - **Spinner.vue** — индикаторы загрузки
+  - **Modal.vue** — модальные окна для форм
+  - **FormField.vue** — поля форм с валидацией
 attention: []

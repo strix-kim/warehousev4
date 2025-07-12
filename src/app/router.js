@@ -46,15 +46,13 @@ export const routes = [
     path: '/events/:id',
     name: 'event-details',
     component: EventDetails,
-    // Детали мероприятия
-  },
-  {
-    path: '/events/:eventId/mount-point/create',
-    component: () => import('@/pages/mount-point-create-page.vue'),
+    // Детали мероприятия (включает создание точек монтажа)
   },
   {
     path: '/mount-point/:id',
+    name: 'mount-point-details',
     component: () => import('@/pages/mount-point-details-page.vue'),
+    // Детали точки монтажа
   },
   {
     path: '/reports',

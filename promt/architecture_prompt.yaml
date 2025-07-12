@@ -7,32 +7,97 @@ context:
     - technician: работает с техникой, управляет мероприятиями (без удаления)
     - manager: полный доступ, включая удаление оборудования
     - admin: администрирование пользователей и ролей, все права
-  entities: [users, equipment, event, mount_point, report]
+  entities: [users, equipments, events, mount_points, reports]
+  
 architecture:
+  tech_stack:
+    frontend:
+      - Vue 3.5.17 (Composition API, script setup)
+      - Vite 7.0.0 (сборщик и dev-сервер)
+      - Vue Router 4.5.1 (маршрутизация)
+      - Pinia 3.0.3 (управление состоянием)
+      - Tailwind CSS 4.1.11 (стилизация)
+    backend:
+      - Supabase (Backend-as-a-Service)
+      - PostgreSQL (основная база данных)
+      - Row Level Security (RLS)
+      - Supabase Auth (аутентификация)
+    tools:
+      - ESLint 9.30.1 + Prettier 3.6.2 (качество кода)
+      - Vitest 3.2.4 (тестирование)
+      - lodash-es 4.17.21 + uuid 11.1.0 (утилиты)
+
   modules:
-    - auth: LoginForm.vue, useAuth.js, authApi.js
-    - equipment: EquipmentTable.vue, EquipmentEditor.vue, useEquipmentList.js, equipmentApi.js
-    - event: EventForm.vue, EventList.vue, useEventFlow.js, eventApi.js
-    - mountPoint: MountPointEditor.vue, MountPointCard.vue, useMountPoints.js, mountPointApi.js
-    - report: ReportViewer.vue, reportApi.js
-    - user: UserProfile.vue, UserList.vue, userApi.js
-    - shared: Button.vue, Modal.vue, Table.vue, Input.vue, DatePicker.vue, utils, httpClient.js
-  api:
-    - POST   /auth/login
-    - GET    /users/me
-    - GET    /users
-    - PATCH  /users/:id
-    - GET    /equipment
-    - POST   /equipment
-    - PATCH  /equipment/:id
-    - DELETE /equipment/:id *(только manager, admin)*
-    - GET    /events
-    - POST   /events
-    - PATCH  /events/:id
-    - GET    /events/:id
-    - GET    /mount-points?event_id=
-    - POST   /mount-points
-    - PATCH  /mount-points/:id
-    - GET    /reports?event_id=
-    - POST   /reports/generate
+    equipment:
+      components: [EquipmentFormModal.vue, EquipmentFormBasicInfo.vue, EquipmentFormTechnicalInfo.vue, EquipmentFormAdditionalInfo.vue]
+      pages: [EquipmentTable.vue, EquipmentDetailsModal.vue]
+      ui: [CategorySelect.vue, EquipmentFilters.vue, EquipmentSearchInput.vue]
+      composables: [useEquipmentCategories.js, useEquipmentFilters.js, useEquipmentForm.js, useEquipmentSearch.js]
+      utils: [equipmentValidationRules.js]
+      api: equipmentApi.js
+    
+    event:
+      components: [EventFormModal.vue, EventDiagnostic.vue]
+      pages: [EventList.vue, EventDetails.vue, EventEditor.vue]
+      ui: [EventTabs.vue, EventGrid.vue, EventCard.vue]
+      api: eventApi.js
+      
+    mount_point:
+      api: mountPointApi.js
+      utils: [filter-available-equipment.js, use-used-equipment-ids.js]
+      
+    users:
+      api: userApi.js
+      
+    report:
+      api: reportApi.js
+      
+    shared:
+      ui:
+        atoms: [Button.vue, Icon.vue, Input.vue, Spinner.vue]
+        molecules: [Card.vue, FormField.vue, Modal.vue, TableRow.vue]
+        organisms: [Navbar.vue, Table.vue, UserCard.vue]
+        templates: [EmptyState.vue, ErrorState.vue, ForbiddenState.vue, Layout.vue, OfflineState.vue]
+      api: [supabase.js]
+      composables: [useFormValidation.js, useLocalStorage.js]
+
+  api_endpoints:
+    auth:
+      - POST /auth/login
+      - GET /auth/session
+      - POST /auth/logout
+    users:
+      - GET /users/me
+      - GET /users
+      - PATCH /users/:id
+      - DELETE /users/:id *(только admin)*
+    equipments:
+      - GET /equipments (с пагинацией, фильтрами, поиском)
+      - POST /equipments
+      - PATCH /equipments/:id
+      - DELETE /equipments/:id *(только manager, admin)*
+    events:
+      - GET /events (активные/архивные)
+      - POST /events
+      - PATCH /events/:id
+      - DELETE /events/:id (архивирование через is_archived)
+      - GET /events/:id
+      - GET /events/stats (статистика)
+    mount_points:
+      - GET /mount-points?event_id=
+      - POST /mount-points
+      - PATCH /mount-points/:id
+      - DELETE /mount-points/:id
+    reports:
+      - GET /reports?event_id=
+      - POST /reports/generate
+      - GET /reports/:id
+
+  patterns:
+    architecture: feature-sliced design (app/pages/features/entities/shared)
+    ui: atomic design (atoms/molecules/organisms/templates)
+    state: store-first (Pinia для глобального состояния)
+    data: service layer (API абстракции, composables для логики)
+    security: RBAC + RLS (роли + политики на уровне строк)
+
 attention: []

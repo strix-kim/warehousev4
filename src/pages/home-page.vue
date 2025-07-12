@@ -1,252 +1,389 @@
 <script setup>
-// Dashboard (home-page.vue): приветствие пользователя, виджеты-метрики
-// Интеграция с Supabase: реальные данные, обработка загрузки и ошибок
-import { ref, onMounted, computed } from 'vue'
+/**
+ * HomePage — современная главная страница с dashboard
+ * Использует обновленную дизайн-систему: светлая тема, единая типографика, адаптивность
+ * Поддерживает все UI состояния: loading, error, offline, forbidden
+ */
+import { ref, onMounted, computed, watch } from 'vue'
 import { supabaseSession, supabase } from '@/shared/api/supabase'
-import Button from '@/components/Button.vue'
-import UiStateForbidden from '@/components/UiStateForbidden.vue'
-import UiStateOffline from '@/components/UiStateOffline.vue'
-import Spinner from '@/components/Spinner.vue'
+import Layout from '@/shared/ui/templates/Layout.vue'
+import Button from '@/shared/ui/atoms/Button.vue'
+import Card from '@/shared/ui/molecules/Card.vue'
+import Icon from '@/shared/ui/atoms/Icon.vue'
+import Spinner from '@/shared/ui/atoms/Spinner.vue'
+import ErrorState from '@/shared/ui/templates/ErrorState.vue'
+import ForbiddenState from '@/shared/ui/templates/ForbiddenState.vue'
+import OfflineState from '@/shared/ui/templates/OfflineState.vue'
 import { useRouter } from 'vue-router'
 import { fetchUserById } from '@/features/users/userApi'
+import SkeletonStatCard from '@/shared/ui/molecules/SkeletonStatCard.vue'
 
-const equipmentCount = ref(null)
-const eventCount = ref(null)
-const reportCount = ref(null)
-const userCount = ref(null)
+// Состояния данных
+const stats = ref({
+  equipmentTotal: null,
+  equipmentAvailable: null,
+  eventsTotal: null,
+  eventsActive: null,
+  reportsTotal: null,
+  reportsRecent: null,
+  usersTotal: null,
+  usersActive: null
+})
+
+const recentEvents = ref([])
 const isLoading = ref(true)
-const hasError = ref(null)
-const isOffline = ref(false)
-const router = useRouter()
+const error = ref(null)
+const isOffline = ref(!navigator.onLine)
 const currentUser = ref(null)
-const userRole = ref(null)
+const router = useRouter()
+const showUserName = ref(false)
+const showRecentEvents = ref(false)
 
-// Получаем текущего пользователя по id из сессии
+watch(currentUser, (val) => {
+  if (val && val.name) {
+    showUserName.value = true
+  }
+})
+
+// Пользователь и роли
+const userName = computed(() => currentUser.value?.name || 'Пользователь')
+const userRole = computed(() => currentUser.value?.role)
+const isAdmin = computed(() => ['admin', 'manager'].includes(userRole.value))
+const isForbidden = computed(() => error.value?.includes('403') || error.value?.includes('Forbidden'))
+
+// Показывать секцию "Последние мероприятия" только после загрузки данных
+watch(recentEvents, (val) => {
+  if (val && val.length > 0) {
+    // Небольшая задержка для плавности анимации
+    setTimeout(() => {
+      showRecentEvents.value = true
+    }, 300)
+  }
+})
+
+// Загрузка данных пользователя
 async function loadCurrentUser() {
-  const id = supabaseSession.value?.user?.id
-  if (!id) return
-  const { data, error } = await fetchUserById(id)
-  if (!error && data) {
+  const userId = supabaseSession.value?.user?.id
+  if (!userId) return
+  
+  try {
+    const { data, error } = await fetchUserById(userId)
+    if (error) throw new Error(error)
     currentUser.value = data
-    userRole.value = data.role
+  } catch (e) {
+    console.warn('Не удалось загрузить данные пользователя:', e.message)
   }
 }
 
-const userName = computed(() => currentUser.value?.name || 'Пользователь')
-const isAdmin = computed(() => userRole.value === 'admin' || userRole.value === 'manager')
-
-// Проверка forbidden (пример)
-const isForbidden = computed(() => {
-  // Замените на актуальную логику forbidden
-  return hasError.value && hasError.value.includes('403')
-})
-
-async function fetchDashboardStats() {
+// Загрузка статистики dashboard
+async function loadDashboardStats() {
   isLoading.value = true
-  hasError.value = null
+  error.value = null
   try {
-    // Получаем количество оборудования
-    const { count: eqCount, error: eqErr } = await supabase
-      .from('equipments')
-      .select('*', { count: 'exact', head: true })
-    if (eqErr) throw eqErr
-    equipmentCount.value = eqCount
-
-    // Получаем количество мероприятий
-    const { count: evCount, error: evErr } = await supabase
-      .from('events')
-      .select('*', { count: 'exact', head: true })
-    if (evErr) throw evErr
-    eventCount.value = evCount
-
-    // Получаем количество отчётов
-    const { count: repCount, error: repErr } = await supabase
-      .from('reports')
-      .select('*', { count: 'exact', head: true })
-    if (repErr) throw repErr
-    reportCount.value = repCount
-
-    // Получаем количество пользователей
-    const { count: usCount, error: usErr } = await supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-    if (usErr) throw usErr
-    userCount.value = usCount
+    const now = new Date().toISOString()
+    // Загружаем статистику параллельно
+    const [equipmentRes, eventsRes, eventsActiveRes, reportsRes, usersRes] = await Promise.all([
+      supabase.from('equipments').select('*', { count: 'exact', head: true }),
+      supabase.from('events').select('*', { count: 'exact', head: true }),
+      supabase
+        .from('events')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_archived', false)
+        .gte('end_date', now),
+      supabase.from('reports').select('*', { count: 'exact', head: true }),
+      supabase.from('users').select('*', { count: 'exact', head: true })
+    ])
+    // Проверяем ошибки
+    if (equipmentRes.error) throw equipmentRes.error
+    if (eventsRes.error) throw eventsRes.error  
+    if (eventsActiveRes.error) throw eventsActiveRes.error
+    if (reportsRes.error) throw reportsRes.error
+    if (usersRes.error) throw usersRes.error
+    // Сохраняем данные
+    stats.value = {
+      equipmentTotal: equipmentRes.count,
+      equipmentAvailable: equipmentRes.count, // TODO: добавить фильтр по статусу
+      eventsTotal: eventsRes.count,
+      eventsActive: eventsActiveRes.count,
+      reportsTotal: reportsRes.count,
+      reportsRecent: Math.min(reportsRes.count, 5), // TODO: добавить фильтр по дате
+      usersTotal: usersRes.count,
+      usersActive: usersRes.count // TODO: добавить фильтр по активным
+    }
   } catch (e) {
-    hasError.value = e.message || 'Ошибка загрузки данных'
+    error.value = e.message || 'Ошибка загрузки данных'
   } finally {
     isLoading.value = false
   }
 }
 
-// Быстрые действия
-function goTo(page) {
-  // page: 'events', 'equipment', 'reports', 'users'
-  if (page === 'events') router.push('/events')
-  else if (page === 'equipment') router.push('/equipment')
-  else if (page === 'reports') router.push('/reports')
-  else if (page === 'users') router.push('/users')
+// Загрузка последних мероприятий
+async function loadRecentEvents() {
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .select('id, name, organizer, start_date, end_date, is_archived')
+      .order('created_at', { ascending: false })
+      .limit(3)
+      
+    if (error) throw error
+    recentEvents.value = data || []
+  } catch (e) {
+    console.warn('Не удалось загрузить последние мероприятия:', e.message)
+  }
 }
 
-// Последние мероприятия
-const lastEvents = ref([])
-async function fetchLastEvents() {
-  const { data, error } = await supabase
-    .from('events')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(3)
-  if (!error && data) lastEvents.value = data
+// Навигация
+// Быстрые действия (только публичные, без adminOnly)
+const quickActions = [
+  { label: 'Создать мероприятие', icon: { name: 'Calendar', set: 'lucide' }, route: '/events', variant: 'primary' },
+  { label: 'Добавить оборудование', icon: { name: 'Video', set: 'lucide' }, route: '/equipment', variant: 'primary' }
+]
+
+function navigateTo(route) {
+  router.push(route)
 }
 
+function handleRetry() {
+  error.value = null
+  loadDashboardStats()
+  loadRecentEvents()
+}
+
+// Обработчик онлайн/оффлайн
+function updateOnlineStatus() {
+  isOffline.value = !navigator.onLine
+}
+
+// Инициализация
 onMounted(async () => {
+  window.addEventListener('online', updateOnlineStatus)
+  window.addEventListener('offline', updateOnlineStatus)
+  
   await loadCurrentUser()
-  await fetchDashboardStats()
-  await fetchLastEvents()
+  await Promise.all([
+    loadDashboardStats(),
+    loadRecentEvents()
+  ])
 })
+
+const statsLoaded = computed(() =>
+  stats.value &&
+  stats.value.equipmentTotal !== null &&
+  stats.value.eventsTotal !== null &&
+  stats.value.reportsTotal !== null &&
+  stats.value.usersTotal !== null
+)
 </script>
 
 <template>
-  <!-- Главная страница: минимализм, инженерный стиль, максимум воздуха, улучшенный layout -->
-  <div class="min-h-screen bg-transparent py-8 px-2 md:px-4">
-    <div class="max-w-5xl mx-auto">
-      <!-- Приветствие -->
-      <h1 class="text-3xl md:text-4xl font-bold mb-8 text-white font-mono tracking-widest select-none drop-shadow-lg text-center md:text-left">
-        Добро пожаловать, {{ userName }}!
-      </h1>
-      <!-- Быстрые действия: отдельный блок, фирменная линия -->
-      <div class="flex flex-col items-center md:flex-row md:justify-start gap-4 mb-8">
-        <Button @click="goTo('events')" class="bg-red-600 hover:bg-red-700 text-white font-mono px-6 py-3 rounded-lg shadow transition text-base md:text-lg w-full md:w-auto">Создать мероприятие</Button>
-        <Button @click="goTo('equipment')" class="bg-white/10 hover:bg-white/20 text-white font-mono px-6 py-3 rounded-lg shadow transition text-base md:text-lg w-full md:w-auto">Добавить оборудование</Button>
-        <Button @click="goTo('users')" v-if="isAdmin" class="bg-white/10 hover:bg-white/20 text-white font-mono px-6 py-3 rounded-lg shadow transition text-base md:text-lg w-full md:w-auto">Пользователи</Button>
+  <!-- Современная главная страница с единым дизайном -->
+  <Layout>
+    <!-- Приветствие и быстрые действия -->
+    <div class="mb-10">
+      <div class="mb-8">
+        <!-- Крупный заголовок, усиленная иерархия -->
+        <h1 class="text-4xl font-extrabold text-gray-900 mb-3">
+          Добро пожаловать,
+          <transition
+            enter-active-class="transition-opacity transition-transform duration-500 ease-out"
+            enter-from-class="opacity-0 translate-y-2"
+            enter-to-class="opacity-100 translate-y-0"
+          >
+            <span v-if="showUserName" class="inline-block">{{ userName }}</span>
+          </transition>
+        </h1>
+        <p class="text-base text-gray-400">
+          Управление видеооборудованием и мероприятиями
+        </p>
       </div>
-      <!-- SVG-фирменная линия -->
-      <div class="w-full flex justify-center mb-10">
-        <svg height="8" width="100%" viewBox="0 0 400 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <line x1="0" y1="4" x2="400" y2="4" stroke="#ef4444" stroke-width="2" stroke-dasharray="8 8" opacity="0.25" />
-          <circle cx="0" cy="4" r="3" fill="#ef4444" opacity="0.5" />
-          <circle cx="400" cy="4" r="3" fill="#ef4444" opacity="0.5" />
-        </svg>
-      </div>
-      <!-- Метрики: карточки glassmorphism, крупнее, больше воздуха -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-12">
-        <MetricCard title="Оборудование" :count="equipmentCount" icon="camera" :loading="isLoading" />
-        <MetricCard title="Мероприятия" :count="eventCount" icon="presentation" :loading="isLoading" />
-        <MetricCard title="Отчёты" :count="reportCount" icon="document" :loading="isLoading" />
-        <MetricCard title="Пользователи" :count="userCount" icon="users" :loading="isLoading" />
-      </div>
-      <!-- Последние мероприятия: карточки glassmorphism, кнопка 'Показать все' -->
-      <div v-if="lastEvents.length" class="mb-12">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-bold text-white font-mono tracking-widest">Последние мероприятия</h2>
-          <Button @click="goTo('events')" class="text-xs font-mono text-red-500 hover:text-red-700 bg-transparent px-3 py-1 rounded transition">Показать все</Button>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div v-for="event in lastEvents" :key="event.id"
-            class="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl shadow-xl p-5 cursor-pointer transition hover:shadow-2xl hover:bg-white/20 text-white"
-            @click="router.push(`/events/${event.id}`)">
-            <div class="font-semibold text-lg mb-1 flex items-center font-mono tracking-wide">
-              {{ event.name }}
-              <span v-if="event.is_archived" class="ml-2 px-2 py-0.5 rounded-full bg-gray-400/60 text-xs text-white shadow">Архив</span>
-            </div>
-            <div class="text-gray-200 text-sm mb-1">Организатор: {{ event.organizer }}</div>
-            <div class="text-gray-400 text-xs">{{ event.start_date }}<span v-if="event.end_date"> — {{ event.end_date }}</span></div>
-          </div>
-        </div>
-      </div>
-      <!-- UI-состояния -->
-      <UiStateForbidden v-if="hasError && isForbidden" />
-      <UiStateOffline v-if="isOffline" />
-      <div v-if="hasError && !isForbidden && !isOffline" class="text-red-500 text-center mb-4 font-semibold">
-        Ошибка: {{ hasError }}
+      <!-- Быстрые действия с SVG-иконками -->
+      <div class="flex flex-wrap gap-4">
+        <!-- Публичные действия -->
+        <Button
+          v-for="action in quickActions"
+          :key="action.route"
+          :variant="action.variant"
+          size="md"
+          @click="navigateTo(action.route)"
+          class="inline-flex items-center gap-2 px-6 py-3 text-base font-semibold"
+        >
+          <Icon v-if="action.icon" :name="action.icon.name" :set="action.icon.set" size="md" />
+          {{ action.label }}
+        </Button>
+        <!-- Кнопка для админа появляется плавно -->
+        <transition
+          enter-active-class="transition-opacity transition-transform duration-500 ease-out"
+          enter-from-class="opacity-0 translate-y-2"
+          enter-to-class="opacity-100 translate-y-0"
+        >
+          <Button
+            v-if="isAdmin"
+            :variant="'secondary'"
+            size="md"
+            @click="navigateTo('/users')"
+            class="inline-flex items-center gap-2 px-6 py-3 text-base font-semibold"
+          >
+            <Icon name="Users" set="lucide" size="md" />
+            Управление пользователями
+          </Button>
+        </transition>
       </div>
     </div>
-  </div>
-</template>
 
-<!--
-  MetricCard — карточка метрики с выраженным светлым glassmorphism, SVG-иконкой и адаптивным дизайном.
-  Используются только Tailwind-утилиты, цвета и стили строго по новым дизайн-стандартам.
--->
-<script>
-import { h } from 'vue'
-// SVG-иконки Lucide — современный стиль, фирменная тематика
-const icons = {
-  camera: h('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'w-10 h-10 mb-2 text-red-500', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
-    h('rect', { x: '3', y: '7', width: '18', height: '13', rx: '2', stroke: 'currentColor', 'stroke-width': '2', fill: 'none' }),
-    h('circle', { cx: '12', cy: '13.5', r: '3', stroke: 'currentColor', 'stroke-width': '2', fill: 'none' })
-  ]),
-  presentation: h('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'w-10 h-10 mb-2 text-red-500', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
-    h('rect', { x: '3', y: '4', width: '18', height: '13', rx: '2', stroke: 'currentColor', 'stroke-width': '2', fill: 'none' }),
-    h('path', { d: 'M12 17v4', stroke: 'currentColor', 'stroke-width': '2' }),
-    h('path', { d: 'M8 21h8', stroke: 'currentColor', 'stroke-width': '2' })
-  ]),
-  document: h('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'w-10 h-10 mb-2 text-red-500', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
-    h('rect', { x: '4', y: '3', width: '16', height: '18', rx: '2', stroke: 'currentColor', 'stroke-width': '2', fill: 'none' }),
-    h('path', { d: 'M8 7h8', stroke: 'currentColor', 'stroke-width': '2' }),
-    h('path', { d: 'M8 11h8', stroke: 'currentColor', 'stroke-width': '2' }),
-    h('path', { d: 'M8 15h4', stroke: 'currentColor', 'stroke-width': '2' })
-  ]),
-  users: h('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'w-10 h-10 mb-2 text-red-500', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
-    h('circle', { cx: '9', cy: '8', r: '4', stroke: 'currentColor', 'stroke-width': '2', fill: 'none' }),
-    h('circle', { cx: '17', cy: '8', r: '4', stroke: 'currentColor', 'stroke-width': '2', fill: 'none' }),
-    h('path', { d: 'M2 21c0-3.866 3.582-7 8-7s8 3.134 8 7', stroke: 'currentColor', 'stroke-width': '2', fill: 'none' })
-  ])
-}
-// Анимация появления карточек (CSS класс)
-const cardAppearClass = 'card-animate';
-export default {
-  components: {
-    MetricCard: (function() {
-      // Стильная карточка метрики: glassmorphism, фирменный border, SVG-деталь
-      return {
-        props: ['title', 'count', 'icon', 'loading'],
-        render() {
-          return h('div', {
-            class: `relative bg-white border-b-4 border-b-red-500 rounded-2xl flex flex-col items-center justify-center py-8 px-4 min-h-40 shadow transition hover:-translate-y-1 hover:border-b-[6px] hover:border-b-red-600 hover:shadow-red-200/40 duration-200 overflow-hidden group ${cardAppearClass}`
-          }, [
-            // SVG-фирменная линия/деталь в углу
-            h('svg', { class: 'absolute top-0 right-0 w-16 h-4 opacity-20 group-hover:opacity-40', viewBox: '0 0 64 8', fill: 'none', xmlns: 'http://www.w3.org/2000/svg' }, [
-              h('rect', { x: '0', y: '3', width: '64', height: '2', rx: '1', fill: '#ef4444' })
-            ]),
-            // Иконка сверху, крупная
-            h('div', { class: 'flex items-center justify-center w-16 h-16 mb-2 rounded-full bg-red-50' }, [
-              icons[this.icon] || null
-            ]),
-            // Число и текст по центру
-            this.loading
-              ? h('div', { class: 'flex items-center justify-center h-10' }, [h('span', { class: 'animate-pulse text-gray-400' }, '...')])
-              : h('div', { class: 'text-5xl md:text-6xl font-bold text-gray-900 font-mono drop-shadow text-center truncate' }, this.count),
-            h('div', { class: 'text-gray-700 text-lg font-mono tracking-widest text-center truncate mt-1' }, this.title)
-          ])
-        }
-      }
-    })(),
-  }
-}
-</script>
+    <!-- Состояния ошибок и offline -->
+    <ForbiddenState 
+      v-if="isForbidden"
+      message="Нет доступа к данным"
+      description="Обратитесь к администратору для получения прав доступа"
+    />
+    
+    <OfflineState 
+      v-if="isOffline"
+      message="Нет соединения с интернетом"
+      description="Проверьте подключение и попробуйте снова"
+    />
+    
+    <ErrorState 
+      v-if="error"
+      :message="error"
+      description="Попробуйте обновить страницу или повторить запрос"
+    >
+      <Button
+        label="Повторить"
+        variant="primary"
+        @click="handleRetry"
+        class="mt-4"
+      />
+    </ErrorState>
 
-<style>
-/* Анимация появления карточек метрик */
-.card-animate {
-  animation: cardFadeIn 0.7s cubic-bezier(.4,0,.2,1);
-}
-@keyframes cardFadeIn {
-  from { opacity: 0; transform: translateY(24px);}
-  to   { opacity: 1; transform: none;}
-}
-.card-inner-shadow {
-  box-shadow: 0 2px 16px 0 rgba(0,0,0,0.04) inset;
-}
-</style>
+    <!-- Основной контент: всегда показывать, даже если isLoading (тогда в grid будут skeleton-карточки) -->
+    <div class="space-y-8">
+      <!-- Статистические карточки -->
+      <section class="mb-10">
+        <h2 class="text-2xl font-bold text-gray-900 mb-8">Обзор системы</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <template v-if="isLoading">
+            <SkeletonStatCard v-for="i in 4" :key="i" />
+          </template>
+          <template v-else>
+            <!-- Оборудование -->
+            <Card variant="default" size="md" :interactive="true" @click="navigateTo('/equipment')">
+              <template #header>
+                <Icon name="Video" set="lucide" size="lg" class="text-blue-400 mb-2" />
+              </template>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">Оборудование</h3>
+              <div class="text-3xl font-bold text-gray-900 mb-1">
+                {{ stats.equipmentTotal || '—' }}
+              </div>
+              <p class="text-sm text-gray-400">
+                {{ stats.equipmentAvailable || 0 }} доступно
+              </p>
+            </Card>
+            <!-- Мероприятия -->
+            <Card variant="default" size="md" :interactive="true" @click="navigateTo('/events')">
+              <template #header>
+                <Icon name="Calendar" set="lucide" size="lg" class="text-green-400 mb-2" />
+              </template>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">Мероприятия</h3>
+              <div class="text-3xl font-bold text-gray-900 mb-1">
+                {{ stats.eventsTotal || '—' }}
+              </div>
+              <p class="text-sm text-gray-400">
+                {{ stats.eventsActive || 0 }} активных
+              </p>
+            </Card>
+            <!-- Отчёты -->
+            <Card variant="default" size="md" :interactive="true" @click="navigateTo('/reports')">
+              <template #header>
+                <Icon name="FileText" set="lucide" size="lg" class="text-purple-400 mb-2" />
+              </template>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">Отчёты</h3>
+              <div class="text-3xl font-bold text-gray-900 mb-1">
+                {{ stats.reportsTotal || '—' }}
+              </div>
+              <p class="text-sm text-gray-400">
+                {{ stats.reportsRecent || 0 }} за неделю
+              </p>
+            </Card>
+            <!-- Пользователи (только для админов) -->
+            <Card 
+              v-if="isAdmin" 
+              variant="default" 
+              size="md" 
+              :interactive="true" 
+              @click="navigateTo('/users')"
+            >
+              <template #header>
+                <Icon name="Users" set="lucide" size="lg" class="text-orange-400 mb-2" />
+              </template>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">Пользователи</h3>
+              <div class="text-3xl font-bold text-gray-900 mb-1">
+                {{ stats.usersTotal || '—' }}
+              </div>
+              <p class="text-sm text-gray-400">
+                {{ stats.usersActive || 0 }} активных
+              </p>
+            </Card>
+          </template>
+        </div>
+      </section>
 
-<!--
-  Все стили и дизайн соответствуют новым стандартам: светлый, читаемый glassmorphism, минимализм, акценты только по смыслу, иконки — видеотехника.
-  Подробные комментарии на русском языке объясняют назначение и реализацию каждого блока.
--->
-
-<!--
-  Все состояния, edge-cases и роли должны быть реализованы согласно production-стандартам и ui_states_prompt.yaml.
-  Для реальных данных используйте хуки и сервисы из features/*/use-*.js и *Api.js
-  Все бизнес-логика — только через хуки/сервисы, никаких прямых запросов из компонента.
---> 
+      <!-- Последние мероприятия с плавным появлением -->
+      <transition
+        enter-active-class="transition-opacity transition-transform duration-700 ease-out"
+        enter-from-class="opacity-0 translate-y-4"
+        enter-to-class="opacity-100 translate-y-0"
+      >
+        <section v-if="showRecentEvents && recentEvents.length > 0">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-semibold text-gray-900">Последние мероприятия</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="navigateTo('/events')"
+              class="text-blue-600 hover:text-blue-700"
+            >
+              Показать все →
+            </Button>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card
+              v-for="event in recentEvents"
+              :key="event.id"
+              variant="outlined"
+              size="md"
+              :interactive="true"
+              @click="navigateTo(`/events/${event.id}`)"
+            >
+              <div class="space-y-3">
+                <div class="flex items-start justify-between">
+                  <h3 class="font-semibold text-gray-900 text-base leading-tight">
+                    {{ event.name }}
+                  </h3>
+                  <span 
+                    v-if="event.is_archived" 
+                    class="inline-flex px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full"
+                  >
+                    Архив
+                  </span>
+                </div>
+                
+                <div class="text-sm text-gray-600">
+                  <p class="mb-1">
+                    <span class="font-medium">Организатор:</span> {{ event.organizer }}
+                  </p>
+                  <p class="text-gray-500">
+                    {{ event.start_date }}
+                    <span v-if="event.end_date"> — {{ event.end_date }}</span>
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </section>
+      </transition>
+    </div>
+  </Layout>
+</template> 
