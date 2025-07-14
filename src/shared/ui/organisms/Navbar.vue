@@ -3,7 +3,13 @@
     <div class="max-w-7xl mx-auto">
       <div class="flex justify-between items-center h-16 px-4 sm:px-6 lg:px-8">
         <!-- Логотип с SVG-иконкой Box -->
-        <div class="flex items-center gap-3">
+        <div 
+          class="flex items-center gap-3 cursor-pointer select-none hover:opacity-80 transition"
+          @click="handleLogoClick"
+          tabindex="0"
+          @keydown.enter="handleLogoClick"
+          aria-label="На главную"
+        >
           <Icon name="Box" set="lucide" size="lg" class="text-blue-500" />
           <div>
             <h1 class="text-lg font-bold text-gray-900">Argo Media</h1>
@@ -89,7 +95,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import Button from '../atoms/Button.vue'
 import Icon from '../atoms/Icon.vue'
 
@@ -102,6 +108,7 @@ const props = defineProps({
 const emit = defineEmits(['navigate', 'logout'])
 
 const route = useRoute()
+const router = useRouter()
 const isMobileMenuOpen = ref(false)
 
 const isCurrentRoute = (routePath) => {
@@ -123,5 +130,10 @@ const toggleMobileMenu = () => {
 const handleMobileNavigate = (path) => {
   isMobileMenuOpen.value = false
   handleNavigate(path)
+}
+
+// Новый обработчик для клика по лого
+const handleLogoClick = () => {
+  router.push('/')
 }
 </script> 

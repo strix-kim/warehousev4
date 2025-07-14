@@ -262,7 +262,7 @@ const statsLoaded = computed(() =>
       <!-- Статистические карточки -->
       <section class="mb-10">
         <h2 class="text-2xl font-bold text-gray-900 mb-8">Обзор системы</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8">
           <template v-if="isLoading">
             <SkeletonStatCard v-for="i in 4" :key="i" />
           </template>

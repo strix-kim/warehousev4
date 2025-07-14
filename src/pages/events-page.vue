@@ -87,15 +87,10 @@ onMounted(() => {
     ИСПРАВЛЕНО: использует только Tailwind CSS, синюю цветовую схему
   -->
   <div class="min-h-screen relative bg-gray-50">
-    <!-- Фоновая текстура -->
-    <div 
-      class="absolute inset-0 w-full h-full pointer-events-none select-none opacity-60 z-0"
-      style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;40&quot; height=&quot;40&quot; viewBox=&quot;0 0 40 40&quot; fill=&quot;none&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Crect x=&quot;0&quot; y=&quot;0&quot; width=&quot;40&quot; height=&quot;40&quot; fill=&quot;none&quot;/%3E%3Cpath d=&quot;M 40 0 L 0 0 0 40&quot; stroke=&quot;%23e5e7eb&quot; stroke-width=&quot;1&quot;/%3E%3C/svg%3E'); background-size: 40px 40px; background-repeat: repeat;"
-      aria-hidden="true"
-    ></div>
+    
     
     <!-- Основной контент -->
-    <div class="relative z-10 w-full max-w-6xl mx-auto p-4 lg:p-8">
+    <div class="relative z-10 max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4">
       <!-- Хлебные крошки (breadcrumbs) — единый стиль с точкой монтажа -->
       <nav class="flex mb-6" aria-label="Breadcrumb">
         <ol class="inline-flex items-center space-x-1 md:space-x-3">

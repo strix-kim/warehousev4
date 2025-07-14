@@ -79,6 +79,15 @@ export const useEquipmentStore = defineStore('equipment', {
     },
 
     /**
+     * Установить лимит и перезагрузить список
+     */
+    setLimit(newLimit) {
+      this.limit = newLimit
+      this.page = 1
+      this.loadEquipments()
+    },
+
+    /**
      * Добавить новое оборудование
      */
     async createEquipment(data) {

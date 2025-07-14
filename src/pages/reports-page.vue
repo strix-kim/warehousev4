@@ -37,9 +37,10 @@ function goToReport(reportId) {
 
 <template>
   <!-- Градиентный фон на всю страницу -->
-  <div class="fixed inset-0 min-h-screen min-w-full bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 -z-10"></div>
+
   <div class="relative z-10">
-    <div class="max-w-7xl mx-auto py-10 px-2 md:px-4 min-h-screen flex flex-col">
+    <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4 md:px-4 min-h-screen flex flex-col">
+     
       <!-- Breadcrumbs -->
       <nav class="flex mb-6" aria-label="Breadcrumb">
         <ol class="inline-flex items-center space-x-1 md:space-x-3">

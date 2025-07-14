@@ -6,6 +6,9 @@
   Подробнее: https://tailwindcss.com/docs/installation
 */
 
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
 html, body {
   height: 100%;
   margin: 0;
@@ -16,9 +19,6 @@ html, body {
 *, *::before, *::after {
   box-sizing: inherit;
 }
-
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
-@import "tailwindcss";
 
 /* Настройка цветовой палитры для Tailwind CSS v4 */
 @theme {
@@ -73,9 +73,5 @@ html, body, .font-mono {
   ВАЖНО: Убираем глобальные цвета темы из body, чтобы не было конфликтов
   с компонентами, которые должны иметь светлую тему
 */
-body {
-  background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='0' y='0' width='40' height='40' fill='none'/%3E%3Cpath d='M 40 0 L 0 0 0 40' stroke='%23333' stroke-width='0.5'/%3E%3C/svg%3E");
-  background-size: 40px 40px;
-  background-repeat: repeat;
-}
+
 

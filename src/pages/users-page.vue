@@ -26,7 +26,8 @@ onMounted(() => {
   <!-- Градиентный фон на всю ширину и высоту окна -->
   <div class="fixed inset-0 min-h-screen min-w-full bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 -z-10"></div>
   <div class="relative z-10">
-    <div class="max-w-7xl mx-auto py-10 px-2 md:px-4 min-h-screen flex flex-col">
+    <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4 md:px-4 min-h-screen flex flex-col">
+      
       <!-- Breadcrumbs -->
       <nav class="flex mb-6" aria-label="Breadcrumb">
         <ol class="inline-flex items-center space-x-1 md:space-x-3">
@@ -59,10 +60,10 @@ onMounted(() => {
         <Spinner size="lg" />
       </div>
       <ErrorState v-else-if="hasError" :message="hasError" @retry="userStore.loadUsers()" />
-      <EmptyState v-else-if="users.length === 0" title="Нет пользователей" description="Пользователи ещё не добавлены." />
+      <EmptyState v-else-if="users.length === 0" message="Нет пользователей" description="Пользователи ещё не добавлены." />
 
       <!-- Сетка пользователей -->
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-8">
+      <div v-else class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
         <UserCard
           v-for="user in users"
           :key="user.id"

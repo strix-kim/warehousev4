@@ -287,11 +287,12 @@ const handleCloseModals = () => {
         </table>
       </div>
 
-      <!-- Пагинация -->
+      <!-- Пагинация и выбор лимита -->
       <div 
         v-if="!loading && !error && totalPages > 1"
-        class="bg-gray-50 px-6 py-4 border-t border-gray-200"
+        class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
       >
+        <!-- Пагинация -->
         <Pagination
           :current-page="page"
           :total-pages="totalPages"
@@ -299,6 +300,20 @@ const handleCloseModals = () => {
           :items-on-page="equipments.length"
           @page-change="handlePageChange"
         />
+        <!-- Выбор количества элементов на странице -->
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <label for="equipment-limit" class="text-sm text-gray-600 font-medium">Показывать по:</label>
+          <select
+            id="equipment-limit"
+            class="block w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors cursor-pointer"
+            :value="limit"
+            @change="equipmentStore.setLimit(Number($event.target.value))"
+          >
+            <option :value="30">30</option>
+            <option :value="50">50</option>
+            <option :value="100">100</option>
+          </select>
+        </div>
       </div>
     </div>
   </div>

@@ -1,0 +1,15 @@
+---
+description: 
+globs: src/**/*
+alwaysApply: false
+---
+- Recommended folder structure:
+  - src/
+    - components/
+    - composables/
+    - views/
+    - router/
+    - store/
+    - assets/
+    - App.vue
+    - main.js

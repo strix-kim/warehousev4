@@ -200,7 +200,7 @@ onMounted(async () => {
     </div>
 
     <!-- Основной контейнер -->
-    <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="relative z-10 max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4">
       <!-- Breadcrumbs -->
       <nav class="flex mb-6" aria-label="Breadcrumb">
         <ol class="inline-flex items-center space-x-1 md:space-x-3">
@@ -274,14 +274,15 @@ onMounted(async () => {
       </ErrorState>
 
       <!-- Основной контент: фильтры + таблица -->
-      <div v-else class="space-y-6">
-        <!-- Панель фильтров -->
-        <EquipmentFilters
-          :loading="loading"
-          :results-count="total"
-          @search="handleSearch"
-        />
-
+      <div v-else class="space-y-2">
+        <!-- Панель фильтров и выбор лимита -->
+        <div class="mb-4">
+          <EquipmentFilters
+            :loading="loading"
+            :results-count="total"
+            @search="handleSearch"
+          />
+        </div>
         <!-- Состояние пустого списка -->
         <EmptyState
           v-if="isEmpty"

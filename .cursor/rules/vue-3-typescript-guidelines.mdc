@@ -1,0 +1,7 @@
+---
+description: 
+globs: src/**/*.ts
+alwaysApply: false
+---
+- Use TypeScript for type safety
+- Implement proper props and emits definitions

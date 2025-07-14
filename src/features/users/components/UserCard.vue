@@ -1,7 +1,7 @@
 <template>
   <!-- Карточка пользователя: только просмотр, фирменный стиль, адаптивность, accessibility -->
   <div
-    class="bg-white rounded-2xl shadow-md border border-gray-200 p-6 flex flex-col gap-4 transition-shadow hover:shadow-lg focus-within:ring-2 focus-within:ring-blue-400"
+    class="bg-white rounded-2xl shadow-md border border-gray-200 p-8 min-w-[320px] flex flex-col gap-4 transition-shadow hover:shadow-lg focus-within:ring-2 focus-within:ring-blue-400"
     role="region"
     :aria-label="`Пользователь ${user.name}`"
     tabindex="0"
@@ -17,7 +17,7 @@
       </div>
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
-          <span class="text-lg font-semibold text-gray-900 truncate">{{ user.name }}</span>
+          <span class="text-xl font-semibold text-gray-900 break-words leading-tight">{{ user.name }}</span>
           <span
             class="px-2 py-0.5 rounded text-xs font-medium"
             :class="roleBadgeClass"
@@ -26,7 +26,7 @@
             {{ user.role || 'Инженер' }}
           </span>
         </div>
-        <div class="text-xs text-gray-500 truncate">{{ user.email }}</div>
+        <div class="text-xs text-gray-500 truncate mt-1">{{ user.email }}</div>
       </div>
     </div>
     <!-- Только просмотр, без статуса и действий -->
