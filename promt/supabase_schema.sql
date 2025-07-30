@@ -70,52 +70,52 @@ alter table reports enable row level security;
 
 -- RLS policies: USERS
 create policy "Users can view own profile" on users
-  for select using (auth.uid() = id);
+  for select using ((select auth.uid()) = id);
 
 create policy "Admins can insert users" on users
-  for insert with check (exists (select 1 from users as u where u.id = auth.uid() and u.role = 'admin'));
+  for insert with check (exists (select 1 from users as u where u.id = (select auth.uid()) and u.role = 'admin'));
 create policy "Admins can update users" on users
-  for update using (exists (select 1 from users as u where u.id = auth.uid() and u.role = 'admin'));
+  for update using (exists (select 1 from users as u where u.id = (select auth.uid()) and u.role = 'admin'));
 create policy "Admins can delete users" on users
-  for delete using (exists (select 1 from users as u where u.id = auth.uid() and u.role = 'admin'));
+  for delete using (exists (select 1 from users as u where u.id = (select auth.uid()) and u.role = 'admin'));
 
 -- RLS policies: EQUIPMENTS
 create policy "All authenticated can read equipments" on equipments
-  for select using (auth.uid() is not null);
+  for select using ((select auth.uid()) is not null);
 
 create policy "Engineers/Technicians can insert equipments" on equipments
   for insert with check (
-    exists (select 1 from users as u where u.id = auth.uid() and u.role in ('video_engineer', 'technician', 'manager', 'admin'))
+    exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('video_engineer', 'technician', 'manager', 'admin'))
   );
 create policy "Engineers/Technicians can update equipments" on equipments
   for update using (
-    exists (select 1 from users as u where u.id = auth.uid() and u.role in ('video_engineer', 'technician', 'manager', 'admin'))
+    exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('video_engineer', 'technician', 'manager', 'admin'))
   );
 create policy "Manager/Admin can delete equipments" on equipments
   for delete using (
-    exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin'))
+    exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin'))
   );
 
 -- RLS policies: EVENTS
 create policy "Engineers can select own events" on events
   for select using (
-    auth.uid() = ANY(responsible_engineers)
-    or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin'))
+    (select auth.uid()) = ANY(responsible_engineers)
+    or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin'))
   );
 create policy "Engineers can insert events" on events
   for insert with check (
-    auth.uid() = ANY(responsible_engineers)
-    or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin'))
+    (select auth.uid()) = ANY(responsible_engineers)
+    or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin'))
   );
 create policy "Engineers can update events" on events
   for update using (
-    auth.uid() = ANY(responsible_engineers)
-    or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin'))
+    (select auth.uid()) = ANY(responsible_engineers)
+    or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin'))
   );
 create policy "Engineers can delete events" on events
   for delete using (
-    auth.uid() = ANY(responsible_engineers)
-    or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin'))
+    (select auth.uid()) = ANY(responsible_engineers)
+    or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin'))
   );
 
 -- RLS policies: MOUNT_POINTS
@@ -124,8 +124,8 @@ create policy "Engineers can select mount_points of their events" on mount_point
     exists (
       select 1 from events e
       where e.id = event_id
-        and (auth.uid() = ANY(e.responsible_engineers)
-        or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
+        and ((select auth.uid()) = ANY(e.responsible_engineers)
+        or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin')))
     )
   );
 create policy "Engineers can insert mount_points of their events" on mount_points
@@ -133,8 +133,8 @@ create policy "Engineers can insert mount_points of their events" on mount_point
     exists (
       select 1 from events e
       where e.id = event_id
-        and (auth.uid() = ANY(e.responsible_engineers)
-        or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
+        and ((select auth.uid()) = ANY(e.responsible_engineers)
+        or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin')))
     )
   );
 create policy "Engineers can update mount_points of their events" on mount_points
@@ -142,8 +142,8 @@ create policy "Engineers can update mount_points of their events" on mount_point
     exists (
       select 1 from events e
       where e.id = event_id
-        and (auth.uid() = ANY(e.responsible_engineers)
-        or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
+        and ((select auth.uid()) = ANY(e.responsible_engineers)
+        or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin')))
     )
   );
 create policy "Engineers can delete mount_points of their events" on mount_points
@@ -151,8 +151,8 @@ create policy "Engineers can delete mount_points of their events" on mount_point
     exists (
       select 1 from events e
       where e.id = event_id
-        and (auth.uid() = ANY(e.responsible_engineers)
-        or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
+        and ((select auth.uid()) = ANY(e.responsible_engineers)
+        or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin')))
     )
   );
 
@@ -162,8 +162,8 @@ create policy "Access reports by event permission (select)" on reports
     exists (
       select 1 from events e
       where e.id = event_id
-        and (auth.uid() = ANY(e.responsible_engineers)
-        or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
+        and ((select auth.uid()) = ANY(e.responsible_engineers)
+        or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin')))
     )
   );
 create policy "Access reports by event permission (insert)" on reports
@@ -171,8 +171,8 @@ create policy "Access reports by event permission (insert)" on reports
     exists (
       select 1 from events e
       where e.id = event_id
-        and (auth.uid() = ANY(e.responsible_engineers)
-        or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
+        and ((select auth.uid()) = ANY(e.responsible_engineers)
+        or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin')))
     )
   );
 create policy "Access reports by event permission (update)" on reports
@@ -180,8 +180,8 @@ create policy "Access reports by event permission (update)" on reports
     exists (
       select 1 from events e
       where e.id = event_id
-        and (auth.uid() = ANY(e.responsible_engineers)
-        or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
+        and ((select auth.uid()) = ANY(e.responsible_engineers)
+        or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin')))
     )
   );
 create policy "Access reports by event permission (delete)" on reports
@@ -189,7 +189,7 @@ create policy "Access reports by event permission (delete)" on reports
     exists (
       select 1 from events e
       where e.id = event_id
-        and (auth.uid() = ANY(e.responsible_engineers)
-        or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
+        and ((select auth.uid()) = ANY(e.responsible_engineers)
+        or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin')))
     )
   ); 

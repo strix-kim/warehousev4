@@ -8,19 +8,19 @@ CREATE POLICY "Users can view all equipment lists" ON equipment_lists
 
 -- Политика для создания: авторизованные пользователи могут создавать списки
 CREATE POLICY "Authenticated users can create equipment lists" ON equipment_lists
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+  FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
 
 -- Политика для обновления: пользователи могут обновлять свои списки или все списки
 CREATE POLICY "Users can update equipment lists" ON equipment_lists
-  FOR UPDATE USING (auth.role() = 'authenticated');
+  FOR UPDATE USING ((select auth.role()) = 'authenticated');
 
 -- Политика для удаления: авторизованные пользователи могут удалять списки
 CREATE POLICY "Authenticated users can delete equipment lists" ON equipment_lists
-  FOR DELETE USING (auth.role() = 'authenticated');
+  FOR DELETE USING ((select auth.role()) = 'authenticated');
 
 -- Альтернативная политика с привязкой к создателю (если нужно ограничить доступ)
 -- CREATE POLICY "Users can only manage their own lists" ON equipment_lists
---   FOR ALL USING (auth.uid() = created_by);
+--   FOR ALL USING ((select auth.uid()) = created_by);
 
 -- Комментарии к политикам
 COMMENT ON POLICY "Users can view all equipment lists" ON equipment_lists IS 'Разрешает всем пользователям просматривать списки оборудования';
