@@ -257,7 +257,7 @@
  * МИГРИРОВАНО: полностью переписан на Tailwind CSS с синей цветовой схемой
  * Все бизнес-правила, edge-cases, loading/error, ролевые ограничения, подробные комментарии
  */
-import { ref, computed, watch, defineEmits, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user-store'
 import { storeToRefs } from 'pinia'
 import Button from '@/shared/ui/atoms/Button.vue'
