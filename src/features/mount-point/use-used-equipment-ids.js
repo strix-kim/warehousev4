@@ -1,36 +1,142 @@
-// use-used-equipment-ids.js
-// Хук для вычисления id оборудования, занятого на других точках монтажа мероприятия.
-// Возвращает usedEquipmentIds (Set) и reload().
-// Используйте для фильтрации доступного оборудования при создании/редактировании точки.
-
+/**
+ * useUsedEquipmentIds - управление контролем уникальности оборудования
+ * Архитектурная роль: предотвращение дублирования оборудования между точками монтажа
+ * Возвращает Set занятых ID с автоматическим обновлением при изменении данных
+ */
 import { computed } from 'vue'
+import { useMountPointStore } from '@/stores/mount-point-store'
 
 /**
- * @param {string} eventId - id мероприятия
- * @param {string|number} [currentMountPointId] - id текущей точки (исключить из расчёта)
- * @returns {{ usedEquipmentIds: import('vue').ComputedRef<Set>, reload: Function }}
+ * Хук для вычисления ID оборудования, занятого на других точках монтажа мероприятия
+ * @param {string|number} eventId - ID мероприятия
+ * @param {string|number} [currentMountPointId] - ID текущей точки (исключить из расчёта)
+ * @returns {{ usedEquipmentIds: import('vue').ComputedRef<Set> }}
  */
-export function useUsedEquipmentIds(eventId, currentMountPointId) {
+export function useUsedEquipmentIds(eventId, currentMountPointId = null) {
+  const mountPointStore = useMountPointStore()
+
+  /**
+   * Реактивный computed для отслеживания занятого оборудования
+   * Автоматически обновляется при изменении точек монтажа в store
+   */
   const usedEquipmentIds = computed(() => {
     const ids = new Set()
-    // Assuming mountPoints are now managed by Pinia store,
-    // and we need to fetch them or access them directly if available.
-    // For now, we'll simulate fetching or assume they are available.
-    // In a real scenario, you'd fetch mountPoints from a Pinia store.
-    // For this example, we'll just iterate over a dummy array to demonstrate.
-    const dummyMountPoints = [
-      { id: 1, equipment_plan: [1, 2, 3], equipment_final: [4, 5], equipment_fact: [6] },
-      { id: 2, equipment_plan: [7, 8], equipment_final: [9], equipment_fact: [10] },
-      { id: 3, equipment_plan: [11, 12], equipment_final: [13], equipment_fact: [14] },
-    ];
-
-    for (const mp of dummyMountPoints) {
-      if (mp.id === currentMountPointId) continue
-      ;['equipment_plan', 'equipment_final', 'equipment_fact'].forEach(field => {
-        (mp[field] || []).forEach(id => ids.add(id))
-      })
+    
+    // Получаем все точки монтажа для данного мероприятия
+    const mountPoints = mountPointStore.getMountPointsByEventId(eventId)
+    
+    for (const mountPoint of mountPoints) {
+      // Пропускаем текущую точку монтажа при редактировании
+      if (currentMountPointId && String(mountPoint.id) === String(currentMountPointId)) {
+        continue
+      }
+      
+      // Собираем ID из всех списков оборудования
+      const equipmentFields = ['equipment_plan', 'equipment_fact', 'equipment_final']
+      
+      for (const field of equipmentFields) {
+        const equipmentList = mountPoint[field]
+        if (Array.isArray(equipmentList)) {
+          equipmentList.forEach(equipmentId => {
+            if (equipmentId != null) {
+              ids.add(Number(equipmentId))
+            }
+          })
+        }
+      }
     }
+    
     return ids
   })
-  return { usedEquipmentIds }
+
+  /**
+   * Получить детальную информацию о том, где используется конкретное оборудование
+   * @param {number} equipmentId - ID оборудования
+   * @returns {Array} Список точек монтажа, где используется это оборудование
+   */
+  const getEquipmentUsageDetails = (equipmentId) => {
+    const mountPoints = mountPointStore.getMountPointsByEventId(eventId)
+    const usage = []
+    
+    for (const mountPoint of mountPoints) {
+      if (currentMountPointId && String(mountPoint.id) === String(currentMountPointId)) {
+        continue
+      }
+      
+      const equipmentFields = ['equipment_plan', 'equipment_fact', 'equipment_final']
+      
+      for (const field of equipmentFields) {
+        const equipmentList = mountPoint[field]
+        if (Array.isArray(equipmentList) && equipmentList.includes(equipmentId)) {
+          usage.push({
+            mountPointId: mountPoint.id,
+            mountPointName: mountPoint.name,
+            field: field,
+            fieldLabel: getFieldLabel(field)
+          })
+        }
+      }
+    }
+    
+    return usage
+  }
+
+  /**
+   * Проверить, доступно ли конкретное оборудование для использования
+   * @param {number} equipmentId - ID оборудования
+   * @returns {boolean} true, если оборудование доступно
+   */
+  const isEquipmentAvailable = (equipmentId) => {
+    return !usedEquipmentIds.value.has(Number(equipmentId))
+  }
+
+  /**
+   * Получить статистику использования оборудования
+   * @returns {Object} Объект со статистикой
+   */
+  const getUsageStats = () => {
+    const mountPoints = mountPointStore.getMountPointsByEventId(eventId)
+    let totalPlanned = 0
+    let totalActual = 0
+    let totalFinal = 0
+    
+    for (const mountPoint of mountPoints) {
+      if (currentMountPointId && String(mountPoint.id) === String(currentMountPointId)) {
+        continue
+      }
+      
+      totalPlanned += mountPoint.equipment_plan?.length || 0
+      totalActual += mountPoint.equipment_fact?.length || 0
+      totalFinal += mountPoint.equipment_final?.length || 0
+    }
+    
+    return {
+      totalUsed: usedEquipmentIds.value.size,
+      totalPlanned,
+      totalActual,
+      totalFinal,
+      mountPointsCount: mountPoints.length - (currentMountPointId ? 1 : 0)
+    }
+  }
+
+  return {
+    usedEquipmentIds,
+    getEquipmentUsageDetails,
+    isEquipmentAvailable,
+    getUsageStats
+  }
+}
+
+/**
+ * Вспомогательная функция для получения читаемого названия поля
+ * @param {string} field - Название поля
+ * @returns {string} Читаемое название
+ */
+function getFieldLabel(field) {
+  const labels = {
+    equipment_plan: 'Планируемое',
+    equipment_fact: 'Установленное',
+    equipment_final: 'Финальное'
+  }
+  return labels[field] || field
 } 

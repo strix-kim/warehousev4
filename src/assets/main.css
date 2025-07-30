@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
 /*
   Основной файл стилей проекта warehousev4.
   Здесь подключается Tailwind CSS v4 через @import "tailwindcss"; — это единственный обязательный импорт для работы всех утилит и кастомных тем.
@@ -5,20 +8,6 @@
   Не используйте директивы @tailwind base; @tailwind components; @tailwind utilities; — они устарели и не поддерживаются в v4.
   Подробнее: https://tailwindcss.com/docs/installation
 */
-
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
-@import "tailwindcss";
-
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  overflow-x: hidden;
-}
-*, *::before, *::after {
-  box-sizing: inherit;
-}
 
 /* Настройка цветовой палитры для Tailwind CSS v4 */
 @theme {
@@ -58,6 +47,17 @@ html, body {
   
   --color-indigo-50: #eef2ff;
   --color-indigo-700: #4338ca;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+*, *::before, *::after {
+  box-sizing: inherit;
 }
 
 /* Основной шрифт для всего проекта */

@@ -1,7 +1,5 @@
 ---
-description: 
-globs: src/**/*
-alwaysApply: false
+alwaysApply: true
 ---
 - Recommended folder structure:
   - src/

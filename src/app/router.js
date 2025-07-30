@@ -15,6 +15,10 @@ const EventDetails = () => import('@/features/event/EventDetails.vue')
 const ReportsPage = () => import('@/pages/reports-page.vue')
 const ReportDetailsPage = () => import('@/pages/report-details-page.vue')
 const UsersPage = () => import('@/pages/users-page.vue')
+const EquipmentSelectionPage = () => import('@/pages/equipment-selection-page.vue')
+const FinalEquipmentSelectionPage = () => import('@/pages/final-equipment-selection-page.vue')
+const EquipmentListsPage = () => import('@/pages/equipment-lists-page.vue')
+const EquipmentListDetailsPage = () => import('@/pages/equipment-list-details-page.vue')
 
 // Описание маршрутов приложения
 export const routes = [
@@ -55,6 +59,18 @@ export const routes = [
     // Детали точки монтажа
   },
   {
+    path: '/mount-point/:mountPointId/equipment-selection/:eventId',
+    name: 'equipment-selection',
+    component: EquipmentSelectionPage,
+    // Страница выбора оборудования для точки монтажа
+  },
+  {
+    path: '/mount-point/:mountPointId/final-equipment-selection/:eventId',
+    name: 'final-equipment-selection',
+    component: FinalEquipmentSelectionPage,
+    // Страница выбора итогового оборудования для точки монтажа
+  },
+  {
     path: '/reports',
     name: 'reports',
     component: ReportsPage,
@@ -71,6 +87,18 @@ export const routes = [
     name: 'users',
     component: UsersPage,
     // Страница пользователей
+  },
+  {
+    path: '/equipment-lists',
+    name: 'equipment-lists',
+    component: EquipmentListsPage,
+    // Страница списков оборудования
+  },
+  {
+    path: '/equipment-lists/:id',
+    name: 'equipment-list-details',
+    component: EquipmentListDetailsPage,
+    // Детальная страница списка оборудования
   },
   {
     path: '/:pathMatch(.*)*',

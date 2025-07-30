@@ -13,13 +13,13 @@
     <div class="relative">
       <input
         ref="searchInputRef"
-        :value="searchQuery"
+        :value="props.modelValue || searchQuery"
         @input="handleInput"
         @focus="handleFocus"
         @blur="handleBlur"
         @keydown="handleKeydown"
         type="text"
-        placeholder="Поиск оборудования..."
+        :placeholder="props.placeholder"
         class="w-full px-4 py-3 pl-12 pr-10 text-gray-900 bg-white border border-gray-300 rounded-lg 
                focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:outline-none
                transition-colors duration-200 placeholder-gray-500"
@@ -191,11 +191,21 @@ const props = defineProps({
   showDiagnostics: {
     type: Boolean,
     default: false
+  },
+  /** Значение для внешнего управления */
+  modelValue: {
+    type: String,
+    default: ''
+  },
+  /** Placeholder для поля ввода */
+  placeholder: {
+    type: String,
+    default: 'Поиск оборудования...'
   }
 })
 
 // Events
-const emit = defineEmits(['search', 'select'])
+const emit = defineEmits(['search', 'select', 'update:modelValue'])
 
 // Композабл с усовершенствованной системой фокуса
 const {
@@ -270,6 +280,7 @@ const handleInput = (event) => {
   }
   
   emit('search', newValue)
+  emit('update:modelValue', newValue)
 }
 
 /**

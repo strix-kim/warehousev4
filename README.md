@@ -1,4 +1,4 @@
-# Warehouse v4 — Production-ready Vue 3 + Supabase
+# Argo Media EPR System — Production-ready Vue 3 + Supabase
 
 ## Архитектура и структура
 - Feature-sliced: `src/app`, `src/pages`, `src/features`, `src/entities`, `src/shared`

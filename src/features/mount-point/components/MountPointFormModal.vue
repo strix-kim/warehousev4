@@ -132,6 +132,22 @@
         <p v-if="errors.technical_duties" class="text-sm text-red-600">{{ errors.technical_duties }}</p>
       </div>
       
+      <!-- Управление оборудованием -->
+      <div class="space-y-4">
+        <h3 class="text-base font-semibold text-gray-900 border-b border-gray-200 pb-2">
+          Оборудование
+        </h3>
+        
+        <!-- Компонент управления оборудованием -->
+        <MountPointEquipmentManager
+          :event-id="eventId"
+          :mount-point-id="isEdit ? mountPoint?.id : null"
+          :initial-data="isEdit ? mountPoint : {}"
+          @change="handleEquipmentChange"
+          @error="handleEquipmentError"
+        />
+      </div>
+
       <!-- Ответственные инженеры -->
       <div class="space-y-4">
         <h3 class="text-base font-semibold text-gray-900 border-b border-gray-200 pb-2">
@@ -221,6 +237,7 @@ import { storeToRefs } from 'pinia'
 import Modal from '@/shared/ui/molecules/Modal.vue'
 import Button from '@/shared/ui/atoms/Button.vue'
 import Spinner from '@/shared/ui/atoms/Spinner.vue'
+import MountPointEquipmentManager from './MountPointEquipmentManager.vue'
 
 // Пропсы
 const props = defineProps({
@@ -262,7 +279,9 @@ const form = ref({
   location: '',
   start_date: '',
   technical_duties: [],
-  responsible_engineers: []
+  responsible_engineers: [],
+  equipment_plan: [],
+  equipment_fact: []
 })
 
 const newDutyTitle = ref('')
@@ -305,7 +324,9 @@ function resetForm() {
       location: props.mountPoint.location || '',
       start_date: props.mountPoint.start_date || '',
       technical_duties: ensureTechnicalDutiesFormat(props.mountPoint.technical_duties || []),
-      responsible_engineers: [...(props.mountPoint.responsible_engineers || [])]
+      responsible_engineers: [...(props.mountPoint.responsible_engineers || [])],
+      equipment_plan: [...(props.mountPoint.equipment_plan || [])],
+      equipment_fact: [...(props.mountPoint.equipment_fact || [])]
     }
   } else {
     // Режим создания
@@ -314,7 +335,9 @@ function resetForm() {
       location: '',
       start_date: '',
       technical_duties: [],
-      responsible_engineers: []
+      responsible_engineers: [],
+      equipment_plan: [],
+      equipment_fact: []
     }
   }
 }
@@ -381,6 +404,17 @@ function addDuty() {
 
 function removeDuty(index) {
   form.value.technical_duties.splice(index, 1)
+}
+
+// Обработчики для управления оборудованием
+const handleEquipmentChange = (equipmentData) => {
+  form.value.equipment_plan = [...equipmentData.planned]
+  form.value.equipment_fact = [...equipmentData.actual]
+  clearErrors() // Очищаем ошибки при изменении оборудования
+}
+
+const handleEquipmentError = (errorMessage) => {
+  submitError.value = errorMessage
 }
 
 function validateForm() {

@@ -5,7 +5,7 @@
  * техническими заданиями, редактированием и удалением
  * Использует современный дизайн с синей цветовой схемой и Tailwind CSS
  */
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMountPointStore } from '@/stores/mount-point-store'
 import { useUserStore } from '@/stores/user-store'
@@ -19,6 +19,7 @@ import Icon from '@/shared/ui/atoms/Icon.vue'
 import Spinner from '@/shared/ui/atoms/Spinner.vue'
 import ErrorState from '@/shared/ui/templates/ErrorState.vue'
 import MountPointFormModal from '@/features/mount-point/components/MountPointFormModal.vue'
+import MountPointEquipmentManager from '@/features/mount-point/components/MountPointEquipmentManager.vue'
 import Modal from '@/shared/ui/molecules/Modal.vue'
 
 const route = useRoute()
@@ -41,6 +42,38 @@ const isDeleting = ref(false)
 const activeTab = ref('overview')
 const loadingDutyId = ref(null)
 const showDeleteModal = ref(false)
+
+// Инициализация активной вкладки из URL или localStorage
+const initializeActiveTab = () => {
+  // Сначала проверяем URL параметр
+  const urlTab = route.query.tab
+  if (urlTab && ['overview', 'equipment', 'team', 'duties'].includes(urlTab)) {
+    activeTab.value = urlTab
+    return
+  }
+  
+  // Если нет в URL, проверяем localStorage
+  const savedTab = localStorage.getItem(`mount-point-tab-${mountPointId}`)
+  if (savedTab && ['overview', 'equipment', 'team', 'duties'].includes(savedTab)) {
+    activeTab.value = savedTab
+  }
+}
+
+// Сохранение активной вкладки
+const saveActiveTab = (tab) => {
+  // Сохраняем в localStorage
+  localStorage.setItem(`mount-point-tab-${mountPointId}`, tab)
+  
+  // Обновляем URL без перезагрузки страницы
+  const newQuery = { ...route.query, tab }
+  router.replace({ query: newQuery })
+}
+
+// Обработчик изменения вкладки
+const handleTabChange = (tab) => {
+  activeTab.value = tab
+  saveActiveTab(tab)
+}
 
 // Computed свойства
 const mountPointData = computed(() => {
@@ -213,6 +246,27 @@ const onStatusChange = async (duty, event) => {
   }
 }
 
+// Обработчики для управления оборудованием
+const handleEquipmentSave = (equipmentData) => {
+  console.log('Оборудование сохранено:', equipmentData)
+  // Обновляем локальные данные точки монтажа, если нужно
+  if (mountPoint.value) {
+    mountPoint.value.equipment_plan = equipmentData.planned
+    mountPoint.value.equipment_fact = equipmentData.actual
+    mountPoint.value.equipment_final = equipmentData.final
+  }
+}
+
+const handleEquipmentChange = (equipmentData) => {
+  // Можно добавить валидацию или другую логику при изменении
+  console.log('Оборудование изменено:', equipmentData)
+}
+
+const handleEquipmentError = (errorMessage) => {
+  console.error('Ошибка управления оборудованием:', errorMessage)
+  // Можно показать уведомление пользователю
+}
+
 // Загрузка данных
 onMounted(async () => {
   // Параллельно загружаем пользователей, оборудование и события, если их нет
@@ -221,10 +275,19 @@ onMounted(async () => {
     equipments.value.length ? Promise.resolve() : equipmentStore.loadEquipments(),
     eventStore.events.length ? Promise.resolve() : eventStore.loadEvents()
   ])
+  // Инициализируем активную вкладку
+  initializeActiveTab()
   // Затем загружаем точку монтажа
   const data = await mountPointStore.loadMountPointById(mountPointId)
   if (data) {
     mountPoint.value = data
+  }
+})
+
+// Отслеживаем изменения URL для восстановления вкладки
+watch(() => route.query.tab, (newTab) => {
+  if (newTab && ['overview', 'equipment', 'team', 'duties'].includes(newTab)) {
+    activeTab.value = newTab
   }
 })
 </script>
@@ -387,7 +450,7 @@ onMounted(async () => {
         <div class="border-b border-gray-200">
           <nav class="flex space-x-8 px-8" aria-label="Tabs">
             <button
-              @click="activeTab = 'overview'"
+              @click="handleTabChange('overview')"
               :class="[
                 'py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200',
                 activeTab === 'overview'
@@ -402,7 +465,7 @@ onMounted(async () => {
             </button>
             
             <button
-              @click="activeTab = 'equipment'"
+              @click="handleTabChange('equipment')"
               :class="[
                 'py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200',
                 activeTab === 'equipment'
@@ -417,7 +480,7 @@ onMounted(async () => {
             </button>
             
             <button
-              @click="activeTab = 'team'"
+              @click="handleTabChange('team')"
               :class="[
                 'py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200',
                 activeTab === 'team'
@@ -432,7 +495,7 @@ onMounted(async () => {
             </button>
             
             <button
-              @click="activeTab = 'duties'"
+              @click="handleTabChange('duties')"
               :class="[
                 'py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200',
                 activeTab === 'duties'
@@ -522,41 +585,15 @@ onMounted(async () => {
           
           <!-- Таб Оборудование -->
           <div v-if="activeTab === 'equipment'" class="space-y-6">
-            <!-- Планируемое оборудование -->
-            <div>
-              <h3 class="text-lg font-semibold text-gray-900 mb-4">Планируемое оборудование</h3>
-              <div v-if="plannedEquipment.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div 
-                  v-for="equipment in plannedEquipment" 
-                  :key="`plan-${equipment.id}`"
-                  class="bg-blue-50 border border-blue-200 rounded-lg p-4"
-                >
-                  <h4 class="font-medium text-gray-900 mb-1">{{ equipment.name }}</h4>
-                  <p class="text-sm text-gray-600">{{ equipment.category }}</p>
-                  <p class="text-sm text-blue-600 mt-2">{{ equipment.serial_number }}</p>
-                </div>
-              </div>
-              <!-- Если оборудование не запланировано, показываем подпись -->
-              <p v-else class="text-gray-400 italic">ещё не заполнено</p>
-            </div>
-            
-            <!-- Фактическое оборудование -->
-            <div>
-              <h3 class="text-lg font-semibold text-gray-900 mb-4">Установленное оборудование</h3>
-              <div v-if="actualEquipment.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div 
-                  v-for="equipment in actualEquipment" 
-                  :key="`fact-${equipment.id}`"
-                  class="bg-green-50 border border-green-200 rounded-lg p-4"
-                >
-                  <h4 class="font-medium text-gray-900 mb-1">{{ equipment.name }}</h4>
-                  <p class="text-sm text-gray-600">{{ equipment.category }}</p>
-                  <p class="text-sm text-green-600 mt-2">{{ equipment.serial_number }}</p>
-                </div>
-              </div>
-              <!-- Если оборудование не установлено, показываем подпись -->
-              <p v-else class="text-gray-400 italic">ещё не заполнено</p>
-            </div>
+            <!-- Интерактивное управление оборудованием -->
+            <MountPointEquipmentManager
+              :event-id="String(mountPointData.event_id)"
+              :mount-point-id="String(mountPointData.id)"
+              :initial-data="mountPointData"
+              @save="handleEquipmentSave"
+              @change="handleEquipmentChange"
+              @error="handleEquipmentError"
+            />
           </div>
           
           <!-- Таб Команда -->

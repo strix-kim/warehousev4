@@ -4,7 +4,7 @@
 // Используется на страницах и в компонентах, где требуется доступ к списку и операциям с оборудованием
 
 import { defineStore } from 'pinia'
-import { fetchEquipmentsPaged, addEquipment, updateEquipment, deleteEquipment } from '@/features/equipment/equipmentApi'
+import { fetchEquipmentsPaged, fetchEquipments, addEquipment, updateEquipment, deleteEquipment } from '@/features/equipment/equipmentApi'
 import { useAuthStore } from '@/stores/auth-store'
 
 export const useEquipmentStore = defineStore('equipment', {
@@ -21,7 +21,7 @@ export const useEquipmentStore = defineStore('equipment', {
       location: ''
     },
     page: 1,
-    limit: 30,
+    limit: 100, // Увеличиваем базовый лимит
     total: 0,
   }),
 
@@ -30,11 +30,36 @@ export const useEquipmentStore = defineStore('equipment', {
     activeEquipments(state) {
       return state.equipments.filter(e => e.status === 'active')
     },
+    
+    // Получить оборудование по ID
+    getEquipmentById: (state) => (id) => {
+      return state.equipments.find(equipment => equipment.id === id)
+    },
   },
 
   actions: {
     /**
-     * Загрузить список оборудования с учётом фильтров и пагинации
+     * Загрузить ВСЁ оборудование без пагинации (для селекторов)
+     */
+    async loadAllEquipments() {
+      this.loading = true
+      this.error = null
+      try {
+        // Загружаем ВСЁ оборудование для селекторов
+        const { data, error } = await fetchEquipments()
+        if (error) throw error
+        this.equipments = data || []
+        this.total = this.equipments.length
+      } catch (e) {
+        this.error = e.message || 'Ошибка загрузки оборудования'
+        this.equipments = []
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * Загрузить список оборудования с учётом фильтров и пагинации (для таблиц)
      */
     async loadEquipments() {
       this.loading = true

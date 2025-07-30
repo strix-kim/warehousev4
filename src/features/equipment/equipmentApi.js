@@ -5,10 +5,26 @@
 import { supabase } from '@/shared/api/supabase'
 
 /**
- * Получить список оборудования
+ * Получить список оборудования (без ограничений для селекторов)
  */
 export async function fetchEquipments() {
-  return await supabase.from('equipments').select('*')
+  // Для селекторов загружаем ВСЁ оборудование с сортировкой
+  return await supabase
+    .from('equipments')
+    .select('*')
+    .order('brand', { ascending: true })
+    .order('model', { ascending: true })
+}
+
+/**
+ * Получить ограниченный список для таблиц (с лимитом)
+ */
+export async function fetchEquipmentsLimited(limit = 100) {
+  return await supabase
+    .from('equipments')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
 }
 
 /**

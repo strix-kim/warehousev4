@@ -12,13 +12,17 @@ import { useRoute, useRouter } from 'vue-router'
 import { useEventStore } from '@/stores/event-store'
 import { useMountPointStore } from '@/stores/mount-point-store'
 import { useUserStore } from '@/stores/user-store'
+import { useEventEquipmentStore } from '@/stores/event-equipment-store'
+import { useEquipmentListsStore } from '@/stores/equipment-lists-store'
 import { storeToRefs } from 'pinia'
 import { addReport } from '@/features/report/reportApi'
+import { supabase } from '@/shared/api/supabase'
 import Spinner from '@/shared/ui/atoms/Spinner.vue'
 import Button from '@/shared/ui/atoms/Button.vue'
 import EventEditor from './EventEditor.vue'
 import MountPointList from '@/features/mount-point/components/MountPointList.vue'
 import MountPointFormModal from '@/features/mount-point/components/MountPointFormModal.vue'
+import EventEquipmentList from './components/EventEquipmentList.vue'
 import Icon from '@/shared/ui/atoms/Icon.vue'
 
 const route = useRoute()
@@ -35,7 +39,11 @@ const { users, loading: isUsersLoading } = storeToRefs(userStore)
 
 // Локальное состояние
 const isReportLoading = ref(false)
+const isArchiveLoading = ref(false)
+const isSecurityListLoading = ref(false)
 const reportError = ref(null)
+const reportSuccess = ref(null)
+const securityListSuccess = ref(null)
 const showEditor = ref(false)
 const showMountPointForm = ref(false)
 const activeTab = ref('overview')
@@ -196,16 +204,40 @@ const afterEditSubmit = async () => {
   await eventStore.loadEventById(eventId, false, true)
 }
 
-const handleArchive = async () => {
+// Функция для формирования отчета
+const generateReport = async () => {
   isReportLoading.value = true
   reportError.value = null
   try {
-    // Получаем точки монтажа для архивирования
+    // Получаем точки монтажа для отчета
     const eventMountPoints = mountPointStore.getMountPointsByEventId(eventId)
+    
+    // Загружаем детальную информацию об оборудовании для отчета
+    const eventEquipmentStore = useEventEquipmentStore()
+    await eventEquipmentStore.loadEventAllocation(eventId)
+    
+    // Получаем детальные списки оборудования
+    const securityEquipmentList = eventEquipmentStore.securityEquipmentList
+    const reportEquipmentList = eventEquipmentStore.reportEquipmentList
+    const allocationStats = eventEquipmentStore.allocationStats
     
     const reportData = {
       event: { ...eventStore.getEventById(eventId) },
-      mount_points: eventMountPoints
+      mount_points: eventMountPoints,
+      equipment: {
+        security: {
+          list: securityEquipmentList,
+          count: securityEquipmentList.length,
+          description: 'Список оборудования для охраны (планируемое оборудование всех точек монтажа)'
+        },
+        report: {
+          list: reportEquipmentList,
+          count: reportEquipmentList.length,
+          unique_count: new Set(reportEquipmentList.map(item => item.equipmentId)).size,
+          description: 'Детальный список оборудования для отчета (планируемое и итоговое с указанием точек монтажа)'
+        },
+        statistics: allocationStats
+      }
     }
     
     const { data: reportInsertData, error: repErr } = await addReport({
@@ -214,12 +246,72 @@ const handleArchive = async () => {
     })
     if (repErr) throw repErr
     
+    // Показываем уведомление об успехе
+    reportError.value = null
+    reportSuccess.value = 'Отчет успешно создан!'
+    setTimeout(() => {
+      reportSuccess.value = null
+    }, 3000)
+    
+  } catch (e) {
+    reportSuccess.value = null
+    reportError.value = e.message || 'Ошибка формирования отчета'
+  } finally {
+    isReportLoading.value = false
+  }
+}
+
+// Функция для создания списка охраны
+const generateSecurityList = async () => {
+  isSecurityListLoading.value = true
+  securityListSuccess.value = null
+  
+  try {
+    // Проверяем авторизацию
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      throw new Error('Необходима авторизация для создания списков')
+    }
+    
+    const equipmentListsStore = useEquipmentListsStore()
+    const event = eventStore.getEventById(eventId)
+    const listName = `Список охраны - ${event?.name || 'Мероприятие'} - ${new Date().toLocaleDateString()}`
+    
+    const result = await equipmentListsStore.generateSecurityList(eventId, listName)
+    
+    if (result) {
+      securityListSuccess.value = 'Список охраны успешно создан!'
+      setTimeout(() => {
+        securityListSuccess.value = null
+      }, 3000)
+    } else {
+      throw new Error('Не удалось создать список охраны')
+    }
+  } catch (e) {
+    console.error('Ошибка создания списка охраны:', e)
+    // Показываем ошибку пользователю
+    securityListSuccess.value = null
+    // Можно добавить состояние для ошибки, если нужно
+  } finally {
+    isSecurityListLoading.value = false
+  }
+}
+
+// Функция для архивирования мероприятия
+const handleArchive = async () => {
+  isArchiveLoading.value = true
+  reportError.value = null
+  try {
+    // Сначала формируем отчет
+    await generateReport()
+    
+    // Затем удаляем мероприятие
     await eventStore.deleteEvent(eventId)
     router.push('/reports')
   } catch (e) {
     reportError.value = e.message || 'Ошибка архивирования мероприятия'
   } finally {
-    isReportLoading.value = false
+    isArchiveLoading.value = false
   }
 }
 
@@ -250,6 +342,40 @@ onMounted(async () => {
 <template>
   <!-- Контейнер страницы с фоном -->
   <div class="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
+    <!-- Уведомления -->
+                <div v-if="reportSuccess" class="fixed top-4 right-4 z-50">
+              <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg shadow-lg">
+                <div class="flex items-center gap-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  {{ reportSuccess }}
+                </div>
+              </div>
+            </div>
+            
+            <div v-if="securityListSuccess" class="fixed top-16 right-4 z-50">
+              <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-lg shadow-lg">
+                <div class="flex items-center gap-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  {{ securityListSuccess }}
+                </div>
+              </div>
+            </div>
+            
+            <div v-if="reportError" class="fixed top-4 right-4 z-50">
+              <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg">
+                <div class="flex items-center gap-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                  {{ reportError }}
+                </div>
+              </div>
+            </div>
+    
     <!-- Лоадер -->
     <div v-if="isLoading" class="flex items-center justify-center min-h-screen">
       <Spinner size="lg" />
@@ -393,11 +519,35 @@ onMounted(async () => {
               Добавить точку
             </Button>
             
+                            <Button 
+                  @click="generateReport" 
+                  variant="success" 
+                  size="sm"
+                  :loading="isReportLoading"
+                >
+                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                  Сформировать отчет
+                </Button>
+                
+                <Button 
+                  @click="generateSecurityList" 
+                  variant="primary" 
+                  size="sm"
+                  :loading="isSecurityListLoading"
+                >
+                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                  </svg>
+                  Список охраны
+                </Button>
+            
             <Button 
               @click="handleArchive" 
               variant="danger" 
               size="sm"
-              :loading="isReportLoading"
+              :loading="isArchiveLoading"
               class="ml-auto"
             >
               <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -476,6 +626,23 @@ onMounted(async () => {
                 Техзадание
               </div>
             </button>
+            
+            <button
+              @click="activeTab = 'equipment'"
+              :class="[
+                'py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200',
+                activeTab === 'equipment'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ]"
+            >
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                Список оборудования
+              </div>
+            </button>
           </nav>
         </div>
         
@@ -503,6 +670,11 @@ onMounted(async () => {
                 </div>
               </div>
             </div>
+          </div>
+          
+          <!-- Таб Список оборудования -->
+          <div v-if="activeTab === 'equipment'" class="space-y-6">
+            <EventEquipmentList :event-id="eventId" />
           </div>
         </div>
       </section>

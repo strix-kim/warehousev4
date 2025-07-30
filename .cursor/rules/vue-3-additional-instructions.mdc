@@ -1,7 +1,5 @@
 ---
-description: 
-globs: src/**/*
-alwaysApply: false
+alwaysApply: true
 ---
 - Utilize Vue 3's Teleport component when needed
 - Use Suspense for async components

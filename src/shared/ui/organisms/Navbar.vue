@@ -1,8 +1,8 @@
 <template>
   <header class="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
     <div class="max-w-7xl mx-auto">
-      <div class="flex justify-between items-center h-16 px-4 sm:px-6 lg:px-8">
-        <!-- Логотип с SVG-иконкой Box -->
+      <div class="flex justify-between items-center h-20 px-4 sm:px-6 lg:px-8">
+        <!-- Логотип с изображением -->
         <div 
           class="flex items-center gap-3 cursor-pointer select-none hover:opacity-80 transition"
           @click="handleLogoClick"
@@ -10,10 +10,24 @@
           @keydown.enter="handleLogoClick"
           aria-label="На главную"
         >
-          <Icon name="Box" set="lucide" size="lg" class="text-blue-500" />
+          <img 
+            src="/logo.png" 
+            alt="Argo Media Logo" 
+            class="w-12 h-12 object-contain"
+            @error="showFallbackIcon = true"
+            v-show="!showFallbackIcon"
+          />
+          <!-- Fallback иконка если изображение не загрузится -->
+          <Icon 
+            v-show="showFallbackIcon"
+            name="Box" 
+            set="lucide" 
+            size="lg" 
+            class="text-blue-500 w-12 h-12"
+          />
           <div>
-            <h1 class="text-lg font-bold text-gray-900">Argo Media</h1>
-            <span class="text-xs text-gray-500 hidden sm:block">Warehouse System</span>
+            <h1 class="text-xl font-bold text-gray-900">Argo Media</h1>
+            <span class="text-sm text-gray-500 hidden sm:block">EPR System</span>
           </div>
         </div>
         <!-- Desktop навигация -->
@@ -110,6 +124,7 @@ const emit = defineEmits(['navigate', 'logout'])
 const route = useRoute()
 const router = useRouter()
 const isMobileMenuOpen = ref(false)
+const showFallbackIcon = ref(false)
 
 const isCurrentRoute = (routePath) => {
   return route.path === routePath || (routePath === '/' && route.path === '/home')

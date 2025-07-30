@@ -86,20 +86,24 @@ const isFormValid = computed(() => {
 <template>
   <!-- Современная страница логина: фирменная svg-иконка, центрирование, без лишнего скролла -->
   <div class="min-h-screen bg-gray-50 flex items-center justify-center">
-    <div class="w-full max-w-md space-y-8">
+    <div class="w-full max-w-md space-y-6 px-4">
       <!-- Логотип и заголовок -->
       <div class="flex flex-col items-center">
-        <!-- Фирменная box-иконка (lucide) -->
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-12 h-12 mb-2 text-blue-500"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>
-        <h1 class="text-2xl font-bold text-gray-900">Argo Media</h1>
-        <h2 class="mt-4 text-center text-3xl font-bold text-gray-900">Вход в систему</h2>
-        <p class="mt-2 text-center text-sm text-gray-600">
+        <!-- Логотип Argo Media -->
+        <img 
+          src="/logo.png" 
+          alt="Argo Media Logo" 
+          class="w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 mb-4 object-contain max-w-full"
+        />
+        <h1 class="text-xl font-bold text-gray-900">EPR System</h1>
+        <h2 class="mt-2 text-center text-2xl font-bold text-gray-900">Вход в систему</h2>
+        <p class="mt-1 text-center text-sm text-gray-600">
           Управление видеооборудованием и мероприятиями
         </p>
       </div>
       <!-- Форма входа -->
-      <div class="bg-white py-8 px-4 shadow-sm rounded-xl border border-gray-200 sm:px-10">
-        <form class="space-y-6" @submit.prevent="handleLogin">
+      <div class="bg-white py-6 px-4 shadow-sm rounded-xl border border-gray-200 sm:px-6">
+        <form class="space-y-4" @submit.prevent="handleLogin">
           <!-- Поле email -->
           <FormField label="Email" id="email">
             <Input
@@ -150,7 +154,7 @@ const isFormValid = computed(() => {
           />
         </form>
         <!-- Дополнительная информация -->
-        <div class="mt-6">
+        <div class="mt-4">
           <div class="text-center">
             <p class="text-xs text-gray-500">
               Возникли проблемы? Обратитесь к администратору

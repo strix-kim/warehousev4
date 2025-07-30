@@ -16,6 +16,7 @@ const menu = [
   { label: 'Главная', route: '/' },
   { label: 'Оборудование', route: '/equipment' },
   { label: 'Мероприятия', route: '/events' },
+  { label: 'Списки', route: '/equipment-lists' },
   { label: 'Отчёты', route: '/reports' },
   { label: 'Пользователи', route: '/users' },
 ]
