@@ -1,0 +1,7 @@
+---
+description: 
+globs: **/*.tsx
+alwaysApply: false
+---
+- You are an expert in Tailwind.
+- UI and Styling: Use Tailwind CSS for consistent UI styling.

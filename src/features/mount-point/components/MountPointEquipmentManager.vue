@@ -12,7 +12,7 @@
           <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
             <Icon name="Calendar" set="lucide" size="lg" class="text-blue-600" />
           </div>
-        </div>
+    </div>
         <div class="flex-1">
           <h3 class="text-lg font-semibold text-blue-900 mb-1">
             Планируемое оборудование
@@ -23,8 +23,8 @@
               : 'Создайте список оборудования, которое планируется использовать на данной точке монтажа'
             }}
           </p>
-        </div>
       </div>
+    </div>
 
       <div class="flex flex-col sm:flex-row gap-3">
         <Button
@@ -91,12 +91,12 @@
     <div v-else class="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
       <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
         <Icon name="Package" set="lucide" size="lg" class="text-gray-400" />
-      </div>
+             </div>
       <h4 class="text-lg font-medium text-gray-900 mb-2">Список еще не сформирован</h4>
       <p class="text-sm text-gray-600">
         Нажмите кнопку выше, чтобы создать список планируемого оборудования
       </p>
-    </div>
+           </div>
 
     <!-- Кнопка формирования итогового списка -->
     <div class="bg-green-50 border border-green-200 rounded-lg p-6">
@@ -104,8 +104,8 @@
         <div class="flex-shrink-0">
           <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
             <Icon name="CheckCircle" set="lucide" size="lg" class="text-green-600" />
-          </div>
-        </div>
+             </div>
+           </div>
         <div class="flex-1">
           <h3 class="text-lg font-semibold text-green-900 mb-1">
             Итоговое оборудование
@@ -115,12 +115,12 @@
               ? `В списке ${props.initialData.equipment_final?.length || 0} единиц оборудования. Нажмите кнопку для изменения.`
               : 'Создайте итоговый список оборудования, которое будет использоваться на данной точке монтажа'
             }}
-          </p>
-        </div>
-      </div>
+           </p>
+         </div>
+       </div>
 
       <div class="flex flex-col sm:flex-row gap-3">
-        <Button
+               <Button
           @click="openFinalListModal"
           variant="primary"
           size="lg"
@@ -129,9 +129,9 @@
         >
           <Icon :name="finalButtonIcon" set="lucide" size="sm" class="mr-2" />
           {{ finalButtonText }}
-        </Button>
-      </div>
-    </div>
+               </Button>
+             </div>
+           </div>
 
     <!-- Список итогового оборудования -->
     <div v-if="hasFinalEquipment" class="bg-white border border-gray-200 rounded-lg shadow-sm">
@@ -142,7 +142,7 @@
         <p class="text-sm text-gray-600 mt-1">
           {{ finalEquipmentList.length }} единиц оборудования
         </p>
-      </div>
+         </div>
 
       <div class="divide-y divide-gray-200">
         <div
@@ -155,10 +155,10 @@
               <div class="flex items-center gap-3">
                 <div class="flex-shrink-0">
                   <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                    <Icon name="Package" set="lucide" size="sm" class="text-green-600" />
+               <Icon name="Package" set="lucide" size="sm" class="text-green-600" />
                   </div>
                 </div>
-                <div class="flex-1 min-w-0">
+               <div class="flex-1 min-w-0">
                   <h5 class="text-sm font-medium text-gray-900 truncate">
                     {{ equipment.brand }} {{ equipment.model }}
                   </h5>
@@ -172,28 +172,28 @@
                       <span v-if="getStatusConfig(equipment.status).icon" class="mr-1">{{ getStatusConfig(equipment.status).icon }}</span>
                       {{ getStatusConfig(equipment.status).label }}
                     </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
+             </div>
+           </div>
+         </div>
+       </div>
+     </div>
+       </div>
+         </div>
+         </div>
+         
     <!-- Заглушка, если итоговый список пуст -->
     <div v-else class="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
       <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
         <Icon name="Package" set="lucide" size="lg" class="text-gray-400" />
-      </div>
+       </div>
       <h4 class="text-lg font-medium text-gray-900 mb-2">Итоговый список еще не сформирован</h4>
       <p class="text-sm text-gray-600">
         {{ hasPlannedEquipment
           ? 'Нажмите кнопку выше, чтобы создать итоговый список оборудования'
           : 'Сначала создайте планируемый список оборудования'
         }}
-      </p>
-    </div>
+         </p>
+       </div>
   </div>
 </template>
 

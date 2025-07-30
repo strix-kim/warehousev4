@@ -2,6 +2,7 @@
 /**
  * Страница управления списками оборудования
  * Просмотр, создание, редактирование и экспорт списков
+ * АДАПТИРОВАНО: приведено в соответствие с дизайном других страниц
  */
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -58,6 +59,41 @@ const filteredLists = computed(() => {
   return filtered
 })
 
+// Статистика
+const statistics = computed(() => {
+  const activeLists = lists.value.filter(list => !list.is_archived)
+  const archivedLists = lists.value.filter(list => list.is_archived)
+  const securityLists = lists.value.filter(list => list.type === 'security')
+  const reportLists = lists.value.filter(list => list.type === 'report')
+  
+  return [
+    {
+      title: 'Всего списков',
+      value: lists.value.length,
+      icon: 'List',
+      color: 'bg-blue-500'
+    },
+    {
+      title: 'Активные',
+      value: activeLists.length,
+      icon: 'CheckCircle',
+      color: 'bg-green-500'
+    },
+    {
+      title: 'Для охраны',
+      value: securityLists.length,
+      icon: 'Shield',
+      color: 'bg-purple-500'
+    },
+    {
+      title: 'Отчеты',
+      value: reportLists.length,
+      icon: 'FileText',
+      color: 'bg-orange-500'
+    }
+  ]
+})
+
 const typeLabels = {
   security: 'Охрана',
   report: 'Отчет',
@@ -71,22 +107,8 @@ const typeColors = {
 }
 
 // Методы
-const handleCreateSecurityList = async (eventId) => {
-  const name = `Список охраны - ${new Date().toLocaleDateString()}`
-  const result = await equipmentListsStore.generateSecurityList(eventId, name)
-  
-  if (result) {
-    // Показываем уведомление об успехе
-    console.log('Список охраны создан:', result)
-  }
-}
-
 const handleViewList = (listId) => {
   router.push(`/equipment-lists/${listId}`)
-}
-
-const handleEditList = (listId) => {
-  router.push(`/equipment-lists/${listId}/edit`)
 }
 
 const handleArchiveList = async (listId) => {
@@ -97,11 +119,6 @@ const handleDeleteList = async (listId) => {
   if (confirm('Вы уверены, что хотите удалить этот список?')) {
     await equipmentListsStore.deleteList(listId)
   }
-}
-
-const handleExportPDF = (listId) => {
-  // TODO: Реализовать экспорт в PDF
-  console.log('Экспорт в PDF для списка:', listId)
 }
 
 const formatDate = (dateString) => {
@@ -122,11 +139,43 @@ onMounted(async () => {
 </script>
 
 <template>
+  <!--
+    Страница управления списками оборудования
+    Архитектура: фоновый паттерн + breadcrumbs + заголовок + статистика + фильтры + список
+    АДАПТИРОВАНО: приведено в соответствие с дизайном других страниц
+  -->
   <div class="min-h-screen bg-gray-50">
-    <!-- Заголовок страницы -->
-    <div class="bg-white border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div class="flex items-center justify-between">
+    <!-- Фоновый паттерн -->
+    <div class="absolute inset-0 w-full h-full pointer-events-none select-none opacity-40 z-0" aria-hidden="true">
+      <div style="width:100%;height:100%;background-image:url('data:image/svg+xml,%3Csvg width=\'40\' height=\'40\' viewBox=\'0 0 40 40\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Crect x=\'0\' y=\'0\' width=\'40\' height=\'40\' fill=\'none\'/%3E%3Cpath d=\'M 40 0 L 0 0 0 40\' stroke=\'%23e5e7eb\' stroke-width=\'1\'/%3E%3C/svg%3E');background-size:40px 40px;background-repeat:repeat;"></div>
+    </div>
+
+    <!-- Основной контейнер -->
+    <div class="relative z-10 max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4">
+      <!-- Breadcrumbs -->
+      <nav class="flex items-center mb-6" aria-label="Breadcrumb">
+        <ol class="inline-flex items-center space-x-1 md:space-x-3">
+          <li class="inline-flex items-center">
+            <button 
+              @click="router.push('/')"
+              class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+            >
+              <Icon name="Home" set="lucide" size="sm" />
+              Главная
+            </button>
+          </li>
+          <li aria-current="page">
+            <div class="inline-flex items-center gap-2">
+              <Icon name="ChevronRight" set="lucide" size="sm" class="text-gray-400" />
+              <span class="text-sm font-medium text-gray-500">Списки оборудования</span>
+            </div>
+          </li>
+        </ol>
+      </nav>
+
+      <!-- Заголовок страницы -->
+      <div class="mb-8">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 class="text-3xl font-bold text-gray-900">Списки оборудования</h1>
             <p class="mt-2 text-sm text-gray-600">
@@ -138,16 +187,35 @@ onMounted(async () => {
             @click="router.push('/equipment-lists/create')"
             variant="primary"
             size="lg"
+            class="w-full sm:w-auto"
           >
             <Icon name="Plus" set="lucide" size="sm" class="mr-2" />
             Создать список
           </Button>
         </div>
       </div>
-    </div>
 
-    <!-- Основной контент -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- Статистические карточки -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <Card
+          v-for="stat in statistics"
+          :key="stat.title"
+          class="text-center"
+        >
+          <div class="flex items-center justify-center">
+            <div class="flex-shrink-0">
+              <div class="flex items-center justify-center h-12 w-12 rounded-md text-white" :class="stat.color">
+                <Icon :name="stat.icon" set="lucide" size="md" />
+              </div>
+            </div>
+            <div class="ml-4">
+              <p class="text-sm font-medium text-gray-500">{{ stat.title }}</p>
+              <p class="text-2xl font-semibold text-gray-900">{{ stat.value }}</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
       <!-- Фильтры и поиск -->
       <div class="mb-8 space-y-4">
         <!-- Вкладки -->
@@ -242,7 +310,8 @@ onMounted(async () => {
         <Card
           v-for="list in filteredLists"
           :key="list.id"
-          class="hover:shadow-lg transition-shadow duration-200"
+          class="hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+          @click="handleViewList(list.id)"
         >
           <div class="flex items-start justify-between">
             <div class="flex-1">
@@ -277,36 +346,13 @@ onMounted(async () => {
             </div>
             
             <!-- Действия -->
-            <div class="flex items-center gap-2">
-              <Button
-                @click="handleViewList(list.id)"
-                variant="ghost"
-                size="sm"
-              >
-                <Icon name="Eye" set="lucide" size="sm" />
-              </Button>
-              
-              <Button
-                @click="handleEditList(list.id)"
-                variant="ghost"
-                size="sm"
-              >
-                <Icon name="Edit" set="lucide" size="sm" />
-              </Button>
-              
-              <Button
-                @click="handleExportPDF(list.id)"
-                variant="ghost"
-                size="sm"
-              >
-                <Icon name="Download" set="lucide" size="sm" />
-              </Button>
-              
+            <div class="flex items-center gap-2" @click.stop>
               <Button
                 v-if="!list.is_archived"
                 @click="handleArchiveList(list.id)"
                 variant="ghost"
                 size="sm"
+                title="Архивировать"
               >
                 <Icon name="Archive" set="lucide" size="sm" />
               </Button>
@@ -316,6 +362,7 @@ onMounted(async () => {
                 variant="ghost"
                 size="sm"
                 class="text-red-600 hover:text-red-700"
+                title="Удалить"
               >
                 <Icon name="Trash2" set="lucide" size="sm" />
               </Button>
