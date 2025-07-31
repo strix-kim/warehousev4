@@ -41,7 +41,7 @@ const { equipments } = storeToRefs(equipmentStore)
 // Computed свойства
 const equipmentList = computed(() => {
   if (props.type === 'security') {
-    // Для охраны - простой список ID
+    // Для постов охраны - простой список ID
     return props.equipmentIds
       .map(id => equipments.value.find(e => e.id === id))
       .filter(Boolean)

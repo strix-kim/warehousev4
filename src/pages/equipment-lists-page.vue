@@ -80,7 +80,7 @@ const statistics = computed(() => {
       color: 'bg-green-500'
     },
     {
-      title: 'Для охраны',
+      title: 'Оборудование',
       value: securityLists.length,
       icon: 'Shield',
       color: 'bg-purple-500'
@@ -95,7 +95,7 @@ const statistics = computed(() => {
 })
 
 const typeLabels = {
-  security: 'Охрана',
+  security: 'Оборудование',
   report: 'Отчет',
   custom: 'Кастомный'
 }
@@ -179,7 +179,7 @@ onMounted(async () => {
           <div>
             <h1 class="text-3xl font-bold text-gray-900">Списки оборудования</h1>
             <p class="mt-2 text-sm text-gray-600">
-              Управление списками оборудования для охраны, отчетов и других целей
+              Управление списками оборудования для постов охраны, отчетов и других целей
             </p>
           </div>
           
@@ -264,7 +264,7 @@ onMounted(async () => {
             class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="all">Все типы</option>
-            <option value="security">Охрана</option>
+            <option value="security">Оборудование</option>
             <option value="report">Отчет</option>
             <option value="custom">Кастомный</option>
           </select>

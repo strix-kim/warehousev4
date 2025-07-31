@@ -37,8 +37,8 @@ CREATE TRIGGER trigger_update_equipment_lists_updated_at
   EXECUTE FUNCTION update_equipment_lists_updated_at();
 
 -- Комментарии к таблице
-COMMENT ON TABLE equipment_lists IS 'Списки оборудования для различных целей (охрана, отчеты, кастомные)';
-COMMENT ON COLUMN equipment_lists.type IS 'Тип списка: security - для охраны, report - для отчетов, custom - кастомный';
+COMMENT ON TABLE equipment_lists IS 'Списки оборудования для различных целей (посты охраны, отчеты, кастомные)';
+COMMENT ON COLUMN equipment_lists.type IS 'Тип списка: security - для постов охраны, report - для отчетов, custom - кастомный';
 COMMENT ON COLUMN equipment_lists.equipment_ids IS 'Массив ID оборудования в списке';
 COMMENT ON COLUMN equipment_lists.metadata IS 'Дополнительные данные (статистика, настройки экспорта и т.д.)';
 COMMENT ON COLUMN equipment_lists.is_archived IS 'Флаг архивирования списка'; 

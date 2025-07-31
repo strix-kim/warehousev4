@@ -81,24 +81,17 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <!-- Список для охраны -->
-    <div class="bg-white rounded-lg shadow">
-      <div class="p-6 border-b border-gray-200">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-lg font-semibold text-gray-900">
-              Список оборудования для охраны
-            </h3>
-            <p class="text-sm text-gray-600 mt-1">
-              Планируемое оборудование всех точек монтажа
-            </p>
-          </div>
-                     <div class="flex items-center gap-2">
-             <Icon name="Shield" set="lucide" size="md" class="text-blue-600" />
-             <span class="text-sm font-medium text-blue-600">
-               {{ (securityEquipmentList || []).length }} единиц
-             </span>
-           </div>
+    <!-- Список для постов охраны -->
+    <div class="bg-white rounded-lg border border-gray-200 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-lg font-semibold text-gray-900">
+          Список оборудования для постов охраны
+        </h3>
+        <div class="flex items-center gap-2">
+          <Icon name="Shield" set="lucide" size="md" class="text-blue-600" />
+          <span class="text-sm font-medium text-blue-600">
+            {{ (securityEquipmentList || []).length }} единиц
+          </span>
         </div>
       </div>
       

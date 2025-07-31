@@ -228,7 +228,7 @@ const generateReport = async () => {
         security: {
           list: securityEquipmentList,
           count: securityEquipmentList.length,
-          description: 'Список оборудования для охраны (планируемое оборудование всех точек монтажа)'
+          description: 'Список оборудования для постов охраны (планируемое оборудование всех точек монтажа)'
         },
         report: {
           list: reportEquipmentList,
@@ -275,20 +275,20 @@ const generateSecurityList = async () => {
     
     const equipmentListsStore = useEquipmentListsStore()
     const event = eventStore.getEventById(eventId)
-    const listName = `Список охраны - ${event?.name || 'Мероприятие'} - ${new Date().toLocaleDateString()}`
+    const listName = `Список оборудования - ${event?.name || 'Мероприятие'} - ${new Date().toLocaleDateString()}`
     
     const result = await equipmentListsStore.generateSecurityList(eventId, listName)
     
     if (result) {
-      securityListSuccess.value = 'Список охраны успешно создан!'
+      securityListSuccess.value = 'Список оборудования успешно создан!'
       setTimeout(() => {
         securityListSuccess.value = null
       }, 3000)
     } else {
-      throw new Error('Не удалось создать список охраны')
+      throw new Error('Не удалось создать список оборудования')
     }
   } catch (e) {
-    console.error('Ошибка создания списка охраны:', e)
+    console.error('Ошибка создания списка оборудования:', e)
     // Показываем ошибку пользователю
     securityListSuccess.value = null
     // Можно добавить состояние для ошибки, если нужно
@@ -341,7 +341,7 @@ onMounted(async () => {
 
 <template>
   <!-- Контейнер страницы с фоном -->
-  <div class="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
+  <div class="min-h-screen bg-gray-50">
     <!-- Уведомления -->
                 <div v-if="reportSuccess" class="fixed top-4 right-4 z-50">
               <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg shadow-lg">
@@ -540,7 +540,7 @@ onMounted(async () => {
                   <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                   </svg>
-                  Список охраны
+                  Сгенерировать список оборудования
                 </Button>
             
             <Button 

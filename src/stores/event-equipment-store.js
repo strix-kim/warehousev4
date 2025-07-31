@@ -150,7 +150,7 @@ export const useEventEquipmentStore = defineStore('eventEquipment', {
       }
     },
 
-    // Список оборудования для охраны (только планируемое)
+    // Список оборудования для постов охраны (только планируемое)
     securityEquipmentList: (state) => {
       const allPlanned = []
       Object.values(state.allocation || {}).forEach(lists => {

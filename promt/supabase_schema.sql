@@ -7,7 +7,9 @@ create table users (
   name varchar(100) not null,
   email varchar(120) not null unique,
   role varchar(32) not null check (role in ('video_engineer', 'technician', 'manager', 'admin')),
-  shifts_count integer not null default 0
+  shifts_count integer not null default 0,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
 -- Таблица оборудования
@@ -22,7 +24,9 @@ create table equipments (
   category varchar(80) not null,
   subcategory varchar(80) not null,
   tech_description text,
-  description text
+  description text,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
 -- Таблица мероприятий
@@ -39,7 +43,10 @@ create table events (
   end_date date,
   teardown_date date,
   mount_points_count integer not null default 0,
-  responsible_engineers uuid[] not null
+  responsible_engineers uuid[] not null,
+  is_archived boolean not null default false,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
 -- Таблица точек монтажа
@@ -50,7 +57,9 @@ create table mount_points (
   responsible_engineers uuid[] not null,
   equipment_plan uuid[] not null,
   equipment_final uuid[] not null,
-  equipment_fact uuid[] not null
+  equipment_fact uuid[] not null,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
 -- Таблица отчётов
@@ -58,7 +67,8 @@ create table reports (
   id uuid primary key default gen_random_uuid(),
   event_id uuid not null references events(id) on delete cascade,
   generated_at timestamp with time zone not null default now(),
-  content jsonb not null
+  content jsonb not null,
+  created_at timestamp with time zone default now()
 );
 
 -- Включаем RLS для всех таблиц

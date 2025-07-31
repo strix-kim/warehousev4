@@ -1,14 +1,10 @@
 <script setup>
-/**
- * Страница детального просмотра списка оборудования
- * Абсолютная аналогия с функционалом отчетов
- */
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useEquipmentListsStore } from '@/stores/equipment-lists-store'
 import { storeToRefs } from 'pinia'
-import html2pdf from 'html2pdf.js'
 import { supabase } from '@/shared/api/supabase'
+import html2pdf from 'html2pdf.js'
 
 const route = useRoute()
 const listId = route.params.id
@@ -24,7 +20,7 @@ const currentList = computed(() => lists.value.find(l => String(l.id) === String
 const equipments = ref([])
 const isEquipmentsLoading = ref(true)
 
-// Загружаем оборудование для списка - аналогично отчетам
+// Загружаем оборудование для списка
 async function loadEquipmentsForList(listData) {
   isEquipmentsLoading.value = true
   try {
@@ -33,13 +29,12 @@ async function loadEquipmentsForList(listData) {
       isEquipmentsLoading.value = false
       return
     }
-    
-    // Прямое обращение к Supabase - как в отчетах
+
     const { data, error } = await supabase
       .from('equipments')
       .select('*')
       .in('id', listData.equipment_ids)
-    
+
     if (error) throw error
     equipments.value = data || []
   } catch (e) {
@@ -49,213 +44,197 @@ async function loadEquipmentsForList(listData) {
   }
 }
 
-// Группировка оборудования по категориям
+// Группируем оборудование по категориям
 const equipmentByCategory = computed(() => {
   const grouped = {}
-  equipments.value.forEach(equipment => {
-    const category = equipment.category || 'Без категории'
-    if (!grouped[category]) {
-      grouped[category] = []
+  equipments.value.forEach(item => {
+    if (!grouped[item.category]) {
+      grouped[item.category] = []
     }
-    grouped[category].push(equipment)
+    grouped[item.category].push(item)
   })
   return grouped
 })
 
+// Плоский список для нумерации
+const flatEquipmentList = computed(() => {
+  const flat = []
+  Object.values(equipmentByCategory.value).forEach(categoryItems => {
+    categoryItems.forEach(item => {
+      flat.push(item)
+    })
+  })
+  return flat
+})
+
 const totalEquipment = computed(() => equipments.value.length)
+const isAllLoaded = computed(() => !loading.value && !isEquipmentsLoading.value)
+const hasData = computed(() => equipments.value && equipments.value.length > 0)
+const isEmpty = computed(() => !loading.value && !isEquipmentsLoading.value && !hasData.value)
 
-const typeLabels = {
-  security: 'Список оборудования для охраны',
-  report: 'Отчет по оборудованию',
-  custom: 'Кастомный список'
-}
+// Динамическое создание страниц
+const pages = computed(() => {
+  if (!hasData.value) return []
+  
+  const pagesArray = []
+  
+  // Страница 1: Заголовок и основная информация
+  pagesArray.push({
+    id: 1,
+    type: 'header',
+    title: 'Список оборудования',
+    content: {
+      listName: currentList.value?.name || 'Не указано',
+      totalEquipment: totalEquipment.value,
+      date: new Date().toLocaleDateString('ru-RU'),
+      listId: listId,
+      // Добавляем информацию о мероприятии
+      eventName: currentList.value?.event?.name || 'Не указано',
+      location: currentList.value?.event?.location || 'Не указано',
+      eventStartDate: currentList.value?.event?.start_date || 'Не указано',
+      installationStartDate: currentList.value?.event?.installation_start_date || 'Не указано'
+    }
+  })
+  
+  // Страницы с таблицей оборудования (динамически создаются)
+  const tablePages = generateTablePages()
+  pagesArray.push(...tablePages)
+  
+  // Страница со сводкой по категориям (после всех табличных страниц)
+  if (Object.keys(equipmentByCategory.value).length > 0) {
+    pagesArray.push({
+      id: pagesArray.length + 1,
+      type: 'summary',
+      title: 'Сводка по категориям',
+      content: {
+        categories: equipmentByCategory.value
+      }
+    })
+  }
+  
+  // Страница с подписями (последняя)
+  pagesArray.push({
+    id: pagesArray.length + 1,
+    type: 'signature',
+    title: 'Подписи',
+    content: {
+      date: new Date().toLocaleDateString('ru-RU')
+    }
+  })
+  
+  return pagesArray
+})
 
-// Функция скачивания PDF - абсолютная аналогия с отчетами
-const listContent = ref(null)
+// Ref для контента PDF
+const pdfContent = ref(null)
 
+// Функция скачивания PDF
 function downloadPDF() {
-  if (!listContent.value) return
+  if (!pdfContent.value) return
   
-  // Создаем копию элемента для изоляции стилей
-  const elementClone = listContent.value.cloneNode(true)
-  
-  // Добавляем изолированные стили без @import
-  const style = document.createElement('style')
-  style.textContent = `
-         /* Базовые стили для PDF без @import */
-     body { 
-       font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; 
-       margin: 0; 
-       padding: 0; 
-       color: #000; 
-       background: #fff; 
-     }
-    * { box-sizing: border-box; }
-    
-    /* Скрываем элементы для печати */
-    .print\\:hidden { display: none !important; }
-    .print\\:bg-white { background-color: #fff !important; }
-    .print\\:text-black { color: #000 !important; }
-    .print\\:shadow-none { box-shadow: none !important; }
-    .print\\:border-none { border: none !important; }
-    
-    /* Основные классы Tailwind */
-    .min-h-screen { min-height: 100vh; }
-    .bg-white { background-color: #fff; }
-    .text-gray-900 { color: #111827; }
-    .print\\:bg-white { background-color: #fff !important; }
-    .print\\:text-black { color: #000 !important; }
-    
-    .max-w-3xl { max-width: 48rem; }
-    .mx-auto { margin-left: auto; margin-right: auto; }
-    .p-6 { padding: 1.5rem; }
-    .sm\\:p-12 { padding: 3rem; }
-    .bg-white { background-color: #fff; }
-    .rounded-2xl { border-radius: 1rem; }
-    .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
-    .border { border-width: 1px; }
-    .border-gray-200 { border-color: #e5e7eb; }
-    .print\\:shadow-none { box-shadow: none !important; }
-    .print\\:border-none { border: none !important; }
-    
-    .mb-6 { margin-bottom: 1.5rem; }
-    .px-4 { padding-left: 1rem; padding-right: 1rem; }
-    .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
-    .rounded { border-radius: 0.25rem; }
-    .bg-purple-600 { background-color: #9333ea; }
-    .text-white { color: #fff; }
-    .font-semibold { font-weight: 600; }
-    .shadow { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); }
-    .hover\\:bg-purple-700:hover { background-color: #7c3aed; }
-    .transition-colors { transition-property: color, background-color, border-color, text-decoration-color, fill, stroke; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
-    .print\\:hidden { display: none !important; }
-    .flex { display: flex; }
-    .items-center { align-items: center; }
-    .gap-2 { gap: 0.5rem; }
-    
-    .w-5 { width: 1.25rem; }
-    .h-5 { height: 1.25rem; }
-    .fill-none { fill: none; }
-    .stroke-currentColor { stroke: currentColor; }
-    .stroke-linecap-round { stroke-linecap: round; }
-    .stroke-linejoin-round { stroke-linejoin: round; }
-    .stroke-width-2 { stroke-width: 2; }
-    
-    .mb-8 { margin-bottom: 2rem; }
-    .flex-col { flex-direction: column; }
-    .items-center { align-items: center; }
-    .text-xs { font-size: 0.75rem; }
-    .uppercase { text-transform: uppercase; }
-    .tracking-widest { letter-spacing: 0.1em; }
-    .text-gray-400 { color: #9ca3af; }
-    .mb-2 { margin-bottom: 0.5rem; }
-    .text-2xl { font-size: 1.5rem; }
-    .font-extrabold { font-weight: 800; }
-    .mb-2 { margin-bottom: 0.5rem; }
-    .text-center { text-align: center; }
-    .text-sm { font-size: 0.875rem; }
-    .text-gray-700 { color: #374151; }
-    .mb-2 { margin-bottom: 0.5rem; }
-    .text-base { font-size: 1rem; }
-    .mb-1 { margin-bottom: 0.25rem; }
-    .text-gray-500 { color: #6b7280; }
-    .text-xs { font-size: 0.75rem; }
-    .mt-2 { margin-top: 0.5rem; }
-    .font-semibold { font-weight: 600; }
-    
-    .border-t { border-top-width: 1px; }
-    .border-gray-200 { border-color: #e5e7eb; }
-    .my-8 { margin-top: 2rem; margin-bottom: 2rem; }
-    
-    .text-xl { font-size: 1.25rem; }
-    .font-bold { font-weight: 700; }
-    .mb-4 { margin-bottom: 1rem; }
-    .text-gray-500 { color: #6b7280; }
-    .mb-8 { margin-bottom: 2rem; }
-    .flex-col { flex-direction: column; }
-    .gap-6 { gap: 1.5rem; }
-    .border { border-width: 1px; }
-    .border-gray-200 { border-color: #e5e7eb; }
-    .rounded-xl { border-radius: 0.75rem; }
-    .p-5 { padding: 1.25rem; }
-    .bg-gray-50 { background-color: #f9fafb; }
-    .print\\:bg-white { background-color: #fff !important; }
-    .gap-3 { gap: 0.75rem; }
-    .mb-4 { margin-bottom: 1rem; }
-    .text-lg { font-size: 1.125rem; }
-    .font-semibold { font-weight: 600; }
-    .text-gray-500 { color: #6b7280; }
-    
-    .space-y-3 > * + * { margin-top: 0.75rem; }
-    .justify-between { justify-content: space-between; }
-    .p-3 { padding: 0.75rem; }
-    .bg-white { background-color: #fff; }
-    .rounded-lg { border-radius: 0.5rem; }
-    .border-gray-100 { border-color: #f3f4f6; }
-    .flex-1 { flex: 1 1 0%; }
-    .font-medium { font-weight: 500; }
-    .text-gray-600 { color: #4b5563; }
-    .text-gray-500 { color: #6b7280; }
-    .ml-4 { margin-left: 1rem; }
-    .inline-flex { display: inline-flex; }
-    .items-center { align-items: center; }
-    .px-2\\.5 { padding-left: 0.625rem; padding-right: 0.625rem; }
-    .py-0\\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
-    .rounded-full { border-radius: 9999px; }
-    .text-xs { font-size: 0.75rem; }
-    .font-medium { font-weight: 500; }
-    .border { border-width: 1px; }
-    
-    
-    
-         .w-5 { width: 1.25rem; }
-     .h-5 { height: 1.25rem; }
-    
-    .mt-16 { margin-top: 4rem; }
-    .items-end { align-items: flex-end; }
-    .print\\:items-start { align-items: flex-start !important; }
-    .text-gray-500 { color: #6b7280; }
-    .mb-2 { margin-bottom: 0.5rem; }
-    .h-8 { height: 2rem; }
-    .border-b { border-bottom-width: 1px; }
-    .border-gray-400 { border-color: #9ca3af; }
-    .w-64 { width: 16rem; }
-  `
-  elementClone.appendChild(style)
+  // Формируем имя файла в нужном порядке
+  const eventName = currentList.value?.event?.name || 'Мероприятие'
+  const fileName = `${eventName} - Список оборудования - ${new Date().toLocaleDateString('ru-RU')}.pdf`
   
   html2pdf()
     .set({
-      margin: 0.5,
-      filename: `${currentList.value?.name || 'equipment-list'}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+      margin: 0, // Убираем margin
+      filename: fileName,
+      image: { 
+        type: 'jpeg', 
+        quality: 0.98 // Оптимальное качество
+      },
+      html2canvas: { 
+        scale: 1.5, // Увеличиваем масштаб для качества
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        letterRendering: true
+      },
+      jsPDF: { 
+        unit: 'mm', 
+        format: 'a4', 
+        orientation: 'portrait',
+        compress: true,
+        precision: 8
+      }
     })
-    .from(elementClone)
+    .from(pdfContent.value)
     .save()
 }
 
-const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString('ru-RU', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+// Вспомогательные функции для таблицы
+function getEquipmentNotes(equipment) {
+  // Приоритет: description, затем tech_description
+  if (equipment.description && equipment.description.trim()) {
+    return equipment.description.trim()
+  }
+  if (equipment.tech_description && equipment.tech_description.trim()) {
+    return equipment.tech_description.trim()
+  }
+  return null
 }
 
+function getTotalQuantity() {
+  return flatEquipmentList.value.reduce((total, equipment) => {
+    return total + (equipment.quantity || 0)
+  }, 0)
+}
 
+function getCategoryTotalQuantity(categoryItems) {
+  return categoryItems.reduce((total, equipment) => {
+    return total + (equipment.quantity || 0)
+  }, 0)
+}
 
-const isAllLoaded = computed(() => !loading.value && !isEquipmentsLoading.value)
+function getAverageQuantity() {
+  if (flatEquipmentList.value.length === 0) return 0
+  const total = getTotalQuantity()
+  return Math.round((total / flatEquipmentList.value.length) * 10) / 10
+}
+
+function getCategoryPercentage(categoryItems) {
+  if (flatEquipmentList.value.length === 0) return 0;
+  const total = getTotalQuantity();
+  const categoryTotal = getCategoryTotalQuantity(categoryItems);
+  return total > 0 ? Math.round((categoryTotal / total) * 100) : 0;
+}
+
+// Функции для пагинации таблицы
+function splitEquipmentIntoPages(equipmentList, itemsPerPage = 15) {
+  const pages = []
+  for (let i = 0; i < equipmentList.length; i += itemsPerPage) {
+    pages.push(equipmentList.slice(i, i + itemsPerPage))
+  }
+  return pages
+}
+
+function generateTablePages() {
+  if (!flatEquipmentList.value.length) return []
+  
+  const itemsPerPage = 12 // Уменьшено с 15 до 12 для лучшего размещения
+  const equipmentPages = splitEquipmentIntoPages(flatEquipmentList.value, itemsPerPage)
+  
+  return equipmentPages.map((pageEquipment, pageIndex) => ({
+    id: 2 + pageIndex, // Начинаем с 2, так как 1 - это заголовок
+    type: 'table',
+    title: `Оборудование (стр. ${pageIndex + 1})`,
+    content: {
+      equipment: pageEquipment,
+      pageNumber: pageIndex + 1,
+      totalPages: equipmentPages.length,
+      startIndex: pageIndex * itemsPerPage + 1,
+      endIndex: Math.min((pageIndex + 1) * itemsPerPage, flatEquipmentList.value.length)
+    }
+  }))
+}
 
 onMounted(async () => {
-  // Если списка нет в store — загружаем все списки
   if (!currentList.value) {
     await equipmentListsStore.loadLists()
   }
-  
-  // Загружаем оборудование для списка
+
   if (currentList.value) {
     await loadEquipmentsForList(currentList.value)
   }
@@ -264,12 +243,12 @@ onMounted(async () => {
 
 <template>
   <div class="min-h-screen bg-white text-gray-900 print:bg-white print:text-black">
-    <div class="max-w-3xl mx-auto p-6 sm:p-12 bg-white rounded-2xl shadow-lg border border-gray-200 print:shadow-none print:border-none">
+    <div class="max-w-3xl mx-auto p-6 sm:p-8 bg-white rounded-2xl shadow-lg border border-gray-200 print:shadow-none print:border-none">
       <!-- Кнопка экспорта в PDF (только на экране, скрыта при печати) -->
       <button
         @click="downloadPDF"
         class="mb-6 px-4 py-2 rounded bg-purple-600 text-white font-semibold shadow hover:bg-purple-700 transition-colors print:hidden flex items-center gap-2"
-        aria-label="Скачать PDF списка"
+        aria-label="Скачать PDF списка оборудования"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -277,78 +256,465 @@ onMounted(async () => {
         Скачать PDF
       </button>
 
-      <!-- Весь список обёрнут в ref -->
-      <div ref="listContent">
-        <!-- Официальная шапка списка -->
-        <div class="mb-8 flex flex-col items-center">
-          <div class="text-xs uppercase tracking-widest text-gray-400 mb-2">
-            {{ typeLabels[currentList?.type] || 'Список оборудования' }}
-          </div>
-          <h1 class="text-2xl font-extrabold mb-2 text-center">{{ currentList?.name || 'Список оборудования' }}</h1>
-          <div class="text-sm text-gray-700 text-center mb-2">ООО ARGO MEDIA</div>
-          <div v-if="currentList?.description" class="text-base text-gray-700 text-center mb-1">
-            {{ currentList.description }}
-          </div>
-          <div class="text-sm text-gray-500 text-center mb-1">
-            Создан: {{ formatDate(currentList?.created_at) }}
-          </div>
-          <div v-if="currentList?.events?.name" class="text-sm text-gray-500 text-center mb-1">
-            Мероприятие: {{ currentList.events.name }}
-          </div>
-          <div class="text-xs text-gray-400 text-center mb-1">
-            ID списка: {{ currentList?.id }}
-          </div>
-          <div class="text-xs text-gray-700 text-center mt-2">
-            <span class="font-semibold">Всего единиц:</span>
-            <span>{{ totalEquipment }}</span>
-          </div>
+      <!-- Состояния загрузки и ошибок -->
+      <div v-if="!isAllLoaded" class="flex justify-center py-12 print:hidden">
+        <div class="text-center">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+          <p class="mt-4 text-gray-600">Загрузка списка оборудования...</p>
         </div>
+      </div>
 
-        <div class="border-t border-gray-200 my-8"></div>
+      <div v-else-if="error" class="text-center py-12 print:hidden">
+        <div class="text-red-600 mb-4">Ошибка загрузки</div>
+        <div class="text-gray-600">{{ error }}</div>
+      </div>
 
-        <!-- Секция оборудования -->
-        <div>
-          <h2 class="text-xl font-bold mb-4">Оборудование</h2>
-          <div v-if="!isAllLoaded" class="text-gray-500 mb-8">Загрузка...</div>
-          <div v-else-if="totalEquipment === 0" class="text-gray-500 mb-8">Список пуст</div>
-          <div v-else class="flex flex-col gap-6">
-            <div 
-              v-for="(equipment, category) in equipmentByCategory" 
-              :key="category" 
-              class="border border-gray-200 rounded-xl p-5 bg-gray-50 print:bg-white"
-            >
-              <div class="flex items-center gap-3 mb-4">
-                <div class="text-lg font-semibold">{{ category }}</div>
-                <div class="text-sm text-gray-500">
-                  ({{ equipment.length }} {{ equipment.length === 1 ? 'единица' : equipment.length < 5 ? 'единицы' : 'единиц' }})
+      <div v-else-if="isEmpty" class="text-center py-12 print:hidden">
+        <div class="text-gray-600 mb-4">Список пуст</div>
+        <div class="text-gray-500">В данном списке нет оборудования</div>
+      </div>
+
+      <!-- Весь контент обёрнут в ref -->
+      <div v-else-if="hasData" ref="pdfContent" class="pdf-pages-container">
+        <!-- Динамические страницы -->
+        <div 
+          v-for="page in pages" 
+          :key="page.id"
+          :class="`page-container page-${page.id} page-type-${page.type}`"
+        >
+          <!-- Страница 1: Заголовок -->
+          <div v-if="page.type === 'header'" class="page-content">
+            <!-- Large Centered Logo -->
+            <div class="logo-section mb-4">
+              <div class="flex justify-center">
+                <img src="/logo.png" alt="ARGO-MEDIA Logo" class="w-48 h-48 object-contain" />
+              </div>
+            </div>
+
+            <!-- Company Name -->
+            <div class="company-name-section mb-4">
+              <div class="text-center">
+                <h1 class="text-2xl font-bold text-gray-800 mb-2 tracking-wide">ООО «ARGO-MEDIA»</h1>
+                <div class="w-16 h-0.5 bg-gray-800 mx-auto rounded-full"></div>
+              </div>
+            </div>
+
+            <!-- Company Details -->
+            <div class="company-details-section mb-6">
+              <div class="bg-gray-100 rounded-lg p-3 border border-gray-300">
+                <div class="text-center text-xs text-gray-700 leading-tight space-y-1">
+                  <div>Адрес: г.Ташкент, Яшнабадский район, ул. Алимкент, пр.1, д. 33/1</div>
+                  <div>телефон: (+99890) 175-55-89</div>
+                  <div>р/с 2020 8000 8055 5124 2001 в ЧАКБ «ORIENT FINANS»</div>
+                  <div>МФО: 01071, ИНН: 309 737 673, ОКЭД: 62090</div>
                 </div>
               </div>
-              
+            </div>
+
+            <!-- Document Title -->
+            <div class="document-title-section mb-6">
+              <div class="text-center">
+                <div class="text-xs uppercase tracking-widest text-gray-600 mb-2">Официальный документ</div>
+                <h2 class="text-3xl font-black text-gray-900 mb-1 tracking-tight">СПИСОК ОБОРУДОВАНИЯ</h2>
+                <h3 class="text-xl font-bold text-gray-700 tracking-wide">ДЛЯ МЕРОПРИЯТИЯ</h3>
+              </div>
+            </div>
+
+            <!-- Event Information Section -->
+            <div class="event-info-section mb-4">
+              <div class="bg-white border border-gray-400 rounded-lg p-4 shadow-sm">
+                <div class="flex items-center mb-3">
+                  <div class="w-6 h-6 bg-gray-800 rounded-full flex items-center justify-center mr-2">
+                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <h2 class="text-base font-bold text-gray-800">Информация о мероприятии</h2>
+                </div>
+                <div class="space-y-2">
+                  <div class="flex justify-between items-center py-1 border-b border-gray-200">
+                    <span class="font-semibold text-gray-700 text-xs">Название мероприятия:</span>
+                    <span class="text-gray-900 font-medium text-xs max-w-xs text-right">{{ page.content.eventName || 'Не указано' }}</span>
+                  </div>
+                  <div class="flex justify-between items-center py-1 border-b border-gray-200">
+                    <span class="font-semibold text-gray-700 text-xs">Локация:</span>
+                    <span class="text-gray-900 font-medium text-xs max-w-xs text-right">{{ page.content.location || 'Не указано' }}</span>
+                  </div>
+                  <div class="flex justify-between items-center py-1 border-b border-gray-200">
+                    <span class="font-semibold text-gray-700 text-xs">Дата начала монтажных работ:</span>
+                    <span class="text-gray-900 font-medium text-xs">{{ page.content.installationStartDate || 'Не указано' }}</span>
+                  </div>
+                  <div class="flex justify-between items-center py-1">
+                    <span class="font-semibold text-gray-700 text-xs">Дата начала мероприятия:</span>
+                    <span class="text-gray-900 font-medium text-xs">{{ page.content.eventStartDate || 'Не указано' }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Status Badge -->
+            <div class="flex justify-center mb-4">
+              <div class="bg-gray-800 text-white px-4 py-1 rounded-full text-xs font-bold tracking-wide border border-gray-600">
+                ДОКУМЕНТ ПОДГОТОВЛЕН
+              </div>
+            </div>
+
+            <!-- Page Footer -->
+            <div class="mt-auto pt-4 border-t border-gray-300">
+              <div class="text-center text-xs text-gray-500">
+                Страница {{ page.id }} из {{ pages.length }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Страница 2: Таблица оборудования -->
+          <div v-if="page.type === 'table'" class="page-content">
+            <!-- Table Header -->
+            <div class="table-header mb-3">
+              <h2 class="text-xl font-bold text-gray-900 text-center mb-1">СПИСОК ОБОРУДОВАНИЯ</h2>
+              <div class="text-center text-xs text-gray-600">
+                Позиции {{ page.content.startIndex }}-{{ page.content.endIndex }} из {{ flatEquipmentList.length }}
+                <span v-if="page.content.totalPages > 1" class="ml-2">
+                  (Страница {{ page.content.pageNumber }} из {{ page.content.totalPages }})
+                </span>
+              </div>
+            </div>
+
+            <!-- Equipment Table -->
+            <div class="equipment-table-container">
+              <table class="w-full border-collapse text-xs">
+                <!-- Table Header -->
+                <thead>
+                  <tr class="bg-gray-100 border-b border-gray-300">
+                    <th class="text-left py-2 px-2 text-xs font-bold text-gray-700 uppercase tracking-wide w-8">№</th>
+                    <th class="text-left py-2 px-2 text-xs font-bold text-gray-700 uppercase tracking-wide w-16">Категория</th>
+                    <th class="text-left py-2 px-2 text-xs font-bold text-gray-700 uppercase tracking-wide w-16">Подкатегория</th>
+                    <th class="text-left py-2 px-2 text-xs font-bold text-gray-700 uppercase tracking-wide w-16">Бренд</th>
+                    <th class="text-left py-2 px-2 text-xs font-bold text-gray-700 uppercase tracking-wide">Модель</th>
+                    <th class="text-center py-2 px-2 text-xs font-bold text-gray-700 uppercase tracking-wide w-12">Кол-во</th>
+                  </tr>
+                </thead>
+                
+                <!-- Table Body -->
+                <tbody>
+                  <tr 
+                    v-for="(equipment, index) in page.content.equipment" 
+                    :key="equipment.id"
+                    class="border-b border-gray-200 hover:bg-gray-50"
+                  >
+                    <!-- Порядковый номер -->
+                    <td class="py-1 px-2 text-xs font-medium text-gray-900 text-center">
+                      {{ index + page.content.startIndex }}
+                    </td>
+                    
+                    <!-- Категория -->
+                    <td class="py-1 px-2 text-xs text-gray-700 font-medium">
+                      {{ equipment.category || '—' }}
+                    </td>
+                    
+                    <!-- Подкатегория -->
+                    <td class="py-1 px-2 text-xs text-gray-700">
+                      {{ equipment.subcategory || '—' }}
+                    </td>
+                    
+                    <!-- Бренд -->
+                    <td class="py-1 px-2 text-xs text-gray-700 font-medium">
+                      {{ equipment.brand || '—' }}
+                    </td>
+                    
+                    <!-- Модель -->
+                    <td class="py-1 px-2 text-xs text-gray-900 font-semibold">
+                      {{ equipment.model || '—' }}
+                    </td>
+                    
+                    <!-- Количество -->
+                    <td class="py-1 px-2 text-xs text-gray-900 font-bold text-center">
+                      {{ equipment.quantity || 0 }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Table Summary -->
+            <div class="table-summary mt-4">
+              <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <div class="grid grid-cols-2 gap-4 text-xs">
+                  <div class="text-center">
+                    <div class="font-bold text-gray-900 text-base">{{ page.content.endIndex - page.content.startIndex + 1 }}</div>
+                    <div class="text-gray-600">Позиций на странице</div>
+                  </div>
+                  <div class="text-center">
+                    <div class="font-bold text-gray-900 text-base">{{ page.content.startIndex }}-{{ page.content.endIndex }}</div>
+                    <div class="text-gray-600">Показано из {{ flatEquipmentList.length }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Page Footer -->
+            <div class="mt-auto pt-3 border-t border-gray-200">
+              <div class="text-center text-xs text-gray-500">
+                Страница {{ page.id }} из {{ pages.length }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Страница сводки по категориям -->
+          <div v-if="page.type === 'summary'" class="page-content">
+            <!-- Summary Header -->
+            <div class="summary-header mb-4">
+              <h2 class="text-xl font-bold text-gray-900 text-center mb-1">СВОДКА ПО КАТЕГОРИЯМ</h2>
+              <div class="text-center text-xs text-gray-600">
+                Статистика оборудования
+              </div>
+            </div>
+
+            <!-- Overall Statistics -->
+            <div class="overall-statistics mb-4">
+              <div class="bg-gray-100 rounded-lg p-3 border border-gray-300">
+                <div class="grid grid-cols-4 gap-2 text-xs">
+                  <div class="text-center">
+                    <div class="font-bold text-gray-900 text-lg">{{ Object.keys(page.content.categories).length }}</div>
+                    <div class="text-gray-600">Категорий</div>
+                  </div>
+                  <div class="text-center">
+                    <div class="font-bold text-gray-900 text-lg">{{ flatEquipmentList.length }}</div>
+                    <div class="text-gray-600">Позиций</div>
+                  </div>
+                  <div class="text-center">
+                    <div class="font-bold text-gray-900 text-lg">{{ getTotalQuantity() }}</div>
+                    <div class="text-gray-600">Единиц</div>
+                  </div>
+                  <div class="text-center">
+                    <div class="font-bold text-gray-900 text-lg">{{ getAverageQuantity() }}</div>
+                    <div class="text-gray-600">Среднее</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Category Distribution Chart -->
+            <div class="category-chart mb-4">
+              <h3 class="text-base font-bold text-gray-800 mb-3 text-center">Распределение по категориям</h3>
               <div class="space-y-3">
-                                 <div 
-                   v-for="(item, index) in equipment" 
-                   :key="item.id"
-                   class="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100"
-                 >
-                   <div class="flex-1">
-                     <div class="font-medium">{{ item.brand }} {{ item.model }}</div>
-                     <div class="text-sm text-gray-600">{{ item.subcategory }}</div>
-                     <div class="text-xs text-gray-500">
-                       Серийный номер: {{ item.serial_number || 'Не указан' }}
-                     </div>
-                   </div>
-                 </div>
+                <div 
+                  v-for="(categoryItems, categoryName) in page.content.categories" 
+                  :key="categoryName"
+                  class="category-bar"
+                >
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-medium text-gray-700">{{ categoryName }}</span>
+                    <span class="text-xs font-bold text-gray-900">{{ getCategoryTotalQuantity(categoryItems) }} ед.</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      class="bg-gray-800 h-2 rounded-full"
+                      :style="{ width: getCategoryPercentage(categoryItems) + '%' }"
+                    ></div>
+                  </div>
+                  <div class="text-xs text-gray-500 mt-1">
+                    {{ categoryItems.length }} позиций • {{ getCategoryPercentage(categoryItems) }}%
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Page Footer -->
+            <div class="mt-auto pt-3 border-t border-gray-200">
+              <div class="text-center text-xs text-gray-500">
+                Страница {{ page.id }} из {{ pages.length }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Страница подписей -->
+          <div v-if="page.type === 'signature'" class="page-content flex flex-col h-full">
+            <!-- Document Footer -->
+            <div class="document-footer flex flex-col h-full">
+              <!-- Top spacing -->
+              <div class="flex-1"></div>
+
+              <!-- Date Section -->
+              <div class="date-section mb-8">
+                <div class="text-center">
+                  <div class="text-sm text-gray-600">Дата составления: {{ page.content.date }}</div>
+                </div>
+              </div>
+
+              <!-- Middle spacing -->
+              <div class="flex-1"></div>
+
+              <!-- Signature Section -->
+              <div class="signature-section mb-8">
+                <div class="border-t border-gray-400 pt-6">
+                  <div class="flex justify-between items-end">
+                    <!-- Company Info -->
+                    <div class="flex-1">
+                      <div class="text-sm font-medium text-gray-800 mb-2">ООО «ARGO-MEDIA»</div>
+                      <div class="text-xs text-gray-600">
+                        г.Ташкент, Яшнабадский район,<br>
+                        ул. Алимкент, пр.1, д. 33/1
+                      </div>
+                    </div>
+
+                    <!-- Signature -->
+                    <div class="flex-1 text-right">
+                      <div class="text-sm text-gray-700 mb-3">Директор</div>
+                      <div class="border-b-2 border-gray-600 w-40 h-8 mb-2"></div>
+                      <div class="text-sm font-bold text-gray-900">Шарапова С.Ш.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bottom spacing -->
+              <div class="flex-1"></div>
+
+              <!-- Contact Information -->
+              <div class="contact-section mb-8">
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div class="text-center">
+                    <div class="text-sm font-medium text-gray-800 mb-2">Контактная информация</div>
+                    <div class="text-sm text-gray-900">
+                      Тел. исполнителя: +998 90 176 55 99
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Document Footer -->
+              <div class="footer-info pt-4 border-t border-gray-300">
+                <div class="text-center text-xs text-gray-500">
+                  <div>Документ подготовлен с помощью Argo Media EPR System</div>
+                  <div class="mt-1">Страница {{ page.id }} из {{ pages.length }}</div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-
-        <!-- Место для подписи -->
-        <div class="mt-16 flex flex-col items-end print:items-start">
-          <div class="text-xs text-gray-500 mb-2">Ответственный за список:</div>
-          <div class="h-8 border-b border-gray-400 w-64"></div>
-        </div>
       </div>
     </div>
   </div>
-</template> 
+</template>
+
+<style scoped>
+/* Контейнер для всех страниц */
+.pdf-pages-container {
+  width: 100%;
+  max-width: 210mm;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Отдельная страница */
+.page-container {
+  /* A4 размеры: 210mm x 297mm */
+  width: 100%;
+  max-width: 210mm;
+  height: 260mm; /* Уменьшена высота для гарантии одной страницы */
+  margin: 0 auto;
+  
+  /* Flexbox для правильного распределения контента */
+  display: flex;
+  flex-direction: column;
+  
+  /* Отступы для контента */
+  padding: 20mm;
+  box-sizing: border-box;
+  
+  /* Фон и границы */
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  
+  /* Для печати */
+  page-break-inside: avoid;
+  break-inside: avoid;
+  page-break-after: always; /* Принудительный разрыв после каждой страницы */
+}
+
+/* Последняя страница не должна разрываться */
+.page-container:last-child {
+  page-break-after: avoid;
+  margin-bottom: 0;
+}
+
+/* Контент страницы */
+.page-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Стили для печати */
+@media print {
+  .pdf-pages-container {
+    max-width: none;
+    margin: 0;
+    gap: 0;
+  }
+  
+  .page-container {
+    /* Убираем границы и тени для печати */
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    margin-bottom: 0;
+    
+    /* Точные размеры A4 для печати */
+    width: 210mm;
+    height: 260mm; /* Соответствует экранной высоте */
+    max-height: 260mm;
+    
+    /* Убираем отступы для печати */
+    padding: 0;
+    margin: 0;
+    
+    /* Принудительные разрывы страниц */
+    page-break-after: always;
+    page-break-before: auto;
+  }
+  
+  /* Внутренние отступы для контента в печати */
+  .page-content {
+    padding: 15mm;
+    height: 100%;
+    box-sizing: border-box;
+  }
+  
+  .page-container:last-child {
+    page-break-after: avoid;
+  }
+  
+  /* Убираем padding у основного контейнера для печати */
+  .max-w-3xl {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
+
+/* Адаптивность для экранов */
+@media (max-width: 640px) {
+  .page-container {
+    /* Для мобильных устройств */
+    max-height: none;
+    height: auto;
+    width: 100%;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .page-container {
+    /* Для планшетов */
+    max-height: 250mm;
+    height: 250mm;
+    padding: 18mm;
+  }
+}
+</style> 

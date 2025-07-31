@@ -147,7 +147,7 @@ export async function getEventListsStats(eventId) {
 }
 
 /**
- * Создать список для охраны на основе мероприятия
+ * Создать список для постов охраны на основе мероприятия
  * @param {string} eventId - ID мероприятия
  * @param {string} name - название списка
  */
@@ -172,8 +172,8 @@ export async function createSecurityList(eventId, name = null) {
 
   // Создаем список
   const listData = {
-    name: name || `Список охраны - ${new Date().toLocaleDateString()}`,
-    description: 'Автоматически сформированный список оборудования для охраны',
+    name: name || `Список оборудования - ${new Date().toLocaleDateString()}`,
+    description: 'Автоматически сформированный список оборудования для постов охраны',
     type: 'security',
     event_id: eventId,
     equipment_ids: equipmentIds,

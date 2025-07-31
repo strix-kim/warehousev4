@@ -89,27 +89,27 @@ schema:
 
     -- RLS policies: USERS
     create policy "Users can view own profile" on users
-      for select using (auth.uid() = id);
+      for select using ((select auth.uid()) = id);
     create policy "Admins can manage users" on users
-      for all using (exists (select 1 from users as u where u.id = auth.uid() and u.role = 'admin'));
+      for all using (exists (select 1 from users as u where u.id = (select auth.uid()) and u.role = 'admin'));
 
     -- RLS policies: EQUIPMENTS
     create policy "All authenticated can read equipments" on equipments
-      for select using (auth.uid() is not null);
+      for select using ((select auth.uid()) is not null);
     create policy "Engineers/Technicians can insert/update" on equipments
       for insert, update using (
-        exists (select 1 from users as u where u.id = auth.uid() and u.role in ('video_engineer', 'technician', 'manager', 'admin'))
+        exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('video_engineer', 'technician', 'manager', 'admin'))
       );
     create policy "Manager/Admin can delete equipments" on equipments
       for delete using (
-        exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin'))
+        exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin'))
       );
 
     -- RLS policies: EVENTS
     create policy "Engineers can manage own events" on events
       for all using (
-        auth.uid() = ANY(responsible_engineers)
-        or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin'))
+        (select auth.uid()) = ANY(responsible_engineers)
+        or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin'))
       );
 
     -- RLS policies: MOUNT_POINTS
@@ -118,8 +118,8 @@ schema:
         exists (
           select 1 from events e
           where e.id = event_id
-            and (auth.uid() = ANY(e.responsible_engineers)
-            or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
+            and ((select auth.uid()) = ANY(e.responsible_engineers)
+            or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin')))
         )
       );
 
@@ -129,8 +129,8 @@ schema:
         exists (
           select 1 from events e
           where e.id = event_id
-            and (auth.uid() = ANY(e.responsible_engineers)
-            or exists (select 1 from users as u where u.id = auth.uid() and u.role in ('manager', 'admin')))
+            and ((select auth.uid()) = ANY(e.responsible_engineers)
+            or exists (select 1 from users as u where u.id = (select auth.uid()) and u.role in ('manager', 'admin')))
         )
       );
   json_schema: |-

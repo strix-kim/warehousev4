@@ -178,18 +178,18 @@ export const useEquipmentListsStore = defineStore('equipmentLists', () => {
       const { data, error: apiError } = await createSecurityList(eventId, name)
       if (apiError) {
         console.error('API Error:', apiError)
-        throw new Error(apiError.message || 'Ошибка создания списка охраны')
+        throw new Error(apiError.message || 'Ошибка создания списка оборудования')
       }
       
       if (data) {
         lists.value.unshift(data)
         return data
       } else {
-        throw new Error('Не удалось создать список охраны')
+        throw new Error('Не удалось создать список оборудования')
       }
     } catch (err) {
       error.value = err.message
-      console.error('Ошибка создания списка охраны:', err)
+      console.error('Ошибка создания списка оборудования:', err)
       return null
     } finally {
       loading.value = false
