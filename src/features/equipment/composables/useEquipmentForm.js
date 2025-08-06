@@ -1,220 +1,188 @@
 /**
- * Composable для управления формой оборудования
- * Интегрируется с Pinia store, валидацией и автосохранением
+ * useEquipmentForm - EPR System
+ * 
+ * Composable для работы с формой оборудования
+ * Использует UI Kit v2 принципы
  */
-import { ref, computed, watch } from 'vue'
-import { useEquipmentStore } from '@/stores/equipment-store'
-import { useFormValidation } from '@/shared/composables/useFormValidation'
-import { useLocalStorage } from '@/shared/composables/useLocalStorage'
-import { 
-  equipmentValidationRules, 
-  getInitialFormData, 
-  hasFormChanges 
-} from '../utils/equipmentValidationRules'
 
-export function useEquipmentForm(isEdit = false, initialData = null) {
-  const equipmentStore = useEquipmentStore()
+import { ref, reactive } from 'vue'
+import { useEquipmentStore } from '../store/equipment-store.js'
+import { equipmentApi } from '../api/equipment-api.js'
+
+export function useEquipmentForm() {
+  const store = useEquipmentStore()
   
-  // Используем ref для более надежного отслеживания параметров
-  const isEditRef = ref(isEdit)
-  const initialDataRef = ref(initialData)
-  
-  // Основное состояние формы
-  const formData = ref(getInitialFormData(initialData))
-  const loading = ref(false)
-  const isDirty = ref(false)
-  const originalData = ref(initialData ? { ...initialData } : null)
-  
-  // Валидация
-  const { errors, validateField, validateForm, clearErrors, hasErrors } = useFormValidation(equipmentValidationRules)
-  
-  // Реактивный ключ для автосохранения черновиков
-  const draftKey = computed(() => 
-    `equipment-form-draft-${isEditRef.value ? initialDataRef.value?.id || 'new' : 'new'}`
-  )
-  
-  // Автосохранение черновиков (только для новых записей)
-  const { save: saveDraft, load: loadDraft, clear: clearDraft } = useLocalStorage(draftKey)
-  
-  // Computed свойства
-  const canSave = computed(() => {
-    return !loading.value && 
-           formData.value.model?.trim() && 
-           formData.value.brand?.trim() && 
-           formData.value.serial_number?.trim() &&
-           formData.value.category?.trim() &&
-           formData.value.subcategory?.trim() &&
-           formData.value.location?.trim() &&
-           !hasErrors()
+  // Form state
+  const showForm = ref(false)
+  const editingEquipment = ref(null)
+  const formLoading = ref(false)
+  const formError = ref(null)
+
+  // Form data
+  const formData = reactive({
+    brand: '',
+    model: '',
+    serial_number: '',
+    category: '',
+    subcategory: '',
+    status: 'available',
+    location: '',
+    description: '',
+    specifications: '',
+    purchase_date: '',
+    warranty_expiry: '',
+    notes: ''
   })
-  
-  const hasUnsavedChanges = computed(() => {
-    return isDirty.value && hasFormChanges(formData.value, originalData.value)
-  })
-  
-  const formTitle = computed(() => {
-    return isEditRef.value ? 'Редактировать оборудование' : 'Добавить оборудование'
-  })
-  
-  // Функция для обновления параметров извне
-  const updateParams = (newIsEdit, newInitialData) => {
-    isEditRef.value = newIsEdit
-    initialDataRef.value = newInitialData
+
+  // Form validation
+  const validationErrors = reactive({})
+  const isFormValid = ref(false)
+
+  // Methods
+  const openForm = (equipment = null) => {
+    editingEquipment.value = equipment
+    showForm.value = true
     
-    // Переинициализируем форму с новыми данными
-    initializeForm()
-  }
-  
-  // Методы
-  
-  /**
-   * Инициализация формы
-   */
-  const initializeForm = () => {
-    if (isEditRef.value && initialDataRef.value) {
-      formData.value = getInitialFormData(initialDataRef.value)
-      originalData.value = { ...initialDataRef.value }
-      isDirty.value = false
-    } else {
-      // Попытка загрузить черновик для новых записей
-      const draft = loadDraft()
-      if (draft && Object.keys(draft).length > 0) {
-        formData.value = { ...getInitialFormData(), ...draft }
-        isDirty.value = true
-      } else {
-        formData.value = getInitialFormData()
-        isDirty.value = false
-      }
-      originalData.value = null
-    }
-    clearErrors()
-  }
-  
-  /**
-   * Валидация отдельного поля с задержкой
-   */
-  const validateFieldDebounced = (fieldName, value) => {
-    // Небольшая задержка для лучшего UX
-    setTimeout(() => {
-      validateField(fieldName, value)
-    }, 300)
-  }
-  
-  /**
-   * Обработка изменения категории
-   */
-  const handleCategoryChange = () => {
-    // Сбрасываем подкатегорию при смене категории
-    formData.value.subcategory = ''
-    validateField('category', formData.value.category)
-  }
-  
-  /**
-   * Сохранение формы
-   */
-  const handleSubmit = async () => {
-    // Валидация всей формы
-    if (!validateForm(formData.value)) {
-      return { success: false, error: 'Пожалуйста, исправьте ошибки в форме' }
-    }
-    
-    loading.value = true
-    try {
-      let result
-      
-      if (isEditRef.value && initialDataRef.value?.id) {
-        // Обновление существующего оборудования
-        result = await equipmentStore.updateEquipmentById(initialDataRef.value.id, formData.value)
-      } else {
-        // Создание нового оборудования
-        result = await equipmentStore.createEquipment(formData.value)
-      }
-      
-      if (result.success) {
-        // Очищаем черновик после успешного сохранения
-        clearDraft()
-        isDirty.value = false
-        originalData.value = { ...formData.value }
-        
-        return { success: true, data: result.data }
-      } else {
-        return { success: false, error: result.error || 'Ошибка сохранения' }
-      }
-    } catch (error) {
-      console.error('Ошибка сохранения оборудования:', error)
-      return { success: false, error: error.message || 'Произошла ошибка при сохранении' }
-    } finally {
-      loading.value = false
-    }
-  }
-  
-  /**
-   * Сохранение черновика
-   */
-  const handleSaveDraft = () => {
-    if (!isEditRef.value && hasUnsavedChanges.value) {
-      saveDraft(formData.value)
-    }
-  }
-  
-  /**
-   * Сброс формы
-   */
-  const resetForm = () => {
-    formData.value = getInitialFormData(isEditRef.value ? initialDataRef.value : null)
-    clearErrors()
-    isDirty.value = false
-    if (!isEditRef.value) {
-      clearDraft()
-    }
-  }
-  
-  /**
-   * Проверка на наличие несохраненных изменений перед закрытием
-   */
-  const canClose = () => {
-    return !hasUnsavedChanges.value
-  }
-  
-  // Автосохранение черновиков при изменениях (только для новых записей)
-  watch(formData, (newData) => {
-    if (!isEditRef.value) {
-      isDirty.value = true
-      // Автосохранение с задержкой
-      setTimeout(() => {
-        if (hasUnsavedChanges.value) {
-          handleSaveDraft()
+    if (equipment) {
+      // Заполняем форму данными для редактирования
+      Object.keys(formData).forEach(key => {
+        if (equipment[key] !== undefined) {
+          formData[key] = equipment[key]
         }
-      }, 1000)
+      })
     } else {
-      isDirty.value = hasFormChanges(newData, originalData.value)
+      // Очищаем форму для создания нового
+      resetForm()
     }
-  }, { deep: true })
-  
-  // Инициализация при создании
-  initializeForm()
-  
+  }
+
+  const closeForm = () => {
+    showForm.value = false
+    editingEquipment.value = null
+    resetForm()
+    clearErrors()
+  }
+
+  const resetForm = () => {
+    Object.keys(formData).forEach(key => {
+      formData[key] = ''
+    })
+    formData.status = 'available'
+  }
+
+  const clearErrors = () => {
+    formError.value = null
+    Object.keys(validationErrors).forEach(key => {
+      validationErrors[key] = null
+    })
+  }
+
+  const validateForm = () => {
+    clearErrors()
+    let isValid = true
+
+    // Обязательные поля
+    if (!formData.brand?.trim()) {
+      validationErrors.brand = 'Бренд обязателен'
+      isValid = false
+    }
+
+    if (!formData.model?.trim()) {
+      validationErrors.model = 'Модель обязательна'
+      isValid = false
+    }
+
+    if (!formData.serial_number?.trim()) {
+      validationErrors.serial_number = 'Серийный номер обязателен'
+      isValid = false
+    }
+
+    if (!formData.category?.trim()) {
+      validationErrors.category = 'Категория обязательна'
+      isValid = false
+    }
+
+    // Проверка уникальности серийного номера
+    const existingEquipment = store.equipments.find(e => 
+      e.serial_number === formData.serial_number && 
+      e.id !== editingEquipment.value?.id
+    )
+    
+    if (existingEquipment) {
+      validationErrors.serial_number = 'Серийный номер уже существует'
+      isValid = false
+    }
+
+    isFormValid.value = isValid
+    return isValid
+  }
+
+  const submitForm = async () => {
+    if (!validateForm()) {
+      return false
+    }
+
+    formLoading.value = true
+    formError.value = null
+
+    try {
+      const equipmentData = { ...formData }
+      
+      if (editingEquipment.value) {
+        // Обновление
+        await store.updateEquipment(editingEquipment.value.id, equipmentData)
+      } else {
+        // Создание
+        await store.createEquipment(equipmentData)
+      }
+
+      closeForm()
+      return true
+    } catch (error) {
+      formError.value = error.message || 'Ошибка сохранения оборудования'
+      return false
+    } finally {
+      formLoading.value = false
+    }
+  }
+
+  const deleteEquipment = async (id) => {
+    if (!confirm('Удалить это оборудование?')) {
+      return false
+    }
+
+    formLoading.value = true
+    formError.value = null
+
+    try {
+      await store.deleteEquipment(id)
+      closeForm()
+      return true
+    } catch (error) {
+      formError.value = error.message || 'Ошибка удаления оборудования'
+      return false
+    } finally {
+      formLoading.value = false
+    }
+  }
+
   return {
-    // Состояние
+    // State
+    showForm,
+    editingEquipment,
+    formLoading,
+    formError,
     formData,
-    loading,
-    isDirty,
-    errors,
-    
-    // Computed
-    canSave,
-    hasUnsavedChanges,
-    formTitle,
-    
-    // Методы
-    validateField: validateFieldDebounced,
-    handleCategoryChange,
-    handleSubmit,
-    handleSaveDraft,
+    validationErrors,
+    isFormValid,
+
+    // Methods
+    openForm,
+    closeForm,
     resetForm,
-    canClose,
-    initializeForm,
     clearErrors,
-    updateParams
+    validateForm,
+    submitForm,
+    deleteEquipment
   }
 } 

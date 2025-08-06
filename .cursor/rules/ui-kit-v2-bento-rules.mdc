@@ -1,0 +1,340 @@
+---
+title: UI Kit v2 + Bento Design Rules
+description: Правила разработки с использованием UI Kit v2 и Bento Grid минимализма. ВСЕГДА используй только UI Kit v2 компоненты, BentoGrid layout, минималистичный дизайн с JetBrains Mono шрифтом. ЗАПРЕЩЕНО использовать legacy компоненты из @/shared/ui/. ОБЯЗАТЕЛЬНО используй BreadcrumbsV2, NotificationV2, SearchInputV2, ButtonV2, StatusBadgeV2 и другие компоненты из @/shared/ui-v2.
+globs:
+  - "src/pages/**/*.vue"
+  - "src/features/**/*.vue"
+  - "src/shared/**/*.vue"
+  - "src/components/**/*.vue"
+alwaysApply: true
+---
+
+# 🎨 UI Kit v2 + Bento Design Rules
+
+## 🏗️ АРХИТЕКТУРНЫЕ ПРИНЦИПЫ
+
+### **ВСЕГДА используй UI Kit v2:**
+- **НИКОГДА** не используй legacy компоненты из `@/shared/ui/`
+- **ВСЕГДА** импортируй из `@/shared/ui-v2`
+- **ОБЯЗАТЕЛЬНО** используй BentoGrid и BentoCard для layout
+
+### **Структура импортов:**
+```javascript
+// ✅ ПРАВИЛЬНО
+import { 
+  ButtonV2,
+  InputV2,
+  SearchInputV2,
+  NotificationV2,
+  BreadcrumbsV2,
+  StatusBadgeV2,
+  DropdownV2,
+  TabsV2,
+  FormV2,
+  TooltipV2
+} from '@/shared/ui-v2'
+import BentoGrid from '@/shared/ui-v2/layouts/BentoGrid.vue'
+import BentoCard from '@/shared/ui-v2/layouts/BentoCard.vue'
+
+// ❌ НЕПРАВИЛЬНО
+import Button from '@/shared/ui/atoms/Button.vue'
+import Card from '@/shared/ui/molecules/Card.vue'
+```
+
+---
+
+## 🎯 BENTO GRID ДИЗАЙН
+
+### **Обязательная структура страницы:**
+```vue
+<template>
+  <div class="min-h-screen bg-accent">
+    <!-- Header с Breadcrumbs -->
+    <div class="bg-white border-b border-gray-200">
+      <div class="max-w-7xl mx-auto px-4 py-4">
+        <BreadcrumbsV2 :items="breadcrumbs" variant="minimal" size="sm" />
+        
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-2xl font-bold text-primary">Page Title</h1>
+            <p class="text-sm text-secondary">Description</p>
+          </div>
+          <ButtonV2 variant="primary">Primary Action</ButtonV2>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content в Bento Grid -->
+    <div class="max-w-7xl mx-auto px-4 py-6">
+      <BentoGrid columns="auto" gap="6">
+        <BentoCard title="Card Title" size="2x1" variant="default">
+          <!-- Content -->
+        </BentoCard>
+      </BentoGrid>
+    </div>
+
+    <!-- Notification System -->
+    <NotificationV2 ref="notificationSystem" position="top-right" />
+  </div>
+</template>
+```
+
+### **Bento Card размеры:**
+- `1x1` - квадратная карточка
+- `2x1` - широкая карточка
+- `1x2` - высокая карточка  
+- `2x2` - большая карточка
+
+### **Bento Card варианты:**
+- `default` - стандартная
+- `primary` - акцентная
+- `minimal` - минимальная
+- `danger` - для ошибок
+
+---
+
+## 🎨 МИНИМАЛИСТИЧНЫЙ СТИЛЬ
+
+### **Цветовая палитра (ТОЛЬКО эти цвета):**
+```css
+/* Основные цвета */
+--color-primary: #2B2D42    /* Темно-синий для заголовков */
+--color-secondary: #8D99AE  /* Серый для второстепенного текста */
+--color-accent: #EDF2F4     /* Светло-серый фон */
+
+/* Фирменные цвета */
+--color-brand-red: #EF233C
+--color-brand-deep-red: #D90429
+
+/* Семантические цвета */
+--color-success: #22c55e
+--color-warning: #f59e0b
+--color-error: #ef4444
+--color-info: #3b82f6
+```
+
+### **Типографика:**
+- **ВСЕГДА** используй `text-primary` для заголовков
+- **ВСЕГДА** используй `text-secondary` для описаний
+- **ВСЕГДА** используй JetBrains Mono шрифт
+- **НЕ ИСПОЛЬЗУЙ** жирный текст без необходимости
+
+### **Отступы и размеры:**
+- Контейнер: `max-w-7xl mx-auto px-4 py-6`
+- Карточки: `gap="6"` между элементами
+- Внутренние отступы: `p-4` или `p-6`
+
+---
+
+## 🧩 КОМПОНЕНТЫ UI KIT V2
+
+### **ButtonV2 - варианты:**
+```vue
+<!-- Основные варианты -->
+<ButtonV2 variant="primary">Primary Action</ButtonV2>
+<ButtonV2 variant="secondary">Secondary</ButtonV2>
+<ButtonV2 variant="ghost">Ghost</ButtonV2>
+<ButtonV2 variant="minimal">Minimal</ButtonV2>
+
+<!-- Семантические варианты -->
+<ButtonV2 variant="success">Success</ButtonV2>
+<ButtonV2 variant="warning">Warning</ButtonV2>
+<ButtonV2 variant="error">Error</ButtonV2>
+<ButtonV2 variant="danger">Danger</ButtonV2>
+<ButtonV2 variant="info">Info</ButtonV2>
+
+<!-- Размеры -->
+<ButtonV2 size="sm">Small</ButtonV2>
+<ButtonV2 size="md">Medium</ButtonV2>
+<ButtonV2 size="lg">Large</ButtonV2>
+```
+
+### **SearchInputV2 - умный поиск:**
+```vue
+<SearchInputV2
+  v-model="searchQuery"
+  placeholder="Поиск..."
+  :results="searchResults"
+  :loading="searchLoading"
+  @search="handleSearch"
+  @select="handleSearchSelect"
+  @clear="handleSearchClear"
+>
+  <!-- Custom result template -->
+  <template #result="{ result, isHighlighted }">
+    <div class="flex items-center gap-3 p-2">
+      <IconV2 name="package" size="xs" color="secondary" />
+      <div class="flex-1">
+        <div class="font-medium text-primary">{{ result.title }}</div>
+        <div class="text-xs text-secondary">{{ result.description }}</div>
+      </div>
+    </div>
+  </template>
+</SearchInputV2>
+```
+
+### **StatusBadgeV2 - статусы:**
+```vue
+<!-- Размеры -->
+<StatusBadgeV2 size="xs" label="Status" variant="success" />
+<StatusBadgeV2 size="sm" label="Status" variant="warning" />
+<StatusBadgeV2 size="md" label="Status" variant="error" />
+
+<!-- Варианты -->
+<StatusBadgeV2 variant="success" label="Доступно" />
+<StatusBadgeV2 variant="warning" label="В работе" />
+<StatusBadgeV2 variant="error" label="Сломано" />
+<StatusBadgeV2 variant="info" label="Информация" />
+```
+
+### **BreadcrumbsV2 - навигация:**
+```vue
+<BreadcrumbsV2 
+  :items="breadcrumbs"
+  variant="minimal"
+  size="sm"
+  @item-click="handleNavigation"
+/>
+
+<!-- Данные для breadcrumbs -->
+const breadcrumbs = [
+  { label: 'Главная', href: '/', icon: 'home' },
+  { label: 'Секция', href: '/section' },
+  { label: 'Текущая страница', disabled: true }
+]
+```
+
+---
+
+## 🚫 ЗАПРЕЩЕНО
+
+### **НЕ используй legacy компоненты:**
+```vue
+<!-- ❌ НЕПРАВИЛЬНО -->
+<Button label="Test" />
+<Card title="Test" />
+<Input v-model="value" />
+<Icon name="home" />
+<Spinner />
+
+<!-- ✅ ПРАВИЛЬНО -->
+<ButtonV2>Test</ButtonV2>
+<BentoCard title="Test">
+<InputV2 v-model="value" />
+<IconV2 name="home" />
+<SpinnerV2 />
+```
+
+### **НЕ используй сложные Tailwind классы:**
+```css
+/* ❌ НЕПРАВИЛЬНО - может не работать в Tailwind v4 */
+bg-primary/10
+border-secondary/20
+text-accent/70
+
+/* ✅ ПРАВИЛЬНО - используй стандартные классы */
+bg-gray-100
+border-gray-200
+text-gray-500
+```
+
+### **НЕ создавай кастомные стили без необходимости:**
+- Используй готовые компоненты UI Kit v2
+- Придерживайся дизайн-системы
+- НЕ изобретай велосипед
+
+---
+
+## ✅ ЧЕКРЛИСТ РАЗРАБОТКИ
+
+### **Перед началом разработки:**
+- [ ] Импортирован ли UI Kit v2?
+- [ ] Используется ли BentoGrid layout?
+- [ ] Добавлены ли BreadcrumbsV2?
+- [ ] Подключена ли NotificationV2?
+
+### **Во время разработки:**
+- [ ] Используются ли только UI Kit v2 компоненты?
+- [ ] Соблюдается ли цветовая палитра?
+- [ ] Применяется ли минималистичный стиль?
+- [ ] Адаптивен ли дизайн?
+
+### **После разработки:**
+- [ ] Нет ли ошибок Tailwind в консоли?
+- [ ] Работают ли все интерактивные элементы?
+- [ ] Корректно ли отображается на мобильных?
+- [ ] Соответствует ли общему стилю проекта?
+
+---
+
+## 🎯 ПРИМЕРЫ ИСПОЛЬЗОВАНИЯ
+
+### **Типичная страница с поиском и таблицей:**
+```vue
+<template>
+  <div class="min-h-screen bg-accent">
+    <!-- Header -->
+    <div class="bg-white border-b border-gray-200">
+      <div class="max-w-7xl mx-auto px-4 py-4">
+        <BreadcrumbsV2 :items="breadcrumbs" variant="minimal" size="sm" />
+        <div class="flex justify-between items-center">
+          <h1 class="text-2xl font-bold text-primary">Page Title</h1>
+          <ButtonV2 variant="primary">Add Item</ButtonV2>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="max-w-7xl mx-auto px-4 py-6">
+      <BentoGrid columns="1" gap="6">
+        <!-- Search -->
+        <BentoCard title="Поиск" size="1x1">
+          <SearchInputV2 v-model="search" @search="handleSearch" />
+        </BentoCard>
+
+        <!-- Table -->
+        <BentoCard title="Данные" size="1x1" scrollable>
+          <TableV2 :data="items" :columns="columns" />
+        </BentoCard>
+      </BentoGrid>
+    </div>
+
+    <NotificationV2 ref="notifications" position="top-right" />
+  </div>
+</template>
+```
+
+---
+
+## 📱 АДАПТИВНОСТЬ
+
+### **Mobile-first подход:**
+```vue
+<!-- Адаптивные классы -->
+<div class="flex flex-col sm:flex-row gap-4">
+  <div class="w-full sm:w-auto">
+    <!-- Mobile: full width, Desktop: auto width -->
+  </div>
+</div>
+
+<!-- BentoGrid адаптивность -->
+<BentoGrid columns="1" gap="4"> <!-- Mobile: 1 column -->
+  <BentoCard size="1x1" class="sm:col-span-2"> <!-- Desktop: 2 columns -->
+```
+
+### **Размеры для разных экранов:**
+- **Mobile (< 640px)**: 1 колонка, размер "sm"
+- **Tablet (640px-1024px)**: 2 колонки, размер "md"  
+- **Desktop (> 1024px)**: auto колонки, размер "lg"
+
+---
+
+## 🎨 ФИНАЛЬНЫЕ ПРИНЦИПЫ
+
+1. **Минимализм**: Меньше элементов, больше пространства
+2. **Консистентность**: Одинаковые паттерны везде
+3. **Функциональность**: UX важнее красоты
+4. **Производительность**: Быстро и отзывчиво
+5. **Доступность**: Работает для всех пользователей
+
+**Помни: UI Kit v2 + Bento Grid = Идеальный баланс красоты и функциональности для EPR System!** ✨

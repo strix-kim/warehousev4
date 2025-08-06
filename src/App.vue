@@ -3,7 +3,7 @@
 import Layout from './app/layout.vue'
 import { useRoute } from 'vue-router'
 import { computed, ref, onMounted } from 'vue'
-import { useAuthStore } from '@/stores/auth-store'
+import { useAuthStore } from '@/app/store/auth-store'
 import Spinner from '@/shared/ui/atoms/Spinner.vue'
 
 const route = useRoute()
@@ -40,9 +40,11 @@ onMounted(async () => {
   <!-- Основной контент после инициализации -->
   <template v-else>
     <Layout v-if="shouldShowLayout">
-      <router-view />
-    </Layout>
-    <router-view v-else />
+    <router-view />
+  </Layout>
+  <template v-else>
+    <router-view />
+  </template>
   </template>
 </template>
 

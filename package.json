@@ -12,6 +12,7 @@
     "@heroicons/vue": "^2.2.0",
     "@supabase/supabase-js": "^2.50.2",
     "@tailwindcss/vite": "^4.1.11",
+    "@vueuse/core": "^13.6.0",
     "html2pdf.js": "^0.10.3",
     "lodash-es": "^4.17.21",
     "lucide-vue-next": "^0.525.0",

@@ -8,9 +8,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { useEquipmentStore } from '@/stores/equipment-store'
-import { useMountPointStore } from '@/stores/mount-point-store'
-import { useEventEquipmentStore } from '@/stores/event-equipment-store'
+import { useEquipmentStore } from '@/features/equipment'
+import { useMountPointStore } from '@/app/store/mount-point-store'
+import { useEventEquipmentStore } from '@/app/store/event-equipment-store'
 
 // Компоненты фичи оборудования
 import EquipmentFilters from '@/features/equipment/ui/EquipmentFilters.vue'

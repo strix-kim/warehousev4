@@ -5,7 +5,8 @@
  * Поддерживает все UI состояния: loading, error, offline, forbidden
  */
 import { ref, onMounted, computed, watch } from 'vue'
-import { supabaseSession, supabase } from '@/shared/api/supabase'
+import { fetchDashboardStats, fetchRecentEvents } from '@/features/dashboard';
+import { supabaseSession } from '@/shared/api/supabase'
 import Layout from '@/shared/ui/templates/Layout.vue'
 import Button from '@/shared/ui/atoms/Button.vue'
 import Card from '@/shared/ui/molecules/Card.vue'
@@ -15,7 +16,7 @@ import ErrorState from '@/shared/ui/templates/ErrorState.vue'
 import ForbiddenState from '@/shared/ui/templates/ForbiddenState.vue'
 import OfflineState from '@/shared/ui/templates/OfflineState.vue'
 import { useRouter } from 'vue-router'
-import { fetchUserById } from '@/features/users/userApi'
+import { fetchUserById } from '@/features/users/api/userApi'
 import SkeletonStatCard from '@/shared/ui/molecules/SkeletonStatCard.vue'
 
 // Состояния данных
@@ -79,57 +80,22 @@ async function loadCurrentUser() {
 async function loadDashboardStats() {
   isLoading.value = true
   error.value = null
-  try {
-    const now = new Date().toISOString()
-    // Загружаем статистику параллельно
-    const [equipmentRes, eventsRes, eventsActiveRes, reportsRes, usersRes] = await Promise.all([
-      supabase.from('equipments').select('*', { count: 'exact', head: true }),
-      supabase.from('events').select('*', { count: 'exact', head: true }),
-      supabase
-        .from('events')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_archived', false)
-        .gte('end_date', now),
-      supabase.from('reports').select('*', { count: 'exact', head: true }),
-      supabase.from('users').select('*', { count: 'exact', head: true })
-    ])
-    // Проверяем ошибки
-    if (equipmentRes.error) throw equipmentRes.error
-    if (eventsRes.error) throw eventsRes.error  
-    if (eventsActiveRes.error) throw eventsActiveRes.error
-    if (reportsRes.error) throw reportsRes.error
-    if (usersRes.error) throw usersRes.error
-    // Сохраняем данные
-    stats.value = {
-      equipmentTotal: equipmentRes.count,
-      equipmentAvailable: equipmentRes.count, // TODO: добавить фильтр по статусу
-      eventsTotal: eventsRes.count,
-      eventsActive: eventsActiveRes.count,
-      reportsTotal: reportsRes.count,
-      reportsRecent: Math.min(reportsRes.count, 5), // TODO: добавить фильтр по дате
-      usersTotal: usersRes.count,
-      usersActive: usersRes.count // TODO: добавить фильтр по активным
-    }
-  } catch (e) {
-    error.value = e.message || 'Ошибка загрузки данных'
-  } finally {
-    isLoading.value = false
+  const { data, error: fetchError } = await fetchDashboardStats()
+  if (fetchError) {
+    error.value = fetchError.message || 'Ошибка загрузки данных'
+  } else {
+    stats.value = data
   }
+  isLoading.value = false
 }
 
 // Загрузка последних мероприятий
 async function loadRecentEvents() {
-  try {
-    const { data, error } = await supabase
-      .from('events')
-      .select('id, name, organizer, start_date, end_date, is_archived')
-      .order('created_at', { ascending: false })
-      .limit(3)
-      
-    if (error) throw error
+  const { data, error: fetchError } = await fetchRecentEvents()
+  if (fetchError) {
+    console.warn('Не удалось загрузить последние мероприятия:', fetchError.message)
+  } else {
     recentEvents.value = data || []
-  } catch (e) {
-    console.warn('Не удалось загрузить последние мероприятия:', e.message)
   }
 }
 

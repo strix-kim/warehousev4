@@ -47,18 +47,65 @@
   
   --color-indigo-50: #eef2ff;
   --color-indigo-700: #4338ca;
+  
+  /* Фирменная цветовая палитра Warehouse v4 */
+  --color-primary: #2B2D42;
+  --color-secondary: #8D99AE;
+  --color-accent: #EDF2F4;
+  --color-brand-red: #EF233C;
+  --color-brand-deep-red: #D90429;
+
+  /* Семантические цвета для системных сообщений */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Вариации фирменных цветов с прозрачностью */
+  --color-primary-10: rgb(43 45 66 / 0.1);
+  --color-primary-20: rgb(43 45 66 / 0.2);
+  --color-secondary-10: rgb(141 153 174 / 0.1);
+  --color-secondary-20: rgb(141 153 174 / 0.2);
+  --color-secondary-30: rgb(141 153 174 / 0.3);
+
+  /* Система отступов */
+  --spacing-xs: 0.25rem;   /* 4px */
+  --spacing-sm: 0.5rem;    /* 8px */
+  --spacing-md: 1rem;      /* 16px */
+  --spacing-lg: 1.5rem;    /* 24px */
+  --spacing-xl: 2rem;      /* 32px */
+  --spacing-2xl: 3rem;     /* 48px */
+
+  /* Система border-radius */
+  --radius-sm: 0.375rem;   /* 6px */
+  --radius-md: 0.5rem;     /* 8px */
+  --radius-lg: 0.75rem;    /* 12px */
+  --radius-xl: 1rem;       /* 16px */
+
+  /* Тени */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+#app {
+  height: 100%;
 }
 
 html, body {
   height: 100%;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
+  /* box-sizing УДАЛЕН - Tailwind обрабатывает это глобально */
   overflow-x: hidden;
 }
+
+/* Tailwind уже включает сброс box-sizing для всех элементов */
+/*
 *, *::before, *::after {
   box-sizing: inherit;
 }
+*/
 
 /* Основной шрифт для всего проекта */
 html, body, .font-mono {
