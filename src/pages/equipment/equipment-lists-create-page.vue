@@ -246,6 +246,7 @@ import { useEquipmentStore } from '@/features/equipment'
 import { useAuthStore } from '@/app/store/auth-store'
 import { EQUIPMENT_CATEGORIES } from '@/features/equipment/constants/categories.js'
 import { createEquipmentList, updateEquipmentList } from '@/features/equipment/api/equipment-lists-api.js'
+import { getEquipmentByIds } from '@/features/equipment/api/equipment-external-data-api.js'
 import { useEquipmentListsData } from '@/features/equipment/composables/useEquipmentListsData'
 import { useEquipmentReservation } from './composables/useEquipmentReservation.js'
 
@@ -837,7 +838,7 @@ onMounted(async () => {
     if (selectedEquipmentIds.value.length > 0) {
       console.log('🔄 [Page] Загружаем оборудование для отображения в режиме редактирования')
       try {
-        const { getEquipmentByIds } = await import('@/features/equipment/api/equipment-external-data-api')
+        // Используем статический импорт для стабильности в production
         const result = await getEquipmentByIds(selectedEquipmentIds.value)
         if (result.data && Array.isArray(result.data)) {
           // Добавляем загруженное оборудование в отдельный кэш для выбранного оборудования
