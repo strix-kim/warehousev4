@@ -13,7 +13,7 @@ import { useEventStore } from '@/features/events/store/event-store'
 import { useMountPointStore } from '@/app/store/mount-point-store'
 import { useUserStore } from '@/app/store/user-store'
 import { useEventEquipmentStore } from '@/app/store/event-equipment-store'
-import { useEquipmentListsStore } from '@/features/equipment'
+import { createEquipmentList } from '@/features/equipment/api/equipment-lists-api'
 import { storeToRefs } from 'pinia'
 import { addReport } from '@/features/reports/api/reportApi'
 import { supabase } from '@/shared/api/supabase'
@@ -272,11 +272,16 @@ const generateSecurityList = async () => {
       throw new Error('Необходима авторизация для создания списков')
     }
     
-    const equipmentListsStore = useEquipmentListsStore()
     const event = eventStore.getEventById(eventId)
     const listName = `Список оборудования - ${event?.name || 'Мероприятие'} - ${new Date().toLocaleDateString()}`
     
-    const result = await equipmentListsStore.generateSecurityList(eventId, listName)
+    const result = await createEquipmentList({
+      name: listName,
+      description: `Список безопасности для мероприятия: ${event?.name}`,
+      type: 'security',
+      event_id: eventId,
+      created_by: session.user.id
+    })
     
     if (result) {
       securityListSuccess.value = 'Список оборудования успешно создан!'

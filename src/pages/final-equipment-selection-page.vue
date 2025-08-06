@@ -13,8 +13,8 @@ import { useMountPointStore } from '@/app/store/mount-point-store'
 import { useEventEquipmentStore } from '@/app/store/event-equipment-store'
 
 // Компоненты фичи оборудования
-import EquipmentFilters from '@/features/equipment/ui/EquipmentFilters.vue'
-import EquipmentTable from '@/features/equipment/EquipmentTable.vue'
+import EquipmentSearchFilters from '@/pages/equipment/components/EquipmentSearchFilters.vue'
+import EquipmentTable from '@/pages/equipment/components/EquipmentTable.vue'
 
 // Компоненты дизайн-системы
 import Button from '@/shared/ui/atoms/Button.vue'
@@ -330,7 +330,7 @@ onMounted(async () => {
       <div v-else class="space-y-2">
         <!-- Панель фильтров и выбор лимита -->
         <div class="mb-4">
-          <EquipmentFilters
+          <EquipmentSearchFilters
             :loading="loading"
             :results-count="availableEquipments.length"
             @search="handleSearch"
