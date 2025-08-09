@@ -101,14 +101,14 @@ const buttonClass = computed(() => {
       'focus:ring-secondary/50'
     ],
     'brand-red': [
-      'bg-brand-red text-accent',
-      'hover:bg-brand-red/90',
-      'focus:ring-brand-red/50'
+      'bg-[var(--color-brand-red)] text-accent',
+      'hover:bg-[color-mix(in_oklab,var(--color-brand-red),#000_10%)]',
+      'focus:ring-[color-mix(in_oklab,var(--color-brand-red),#000_30%)]'
     ],
     'brand-deep-red': [
-      'bg-brand-deep-red text-accent',
-      'hover:bg-brand-deep-red/90',
-      'focus:ring-brand-deep-red/50'
+      'bg-[var(--color-brand-deep-red)] text-accent',
+      'hover:bg-[color-mix(in_oklab,var(--color-brand-deep-red),#000_10%)]',
+      'focus:ring-[color-mix(in_oklab,var(--color-brand-deep-red),#000_30%)]'
     ],
     
     // Семантические цвета

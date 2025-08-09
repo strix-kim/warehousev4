@@ -1,7 +1,7 @@
 <template>
   <div :class="tabsContainerClass">
     <!-- Tabs Navigation -->
-    <div :class="tabsListClass" role="tablist">
+    <div :class="tabsListClass" role="tablist" :aria-orientation="orientation">
       <button
         v-for="(tab, index) in tabs"
         :key="getTabKey(tab, index)"

@@ -15,7 +15,8 @@
           :disabled="disabled"
           @click="toggle"
           :aria-expanded="isOpen"
-          :aria-haspopup="true"
+          aria-haspopup="menu"
+          :aria-controls="menuId"
           :aria-label="triggerLabel"
         >
           <span v-if="triggerText">{{ triggerText }}</span>
@@ -40,6 +41,7 @@
           :class="menuClass"
           :style="menuStyle"
           role="menu"
+          :id="menuId"
           :aria-orientation="orientation"
           @keydown="handleMenuKeydown"
         >
@@ -153,6 +155,7 @@
  * Поддержка keyboard navigation, позиционирование, группировка элементов
  */
 import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { computePosition, autoUpdate, offset, flip, shift, size } from '@floating-ui/dom'
 import ButtonV2 from '../atoms/Button.vue'
 import IconV2 from '../atoms/Icon.vue'
 
@@ -260,6 +263,7 @@ const emit = defineEmits(['select', 'open', 'close'])
 const dropdownContainer = ref(null)
 const triggerRef = ref(null)
 const menuRef = ref(null)
+const menuId = computed(() => `dropdown-menu-${Math.random().toString(36).slice(2, 9)}`)
 
 // State
 const isOpen = ref(false)
@@ -400,77 +404,29 @@ const getItemIconClass = (item) => {
   return baseClasses
 }
 
-const updateMenuPosition = () => {
-  if (!triggerRef.value || isMobile.value) return
-  
-  const triggerRect = triggerRef.value.getBoundingClientRect()
-  const viewportWidth = window.innerWidth
-  const viewportHeight = window.innerHeight
-  
-  let top = 0
-  let left = 0
-  
-  // Calculate position based on placement
-  switch (props.placement) {
-    case 'top':
-      top = triggerRect.top - 8
-      left = triggerRect.left + triggerRect.width / 2
-      break
-    case 'top-start':
-      top = triggerRect.top - 8
-      left = triggerRect.left
-      break
-    case 'top-end':
-      top = triggerRect.top - 8
-      left = triggerRect.right
-      break
-    case 'bottom':
-      top = triggerRect.bottom + 8
-      left = triggerRect.left + triggerRect.width / 2
-      break
-    case 'bottom-start':
-      top = triggerRect.bottom + 8
-      left = triggerRect.left
-      break
-    case 'bottom-end':
-      top = triggerRect.bottom + 8
-      left = triggerRect.right
-      break
-    case 'left':
-      top = triggerRect.top + triggerRect.height / 2
-      left = triggerRect.left - 8
-      break
-    case 'left-start':
-      top = triggerRect.top
-      left = triggerRect.left - 8
-      break
-    case 'left-end':
-      top = triggerRect.bottom
-      left = triggerRect.left - 8
-      break
-    case 'right':
-      top = triggerRect.top + triggerRect.height / 2
-      left = triggerRect.right + 8
-      break
-    case 'right-start':
-      top = triggerRect.top
-      left = triggerRect.right + 8
-      break
-    case 'right-end':
-      top = triggerRect.bottom
-      left = triggerRect.right + 8
-      break
+let cleanupAutoUpdate
+const updateMenuPosition = async () => {
+  if (!triggerRef.value || !menuRef.value || isMobile.value) return
+  if (cleanupAutoUpdate) {
+    cleanupAutoUpdate()
+    cleanupAutoUpdate = undefined
   }
-  
-  // Add scroll offset
-  top += window.scrollY
-  left += window.scrollX
-  
-  menuPosition.value = {
-    top,
-    left,
-    width: triggerRect.width
-  }
+  cleanupAutoUpdate = autoUpdate(triggerRef.value, menuRef.value, async () => {
+    const { x, y, placement, middlewareData, rects } = await computePosition(triggerRef.value, menuRef.value, {
+      placement: props.placement.replace('-start', '-start').replace('-end', '-end'),
+      middleware: [
+        offset(8),
+        flip(),
+        shift({ padding: 8 }),
+        size({
+          apply({ availableHeight, elements }) {
+            elements.floating.style.maxHeight = `${Math.min(availableHeight, parseInt(props.maxHeight))}px`
+          }
+        })
+      ]
+    })
+    menuPosition.value = { top: y, left: x, width: rects.reference.width }
+  })
 }
 
 const toggle = () => {
@@ -643,6 +599,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('scroll', updateMenuPosition)
   document.removeEventListener('click', handleClickOutside)
+  if (cleanupAutoUpdate) cleanupAutoUpdate()
 })
 </script>
 

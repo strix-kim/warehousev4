@@ -6,7 +6,10 @@
       :for="fieldId" 
       :class="labelClass"
     >
-      {{ label }}
+      <span class="inline-flex items-center gap-2">
+        <IconV2 v-if="labelIcon" :name="labelIcon" size="xs" class="text-secondary" />
+        <span>{{ label }}</span>
+      </span>
       <span v-if="required" class="text-error ml-1">*</span>
     </label>
 
@@ -23,6 +26,9 @@
         :disabled="disabled"
         :size="size"
         :error="error"
+        :show-error="false"
+        :prefix-icon="prefixIcon"
+        :suffix-icon="suffixIcon"
         @blur="handleBlur"
       />
 
@@ -140,6 +146,7 @@
  * Обертка для всех типов полей с единообразным API
  */
 import { computed } from 'vue'
+import IconV2 from '../atoms/Icon.vue'
 import InputV2 from '../atoms/Input.vue'
 import SelectV2 from '../atoms/Select.vue'
 
@@ -148,6 +155,19 @@ const props = defineProps({
   modelValue: {
     type: [String, Number, Boolean, Array, Object, File],
     default: null
+  },
+  // Label icon
+  labelIcon: {
+    type: String,
+    default: ''
+  },
+  prefixIcon: {
+    type: String,
+    default: ''
+  },
+  suffixIcon: {
+    type: String,
+    default: ''
   },
   type: {
     type: String,

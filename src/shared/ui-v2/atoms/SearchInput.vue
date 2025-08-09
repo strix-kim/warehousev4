@@ -515,12 +515,12 @@ const getResultKey = (result, index) => {
 const getResultItemClass = (index) => {
   const baseClasses = [
     'px-3 py-2 cursor-pointer transition-colors duration-150',
-    'hover:bg-primary/8 focus:bg-primary/8',
+    'hover:bg-primary/10 focus:bg-primary/10',
     'text-primary'
   ]
   
   if (hoveredIndex.value === index) {
-    baseClasses.push('bg-primary/12')
+    baseClasses.push('bg-primary/10')
   }
   
   return baseClasses

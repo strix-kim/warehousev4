@@ -5,7 +5,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { supabase, fetchUsers } from '@/shared/api/supabase'
+import { supabase } from '@/shared/api/supabase'
 import { debounce } from 'lodash-es'
 
 /**
@@ -24,10 +24,11 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoading = ref(false)
   const hasError = ref(null)
   const isInitialized = ref(false) // Флаг инициализации
+  const isFetchingUser = ref(false) // Отдельный флаг только для загрузки пользователя
 
   // --- Getters ---
-  // Авторизован ли пользователь
-  const isAuthenticated = computed(() => !!session.value && !!user.value)
+  // Авторизован ли пользователь (по сессии Supabase)
+  const isAuthenticated = computed(() => !!session.value?.user)
   // Является ли пользователь админом
   const isAdmin = computed(() => role.value === 'admin')
 
@@ -49,9 +50,10 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const { data: { session: s } } = await supabase.auth.getSession()
       session.value = s
+      // Не блокируем инициализацию отсутствием профиля: достаточно валидной сессии
       if (s && s.user) {
-        console.log('🔄 Auth: найдена сессия, загружаем пользователя')
-        await fetchUser()
+        console.log('🔄 Auth: найдена сессия, загружаем (лениво) профиль пользователя')
+        try { await fetchUser() } catch {}
       } else {
         console.log('🔄 Auth: сессия не найдена')
         user.value = null
@@ -114,38 +116,55 @@ export const useAuthStore = defineStore('auth', () => {
    * Получить пользователя и его роль из таблицы users по id из сессии
    */
   async function fetchUser() {
-    // Предотвращаем дублирование запросов
-    if (isLoading.value) {
+    if (isFetchingUser.value) {
       console.log('🔄 Auth: fetchUser уже выполняется, пропускаем')
       return
     }
-    
+    isFetchingUser.value = true
     isLoading.value = true
     hasError.value = null
     try {
       const id = session.value?.user?.id
       if (!id) throw new Error('Нет id пользователя в сессии')
-      
-      // Проверяем, не загружен ли уже пользователь с тем же ID
+
+      // Если пользователь уже загружен и совпадает ID — выходим
       if (user.value && user.value.id === id) {
-        console.log('🔄 Auth: пользователь уже загружен, пропускаем fetchUsers()')
+        console.log('🔄 Auth: пользователь уже загружен, пропускаем повторную загрузку')
         return
       }
-      
-      console.log('🔄 Auth: загружаем пользователя из API')
-      // Предполагается, что fetchUsers возвращает массив пользователей
-      const users = await fetchUsers()
-      const u = users.find(u => u.id === id)
-      if (!u) throw new Error('Пользователь не найден')
-      user.value = u
-      role.value = u.role || null
-      console.log('✅ Auth: пользователь загружен:', u.email)
+
+      // 1) Получаем текущего auth-пользователя напрямую из Supabase
+      const { data: authUserData, error: authErr } = await supabase.auth.getUser()
+      if (authErr) throw authErr
+      const authUser = authUserData?.user
+      if (!authUser) throw new Error('Не удалось получить пользователя из Supabase auth')
+
+      // 2) Пытаемся обогатить профилем из таблицы users, но это НЕ критично
+      let profile = null
+      try {
+        const { data: profileData, error: profileErr } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.id)
+          .maybeSingle?.() // если доступно
+        if (profileErr && profileErr.code !== 'PGRST116') throw profileErr
+        profile = profileData || null
+      } catch (pErr) {
+        console.warn('⚠️ Auth: профиль в таблице users отсутствует или не загружен. Продолжаем с auth-пользователем.')
+      }
+
+      // 3) Собираем итоговый объект пользователя
+      const mergedUser = { ...authUser, ...(profile || {}) }
+      user.value = mergedUser
+      role.value = mergedUser.role || null
+      console.log('✅ Auth: пользователь загружен:', mergedUser.email)
     } catch (e) {
       console.error('❌ Auth: ошибка загрузки пользователя:', e.message)
       hasError.value = e.message || 'Ошибка загрузки пользователя'
       user.value = null
       role.value = null
     } finally {
+      isFetchingUser.value = false
       isLoading.value = false
     }
   }
@@ -180,6 +199,7 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('🔄 Auth: сессия удалена, очищаем пользователя')
       user.value = null
       role.value = null
+      isFetchingUser.value = false
     }
   })
 
@@ -191,6 +211,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading,
     hasError,
     isInitialized,
+    isFetchingUser,
     isAuthenticated,
     isAdmin,
     init,

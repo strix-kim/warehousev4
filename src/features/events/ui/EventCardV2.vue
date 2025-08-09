@@ -8,6 +8,14 @@ const props = defineProps({
   event: {
     type: Object,
     required: true
+  },
+  variant: {
+    type: String,
+    default: 'default'
+  },
+  interactive: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -23,24 +31,62 @@ const statusInfo = computed(() => {
   if (end && now > end) return { label: 'Завершено', variant: 'inactive' }
   return { label: 'Активно', variant: 'primary' }
 })
+
+const formatShort = (dateStr) => {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (Number.isNaN(d.getTime())) return '—'
+  return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' }).format(d)
+}
+
+const engineersCount = computed(() => Array.isArray(props.event.responsible_engineers) ? props.event.responsible_engineers.length : 0)
+const mountPointsCount = computed(() => props.event.mount_points_count || 0)
 </script>
 
 <template>
-  <BentoCard :title="event.name" size="1x1" variant="default" class="hover:shadow-lg transition-shadow">
+  <BentoCard :title="event.name" size="1x1" :variant="variant" :interactive="interactive" class="hover:shadow-lg transition-shadow">
     <template #subtitle>
-      <span class="text-secondary text-xs">{{ event.location }}</span>
+      <div class="flex items-center gap-2 text-xs text-secondary truncate">
+        <IconV2 name="map-pin" size="xs" />
+        <span class="truncate">{{ event.location || 'Локация не указана' }}</span>
+      </div>
     </template>
 
     <div class="flex flex-col gap-3 text-sm">
-      <!-- Даты -->
-      <div>
-        <span class="text-secondary">{{ event.start_date || '—' }} → {{ event.end_date || '—' }}</span>
+      <!-- Даты мероприятия -->
+      <div class="flex items-center gap-2 text-secondary">
+        <IconV2 name="calendar" size="xs" />
+        <span class="truncate">{{ formatShort(event.start_date) }} → {{ formatShort(event.end_date) }}</span>
       </div>
 
-      <!-- Ответственные -->
-      <div v-if="Array.isArray(event.responsible_engineers) && event.responsible_engineers.length" class="flex items-center gap-1 text-secondary">
-        <IconV2 name="users" size="xs" />
-        <span>{{ event.responsible_engineers.length }} инженера</span>
+      <!-- Организатор -->
+      <div v-if="event.organizer" class="flex items-center gap-2 text-secondary">
+        <IconV2 name="user" size="xs" />
+        <span class="truncate">{{ event.organizer }}</span>
+      </div>
+
+      <!-- Команда и точки монтажа -->
+      <div class="flex items-center gap-4 text-secondary">
+        <div class="flex items-center gap-1">
+          <IconV2 name="users" size="xs" />
+          <span>{{ engineersCount }} инженера</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <IconV2 name="map-pin" size="xs" />
+          <span>{{ mountPointsCount }} точек</span>
+        </div>
+      </div>
+
+      <!-- Монтаж/Демонтаж (кратко) -->
+      <div class="flex items-center gap-3 text-xs">
+        <div class="flex items-center gap-1 text-info">
+          <span class="inline-block w-2 h-2 rounded-full bg-info"></span>
+          <span>Монтаж: {{ formatShort(event.setup_date) }}</span>
+        </div>
+        <div class="flex items-center gap-1 text-warning">
+          <span class="inline-block w-2 h-2 rounded-full bg-warning"></span>
+          <span>Демонтаж: {{ formatShort(event.teardown_date) }}</span>
+        </div>
       </div>
 
       <!-- Статус -->

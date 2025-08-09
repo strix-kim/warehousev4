@@ -18,13 +18,10 @@ const shouldShowLayout = computed(() => {
   return !route.meta.public
 })
 
-// Инициализация авторизации при загрузке приложения
+// Инициализация авторизации при загрузке приложения (жёсткая гарантия завершения перед рендером)
 onMounted(async () => {
-  try {
-    await authStore.init()
-  } finally {
-    isAuthInitialized.value = true
-  }
+  await authStore.init()
+  isAuthInitialized.value = true
 })
 </script>
 

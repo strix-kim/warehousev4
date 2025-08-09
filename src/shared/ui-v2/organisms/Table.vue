@@ -17,10 +17,13 @@
       </div>
 
       <!-- Table Content -->
-      <div v-else class="overflow-x-auto">
+      <div v-else :class="tableScrollContainerClass" :style="tableScrollContainerStyle">
         <table class="w-full">
+          <caption v-if="$slots.caption">
+            <slot name="caption" />
+          </caption>
           <!-- Table Header -->
-          <thead class="bg-secondary/5 border-b border-secondary/10">
+          <thead :class="theadClass">
             <tr>
               <th
                 v-for="column in columns"
@@ -29,6 +32,8 @@
                   'px-4 py-3 text-left text-xs font-medium text-primary uppercase tracking-wider',
                   { 'cursor-pointer hover:bg-secondary/10 transition-colors': column.sortable }
                 ]"
+                :aria-sort="column.sortable ? (sortBy === column.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none') : undefined"
+                scope="col"
                 @click="column.sortable && handleSort(column.key)"
               >
                 <div class="flex items-center gap-2">
@@ -88,8 +93,9 @@
         <PaginationV2
           :current-page="currentPage"
           :total-items="totalItems"
-          :items-per-page="itemsPerPage"
-          :items-per-page-options="itemsPerPageOptions"
+          :items-per-page="effectiveItemsPerPage"
+          :items-per-page-options="normalizedItemsPerPageOptions"
+          :total-pages="totalPages"
           @update:current-page="handlePageChange"
           @update:items-per-page="handleItemsPerPageChange"
         />
@@ -103,7 +109,7 @@
  * TableV2 - Простая универсальная таблица
  * Замена сложного Table компонента на простую версию
  */
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import SpinnerV2 from '../atoms/Spinner.vue'
 import IconV2 from '../atoms/Icon.vue'
 import PaginationV2 from '../molecules/Pagination.vue'
@@ -164,9 +170,23 @@ const props = defineProps({
     type: Number,
     default: 20
   },
+  // Алиас для совместимости: pageSize == itemsPerPage
+  pageSize: {
+    type: Number,
+    default: null
+  },
   itemsPerPageOptions: {
     type: Array,
     default: () => [10, 20, 50, 100]
+  },
+  // Дополнительно: залипающий заголовок и внутренний скролл
+  stickyHeader: {
+    type: Boolean,
+    default: false
+  },
+  maxBodyHeight: {
+    type: [String, Number],
+    default: null
   }
 })
 
@@ -203,4 +223,40 @@ const handlePageChange = (page) => {
 const handleItemsPerPageChange = (items) => {
   emit('update:itemsPerPage', items)
 }
+
+// Вычисляемые значения
+const effectiveItemsPerPage = computed(() => props.pageSize ?? props.itemsPerPage)
+const totalPages = computed(() => {
+  const total = Math.ceil((props.totalItems || 0) / (effectiveItemsPerPage.value || 1))
+  return Math.max(total, 1)
+})
+
+const normalizedItemsPerPageOptions = computed(() => {
+  const opts = props.itemsPerPageOptions || []
+  if (opts.length === 0) return []
+  const first = opts[0]
+  if (typeof first === 'number') {
+    return opts.map((n) => ({ label: String(n), value: n }))
+  }
+  return opts
+})
+
+// Стили скролла и sticky header
+const tableScrollContainerClass = computed(() => [
+  'overflow-x-auto',
+  props.stickyHeader && props.maxBodyHeight ? 'overflow-y-auto' : ''
+])
+
+const toPx = (val) => (typeof val === 'number' ? `${val}px` : val)
+const tableScrollContainerStyle = computed(() => {
+  if (props.stickyHeader && props.maxBodyHeight) {
+    return { maxHeight: toPx(props.maxBodyHeight) }
+  }
+  return {}
+})
+
+const theadClass = computed(() => [
+  'bg-secondary/5 border-b border-secondary/10',
+  props.stickyHeader ? 'sticky top-0 z-10' : ''
+])
 </script>

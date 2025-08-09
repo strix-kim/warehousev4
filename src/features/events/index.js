@@ -16,7 +16,5 @@ export { useEventStore } from './store/event-store.js'
 export * from './composables/useEventMountPoints.js'
 
 // UI Components
-export { default as EventCard } from './ui/EventCard.vue'
-export { default as EventGrid } from './ui/EventGrid.vue'
 export { default as EventTabs } from './ui/EventTabsV2.vue'
 export { default as EventCardV2 } from './ui/EventCardV2.vue' 

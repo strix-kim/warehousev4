@@ -71,9 +71,14 @@
         :sort-by="sortBy"
         :sort-direction="sortDirection"
         :clickable-rows="true"
+        :sticky-header="true"
+        :max-body-height="300"
         @sort="handleSort"
         @row-click="handleRowClick"
       >
+        <template #caption>
+          Список оборудования (демо), залипание заголовка и внутренний скролл
+        </template>
         <!-- Кастомная ячейка для статуса -->
         <template #cell-status="{ value }">
           <StatusBadgeV2 

@@ -36,15 +36,17 @@ const gridClass = computed(() => {
     // На мобильных: 1 колонка, на планшетах: 2, на десктопах: auto-fit
     cols = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(280px,1fr))]'
   } else {
-    // Адаптивные фиксированные колонки
-    const colNum = Number(props.columns)
-    if (colNum <= 2) {
-      cols = `grid-cols-1 sm:grid-cols-${colNum}`
-    } else if (colNum <= 4) {
-      cols = `grid-cols-1 sm:grid-cols-2 lg:grid-cols-${colNum}`
-    } else {
-      cols = `grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-${colNum}`
+    // Адаптивные фиксированные колонки — без динамических классов
+    const colNum = Math.min(Math.max(Number(props.columns), 1), 6)
+    const colsMap = {
+      1: 'grid-cols-1',
+      2: 'grid-cols-1 sm:grid-cols-2',
+      3: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3',
+      4: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
+      5: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
+      6: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
     }
+    cols = colsMap[colNum]
   }
   
   // ИСПРАВЛЕНО: Динамическая высота строк с минимумом
@@ -65,7 +67,8 @@ const gridClass = computed(() => {
   }
   
   // Адаптивные отступы между элементами
-  const gapClass = `gap-2 sm:gap-${props.gap}`
+  const gapMap = { '2': 'gap-2 sm:gap-2', '4': 'gap-2 sm:gap-4', '6': 'gap-2 sm:gap-6', '8': 'gap-2 sm:gap-8' }
+  const gapClass = gapMap[props.gap] || 'gap-2 sm:gap-4'
   
   return [cols, rows, gapClass]
 })

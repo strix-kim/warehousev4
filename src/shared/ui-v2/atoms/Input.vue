@@ -18,14 +18,24 @@
       :placeholder="placeholder"
       :disabled="disabled"
       :required="required"
-      :class="inputClass"
+      :class="[inputClass, leftPaddingClass, rightPaddingClass]"
       @input="handleInput"
       @focus="handleFocus"
       @blur="handleBlur"
     />
 
+    <!-- Prefix Icon -->
+    <span v-if="prefixIcon" class="absolute inset-y-0 left-3 flex items-center pointer-events-none z-10">
+      <IconV2 :name="prefixIcon" size="sm" class="text-secondary" />
+    </span>
+
+    <!-- Suffix Icon (display only) -->
+    <span v-if="suffixIcon" class="absolute inset-y-0 right-3 flex items-center pointer-events-none z-10">
+      <IconV2 :name="suffixIcon" size="sm" class="text-secondary" />
+    </span>
+
     <!-- Сообщение об ошибке -->
-    <p v-if="error" class="text-danger text-sm mt-1">
+    <p v-if="error && showError" class="text-danger text-sm mt-1">
       {{ error }}
     </p>
 
@@ -42,6 +52,7 @@
  * Минималистичный дизайн с фокусом на UX
  */
 import { computed, ref } from 'vue'
+import IconV2 from './Icon.vue'
 
 const props = defineProps({
   modelValue: {
@@ -81,6 +92,18 @@ const props = defineProps({
     type: String,
     default: 'md',
     validator: (value) => ['sm', 'md', 'lg'].includes(value)
+  },
+  showError: {
+    type: Boolean,
+    default: true
+  },
+  prefixIcon: {
+    type: String,
+    default: ''
+  },
+  suffixIcon: {
+    type: String,
+    default: ''
   }
 })
 
@@ -139,5 +162,18 @@ const inputClass = computed(() => {
     sizeClasses[props.size] || sizeClasses.md,
     bgClass
   ].filter(Boolean).join(' ')
+})
+
+// Dynamic padding for icons to avoid text overlap
+const leftPaddingClass = computed(() => {
+  if (!props.prefixIcon) return ''
+  const map = { sm: 'pl-8', md: 'pl-10', lg: 'pl-12' }
+  return map[props.size] || 'pl-10'
+})
+
+const rightPaddingClass = computed(() => {
+  if (!props.suffixIcon) return ''
+  const map = { sm: 'pr-8', md: 'pr-10', lg: 'pr-12' }
+  return map[props.size] || 'pr-10'
 })
 </script>

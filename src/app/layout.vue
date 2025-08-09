@@ -34,7 +34,7 @@ const menu = [
       { label: '➕ Создать список', route: '/equipment/lists/create' }
     ]
   },
-  { label: 'Мероприятия', route: '/events', disabled: true },
+  { label: 'Мероприятия', route: '/events' },
   { label: 'Отчёты', route: '/reports', disabled: true },
   { label: 'Пользователи', route: '/users', disabled: true },
 ]

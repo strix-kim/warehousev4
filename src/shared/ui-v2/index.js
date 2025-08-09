@@ -18,6 +18,7 @@ export { default as TooltipV2 } from './molecules/Tooltip.vue'
 
 // Molecules
 export { default as DataCardV2 } from './molecules/DataCard.vue'
+export { default as EventDataCardV2 } from './molecules/EventDataCard.vue'
 export { default as ModalV2 } from './molecules/Modal.vue'
 export { default as FormV2 } from './molecules/Form.vue'
 export { default as FormFieldV2 } from './molecules/FormField.vue'

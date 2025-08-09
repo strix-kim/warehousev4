@@ -70,9 +70,8 @@ async function handleLogin() {
     console.log('✅ Login: успешный вход через auth store, перенаправляем')
     
     // Небольшая задержка для показа уведомления, затем перенаправление
-    setTimeout(() => {
-      router.push('/')
-    }, 100)
+    // Мгновенная навигация без дополнительного клика
+    await router.replace({ name: 'home' })
   } catch (e) {
     console.error('❌ Login: ошибка авторизации:', e)
     
