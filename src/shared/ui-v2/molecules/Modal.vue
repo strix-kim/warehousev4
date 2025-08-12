@@ -403,6 +403,11 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
   unlockBodyScroll()
 })
+
+// Expose public methods for parent components (e.g., to trigger close with confirmation)
+defineExpose({
+  requestClose
+})
 </script>
 
 <style scoped>

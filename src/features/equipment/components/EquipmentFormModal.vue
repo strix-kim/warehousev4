@@ -1,6 +1,7 @@
 <template>
   <!-- ✅ Модальная форма оборудования - UI Kit v2 -->
   <ModalV2
+    ref="modalRef"
     v-model="show"
     :title="editingEquipment ? 'Редактировать оборудование' : 'Добавить оборудование'"
     :description="editingEquipment ? 'Обновите информацию об оборудовании' : 'Заполните информацию о новом оборудовании'"
@@ -8,6 +9,11 @@
     variant="default"
     :loading="formLoading"
     :persistent="false"
+    :require-close-confirm="shouldConfirmClose"
+    confirm-close-title="Подтвердите закрытие"
+    confirm-close-message="Несохранённые изменения будут потеряны. Вы действительно хотите закрыть форму?"
+    confirm-close-confirm-text="Да, закрыть"
+    confirm-close-cancel-text="Остаться"
     scrollable
     @close="handleClose"
   >
@@ -153,7 +159,7 @@
             variant="ghost"
             size="sm"
             class="w-full sm:w-auto"
-            @click="handleClose"
+            @click="handleRequestClose"
             :disabled="formLoading"
           >
             Отмена
@@ -245,6 +251,7 @@ const show = computed({
 const editingEquipment = computed(() => props.equipment)
 const formLoading = ref(false)
 const formError = ref(null)
+const modalRef = ref(null)
 
 // === ДАННЫЕ ФОРМЫ ===
 const formData = reactive({
@@ -263,6 +270,22 @@ const formData = reactive({
 
 // === ВАЛИДАЦИЯ ===
 const validationErrors = reactive({})
+
+// Флаг наличия несохранённых изменений
+const hasUnsavedChanges = computed(() => {
+  if (!editingEquipment.value) {
+    // Создание: считаем изменённым, если есть хоть одно заполненное обязательное поле
+    return !!(formData.brand || formData.model || formData.serialnumber || formData.type || formData.subtype || formData.location || formData.description || formData.technicalspecification || formData.count !== 1 || formData.lengthinmeters)
+  }
+  // Редактирование: сравниваем текущие значения с исходными
+  const original = editingEquipment.value || {}
+  return Object.keys(formData).some((key) => {
+    return (formData[key] ?? '') !== (original[key] ?? (key === 'count' ? 1 : ''))
+  })
+})
+
+// Требовать подтверждение закрытия только если есть несохранённые изменения
+const shouldConfirmClose = computed(() => hasUnsavedChanges.value)
 
 const isFormValid = computed(() => {
   return formData.brand?.trim() && 
@@ -434,6 +457,15 @@ const handleClose = () => {
   console.log('❌ [FormModal] Closing modal')
   show.value = false
   emit('close')
+}
+
+// Запрос закрытия с учётом подтверждения
+const handleRequestClose = () => {
+  if (shouldConfirmClose.value) {
+    modalRef.value?.requestClose?.()
+  } else {
+    handleClose()
+  }
 }
 
 // === WATCHERS ===
