@@ -139,7 +139,13 @@ const handleSubmit = async (data) => {
     :model-value="props.show"
     @update:modelValue="val=>emit('update:show',val)"
     :title="isEdit ? 'Редактировать мероприятие' : 'Создать мероприятие'"
+    size="xl"
     :show-close-button="true"
+    :require-close-confirm="true"
+    confirm-close-title="Подтвердите закрытие"
+    confirm-close-message="Несохранённые изменения могут быть потеряны. Закрыть окно?"
+    confirm-close-confirm-text="Да, закрыть"
+    confirm-close-cancel-text="Остаться"
     @close="emit('close')"
     :loading="loadingCreate || loadingUpdate"
   >
@@ -333,7 +339,7 @@ const handleSubmit = async (data) => {
 
         <template #actions="{ submit, isValid, isLoading }">
           <div class="flex justify-end gap-3 mt-4">
-            <ButtonV2 variant="ghost" @click="emit('update:show', false)" :disabled="isLoading">Отмена</ButtonV2>
+            <ButtonV2 variant="ghost" @click="emit('cancel')" :disabled="isLoading">Отмена</ButtonV2>
             <ButtonV2 variant="primary" @click="submit" :loading="isLoading" :disabled="!isValid || isLoading">
               {{ isEdit ? 'Сохранить изменения' : 'Создать' }}
             </ButtonV2>

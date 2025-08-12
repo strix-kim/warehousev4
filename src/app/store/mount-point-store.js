@@ -267,6 +267,46 @@ export const useMountPointStore = defineStore('mountPoint', () => {
     }
   }
 
+  /**
+   * Добавить техническое задание к точке монтажа
+   * @param {string} mountPointId
+   * @param {{id?: string, title: string, description?: string, status?: 'в работе'|'выполнено'|'проблема'}} duty
+   */
+  async function addTechnicalDuty(mountPointId, duty) {
+    loading.value = true
+    error.value = null
+    try {
+      const mp = getMountPointById.value(mountPointId)
+      if (!mp) throw new Error('Точка монтажа не найдена')
+      const duties = Array.isArray(mp.technical_duties) ? [...mp.technical_duties] : []
+      const newDuty = {
+        id: duty?.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+        title: String(duty?.title || '').trim(),
+        description: String(duty?.description || ''),
+        status: duty?.status || 'в работе'
+      }
+      if (!newDuty.title) throw new Error('Название задания обязательно')
+      duties.push(newDuty)
+      const { data, error: apiError } = await updateMountPoint(mountPointId, { technical_duties: duties })
+      if (apiError) throw new Error(apiError.message || 'Ошибка добавления задания')
+      // Синхронизируем store
+      const index = mountPoints.value.findIndex(mp => mp.id === mountPointId)
+      if (index >= 0 && data && data[0]) {
+        mountPoints.value[index] = data[0]
+        if (currentMountPoint.value?.id === mountPointId) {
+          currentMountPoint.value = data[0]
+        }
+      }
+      return { data: data?.[0] || null, error: null }
+    } catch (err) {
+      error.value = err.message || 'Ошибка добавления задания'
+      console.error('❌ Ошибка addTechnicalDuty:', err)
+      return { data: null, error: err.message }
+    } finally {
+      loading.value = false
+    }
+  }
+ 
   return {
     // Состояния
     mountPoints,
@@ -287,6 +327,7 @@ export const useMountPointStore = defineStore('mountPoint', () => {
     removeMountPoint,
     clearStore,
     clearError,
-    updateTechnicalDutyStatus
+    updateTechnicalDutyStatus,
+    addTechnicalDuty
   }
 }) 

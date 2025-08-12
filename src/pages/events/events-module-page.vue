@@ -18,85 +18,119 @@
     <div class="max-w-7xl mx-auto px-4 py-8">
       <BentoGrid columns="auto" gap="6">
         <!-- Статистика мероприятий -->
-        <BentoCard title="Всего мероприятий" size="1x1" variant="primary">
+        <BentoCard title="Всего мероприятий" size="1x1" variant="primary" :aria-busy="loading">
           <template #header>
             <div class="flex items-center gap-2">
               <IconV2 name="calendar-check" size="sm" />
               <h3 class="text-base sm:text-lg font-semibold leading-tight">Всего мероприятий</h3>
             </div>
           </template>
-          <div class="flex flex-col items-center justify-center h-full">
+          <div v-if="loading" class="flex flex-col items-center justify-center h-full gap-2">
+            <SkeletonV2 variant="text" width="48px" height="28px" animation="pulse" />
+            <SkeletonV2 variant="text" width="40%" height="12px" animation="pulse" />
+          </div>
+          <div v-else class="flex flex-col items-center justify-center h-full">
             <span class="text-2xl font-bold">{{ totalCount }}</span>
             <span class="text-sm opacity-80">Всего</span>
           </div>
         </BentoCard>
-        <BentoCard title="Активные мероприятия" size="1x1" variant="danger">
+        <BentoCard title="Активные мероприятия" size="1x1" variant="danger" :aria-busy="loading">
           <template #header>
             <div class="flex items-center gap-2">
               <IconV2 name="calendar" size="sm" />
               <h3 class="text-base sm:text-lg font-semibold leading-tight">Активные мероприятия</h3>
             </div>
           </template>
-          <div class="flex flex-col items-center justify-center h-full">
+          <div v-if="loading" class="flex flex-col items-center justify-center h-full gap-2">
+            <SkeletonV2 variant="text" width="48px" height="28px" animation="pulse" />
+            <SkeletonV2 variant="text" width="50%" height="12px" animation="pulse" />
+          </div>
+          <div v-else class="flex flex-col items-center justify-center h-full">
             <span class="text-2xl font-bold">{{ activeCount }}</span>
             <span class="text-sm opacity-80">Активные</span>
           </div>
         </BentoCard>
-        <BentoCard title="Архивные мероприятия" size="1x1" variant="secondary">
+        <BentoCard title="Архивные мероприятия" size="1x1" variant="secondary" :aria-busy="loading">
           <template #header>
             <div class="flex items-center gap-2">
               <IconV2 name="inbox" size="sm" />
               <h3 class="text-base sm:text-lg font-semibold leading-tight">Архивные мероприятия</h3>
             </div>
           </template>
-          <div class="flex flex-col items-center justify-center h-full">
+          <div v-if="loading" class="flex flex-col items-center justify-center h-full gap-2">
+            <SkeletonV2 variant="text" width="48px" height="28px" animation="pulse" />
+            <SkeletonV2 variant="text" width="60%" height="12px" animation="pulse" />
+          </div>
+          <div v-else class="flex flex-col items-center justify-center h-full">
             <span class="text-2xl font-bold">{{ archivedCount }}</span>
             <span class="text-sm opacity-80">Архивные</span>
           </div>
         </BentoCard>
 
-        <!-- Календарь мероприятий -->
-        <BentoCard title="Календарь" size="2x2" variant="default">
-          <EventsCalendar :events="displayEvents" v-model="calendarMonth" @event-click="goToEvent" />
+        <!-- Календарь мероприятий: растягиваем на всю ширину -->
+        <BentoCard title="Календарь" size="2x2" variant="default" class="sm:col-span-2 lg:col-span-3" :aria-busy="loading">
+          <div v-if="loading" class="space-y-2">
+            <div class="grid grid-cols-7 gap-1 sm:gap-2">
+              <SkeletonV2 v-for="i in 7" :key="'dow-'+i" variant="text" height="10px" animation="pulse" />
+            </div>
+            <div class="grid grid-cols-7 gap-1 sm:gap-2">
+              <div v-for="i in 42" :key="'cell-'+i" class="rounded-lg overflow-hidden aspect-[6/5] md:aspect-[4/3]">
+                <SkeletonV2 variant="rounded" height="100%" animation="wave" />
+              </div>
+            </div>
+          </div>
+          <template v-else>
+            <EventsCalendar :events="displayEvents" v-model="calendarMonth" @event-click="goToEvent" />
+          </template>
         </BentoCard>
 
-        <!-- Список мероприятий -->
-        <BentoCard title="Список мероприятий" size="2x2" variant="default">
+        <!-- Список мероприятий: ниже календаря, на всю ширину -->
+        <BentoCard title="Список мероприятий" size="2x2" variant="default" class="sm:col-span-2 lg:col-span-3" :aria-busy="loading">
           <template #header>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <IconV2 name="list" size="sm" class="text-primary" />
-                <h3 class="text-base sm:text-lg font-semibold leading-tight text-primary">Список мероприятий</h3>
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <div class="flex items-center gap-2 min-w-0">
+                <IconV2 name="list" size="sm" class="text-primary flex-shrink-0" />
+                <h3 class="text-base sm:text-lg font-semibold leading-tight text-primary truncate">Список мероприятий</h3>
               </div>
-              <TabsV2 v-model="activeTab" :tabs="tabsConfig" />
+              <div class="w-full sm:w-auto sm:max-w-full overflow-hidden">
+                <TabsV2 v-model="activeTab" :tabs="tabsConfig" :scrollable="true" />
+              </div>
             </div>
           </template>
-          <div v-if="loading" class="text-secondary">Загрузка...</div>
-          <div v-else-if="error" class="text-error">{{ error }}</div>
-          <div v-else>
-            <div v-if="displayEvents.length === 0" class="flex items-center justify-center h-40">
-              <div class="text-center">
-                <IconV2 name="calendar" size="lg" class="mx-auto mb-2 text-secondary/60" />
-                <div class="font-medium text-primary">
-                  {{ activeTab === 'archived' ? 'Нет архивных мероприятий' : 'Нет активных мероприятий' }}
+          <div class="min-h-[50vh]" style="overflow-anchor: none;">
+            <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div v-for="i in 6" :key="i" class="p-4 rounded-lg border border-gray-200 bg-white">
+                <div class="flex items-center gap-2 mb-3">
+                  <SkeletonV2 variant="circular" width="24px" height="24px" animation="pulse" />
+                  <SkeletonV2 variant="text" width="60%" height="14px" animation="pulse" />
                 </div>
-                <div class="text-sm text-secondary">
-                  {{ activeTab === 'archived' ? 'Переключитесь на вкладку «Активные» для просмотра' : 'Переключитесь на вкладку «Архивные» для просмотра' }}
-                </div>
+                <SkeletonV2 variant="text" width="90%" height="12px" animation="pulse" />
+                <SkeletonV2 variant="text" width="70%" height="12px" animation="pulse" />
               </div>
             </div>
-            <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
-                <EventDataCardV2
-                  v-for="ev in displayEvents.slice(0, 6)"
-                  :key="ev.id"
-                  :event="ev"
-                  variant="primary"
-                  :interactive="true"
-                  @click="goToEvent(ev)"
-                />
+            <div v-else-if="error" class="text-error">{{ error }}</div>
+            <div v-else>
+              <div v-if="displayEvents.length === 0" class="flex items-center justify-center h-40">
+                <div class="text-center">
+                  <IconV2 name="calendar" size="lg" class="mx-auto mb-2 text-secondary/60" />
+                  <div class="font-medium text-primary">
+                    {{ activeTab === 'archived' ? 'Нет архивных мероприятий' : 'Нет активных мероприятий' }}
+                  </div>
+                  <div class="text-sm text-secondary">
+                    {{ activeTab === 'archived' ? 'Переключитесь на вкладку «Активные» для просмотра' : 'Переключитесь на вкладку «Архивные» для просмотра' }}
+                  </div>
+                </div>
               </div>
-            <div class="flex justify-end mt-4">
-              <ButtonV2 variant="ghost" @click="navigateToList">Перейти ко всем</ButtonV2>
+              <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+                  <EventDataCardV2
+                    v-for="ev in displayEvents.slice(0, 6)"
+                    :key="ev.id"
+                    :event="ev"
+                    variant="primary"
+                    :interactive="true"
+                    @click="goToEvent(ev)"
+                  />
+                </div>
             </div>
           </div>
         </BentoCard>
@@ -130,7 +164,8 @@ import {
   NotificationV2,
   IconV2,
   TabsV2,
-  ButtonV2
+  ButtonV2,
+  SkeletonV2
 } from '@/shared/ui-v2'
 import EventsCalendar from '@/features/events/components/EventsCalendar.vue'
 import { EventDataCardV2 } from '@/shared/ui-v2'
@@ -171,7 +206,7 @@ const breadcrumbs = [
   { label: 'Мероприятия', disabled: true }
 ]
 
-const navigateToList = () => router.push('/events/list')
+// /events/list удалена
 const goToEvent = (ev) => router.push(`/events/${ev.id}`)
 
 const handleCreateSuccess = () => {

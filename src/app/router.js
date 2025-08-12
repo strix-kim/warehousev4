@@ -89,12 +89,7 @@ export const routes = [
     component: EventsModulePage,
     // Главная страница модуля мероприятий
   },
-  {
-    path: '/events/list',
-    name: 'events-list',
-    component: EventsListPage,
-    // Страница списка мероприятий
-  },
+  // Удалено: список мероприятий /events/list
   {
     path: '/events/:id',
     name: 'event-details',

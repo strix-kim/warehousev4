@@ -144,13 +144,7 @@
     </Teleport>
 
     <!-- Backdrop для мобильных устройств -->
-    <Teleport to="body">
-      <div
-        v-if="showResults && isMobile"
-        class="fixed inset-0 bg-black/20 backdrop-blur-sm z-[9998]"
-        @click="handleBlur"
-      />
-    </Teleport>
+    <!-- Убрали мобильный полноэкранный backdrop, чтобы дропдаун не перекрывал всю страницу -->
   </div>
 </template>
 
@@ -378,22 +372,22 @@ const resultsClass = computed(() => {
     'fixed',
     'bg-accent border border-secondary/20 rounded-lg shadow-lg',
     'backdrop-blur-sm',
-    'max-h-96 overflow-y-auto',
+    'overflow-y-auto',
     'z-[9999]'
   ]
-  
+
+  // Ограничиваем высоту в зависимости от устройства
   if (isMobile.value) {
-    baseClasses.push('bottom-4 left-4 right-4 max-h-[60vh]')
+    baseClasses.push('max-h-[50vh]')
+  } else {
+    baseClasses.push('max-h-96')
   }
-  
+
   return baseClasses
 })
 
 const dropdownStyle = computed(() => {
-  if (isMobile.value) {
-    return {}
-  }
-  
+  // На всех устройствах привязываем к инпуту
   return {
     top: `${dropdownPosition.value.top}px`,
     left: `${dropdownPosition.value.left}px`,
@@ -537,7 +531,7 @@ const highlightMatch = (text, query) => {
 
 // Methods
 const updateDropdownPosition = () => {
-  if (!inputRef.value || isMobile.value) return
+  if (!inputRef.value) return
   
   // Используем позицию input'а, а не всего контейнера
   const rect = inputRef.value.getBoundingClientRect()
@@ -666,9 +660,10 @@ const handleResize = () => {
 }
 
 const handleClickOutside = (event) => {
-  if (searchContainer.value && !searchContainer.value.contains(event.target)) {
-    showResults.value = false
-  }
+  const clickedInsideSearch = searchContainer.value && searchContainer.value.contains(event.target)
+  const clickedInsideDropdown = dropdownRef.value && dropdownRef.value.contains(event.target)
+  if (clickedInsideSearch || clickedInsideDropdown) return
+  showResults.value = false
 }
 
 // Watch for external value changes

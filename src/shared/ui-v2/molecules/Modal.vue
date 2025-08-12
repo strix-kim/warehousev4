@@ -33,13 +33,13 @@
             <div
               v-if="modelValue"
               :class="[modalClasses]"
-              class="relative bg-accent rounded-2xl shadow-2xl border border-secondary/20 flex flex-col max-h-[90vh]"
+              class="relative bg-accent rounded-2xl shadow-2xl border border-secondary/20 flex flex-col max-h-[90vh] w-full max-w-5xl mx-2"
               @click.stop
               ref="modalRef"
             >
               <!-- Header -->
               <header
-                v-if="$slots.header || title || showCloseButton"
+                v-if="$slots.header || title || shouldShowCloseButton"
                 class="flex items-center justify-between p-4 sm:p-6 border-b border-secondary/10 flex-shrink-0"
               >
                 <div class="flex-1 min-w-0">
@@ -52,8 +52,8 @@
                 
                 <!-- Close Button -->
                 <button
-                  v-if="showCloseButton"
-                  @click="handleClose"
+                  v-if="shouldShowCloseButton"
+                  @click="requestClose"
                   class="ml-4 p-2 text-secondary hover:text-primary hover:bg-secondary/10 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
                   aria-label="Закрыть модальное окно"
                 >
@@ -117,6 +117,21 @@
                   </slot>
                 </div>
               </footer>
+
+              <!-- Close Confirmation Overlay -->
+              <div
+                v-if="showCloseConfirm"
+                class="fixed inset-0 z-[60] bg-black/20 backdrop-blur-[1px] flex items-center justify-center p-4"
+              >
+                <div class="w-[min(100vw-2rem,56rem)] rounded-xl border border-secondary/20 bg-white shadow-xl p-4 sm:p-5 mx-2">
+                  <div class="text-primary font-medium mb-2">{{ confirmCloseTitle }}</div>
+                  <div class="text-sm text-secondary mb-4">{{ confirmCloseMessage }}</div>
+                  <div class="flex justify-end gap-2">
+                    <ButtonV2 variant="ghost" size="sm" @click="showCloseConfirm = false">{{ confirmCloseCancelText }}</ButtonV2>
+                    <ButtonV2 variant="danger" size="sm" @click="confirmForcedClose">{{ confirmCloseConfirmText }}</ButtonV2>
+                  </div>
+                </div>
+              </div>
             </div>
           </Transition>
         </div>
@@ -188,6 +203,29 @@ const props = defineProps({
   scrollable: {
     type: Boolean,
     default: true
+  },
+  /**
+   * Режим, при котором закрытие (крестик, backdrop, Escape, Cancel) требует подтверждения.
+   */
+  requireCloseConfirm: {
+    type: Boolean,
+    default: false
+  },
+  confirmCloseTitle: {
+    type: String,
+    default: 'Подтвердите закрытие'
+  },
+  confirmCloseMessage: {
+    type: String,
+    default: 'Несохранённые изменения могут быть потеряны. Вы действительно хотите закрыть?'
+  },
+  confirmCloseConfirmText: {
+    type: String,
+    default: 'Да, закрыть'
+  },
+  confirmCloseCancelText: {
+    type: String,
+    default: 'Остаться'
   }
 })
 
@@ -201,13 +239,18 @@ const previousActiveElement = ref(null)
 const titleId = computed(() => `modal-title-${Math.random().toString(36).substring(2, 9)}`)
 const descriptionId = computed(() => `modal-desc-${Math.random().toString(36).substring(2, 9)}`)
 
+// Сопоставления состояний
+const isPersistent = computed(() => props.persistent)
+const shouldShowCloseButton = computed(() => props.showCloseButton)
+const showCloseConfirm = ref(false)
+
 // Размеры модального окна
 const modalClasses = computed(() => {
   const sizeClasses = {
-    sm: 'w-full max-w-md modal-min-width-sm',
-    md: 'w-full max-w-lg modal-min-width-md',
-    lg: 'w-full max-w-2xl modal-min-width-lg',
-    xl: 'w-full max-w-4xl modal-min-width-xl',
+    sm: 'w-full max-w-md sm:max-w-lg modal-min-width-sm',
+    md: 'w-full max-w-lg sm:max-w-xl modal-min-width-md',
+    lg: 'w-full max-w-2xl sm:max-w-3xl modal-min-width-lg',
+    xl: 'w-full max-w-4xl sm:max-w-5xl modal-min-width-xl',
     fullscreen: 'w-full h-full max-w-none max-h-none m-0 rounded-none'
   }
   
@@ -238,9 +281,17 @@ const handleClose = () => {
   emit('close')
 }
 
+const requestClose = () => {
+  if (props.requireCloseConfirm) {
+    showCloseConfirm.value = true
+    return
+  }
+  handleClose()
+}
+
 const handleBackdropClick = () => {
-  if (!props.persistent) {
-    handleClose()
+  if (!isPersistent.value) {
+    requestClose()
   }
 }
 
@@ -250,21 +301,26 @@ const handleConfirm = () => {
 
 const handleCancel = () => {
   emit('cancel')
-  if (!props.persistent) {
-    handleClose()
+  if (!isPersistent.value) {
+    requestClose()
   }
 }
 
 // Keyboard handling
 const handleKeydown = (event) => {
-  if (event.key === 'Escape' && !props.persistent) {
-    handleClose()
+  if (event.key === 'Escape' && !isPersistent.value) {
+    requestClose()
   }
   
   // Focus trap
   if (event.key === 'Tab') {
     trapFocus(event)
   }
+}
+
+const confirmForcedClose = () => {
+  showCloseConfirm.value = false
+  handleClose()
 }
 
 // Focus trap implementation

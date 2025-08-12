@@ -20,15 +20,7 @@ const monthDate = computed(() => {
   return new Date(y, (m || 1) - 1, 1)
 })
 
-// Mobile detection
-const isMobile = ref(false)
-function updateIsMobile() {
-  isMobile.value = window.innerWidth < 640
-}
-if (typeof window !== 'undefined') {
-  updateIsMobile()
-  window.addEventListener('resize', updateIsMobile)
-}
+// Mobile detection (no longer used for branching behaviour)
 
 const monthLabel = computed(() =>
   monthDate.value.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
@@ -47,7 +39,7 @@ const startOffset = computed(() => {
   return (firstDay + 6) % 7
 })
 
-// Индексация событий по дню
+// Индексация событий по дню (точечные даты)
 function normalizeDate(dateStr) {
   if (!dateStr) return null
   const d = new Date(dateStr)
@@ -78,6 +70,7 @@ const dayToEvents = computed(() => {
 const kindMeta = {
   setup: { label: 'Монтаж', variant: 'info' },
   start: { label: 'Старт', variant: 'success' },
+  event: { label: 'Идёт', variant: 'success' },
   end: { label: 'Финиш', variant: 'inactive' },
   teardown: { label: 'Демонтаж', variant: 'warning' }
 }
@@ -142,6 +135,49 @@ const dayPhases = computed(() => {
   return map
 })
 
+// Отображаемые события по дням, включая диапазон проведения мероприятия (start..end),
+// чтобы в ячейке был не только индикатор, но и название мероприятия
+const dayToEventsDisplay = computed(() => {
+  const map = new Map()
+  const year = monthDate.value.getFullYear()
+  const month = monthDate.value.getMonth()
+  const monthStart = new Date(year, month, 1)
+  const monthEnd = new Date(year, month + 1, 0)
+
+  props.events.forEach((ev) => {
+    const setup = toDateOrNull(ev.setup_date)
+    const start = toDateOrNull(ev.start_date)
+    const end = toDateOrNull(ev.end_date)
+    const teardown = toDateOrNull(ev.teardown_date)
+
+    for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+      const key = dayKey(d)
+      const keyStr = key
+      const isSetupDay = setup && normalizeDate(ev.setup_date) === keyStr
+      const isStartDay = start && normalizeDate(ev.start_date) === keyStr
+      const isEndDay = end && normalizeDate(ev.end_date) === keyStr
+      const isTeardownDay = teardown && normalizeDate(ev.teardown_date) === keyStr
+
+      let kind = null
+      if (isSetupDay) kind = 'setup'
+      else if (isStartDay) kind = 'start'
+      else if (isEndDay) kind = 'end'
+      else if (isWithin(d, start, end)) kind = 'event'
+      else if (isTeardownDay) kind = 'teardown'
+
+      if (kind) {
+        if (!map.has(key)) map.set(key, [])
+        const arr = map.get(key)
+        if (!arr.some(e => e.id === ev.id)) {
+          arr.push({ ...ev, _kind: kind })
+        }
+      }
+    }
+  })
+
+  return map
+})
+
 function segmentStyle(type) {
   const colorVar = type === 'setup'
     ? 'var(--color-info)'
@@ -178,27 +214,63 @@ function nextMonth() {
   emit('update:modelValue', monthModel.value)
 }
 
-// Mobile preview modal state
-const showMobilePreview = ref(false)
-const mobileEvent = ref(null)
+// (mobile preview удален)
 
-function handleEventClick(ev) {
-  if (isMobile.value) {
-    mobileEvent.value = ev
-    showMobilePreview.value = true
-  } else {
-    emit('event-click', ev)
+// Desktop/Mobile: модал информации по дню (список событий дня)
+const showDayPreview = ref(false)
+const previewDayKey = ref(null)
+const previewDayLabel = computed(() => {
+  if (!previewDayKey.value) return ''
+  const [y, m, d] = previewDayKey.value.split('-').map(Number)
+  return new Date(y, (m || 1) - 1, d || 1).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+})
+// Для модала используем тот же источник, что и для ячеек
+const dayPreviewEvents = computed(() => dayToEventsDisplay.value.get(previewDayKey.value) || [])
+
+// Клики по событию внутри ячейки теперь не навигируют напрямую —
+// мы открываем превью дня, а переход в событие осуществляется из модального окна.
+
+function openDayPreview(day) {
+  const key = dayKey(day)
+  // Открываем модал даже если событий нет — для единообразия поведения
+  previewDayKey.value = key
+  showDayPreview.value = true
+}
+function getKindVariant(kind) {
+  switch (kind) {
+    case 'setup': return 'info'
+    case 'start': return 'success'
+    case 'end': return 'info'
+    case 'teardown': return 'warning'
+    case 'event': return 'success'
+    default: return 'info'
   }
 }
 
-function closeMobilePreview() {
-  showMobilePreview.value = false
-  mobileEvent.value = null
+function getKindLabel(kind) {
+  return kindMeta[kind]?.label || 'Событие'
 }
 
-function openEventFromPreview() {
-  if (mobileEvent.value) emit('event-click', mobileEvent.value)
-  closeMobilePreview()
+function closeDayPreview() {
+  showDayPreview.value = false
+  previewDayKey.value = null
+}
+
+function isDayActive(day) {
+  return previewDayKey.value && dayKey(day) === previewDayKey.value
+}
+
+// Today highlight
+const todayKeyStr = computed(() => {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+})
+
+function isToday(day) {
+  return dayKey(day) === todayKeyStr.value
 }
 </script>
 
@@ -212,7 +284,7 @@ function openEventFromPreview() {
     </div>
 
     <!-- Сетка дней недели -->
-    <div class="grid grid-cols-7 gap-2 text-xs text-secondary mb-2">
+    <div class="grid grid-cols-7 gap-1 sm:gap-2 text-xs text-secondary mb-1 sm:mb-2">
       <div>Пн</div>
       <div>Вт</div>
       <div>Ср</div>
@@ -223,13 +295,23 @@ function openEventFromPreview() {
     </div>
 
     <!-- Сетка месяца -->
-    <div class="grid grid-cols-7 gap-2">
+    <div class="grid grid-cols-7 gap-1 sm:gap-2 gap-y-1 sm:gap-y-2">
       <!-- Пустые offset-ячейки -->
-      <div v-for="i in startOffset" :key="`o-${i}`" class="h-24 bg-white border border-gray-200 rounded-lg"></div>
+      <div v-for="i in startOffset" :key="`o-${i}`" class="aspect-[6/5] md:aspect-[4/3] bg-white border border-gray-200 rounded-lg"></div>
 
       <!-- Дни -->
-      <div v-for="d in daysInMonth" :key="dayKey(d)" class="h-24 bg-white border border-gray-200 rounded-lg p-2 flex flex-col overflow-hidden">
-        <div class="text-xs text-secondary mb-1">{{ d.getDate() }}</div>
+      <button
+        v-for="d in daysInMonth"
+        :key="dayKey(d)"
+        type="button"
+        class="aspect-[6/5] md:aspect-[4/3] border rounded-lg p-1 sm:p-2 flex flex-col overflow-hidden transition-colors duration-150 ease-out hover:border-[var(--color-brand-red)]/60 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[color-mix(in_oklab,var(--color-brand-deep-red),#000_20%)]"
+        :class="{
+          'bg-[color-mix(in_oklab,var(--color-success),#fff_92%)] border-[color-mix(in_oklab,var(--color-success),#000_15%)]': isToday(d),
+          'bg-white border-gray-200': !isToday(d)
+        }"
+        @click="openDayPreview(d)"
+      >
+        <div class="text-xs mb-1" :class="isToday(d) ? 'text-primary' : 'text-secondary'">{{ d.getDate() }}</div>
 
         <!-- Упрощённые индикаторы фаз дня: точки setup/event/teardown -->
         <div v-if="showRanges" class="flex items-center gap-1 mb-1">
@@ -238,59 +320,56 @@ function openEventFromPreview() {
           <span v-if="dayPhases.get(dayKey(d))?.has('teardown')" class="inline-block w-2 h-2 rounded-full" :style="segmentStyle('teardown')" />
         </div>
 
-        <!-- Точечные маркеры дней -->
-        <div class="flex flex-col gap-1 overflow-hidden">
-          <template v-if="dayToEvents.get(dayKey(d))?.length">
-            <template v-for="(ev, idx) in dayToEvents.get(dayKey(d)).slice(0, 3)" :key="ev.id + '-' + idx">
-              <button type="button" class="w-full text-left text-xs flex items-center gap-1 truncate" :title="tooltipContent(ev, ev._kind)" @click="handleEventClick(ev)">
-                <span class="inline-block w-2 h-2 rounded-full" :style="segmentStyle(ev._kind === 'start' || ev._kind === 'end' ? 'event' : ev._kind)" />
-                <span class="truncate text-primary">{{ ev.name }}</span>
-              </button>
+        <!-- Заполнитель, чтобы список был внизу (только ≥ sm) -->
+        <div class="flex-1 hidden sm:block"></div>
+        <!-- Список мероприятий дня (внизу ячейки, скрыт на мобильных) -->
+        <div class="pt-1 border-t border-gray-100/80 hidden sm:block">
+          <div class="flex flex-col gap-1 overflow-hidden">
+            <template v-if="dayToEventsDisplay.get(dayKey(d))?.length">
+              <template v-for="(ev, idx) in dayToEventsDisplay.get(dayKey(d)).slice(0, 3)" :key="ev.id + '-' + idx">
+                <div class="w-full text-left text-[11px] flex items-center gap-1 truncate">
+                  <StatusBadgeV2 :label="getKindLabel(ev._kind)" :variant="getKindVariant(ev._kind)" size="xs" />
+                  <span class="truncate" :class="isToday(d) ? 'text-primary' : 'text-primary/90'">{{ ev.name }}</span>
+                </div>
+              </template>
+              <div v-if="dayToEventsDisplay.get(dayKey(d)).length > 3" class="text-[10px] text-secondary">+{{ dayToEventsDisplay.get(dayKey(d)).length - 3 }} ещё</div>
             </template>
-            <div v-if="dayToEvents.get(dayKey(d)).length > 3" class="text-[10px] text-secondary">+{{ dayToEvents.get(dayKey(d)).length - 3 }} ещё</div>
-          </template>
+          </div>
         </div>
-      </div>
+      </button>
     </div>
   </div>
   
-  <!-- Mobile Preview Modal -->
+  
+
+  <!-- Day Preview Modal (Desktop + Mobile) -->
   <ModalV2
-    v-if="isMobile"
-    :model-value="showMobilePreview"
-    @update:modelValue="val => (showMobilePreview = val)"
-    :title="mobileEvent?.name || 'Мероприятие'"
+    :model-value="showDayPreview"
+    @update:modelValue="val => (showDayPreview = val)"
+    :title="previewDayLabel || 'День'"
     :show-close-button="true"
-    @close="closeMobilePreview"
+    @close="closeDayPreview"
   >
     <template #default>
-      <div class="space-y-3 text-sm">
-        <div v-if="mobileEvent?.organizer" class="flex justify-between">
-          <span class="text-secondary">Организатор</span>
-          <span class="text-primary">{{ mobileEvent.organizer }}</span>
-        </div>
-        <div v-if="mobileEvent?.location" class="flex justify-between">
-          <span class="text-secondary">Локация</span>
-          <span class="text-primary">{{ mobileEvent.location }}</span>
-        </div>
-        <div class="flex justify-between">
-          <span class="text-secondary">Даты</span>
-          <span class="text-primary">{{ mobileEvent?.start_date || '—' }} → {{ mobileEvent?.end_date || '—' }}</span>
-        </div>
-        <div class="flex justify-between">
-          <span class="text-secondary">Монтаж</span>
-          <span class="text-primary">{{ mobileEvent?.setup_date || '—' }}</span>
-        </div>
-        <div class="flex justify-between">
-          <span class="text-secondary">Демонтаж</span>
-          <span class="text-primary">{{ mobileEvent?.teardown_date || '—' }}</span>
+      <div v-if="dayPreviewEvents.length === 0" class="text-secondary text-sm">Нет событий</div>
+      <div v-else class="space-y-2">
+        <div
+          v-for="ev in dayPreviewEvents"
+          :key="ev.id + '-' + ev._kind"
+          class="p-3 rounded-lg border border-gray-200 bg-white flex items-start gap-2"
+        >
+          <StatusBadgeV2 :variant="getKindVariant(ev._kind === 'start' || ev._kind === 'end' ? 'event' : ev._kind)" :label="getKindLabel(ev._kind)" size="xs" />
+          <div class="flex-1 min-w-0">
+            <div class="text-primary font-medium truncate">{{ ev.name }}</div>
+            <div class="text-xs text-secondary truncate">{{ [ev.location, ev.organizer].filter(Boolean).join(' • ') }}</div>
+          </div>
+          <ButtonV2 variant="minimal" size="sm" @click="$emit('event-click', ev)">Открыть</ButtonV2>
         </div>
       </div>
     </template>
     <template #actions>
       <div class="flex justify-end gap-2">
-        <ButtonV2 variant="ghost" @click="closeMobilePreview">Закрыть</ButtonV2>
-        <ButtonV2 variant="primary" @click="openEventFromPreview">Открыть</ButtonV2>
+        <ButtonV2 variant="ghost" @click="closeDayPreview">Закрыть</ButtonV2>
       </div>
     </template>
   </ModalV2>

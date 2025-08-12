@@ -12,7 +12,7 @@
 <script setup>
 /**
  * SkeletonV2 - компонент для loading states
- * Создает красивые placeholder'ы во время загрузки
+ * Минималистичный placeholder в стиле UI Kit v2
  */
 import { computed } from 'vue'
 
@@ -45,28 +45,27 @@ const variantClasses = {
   rounded: 'rounded-lg'
 }
 
-// Анимации
-const animationClasses = {
-  pulse: 'animate-pulse',
-  wave: 'animate-shimmer',
-  none: ''
-}
+const skeletonClasses = computed(() => {
+  const classes = [variantClasses[props.variant]]
 
-const skeletonClasses = computed(() => [
-  'bg-gradient-to-r from-accent via-secondary/20 to-accent',
-  'bg-secondary/20',
-  variantClasses[props.variant],
-  animationClasses[props.animation]
-])
+  // Нейтральный фон + мягкая анимация
+  if (props.animation === 'wave') {
+    classes.push('animate-shimmer', 'bg-gray-200')
+  } else if (props.animation === 'pulse') {
+    classes.push('animate-pulse', 'bg-gray-200')
+  } else {
+    classes.push('bg-gray-200')
+  }
+
+  return classes
+})
 
 const customStyles = computed(() => {
   const styles = {}
-  
   // Ширина
   if (props.width) {
     styles.width = typeof props.width === 'number' ? `${props.width}px` : props.width
   }
-  
   // Высота
   if (props.height) {
     styles.height = typeof props.height === 'number' ? `${props.height}px` : props.height
@@ -75,7 +74,6 @@ const customStyles = computed(() => {
     styles.height = styles.width || '2rem'
     styles.width = styles.height
   }
-  
   return styles
 })
 </script>
@@ -92,7 +90,7 @@ const customStyles = computed(() => {
 }
 
 .animate-shimmer {
-  background: linear-gradient(90deg, var(--color-secondary-20) 25%, var(--color-accent) 50%, var(--color-secondary-20) 75%);
+  background: linear-gradient(90deg, rgb(229 231 235) 25%, rgb(243 244 246) 50%, rgb(229 231 235) 75%);
   background-size: 200px 100%;
   animation: shimmer 1.5s infinite;
 }

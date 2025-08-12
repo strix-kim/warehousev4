@@ -4,276 +4,183 @@
   Поддержка технических заданий и назначения инженеров
 -->
 <template>
-  <Modal 
-    v-model="isVisible" 
+  <ModalV2
+    :model-value="show"
+    @update:modelValue="val => emit('update:show', val)"
+    :title="isEdit ? 'Редактировать точку монтажа' : 'Создать точку монтажа'"
     size="lg"
+    :show-close-button="true"
+    @close="emit('close')"
   >
-    <template #header>
-      <h2 class="text-xl font-semibold text-gray-900">
-        {{ isEdit ? 'Редактировать точку монтажа' : 'Создать точку монтажа' }}
-      </h2>
-    </template>
-    
-    <form @submit.prevent="handleSubmit" class="space-y-6">
-      <!-- Основная информация -->
-      <div class="space-y-4">
-        <h3 class="text-base font-semibold text-gray-900 border-b border-gray-200 pb-2">
-          Основная информация
-        </h3>
-        
-        <!-- Название точки -->
-        <div>
-          <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
-            Название точки монтажа *
-          </label>
-          <input
-            id="name"
-            v-model="form.name"
-            type="text"
-            required
-            maxlength="120"
-            placeholder="Например: Основная сцена, Зал А, Фойе..."
-            class="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 bg-white transition-colors duration-200 placeholder:text-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-            :class="{ 'border-red-300 focus:border-red-500 focus:ring-red-500/20': errors.name }"
-          />
-          <p v-if="errors.name" class="mt-1 text-sm text-red-600">{{ errors.name }}</p>
-        </div>
+    <template #default>
+      <FormV2
+        ref="formRef"
+        v-model="form"
+        :validation-rules="validationRules"
+        layout="vertical"
+        @submit="handleSubmit"
+      >
+        <template #default="{ formData, errors, validate, setField }">
+          <!-- Основная информация -->
+          <h3 class="text-lg font-semibold text-primary mb-2">Основная информация</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 pb-6 border-b border-secondary/10">
+            <FormField
+              v-model="formData.name"
+              type="input"
+              label="Название точки монтажа"
+              label-icon="map-pin"
+              :error="errors.name"
+              required
+              class="md:col-span-2"
+              placeholder="Например: Главная сцена"
+              @blur="validate('name')"
+            />
+            <FormField
+              v-model="formData.location"
+              type="input"
+              label="Локация"
+              label-icon="map"
+              :error="errors.location"
+              placeholder="Зал А, Фойе..."
+            />
+            <FormField
+              v-model="formData.start_date"
+              type="date"
+              label="Дата начала работ"
+              label-icon="calendar"
+              :error="errors.start_date"
+              :hint="!errors.start_date && defaultStartHint"
+            />
+          </div>
 
-        <!-- Локация -->
-        <div>
-          <label for="location" class="block text-sm font-medium text-gray-700 mb-2">
-            Локация
-          </label>
-          <input
-            id="location"
-            v-model="form.location"
-            type="text"
-            maxlength="100"
-            placeholder="Например: Главный зал, Фойе, Сцена..."
-            class="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 bg-white transition-colors duration-200 placeholder:text-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-          />
-        </div>
-
-        <!-- Дата начала работы -->
-        <div>
-          <label for="start_date" class="block text-sm font-medium text-gray-700 mb-2">
-            Дата начала работы
-          </label>
-          <input
-            id="start_date"
-            v-model="form.start_date"
-            type="date"
-            class="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 bg-white transition-colors duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-          />
-        </div>
-      </div>
-      
-      <!-- Технические задания -->
-      <div class="space-y-4">
-        <h3 class="text-base font-semibold text-gray-900 border-b border-gray-200 pb-2">
-          Технические задания
-        </h3>
-        
-        <!-- Добавление нового задания -->
-        <div class="flex gap-2">
-          <input
-            v-model="newDutyTitle"
-            type="text"
-            placeholder="Добавить техническое задание..."
-            class="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-900 bg-white transition-colors duration-200 placeholder:text-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-            @keydown.enter.prevent="addDuty"
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            @click="addDuty"
-            :disabled="!newDutyTitle.trim()"
-          >
-            Добавить
-          </Button>
-        </div>
-        
-        <!-- Список заданий с статусами -->
-        <div v-if="form.technical_duties.length > 0" class="space-y-3">
-          <div
-            v-for="(duty, index) in form.technical_duties"
-            :key="duty.id || index"
-            class="p-4 bg-gray-50 border border-gray-200 rounded-lg"
-          >
-            <div class="flex items-start gap-3 mb-3">
-              <div class="flex-1">
-                <input
-                  v-model="duty.title"
-                  type="text"
-                  class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  placeholder="Название задания"
-                />
+          <!-- Технические задания (опционально) -->
+          <h3 class="text-lg font-semibold text-primary mb-2">Технические задания (опционально)</h3>
+          <div class="space-y-3 mb-6 pb-6 border-b border-secondary/10">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
+              <FormField
+                :model-value="newDutyTitle"
+                @update:modelValue="val => (newDutyTitle = val)"
+                type="input"
+                label="Название задания"
+                placeholder="Например: Вывод на экраны"
+              />
+              <FormField
+                :model-value="newDutyDescription"
+                @update:modelValue="val => (newDutyDescription = val)"
+                type="textarea"
+                :rows="2"
+                label="Описание (опционально)"
+                placeholder="Кратко опишите задачу"
+              />
+              <div class="md:col-span-2 flex justify-end">
+                <ButtonV2 variant="secondary" size="sm" :disabled="!newDutyTitle.trim()" @click="addDuty">Добавить</ButtonV2>
               </div>
-              <button
-                type="button"
-                @click="removeDuty(index)"
-                class="w-6 h-6 text-gray-400 hover:text-red-600 transition-colors duration-200 flex-shrink-0 mt-1"
-              >
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
             </div>
-            <!-- Статус всегда 'в работе', не редактируется -->
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-gray-700">Статус:</span>
-              <span class="text-xs font-medium text-yellow-700">В работе</span>
-              <div class="w-2 h-2 rounded-full bg-yellow-500"></div>
+
+            <div v-if="form.technical_duties.length" class="space-y-2">
+              <div
+                v-for="(duty, index) in form.technical_duties"
+                :key="duty.id || index"
+                class="p-3 rounded-lg border border-secondary/20 bg-white"
+              >
+                <div class="flex items-start gap-2">
+                  <div class="flex-1 min-w-0">
+                    <FormField
+                      v-model="duty.title"
+                      type="input"
+                      label="Название"
+                      placeholder="Название задания"
+                    />
+                  </div>
+                  <div class="flex items-center gap-2 flex-shrink-0 pt-6">
+                    <StatusBadgeV2 size="xs" variant="warning" label="В работе" />
+                    <ButtonV2 variant="ghost" size="sm" @click="removeDuty(index)">
+                      <IconV2 name="trash" size="sm" />
+                    </ButtonV2>
+                  </div>
+                </div>
+                <div class="mt-2">
+                  <FormField
+                    v-model="duty.description"
+                    type="textarea"
+                    :rows="2"
+                    label="Описание"
+                    placeholder="Описание задания"
+                  />
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <p v-if="errors.technical_duties" class="text-sm text-red-600">{{ errors.technical_duties }}</p>
-      </div>
-      
-      <!-- Управление оборудованием -->
-      <div class="space-y-4">
-        <h3 class="text-base font-semibold text-gray-900 border-b border-gray-200 pb-2">
-          Оборудование
-        </h3>
-        
-        <!-- Компонент управления оборудованием -->
-        <MountPointEquipmentManager
-          :event-id="eventId"
-          :mount-point-id="isEdit ? mountPoint?.id : null"
-          :initial-data="isEdit ? mountPoint : {}"
-          @change="handleEquipmentChange"
-          @error="handleEquipmentError"
-        />
-      </div>
 
-      <!-- Ответственные инженеры -->
-      <div class="space-y-4">
-        <h3 class="text-base font-semibold text-gray-900 border-b border-gray-200 pb-2">
-          Ответственные инженеры *
-        </h3>
-        
-        <!-- Загрузка пользователей -->
-        <div v-if="isUsersLoading" class="flex items-center justify-center py-8">
-          <Spinner class="h-6 w-6 text-blue-600" />
-          <span class="ml-2 text-gray-600">Загрузка списка инженеров...</span>
-        </div>
-        
-        <!-- Список инженеров для выбора -->
-        <div v-else-if="availableEngineers.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
-          <label 
-            v-for="engineer in availableEngineers" 
-            :key="engineer.id"
-            class="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg cursor-pointer transition-colors duration-200 hover:border-blue-500 hover:shadow-sm"
-            :class="{ 'border-blue-500 bg-blue-50': form.responsible_engineers.includes(engineer.id) }"
-          >
-            <input
-              type="checkbox"
-              :value="engineer.id"
-              v-model="form.responsible_engineers"
-              class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-            />
-            <div class="flex-1 min-w-0">
-              <span class="text-sm font-medium text-gray-900">{{ engineer.name }}</span>
-              <span class="text-xs text-gray-500 ml-2">({{ engineer.role }})</span>
+          <!-- Ответственные инженеры -->
+          <h3 class="text-lg font-semibold text-primary mb-2">Ответственные инженеры</h3>
+          <div class="mb-6">
+            <div v-if="isUsersLoading" class="text-secondary text-sm py-4">Загрузка списка инженеров...</div>
+            <div v-else-if="!availableEngineers.length" class="text-secondary text-sm py-4">Нет доступных инженеров</div>
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                v-for="u in availableEngineers"
+                :key="u.id"
+                type="button"
+                class="w-full text-left rounded-lg border transition-all duration-200 bg-accent/50 hover:bg-accent/70"
+                :class="(form.responsible_engineers || []).includes(u.id) ? 'border-primary ring-1 ring-primary/20' : 'border-secondary/30 hover:border-secondary/50'"
+                @click="setField('responsible_engineers', toggleValue(form.responsible_engineers, u.id))"
+                :aria-pressed="(form.responsible_engineers || []).includes(u.id)"
+              >
+                <div class="p-3 flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-full bg-secondary/20 flex items-center justify-center">
+                    <IconV2 name="user" size="sm" class="text-secondary" />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm text-primary truncate">{{ u.name || u.email }}</div>
+                    <div class="text-xs text-secondary truncate">{{ u.email }}</div>
+                  </div>
+                  <div class="flex-shrink-0">
+                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full border"
+                          :class="(form.responsible_engineers || []).includes(u.id) ? 'bg-primary text-accent border-primary' : 'border-secondary/40 text-secondary'">
+                      <IconV2 v-if="(form.responsible_engineers || []).includes(u.id)" name="check" size="xs" />
+                    </span>
+                  </div>
+                </div>
+              </button>
             </div>
-          </label>
-        </div>
-        
-        <div v-else class="text-center py-8 text-gray-500">
-          Нет доступных инженеров для назначения
-        </div>
-        
-        <p v-if="errors.responsible_engineers" class="text-sm text-red-600">{{ errors.responsible_engineers }}</p>
-      </div>
-      
-      <!-- Ошибка -->
-      <div v-if="submitError" class="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <div class="flex items-center gap-2">
-          <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          <span class="text-sm font-medium text-red-800">{{ submitError }}</span>
-        </div>
-      </div>
-      
-      <!-- Действия -->
-      <div class="flex flex-col sm:flex-row gap-3 justify-end pt-4 border-t border-gray-200">
-        <Button
-          type="button"
-          variant="secondary"
-          size="lg"
-          @click="isVisible = false; emit('close')"
-          class="sm:w-auto w-full"
-        >
-          Отмена
-        </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          :loading="isSubmitting"
-          :disabled="isSubmitting"
-          class="sm:w-auto w-full"
-        >
-          {{ isEdit ? 'Сохранить изменения' : 'Создать точку монтажа' }}
-        </Button>
-      </div>
-    </form>
-  </Modal>
+            <div v-if="errors.responsible_engineers" class="text-xs text-error mt-1">{{ errors.responsible_engineers }}</div>
+          </div>
+        </template>
+
+        <template #actions="{ submit, isValid, isLoading }">
+          <div class="flex justify-end gap-3">
+            <ButtonV2 variant="ghost" @click="emit('update:show', false)">Отмена</ButtonV2>
+            <ButtonV2 variant="primary" :loading="isSubmitting || isLoading" :disabled="!isValid || isSubmitting || isLoading" @click="submit">
+              {{ isEdit ? 'Сохранить изменения' : 'Создать точку монтажа' }}
+            </ButtonV2>
+          </div>
+        </template>
+      </FormV2>
+    </template>
+  </ModalV2>
 </template>
 
 <script setup>
-/**
- * MountPointFormModal - модальная форма для создания/редактирования точки монтажа
- * Поддерживает валидацию, добавление технических заданий, назначение инженеров
- * Интегрируется с Pinia store для управления данными
- */
 import { ref, computed, watch, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/app/store/user-store'
 import { useMountPointStore } from '@/app/store/mount-point-store'
-import { storeToRefs } from 'pinia'
-import Modal from '@/shared/ui/molecules/Modal.vue'
-import Button from '@/shared/ui/atoms/Button.vue'
-import Spinner from '@/shared/ui/atoms/Spinner.vue'
-import MountPointEquipmentManager from './MountPointEquipmentManager.vue'
+import { ModalV2, FormV2, FormFieldV2 as FormField, ButtonV2, IconV2, StatusBadgeV2 } from '@/shared/ui-v2'
 
-// Пропсы
 const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false
-  },
-  eventId: {
-    type: String,
-    required: true
-  },
-  mountPoint: {
-    type: Object,
-    default: null
-  },
-  event: {
-    type: Object,
-    default: null
-  }
+  show: { type: Boolean, default: false },
+  eventId: { type: String, required: true },
+  mountPoint: { type: Object, default: null },
+  event: { type: Object, default: null }
 })
+const emit = defineEmits(['update:show', 'success', 'error', 'close'])
 
-// События
-const emit = defineEmits(['update:visible', 'success', 'submit', 'close'])
-
-// Локальная реактивная переменная для v-model
-const isVisible = computed({
-  get: () => props.visible,
-  set: (value) => emit('update:visible', value)
-})
-
-// Stores
 const userStore = useUserStore()
 const mountPointStore = useMountPointStore()
 const { users, loading: isUsersLoading } = storeToRefs(userStore)
 
-// Локальное состояние
+const formRef = ref(null)
 const form = ref({
   name: '',
   location: '',
@@ -283,204 +190,132 @@ const form = ref({
   equipment_plan: [],
   equipment_fact: []
 })
-
 const newDutyTitle = ref('')
-const errors = ref({})
-const submitError = ref('')
+const newDutyDescription = ref('')
 const isSubmitting = ref(false)
 
-// Вычисляемые свойства
 const isEdit = computed(() => !!props.mountPoint)
+const defaultStartHint = computed(() => props.event?.setup_date ? `По умолчанию: ${new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short' }).format(new Date(props.event.setup_date))}` : '')
 
-// Доступные инженеры — только те, кто назначен на выбранное мероприятие и имеет подходящую роль
 const availableEngineers = computed(() => {
   if (!props.event?.responsible_engineers) return []
-  return users.value.filter(user =>
-    props.event.responsible_engineers.includes(user.id) &&
-    ['video_engineer', 'technician', 'manager', 'admin'].includes(user.role)
-  )
+  return users.value.filter(u => props.event.responsible_engineers.includes(u.id))
 })
 
-// Наблюдатели
-watch(() => props.visible, (newVal) => {
-  if (newVal) {
+watch(() => props.show, (val) => {
+  if (val) {
     resetForm()
-    clearErrors()
   }
 })
 
-watch(() => props.mountPoint, (newVal) => {
-  if (newVal && props.visible) {
-    resetForm()
-  }
-}, { immediate: true })
+onMounted(() => {
+  if (!users.value.length) userStore.loadUsers?.()
+})
 
-// Методы
 function resetForm() {
   if (props.mountPoint) {
-    // Режим редактирования
     form.value = {
       name: props.mountPoint.name || '',
       location: props.mountPoint.location || '',
-      start_date: props.mountPoint.start_date || '',
+      start_date: props.mountPoint.start_date || (props.event?.setup_date || ''),
       technical_duties: ensureTechnicalDutiesFormat(props.mountPoint.technical_duties || []),
       responsible_engineers: [...(props.mountPoint.responsible_engineers || [])],
       equipment_plan: [...(props.mountPoint.equipment_plan || [])],
       equipment_fact: [...(props.mountPoint.equipment_fact || [])]
     }
   } else {
-    // Режим создания
     form.value = {
       name: '',
       location: '',
-      start_date: '',
+      start_date: props.event?.setup_date || '',
       technical_duties: [],
       responsible_engineers: [],
       equipment_plan: [],
       equipment_fact: []
     }
   }
+  newDutyTitle.value = ''
+  newDutyDescription.value = ''
 }
 
-function clearErrors() {
-  errors.value = {}
-  submitError.value = ''
+function ensureTechnicalDutiesFormat(list) {
+  return Array.isArray(list) ? list.map(item => {
+    if (item && typeof item === 'object' && item.title) return { id: item.id || crypto.randomUUID(), title: item.title, description: item.description || '', status: item.status || 'в работе' }
+    if (typeof item === 'string') return { id: crypto.randomUUID(), title: item, description: '', status: 'в работе' }
+    return { id: crypto.randomUUID(), title: String(item || ''), description: '', status: 'в работе' }
+  }) : []
 }
 
-// Вспомогательные функции
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2)
-}
-
-function ensureTechnicalDutiesFormat(duties) {
-  if (!Array.isArray(duties)) return []
-  
-  return duties.map(duty => {
-    // Если это уже объект с нужной структурой
-    if (typeof duty === 'object' && duty.title && duty.status) {
-      return {
-        id: duty.id || generateId(),
-        title: duty.title,
-        status: duty.status
-      }
-    }
-    // Если это старый формат (просто строка)
-    if (typeof duty === 'string') {
-      return {
-        id: generateId(),
-        title: duty,
-        status: 'в работе'
-      }
-    }
-    // Fallback
-    return {
-      id: generateId(),
-      title: String(duty),
-      status: 'в работе'
-    }
-  })
-}
-
-// В функции addDuty всегда присваиваем статус 'в работе'
 function addDuty() {
   const title = newDutyTitle.value.trim()
+  const desc = newDutyDescription.value.trim()
   if (!title) return
-  
-  if (form.value.technical_duties.some(duty => duty.title === title)) {
-    submitError.value = 'Такое техническое задание уже добавлено'
-    return
-  }
-  
-  const newDuty = {
-    id: crypto.randomUUID(),
-    title,
-    status: 'в работе'
-  }
-  
-  form.value.technical_duties.push(newDuty)
+  const current = Array.isArray(form.value.technical_duties) ? [...form.value.technical_duties] : []
+  if (current.some(d => d.title === title)) return
+  current.push({ id: crypto.randomUUID(), title, description: desc, status: 'в работе' })
+  formRef.value?.setField?.('technical_duties', current)
   newDutyTitle.value = ''
-  submitError.value = ''
+  newDutyDescription.value = ''
 }
 
 function removeDuty(index) {
-  form.value.technical_duties.splice(index, 1)
+  const current = Array.isArray(form.value.technical_duties) ? [...form.value.technical_duties] : []
+  if (index < 0 || index >= current.length) return
+  current.splice(index, 1)
+  formRef.value?.setField?.('technical_duties', current)
 }
 
-// Обработчики для управления оборудованием
-const handleEquipmentChange = (equipmentData) => {
-  form.value.equipment_plan = [...equipmentData.planned]
-  form.value.equipment_fact = [...equipmentData.actual]
-  clearErrors() // Очищаем ошибки при изменении оборудования
+function toggleValue(list, id) {
+  const current = Array.isArray(list) ? [...list] : []
+  const idx = current.indexOf(id)
+  if (idx === -1) current.push(id)
+  else current.splice(idx, 1)
+  return current
 }
 
-const handleEquipmentError = (errorMessage) => {
-  submitError.value = errorMessage
+const validationRules = {
+  name: [{ rule: 'required', message: 'Название обязательно' }],
+  responsible_engineers: [{ rule: (val) => Array.isArray(val) && val.length > 0, message: 'Назначьте хотя бы одного инженера' }]
 }
 
-function validateForm() {
-  const newErrors = {}
-  
-  if (!form.value.name.trim()) {
-    newErrors.name = 'Название точки монтажа обязательно'
-  } else if (form.value.name.trim().length > 120) {
-    newErrors.name = 'Название не должно превышать 120 символов'
-  }
-  
-  if (form.value.technical_duties.length === 0) {
-    newErrors.technical_duties = 'Добавьте хотя бы одно техническое задание'
-  } else {
-    // Проверяем, что все задания имеют название
-    const hasEmptyTitles = form.value.technical_duties.some(duty => !duty.title?.trim())
-    if (hasEmptyTitles) {
-      newErrors.technical_duties = 'Все технические задания должны иметь название'
-    }
-  }
-  
-  if (form.value.responsible_engineers.length === 0) {
-    newErrors.responsible_engineers = 'Назначьте хотя бы одного ответственного инженера'
-  }
-  
-  errors.value = newErrors
-  return Object.keys(newErrors).length === 0
-}
-
-async function handleSubmit() {
-  clearErrors()
-  
-  if (!validateForm()) {
-    return
-  }
-  
-  isSubmitting.value = true
-  
+async function handleSubmit(data) {
   try {
-    const formData = {
-      ...form.value,
-      name: form.value.name.trim(),
-      location: form.value.location?.trim() || null,
-      start_date: form.value.start_date || null,
-      technical_duties: form.value.technical_duties.map(duty => ({
-        id: duty.id,
-        title: duty.title.trim(),
-        status: duty.status
-      })),
+    isSubmitting.value = true
+    if (isEdit.value && props.mountPoint?.id) {
+      const updates = {
+        name: data.name?.trim(),
+        location: data.location?.trim() || null,
+        start_date: data.start_date || null,
+        technical_duties: (data.technical_duties || []).map(d => ({ id: d.id, title: d.title?.trim(), description: (d.description || '').trim(), status: d.status || 'в работе' })),
+        responsible_engineers: Array.isArray(data.responsible_engineers) ? data.responsible_engineers : [],
+        equipment_plan: Array.isArray(data.equipment_plan) ? data.equipment_plan : [],
+        equipment_fact: Array.isArray(data.equipment_fact) ? data.equipment_fact : []
+      }
+      const result = await mountPointStore.editMountPoint(props.mountPoint.id, updates)
+      if (result?.error) throw new Error(result.error)
+      emit('success', result?.data || null)
+      emit('update:show', false)
+      return
+    }
+
+    const payload = {
+      ...data,
+      name: data.name?.trim(),
+      location: data.location?.trim() || null,
+      start_date: data.start_date || null,
+      technical_duties: (data.technical_duties || []).map(d => ({ id: d.id, title: d.title?.trim(), description: (d.description || '').trim(), status: d.status || 'в работе' })),
       event_id: props.eventId
     }
-    
-    // Отправляем данные родительскому компоненту для обработки
-    emit('submit', formData)
-    
-  } catch (err) {
-    submitError.value = err.message || 'Ошибка валидации данных'
+
+    const result = await mountPointStore.createMountPoint(payload)
+    if (result?.error) throw new Error(result.error)
+
+    emit('success', result?.data || null)
+    emit('update:show', false)
+  } catch (e) {
+    emit('error', e?.message || (isEdit.value ? 'Ошибка обновления точки монтажа' : 'Ошибка создания точки монтажа'))
   } finally {
     isSubmitting.value = false
   }
 }
-
-// Инициализация
-onMounted(() => {
-  if (!users.value.length) {
-    userStore.loadUsers()
-  }
-})
 </script> 
