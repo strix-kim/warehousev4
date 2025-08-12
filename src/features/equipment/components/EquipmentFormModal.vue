@@ -31,19 +31,37 @@
       <div class="bg-white border border-gray-200 rounded-lg p-4 mb-6">
         <h3 class="text-lg font-semibold text-primary mb-4">Основная информация</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <InputV2
-            v-model="formData.brand"
-            label="Бренд *"
-            placeholder="Введите бренд"
-            :error="validationErrors.brand"
-          />
-          
-          <InputV2
-            v-model="formData.model"
-            label="Модель *"
-            placeholder="Введите модель"
-            :error="validationErrors.model"
-          />
+          <div>
+            <label class="block text-sm font-medium text-primary mb-2">Бренд *</label>
+            <SearchInputV2
+              v-model="formData.brand"
+              placeholder="Начните вводить бренд"
+              :results="brandSuggestions"
+              :loading="brandLoading"
+              :min-search-length="3"
+              :max-results="7"
+              @search="handleBrandSearch"
+              @select="handleBrandSelect"
+              @clear="handleBrandClear"
+            />
+            <p v-if="validationErrors.brand" class="text-error text-sm mt-1">{{ validationErrors.brand }}</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-primary mb-2">Модель *</label>
+            <SearchInputV2
+              v-model="formData.model"
+              placeholder="Начните вводить модель"
+              :results="modelSuggestions"
+              :loading="modelLoading"
+              :min-search-length="3"
+              :max-results="7"
+              @search="handleModelSearch"
+              @select="handleModelSelect"
+              @clear="handleModelClear"
+            />
+            <p v-if="validationErrors.model" class="text-error text-sm mt-1">{{ validationErrors.model }}</p>
+          </div>
           
           <InputV2
             v-model="formData.serialnumber"
@@ -208,6 +226,7 @@ import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { 
   ModalV2,
   InputV2,
+  SearchInputV2,
   SelectV2,
   FormFieldV2,
   ButtonV2,
@@ -216,6 +235,7 @@ import {
 
 // Equipment module
 import { useEquipmentStore } from '@/features/equipment'
+import { equipmentApi } from '@/features/equipment/api/equipment-api.js'
 import { 
   EQUIPMENT_CATEGORIES, 
   getCategoryOptions, 
@@ -260,7 +280,7 @@ const formData = reactive({
   serialnumber: '',
   type: '',
   subtype: '',
-  location: '',
+  location: 'Офис',
   technicalspecification: '',
   lengthinmeters: '',
   count: 1,
@@ -270,6 +290,12 @@ const formData = reactive({
 
 // === ВАЛИДАЦИЯ ===
 const validationErrors = reactive({})
+
+// === ПОДСКАЗКИ ДЛЯ ПОЛЕЙ ===
+const brandSuggestions = ref([])
+const brandLoading = ref(false)
+const modelSuggestions = ref([])
+const modelLoading = ref(false)
 
 // Флаг наличия несохранённых изменений
 const hasUnsavedChanges = computed(() => {
@@ -352,6 +378,8 @@ const resetForm = () => {
       formData[key] = 1
     } else if (key === 'availability') {
       formData[key] = EQUIPMENT_STATUSES.AVAILABLE
+    } else if (key === 'location') {
+      formData[key] = 'Офис'
     } else {
       formData[key] = ''
     }
@@ -466,6 +494,55 @@ const handleRequestClose = () => {
   } else {
     handleClose()
   }
+}
+
+// === ОБРАБОТЧИКИ АВТОКОМПЛИТА ===
+const handleBrandSearch = async (query) => {
+  if (!query || query.trim().length < 3) {
+    brandSuggestions.value = []
+    return
+  }
+  brandLoading.value = true
+  try {
+    const items = await equipmentApi.getBrandSuggestions(query, 7)
+    brandSuggestions.value = items.map(text => ({ label: text, value: text, icon: 'package' }))
+  } catch (e) {
+    brandSuggestions.value = []
+  } finally {
+    brandLoading.value = false
+  }
+}
+
+const handleBrandSelect = ({ value }) => {
+  formData.brand = value
+}
+
+const handleBrandClear = () => {
+  brandSuggestions.value = []
+}
+
+const handleModelSearch = async (query) => {
+  if (!query || query.trim().length < 3) {
+    modelSuggestions.value = []
+    return
+  }
+  modelLoading.value = true
+  try {
+    const items = await equipmentApi.getModelSuggestions(query, formData.brand || null, 7)
+    modelSuggestions.value = items.map(text => ({ label: text, value: text, icon: 'package' }))
+  } catch (e) {
+    modelSuggestions.value = []
+  } finally {
+    modelLoading.value = false
+  }
+}
+
+const handleModelSelect = ({ value }) => {
+  formData.model = value
+}
+
+const handleModelClear = () => {
+  modelSuggestions.value = []
 }
 
 // === WATCHERS ===

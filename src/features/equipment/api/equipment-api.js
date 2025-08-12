@@ -84,6 +84,67 @@ export const equipmentApi = {
     }
   },
 
+  /**
+   * Получить предложения для бренда (уникальные значения brand)
+   */
+  async getBrandSuggestions(query, limit = 7) {
+    try {
+      if (!query || query.trim().length < 3) return []
+
+      const searchTerm = query.trim()
+
+      const { data, error } = await supabase
+        .from('equipment')
+        .select('brand')
+        .ilike('brand', `%${searchTerm}%`)
+        .not('brand', 'is', null)
+        .order('brand', { ascending: true })
+        .limit(50)
+
+      if (error) throw error
+
+      const uniqueBrands = [...new Set((data || []).map(item => item.brand).filter(Boolean))]
+      return uniqueBrands.slice(0, limit)
+    } catch (error) {
+      console.error('Brand suggestions error:', error)
+      return []
+    }
+  },
+
+  /**
+   * Получить предложения для модели (уникальные значения model)
+   * Если указан brand, ограничиваем выборку моделями этого бренда
+   */
+  async getModelSuggestions(query, brand = null, limit = 7) {
+    try {
+      if (!query || query.trim().length < 3) return []
+
+      const searchTerm = query.trim()
+
+      let request = supabase
+        .from('equipment')
+        .select('model, brand')
+        .ilike('model', `%${searchTerm}%`)
+        .not('model', 'is', null)
+        .order('model', { ascending: true })
+        .limit(70)
+
+      if (brand && brand.trim()) {
+        request = request.eq('brand', brand.trim())
+      }
+
+      const { data, error } = await request
+
+      if (error) throw error
+
+      const uniqueModels = [...new Set((data || []).map(item => item.model).filter(Boolean))]
+      return uniqueModels.slice(0, limit)
+    } catch (error) {
+      console.error('Model suggestions error:', error)
+      return []
+    }
+  },
+
 
 
   /**
