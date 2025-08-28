@@ -1,10 +1,10 @@
 <template>
   <div 
-    class="group rounded-xl border bg-white hover:shadow-md transition-all duration-200 overflow-hidden relative"
+    class="group rounded-xl border bg-white hover:shadow-md transition-all duration-200 overflow-hidden relative flex flex-col"
     :class="[
       cardBorderClass,
       cardAnimationClass,
-      'min-h-0' // Убираем фиксированную высоту
+      'min-h-[200px]' // Сбалансированная минимальная высота
     ]"
   >
     <!-- 🚨 КРИТИЧЕСКИЙ ALERT BAR (если есть проблемы) -->
@@ -19,7 +19,7 @@
       </div>
     </div>
 
-    <div class="p-4">
+    <div class="p-4 flex-1 flex flex-col">
       <!-- 📍 ИДЕНТИФИКАЦИЯ: Название + Локация -->
       <div class="mb-4">
         <div class="flex items-start justify-between gap-3 mb-2">

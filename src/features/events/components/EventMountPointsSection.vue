@@ -156,7 +156,7 @@ const gridClasses = computed(() => {
   
   // Оптимизация для разного количества карточек
   if (count === 1) {
-    return 'grid-cols-1 max-w-md mx-auto' // Одна карточка по центру
+    return 'grid-cols-1 max-w-3xl mx-auto' // Одна карточка с достаточной шириной
   } else if (count === 2) {
     return 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto' // Две карточки
   } else if (count <= 6) {
