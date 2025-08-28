@@ -98,6 +98,8 @@ html, body {
   padding: 0;
   /* box-sizing УДАЛЕН - Tailwind обрабатывает это глобально */
   overflow-x: hidden;
+  /* Принудительно убираем scroll-behavior для контроля через JS */
+  scroll-behavior: auto !important;
 }
 
 /* Tailwind уже включает сброс box-sizing для всех элементов */

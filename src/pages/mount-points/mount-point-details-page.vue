@@ -1,26 +1,377 @@
+<template>
+  <div class="min-h-screen bg-accent">
+    <!-- Notification System -->
+    <NotificationV2 ref="notify" position="top-right" />
+
+    <!-- Skeleton Loading State -->
+    <div v-if="isLoading" class="max-w-7xl mx-auto px-4 py-6">
+      <div class="space-y-6">
+        <!-- Header Skeleton -->
+        <div class="bg-white rounded-xl p-6 animate-pulse">
+          <div class="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+          <div class="grid grid-cols-3 gap-4">
+            <div class="h-16 bg-gray-200 rounded"></div>
+            <div class="h-16 bg-gray-200 rounded"></div>
+            <div class="h-16 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+        
+        <!-- Content Skeleton -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 space-y-6">
+            <div class="h-96 bg-white rounded-xl animate-pulse"></div>
+          </div>
+          <div class="space-y-6">
+            <div class="h-48 bg-white rounded-xl animate-pulse"></div>
+            <div class="h-48 bg-white rounded-xl animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="error" class="max-w-7xl mx-auto px-4 py-6">
+      <BentoCard size="2x1" variant="error">
+        <div class="text-center py-8">
+          <IconV2 name="alert-circle" size="lg" class="text-error mb-4" />
+          <h2 class="text-xl font-semibold text-primary mb-2">Ошибка загрузки</h2>
+          <p class="text-secondary mb-4">{{ error }}</p>
+          <ButtonV2 variant="primary" @click="loadMountPoint">
+            Попробовать снова
+          </ButtonV2>
+        </div>
+      </BentoCard>
+    </div>
+
+    <!-- Main Content -->
+    <div v-else-if="mountPointData" class="max-w-7xl mx-auto px-4 py-6">
+      <!-- Header / Breadcrumbs -->
+      <div class="bg-white border-b border-gray-200 -mx-4 px-4 py-4 mb-6">
+        <BreadcrumbsV2 
+          :items="breadcrumbs" 
+          variant="minimal" 
+          size="sm" 
+          @item-click="handleBreadcrumbClick"
+        />
+      </div>
+
+      <!-- Hero Header -->
+      <BentoCard size="2x1" variant="primary" class="mb-6">
+        <template #header>
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="min-w-0 flex-1">
+              <h1 class="text-2xl sm:text-3xl font-bold text-white mb-2">
+                {{ mountPointData.name }}
+              </h1>
+              <div class="flex flex-wrap items-center gap-4 text-white/80">
+                <div class="flex items-center gap-2">
+                  <IconV2 name="map-pin" size="sm" />
+                  <span>{{ mountPointData.location || 'Локация не указана' }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <IconV2 name="calendar" size="sm" />
+                  <span>{{ formatDate(mountPointData.start_date) || 'Дата не указана' }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="flex items-center gap-2">
+              <ButtonV2 variant="ghost" size="sm" @click="goToEvent">
+                <template #icon><IconV2 name="arrow-left" size="sm" /></template>
+                К мероприятию
+              </ButtonV2>
+            </div>
+          </div>
+        </template>
+
+        <!-- Status Overview -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Technical Duties Progress -->
+          <div class="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-white/80 text-sm">Техзадания</span>
+              <StatusBadgeV2 
+                :label="dutiesStatus.label" 
+                :variant="dutiesStatus.variant" 
+                size="xs" 
+              />
+            </div>
+            <div class="text-2xl font-bold text-white mb-1">
+              {{ dutiesStats.completed }}/{{ dutiesStats.total }}
+            </div>
+            <div class="w-full bg-white/20 rounded-full h-2">
+              <div 
+                class="h-2 rounded-full transition-all duration-300"
+                :class="dutiesStatus.progressClass"
+                :style="{ width: dutiesStats.progress + '%' }"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Team -->
+          <div class="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <IconV2 name="users" size="sm" class="text-white/80" />
+              <span class="text-white/80 text-sm">Команда</span>
+            </div>
+            <div class="text-2xl font-bold text-white mb-1">
+              {{ responsibleEngineers.length }}
+            </div>
+            <div class="text-white/60 text-sm">
+              {{ responsibleEngineers.length === 1 ? 'инженер' : 'инженеров' }}
+            </div>
+          </div>
+        </div>
+      </BentoCard>
+
+      <!-- Main Content Grid -->
+      <BentoGrid columns="3" gap="6">
+        <!-- Technical Duties - Main Focus (2 columns) -->
+        <BentoCard size="2x1" variant="default">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <IconV2 name="clipboard-list" size="sm" />
+                <h2 class="text-xl font-semibold text-primary">Технические задания</h2>
+                <StatusBadgeV2 :label="String(dutiesStats.total)" variant="info" size="xs" />
+              </div>
+              <ButtonV2 variant="primary" size="sm" @click="showAddDutyModal = true">
+                <template #icon><IconV2 name="plus" size="sm" /></template>
+                Добавить задание
+              </ButtonV2>
+            </div>
+          </template>
+
+          <!-- Technical Duties List -->
+          <div v-if="technicalDuties.length > 0" class="space-y-4">
+            <TechnicalDutyCard
+              v-for="duty in technicalDuties"
+              :key="duty.id"
+              :duty="duty"
+              :loading="loadingDutyId === duty.id"
+              @status-change="handleDutyStatusChange"
+              @edit="handleEditDuty"
+              @delete="handleDeleteDuty"
+            />
+          </div>
+
+          <!-- Empty State -->
+          <div v-else class="text-center py-12">
+            <IconV2 name="clipboard-list" size="lg" class="text-secondary/50 mb-4" />
+            <h3 class="text-lg font-medium text-primary mb-2">Нет технических заданий</h3>
+            <p class="text-secondary mb-4">Добавьте первое техническое задание для этой точки монтажа</p>
+            <ButtonV2 variant="primary" @click="showAddDutyModal = true">
+              <template #icon><IconV2 name="plus" size="sm" /></template>
+              Добавить задание
+            </ButtonV2>
+          </div>
+        </BentoCard>
+
+        <!-- Team Info -->
+        <BentoCard size="1x1" variant="default">
+          <template #header>
+            <div class="flex items-center gap-2">
+              <IconV2 name="users" size="sm" />
+              <h3 class="text-lg font-semibold text-primary">Команда</h3>
+            </div>
+          </template>
+
+          <div v-if="responsibleEngineers.length > 0" class="space-y-3">
+            <div 
+              v-for="engineer in responsibleEngineers"
+              :key="engineer.id"
+              class="flex items-center gap-3 p-3 bg-accent/50 rounded-lg"
+            >
+              <div class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                <span class="text-primary font-semibold text-sm">
+                  {{ getInitials(engineer.name) }}
+                </span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium text-primary truncate">{{ engineer.name }}</div>
+                <div class="text-sm text-secondary">{{ engineer.role || 'Инженер' }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="text-center py-8">
+            <IconV2 name="user-x" size="lg" class="text-secondary/50 mb-3" />
+            <p class="text-secondary">Инженеры не назначены</p>
+          </div>
+        </BentoCard>
+
+        <!-- Equipment Lists -->
+        <BentoCard size="1x1" variant="default">
+          <template #header>
+            <div class="flex items-center gap-2">
+              <IconV2 name="package" size="sm" />
+              <h3 class="text-lg font-semibold text-primary">Списки оборудования</h3>
+            </div>
+          </template>
+
+          <div v-if="equipmentLists.length > 0" class="space-y-3">
+            <div 
+              v-for="list in equipmentLists"
+              :key="list.id"
+              class="p-3 bg-accent/50 rounded-lg hover:bg-accent/70 transition-colors cursor-pointer"
+              @click="goToEquipmentList(list.id)"
+            >
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="font-medium text-primary text-sm truncate">{{ list.name }}</h4>
+                <StatusBadgeV2 
+                  :label="String(list.equipment_items?.length || list.equipment_ids?.length || 0)" 
+                  variant="info" 
+                  size="xs" 
+                />
+              </div>
+              <div class="text-xs text-secondary">
+                {{ list.type || 'Общий список' }}
+              </div>
+              <div v-if="list.description" class="text-xs text-secondary mt-1 line-clamp-2">
+                {{ list.description }}
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="text-center py-8">
+            <IconV2 name="package-x" size="lg" class="text-secondary/50 mb-3" />
+            <p class="text-secondary text-sm">Списки оборудования не найдены</p>
+          </div>
+
+
+        </BentoCard>
+
+        <!-- Quick Info -->
+        <BentoCard size="1x1" variant="minimal">
+          <template #header>
+            <div class="flex items-center gap-2">
+              <IconV2 name="info" size="sm" />
+              <h3 class="text-lg font-semibold text-primary">Информация</h3>
+            </div>
+          </template>
+
+          <div class="space-y-4">
+            <div>
+              <label class="text-sm font-medium text-secondary">Мероприятие</label>
+              <div class="text-primary font-medium">{{ eventData?.name || 'Не указано' }}</div>
+            </div>
+
+            <div>
+              <label class="text-sm font-medium text-secondary">Локация</label>
+              <div class="text-primary">{{ mountPointData.location || 'Не указана' }}</div>
+            </div>
+
+            <div>
+              <label class="text-sm font-medium text-secondary">Дата начала</label>
+              <div class="text-primary">{{ formatDate(mountPointData.start_date) || 'Не указана' }}</div>
+            </div>
+
+            <div v-if="mountPointData.description">
+              <label class="text-sm font-medium text-secondary">Описание</label>
+              <div class="text-primary text-sm">{{ mountPointData.description }}</div>
+            </div>
+
+            <!-- Actions -->
+            <div class="pt-4 border-t border-secondary/10 space-y-2">
+              <ButtonV2 variant="ghost" size="sm" class="w-full" @click="showEditModal = true">
+                <template #icon><IconV2 name="edit" size="sm" /></template>
+                Редактировать
+              </ButtonV2>
+            </div>
+          </div>
+        </BentoCard>
+      </BentoGrid>
+    </div>
+
+    <!-- Modals -->
+    <AddTechnicalDutyModal
+      v-if="mountPointData"
+      v-model:show="showAddDutyModal"
+      :mount-point="mountPointData"
+      @success="handleDutyAdded"
+      @error="(msg) => notify?.error?.(msg)"
+    />
+
+    <AddTechnicalDutyModal
+      v-if="mountPointData && editingDuty"
+      v-model:show="showEditDutyModal"
+      :mount-point="mountPointData"
+      :editing-duty="editingDuty"
+      @success="handleDutyEdited"
+      @error="(msg) => notify?.error?.(msg)"
+    />
+
+    <MountPointFormModal
+      v-if="mountPointData"
+      v-model:show="showEditModal"
+      :mount-point="mountPointData"
+      :event-id="String(mountPointData.event_id)"
+      :event="eventData"
+      @success="handleMountPointUpdated"
+      @error="(msg) => notify?.error?.(msg)"
+    />
+
+    <!-- Confirmation Modals -->
+    <ConfirmationModalV2
+      v-model:show="showEditConfirmModal"
+      type="warning"
+      title="Редактировать техническое задание?"
+      :message="`Вы хотите отредактировать задание «${dutyToEdit?.title}»?`"
+      details="Откроется форма редактирования с текущими данными задания."
+      confirm-text="Редактировать"
+      cancel-text="Отмена"
+      @confirm="confirmEditDuty"
+      @cancel="cancelEditDuty"
+    />
+
+    <ConfirmationModalV2
+      v-model:show="showDeleteConfirmModal"
+      type="danger"
+      title="Удалить техническое задание?"
+      :message="`Вы действительно хотите удалить задание «${dutyToDelete?.title}»?`"
+      details="Это действие необратимо. Задание будет удалено навсегда."
+      confirm-text="Удалить"
+      cancel-text="Отмена"
+      :loading="isDeleting"
+      @confirm="confirmDeleteDuty"
+      @cancel="cancelDeleteDuty"
+    />
+  </div>
+</template>
+
 <script setup>
 /**
- * MountPointDetailsPage — страница деталей точки монтажа
- * Полнофункциональная страница с управлением оборудованием, назначением инженеров,
- * техническими заданиями, редактированием и удалением
- * Использует современный дизайн с синей цветовой схемой и Tailwind CSS
+ * MountPointDetailsPage - новая страница деталей точки монтажа
+ * Фокус на технических заданиях для инженеров
+ * Использует UI Kit v2 и Bento дизайн
  */
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
+
+// UI Kit v2
+import {
+  BreadcrumbsV2,
+  BentoGrid,
+  BentoCard,
+  ButtonV2,
+  StatusBadgeV2,
+  IconV2,
+  NotificationV2,
+  ConfirmationModalV2
+} from '@/shared/ui-v2'
+
+// Stores
 import { useMountPointStore } from '@/app/store/mount-point-store'
 import { useUserStore } from '@/app/store/user-store'
-import { useEquipmentStore } from '@/features/equipment'
 import { useEventStore } from '@/features/events/store/event-store'
-import { storeToRefs } from 'pinia'
-import Layout from '@/shared/ui/templates/Layout.vue'
-import Button from '@/shared/ui/atoms/Button.vue'
-import Card from '@/shared/ui/molecules/Card.vue'
-import Icon from '@/shared/ui/atoms/Icon.vue'
-import Spinner from '@/shared/ui/atoms/Spinner.vue'
-import ErrorState from '@/shared/ui/templates/ErrorState.vue'
-import MountPointFormModal from '@/features/mount-points/components/MountPointFormModal.vue'
-import MountPointEquipmentManager from '@/features/mount-points/components/MountPointEquipmentManager.vue'
-import Modal from '@/shared/ui/molecules/Modal.vue'
+import { useEquipmentListsStore } from '@/features/events/store/equipment-lists-store'
+
+// Components
+import TechnicalDutyCard from '@/features/mount-points/components/TechnicalDutyCard.vue'
+import AddTechnicalDutyModal from '@/features/mount-points/components/AddTechnicalDutyModal.vue'
+import { MountPointFormModal } from '@/features/mount-points'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,56 +379,30 @@ const mountPointId = route.params.id
 
 // Stores
 const mountPointStore = useMountPointStore()
-const { isLoading, error } = storeToRefs(mountPointStore)
+const { loading: isLoading, error } = storeToRefs(mountPointStore)
 const userStore = useUserStore()
 const { users } = storeToRefs(userStore)
-const equipmentStore = useEquipmentStore()
-const { equipments } = storeToRefs(equipmentStore)
 const eventStore = useEventStore()
+const equipmentListsStore = useEquipmentListsStore()
 
-// Локальное состояние
-const mountPoint = ref(null)
+// Local state
+const notify = ref(null)
+const showAddDutyModal = ref(false)
 const showEditModal = ref(false)
-const isDeleting = ref(false)
-const activeTab = ref('overview')
+const showEditDutyModal = ref(false)
 const loadingDutyId = ref(null)
-const showDeleteModal = ref(false)
+const editingDuty = ref(null)
 
-// Инициализация активной вкладки из URL или localStorage
-const initializeActiveTab = () => {
-  // Сначала проверяем URL параметр
-  const urlTab = route.query.tab
-  if (urlTab && ['overview', 'equipment', 'team', 'duties'].includes(urlTab)) {
-    activeTab.value = urlTab
-    return
-  }
-  
-  // Если нет в URL, проверяем localStorage
-  const savedTab = localStorage.getItem(`mount-point-tab-${mountPointId}`)
-  if (savedTab && ['overview', 'equipment', 'team', 'duties'].includes(savedTab)) {
-    activeTab.value = savedTab
-  }
-}
+// Confirmation modals
+const showDeleteConfirmModal = ref(false)
+const showEditConfirmModal = ref(false)
+const dutyToDelete = ref(null)
+const dutyToEdit = ref(null)
+const isDeleting = ref(false)
 
-// Сохранение активной вкладки
-const saveActiveTab = (tab) => {
-  // Сохраняем в localStorage
-  localStorage.setItem(`mount-point-tab-${mountPointId}`, tab)
-  
-  // Обновляем URL без перезагрузки страницы
-  const newQuery = { ...route.query, tab }
-  router.replace({ query: newQuery })
-}
-
-// Обработчик изменения вкладки
-const handleTabChange = (tab) => {
-  activeTab.value = tab
-  saveActiveTab(tab)
-}
-
-// Computed свойства
+// Data
 const mountPointData = computed(() => {
-  return mountPointStore.getMountPointById(mountPointId) || mountPoint.value
+  return mountPointStore.getMountPointById(mountPointId)
 })
 
 const eventData = computed(() => {
@@ -92,132 +417,131 @@ const responsibleEngineers = computed(() => {
     .filter(Boolean)
 })
 
-const plannedEquipment = computed(() => {
-  if (!mountPointData.value?.equipment_plan) return []
-  return mountPointData.value.equipment_plan
-    .map(id => equipments.value.find(e => e.id === id))
-    .filter(Boolean)
-})
-
-const actualEquipment = computed(() => {
-  if (!mountPointData.value?.equipment_fact) return []
-  return mountPointData.value.equipment_fact
-    .map(id => equipments.value.find(e => e.id === id))
-    .filter(Boolean)
-})
-
-const completionStatus = computed(() => {
-  const planned = mountPointData.value?.equipment_plan?.length || 0
-  const actual = mountPointData.value?.equipment_fact?.length || 0
-  
-  if (planned === 0) {
-    return { label: 'Планирование', progress: 0, color: 'gray' }
-  }
-  
-  const progress = Math.round((actual / planned) * 100)
-  
-  if (progress === 0) {
-    return { label: 'Не начато', progress: 0, color: 'red' }
-  } else if (progress < 100) {
-    return { label: 'В процессе', progress, color: 'yellow' }
-  } else {
-    return { label: 'Завершено', progress: 100, color: 'green' }
-  }
-})
-
-const readinessStatus = computed(() => {
-  const duties = technicalDuties.value
-  if (!duties.length) return { label: 'Не начато', color: 'gray', progress: 0 }
-
-  const total = duties.length
-  const completed = duties.filter(d => d.status === 'выполнено').length
-  const inProgress = duties.filter(d => d.status === 'в работе').length
-  const problem = duties.filter(d => d.status === 'проблема').length
-
-  if (completed === 0) {
-    return { label: 'Не начато', color: 'red', progress: 0 }
-  }
-  if (completed === total) {
-    return { label: 'Готово', color: 'green', progress: 100 }
-  }
-  // Если есть хотя бы одно "в работе" или "проблема", и не все "выполнено"
-  return { label: 'В процессе', color: problem > 0 ? 'red' : 'yellow', progress: Math.round((completed / total) * 100) }
-})
-
 const technicalDuties = computed(() => {
   return mountPointData.value?.technical_duties || []
 })
 
-// Статистика статусов технических заданий
+// Equipment lists for this mount point
+const equipmentLists = computed(() => {
+  if (!mountPointData.value?.event_id) return []
+  return equipmentListsStore.getEquipmentListsByEventId(mountPointData.value.event_id)
+    .filter(list => list.mount_point_id === mountPointId)
+})
+
+// Technical duties statistics
 const dutiesStats = computed(() => {
   const duties = technicalDuties.value
+  const total = duties.length
+  const completed = duties.filter(d => d.status === 'выполнено').length
+  const inProgress = duties.filter(d => d.status === 'в работе').length
+  const problems = duties.filter(d => d.status === 'проблема').length
   
   return {
-    inProgress: duties.filter(duty => {
-      const status = typeof duty === 'object' ? duty.status : 'в работе'
-      return status === 'в работе'
-    }).length,
-    completed: duties.filter(duty => {
-      const status = typeof duty === 'object' ? duty.status : 'в работе'
-      return status === 'выполнено'
-    }).length,
-    problem: duties.filter(duty => {
-      const status = typeof duty === 'object' ? duty.status : 'в работе'
-      return status === 'проблема'
-    }).length
+    total,
+    completed,
+    inProgress,
+    problems,
+    progress: total > 0 ? Math.round((completed / total) * 100) : 0
   }
 })
 
-// Функции
+const dutiesStatus = computed(() => {
+  const stats = dutiesStats.value
+  
+  if (stats.total === 0) {
+    return { 
+      label: 'Нет заданий', 
+      variant: 'info', 
+      progressClass: 'bg-secondary/40' 
+    }
+  }
+  
+  if (stats.problems > 0) {
+    return { 
+      label: 'Есть проблемы', 
+      variant: 'error', 
+      progressClass: 'bg-error' 
+    }
+  }
+  
+  if (stats.completed === stats.total) {
+    return { 
+      label: 'Готово', 
+      variant: 'success', 
+      progressClass: 'bg-success' 
+    }
+  }
+  
+  if (stats.inProgress > 0) {
+    return { 
+      label: 'В работе', 
+      variant: 'warning', 
+      progressClass: 'bg-warning' 
+    }
+  }
+  
+  return { 
+    label: 'Не начато', 
+    variant: 'info', 
+    progressClass: 'bg-secondary/40' 
+  }
+})
+
+
+
+// Breadcrumbs
+const breadcrumbs = computed(() => {
+  console.log('🍞 [Breadcrumbs] Computing breadcrumbs:', {
+    mountPointData: mountPointData.value?.name,
+    eventData: eventData.value?.name,
+    eventId: mountPointData.value?.event_id
+  })
+  
+  const items = [
+    { label: 'Главная', href: '/', icon: 'home' },
+    { label: 'Мероприятия', href: '/events' }
+  ]
+  
+  if (eventData.value) {
+    items.push({
+      label: eventData.value.name,
+      href: `/events/${eventData.value.id}`
+    })
+  } else if (mountPointData.value?.event_id) {
+    // Fallback если eventData еще не загружен
+    items.push({
+      label: 'Мероприятие',
+      href: `/events/${mountPointData.value.event_id}`
+    })
+  }
+  
+  items.push({
+    label: mountPointData.value?.name || 'Точка монтажа',
+    disabled: true
+  })
+  
+  console.log('🍞 [Breadcrumbs] Final items:', items)
+  return items
+})
+
+// Methods
 const formatDate = (dateStr) => {
-  if (!dateStr) return 'не указана'
+  if (!dateStr) return null
   const date = new Date(dateStr)
   return new Intl.DateTimeFormat('ru-RU', { 
-    day: 'numeric', 
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
+    day: '2-digit', 
+    month: 'short',
+    year: 'numeric'
   }).format(date)
 }
 
-const openEditModal = () => {
-  showEditModal.value = true
-}
-
-const closeEditModal = () => {
-  showEditModal.value = false
-}
-
-const handleEditSubmit = async (formData) => {
-  try {
-    await mountPointStore.editMountPoint(mountPointId, formData)
-    showEditModal.value = false
-    // Обновляем локальные данные
-    mountPoint.value = { ...mountPoint.value, ...formData }
-  } catch (error) {
-    console.error('Ошибка редактирования точки монтажа:', error)
-  }
-}
-
-// handleDelete теперь вызывается только из модального окна, confirm() удалён
-const handleDelete = async () => {
-  isDeleting.value = true
-  try {
-    // Сохраняем event_id до удаления, чтобы не потерять его после удаления точки
-    const eventId = mountPointData.value?.event_id
-    await mountPointStore.removeMountPoint(mountPointId)
-    showDeleteModal.value = false
-    if (eventId) {
-      router.push(`/events/${eventId}`)
-    } else {
-      router.push('/events')
-    }
-  } catch (error) {
-    console.error('Ошибка удаления точки монтажа:', error)
-  } finally {
-    isDeleting.value = false
-  }
+const getInitials = (name) => {
+  if (!name) return '??'
+  return name.split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
 }
 
 const goToEvent = () => {
@@ -226,481 +550,156 @@ const goToEvent = () => {
   }
 }
 
-const goBack = () => {
-  router.back()
+const goToEquipmentList = (listId) => {
+  router.push(`/equipment/lists/${listId}`)
 }
 
-const onStatusChange = async (duty, event) => {
-  const prevStatus = duty.status
-  const newStatus = event.target.value
+const handleBreadcrumbClick = (item) => {
+  if (item.href && !item.disabled) {
+    router.push(item.href)
+  }
+}
+
+// Technical duties handlers
+const handleDutyStatusChange = async (duty, newStatus) => {
+  console.log('🔄 [MountPointDetailsPage] handleDutyStatusChange called:', {
+    dutyId: duty.id,
+    oldStatus: duty.status,
+    newStatus,
+    mountPointId
+  })
+  
   loadingDutyId.value = duty.id
-  duty.error = null
+  
   try {
+    console.log('🔄 [MountPointDetailsPage] Calling store.updateTechnicalDutyStatus...')
     await mountPointStore.updateTechnicalDutyStatus(mountPointId, duty.id, newStatus)
-    // После успешного обновления статус уже синхронизирован через store
-  } catch (e) {
-    duty.status = prevStatus
-    duty.error = 'Не удалось обновить статус. Попробуйте ещё раз.'
+    console.log('✅ [MountPointDetailsPage] Status updated successfully')
+    notify.value?.success('Статус задания обновлен')
+  } catch (error) {
+    console.error('❌ [MountPointDetailsPage] Error updating duty status:', error)
+    notify.value?.error('Не удалось обновить статус задания')
   } finally {
     loadingDutyId.value = null
+    console.log('🔄 [MountPointDetailsPage] handleDutyStatusChange finished')
   }
 }
 
-// Обработчики для управления оборудованием
-const handleEquipmentSave = (equipmentData) => {
-  console.log('Оборудование сохранено:', equipmentData)
-  // Обновляем локальные данные точки монтажа, если нужно
-  if (mountPoint.value) {
-    mountPoint.value.equipment_plan = equipmentData.planned
-    mountPoint.value.equipment_fact = equipmentData.actual
-    mountPoint.value.equipment_final = equipmentData.final
+const handleEditDuty = (duty) => {
+  console.log('🔍 [DEBUG] updateTechnicalDuty exists:', typeof mountPointStore.updateTechnicalDuty)
+  // Показываем модальное окно подтверждения редактирования
+  dutyToEdit.value = duty
+  showEditConfirmModal.value = true
+}
+
+const handleDeleteDuty = (duty) => {
+  // Показываем модальное окно подтверждения удаления
+  dutyToDelete.value = duty
+  showDeleteConfirmModal.value = true
+}
+
+// Подтверждение редактирования
+const confirmEditDuty = () => {
+  if (dutyToEdit.value) {
+    editingDuty.value = dutyToEdit.value
+    showEditDutyModal.value = true
+    showEditConfirmModal.value = false
+    dutyToEdit.value = null
   }
 }
 
-const handleEquipmentChange = (equipmentData) => {
-  // Можно добавить валидацию или другую логику при изменении
-  console.log('Оборудование изменено:', equipmentData)
+// Подтверждение удаления
+const confirmDeleteDuty = async () => {
+  if (!dutyToDelete.value) return
+  
+  isDeleting.value = true
+  try {
+    console.log('🔍 [DEBUG] Available store methods:', Object.keys(mountPointStore))
+    console.log('🔍 [DEBUG] deleteTechnicalDuty exists:', typeof mountPointStore.deleteTechnicalDuty)
+    
+    if (typeof mountPointStore.deleteTechnicalDuty !== 'function') {
+      throw new Error('Метод deleteTechnicalDuty не найден в store')
+    }
+    
+    await mountPointStore.deleteTechnicalDuty(mountPointId, dutyToDelete.value.id)
+    await loadMountPoint()
+    notify.value?.success('Техническое задание удалено')
+    
+    // Закрываем модальное окно
+    showDeleteConfirmModal.value = false
+    dutyToDelete.value = null
+  } catch (error) {
+    notify.value?.error('Не удалось удалить техническое задание')
+    console.error('Error deleting duty:', error)
+  } finally {
+    isDeleting.value = false
+  }
 }
 
-const handleEquipmentError = (errorMessage) => {
-  console.error('Ошибка управления оборудованием:', errorMessage)
-  // Можно показать уведомление пользователю
+// Отмена действий
+const cancelEditDuty = () => {
+  showEditConfirmModal.value = false
+  dutyToEdit.value = null
 }
 
-// Загрузка данных
+const cancelDeleteDuty = () => {
+  showDeleteConfirmModal.value = false
+  dutyToDelete.value = null
+}
+
+const handleDutyAdded = async () => {
+  showAddDutyModal.value = false
+  await loadMountPoint()
+  notify.value?.success('Техническое задание добавлено')
+}
+
+const handleDutyEdited = async () => {
+  showEditDutyModal.value = false
+  editingDuty.value = null
+  await loadMountPoint()
+  notify.value?.success('Техническое задание обновлено')
+}
+
+const handleMountPointUpdated = async () => {
+  showEditModal.value = false
+  await loadMountPoint()
+  notify.value?.success('Точка монтажа обновлена')
+}
+
+// Load data
+const loadMountPoint = async () => {
+  try {
+    await mountPointStore.loadMountPointById(mountPointId)
+  } catch (error) {
+    console.error('Error loading mount point:', error)
+  }
+}
+
 onMounted(async () => {
-  // Параллельно загружаем пользователей, оборудование и события, если их нет
-  await Promise.all([
-    users.value.length ? Promise.resolve() : userStore.loadUsers(),
-    equipments.value.length ? Promise.resolve() : equipmentStore.loadEquipments(),
-    eventStore.events.length ? Promise.resolve() : eventStore.loadEvents()
-  ])
-  // Инициализируем активную вкладку
-  initializeActiveTab()
-  // Затем загружаем точку монтажа
-  const data = await mountPointStore.loadMountPointById(mountPointId)
-  if (data) {
-    mountPoint.value = data
+  // Load users if not loaded
+  if (!users.value.length) {
+    await userStore.loadUsers()
   }
-})
-
-// Отслеживаем изменения URL для восстановления вкладки
-watch(() => route.query.tab, (newTab) => {
-  if (newTab && ['overview', 'equipment', 'team', 'duties'].includes(newTab)) {
-    activeTab.value = newTab
+  
+  // Load mount point first
+  await loadMountPoint()
+  
+  // Load specific event for this mount point
+  if (mountPointData.value?.event_id) {
+    console.log('🔄 [MountPointDetailsPage] Loading event:', mountPointData.value.event_id)
+    await eventStore.loadEventById(mountPointData.value.event_id)
+    
+    // Load equipment lists
+    await equipmentListsStore.loadEquipmentListsByEventId(mountPointData.value.event_id)
   }
 })
 </script>
 
-<template>
-  <Layout>
-    <!-- Хлебные крошки -->
-    <nav class="flex mb-6" aria-label="Breadcrumb">
-      <ol class="inline-flex items-center space-x-1 md:space-x-3">
-        <li class="inline-flex items-center">
-          <button 
-            @click="goBack"
-            class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
-          >
-            <Icon name="ArrowLeft" set="lucide" size="sm" class="mr-2" />
-            Назад
-          </button>
-        </li>
-        <li v-if="mountPointData?.event_id">
-          <div class="flex items-center">
-            <Icon name="ChevronRight" set="lucide" size="sm" class="text-gray-400 mx-1" />
-            <button 
-              @click="goToEvent"
-              class="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
-            >
-              Мероприятие
-            </button>
-            </div>
-              </li>
-        <li aria-current="page">
-          <div class="flex items-center">
-            <Icon name="ChevronRight" set="lucide" size="sm" class="text-gray-400 mx-1" />
-            <span class="text-sm font-medium text-gray-500">Точка монтажа</span>
-          </div>
-        </li>
-      </ol>
-    </nav>
-
-    <!-- Лоадер -->
-    <div v-if="isLoading" class="flex items-center justify-center min-h-96">
-      <Spinner size="lg" />
-    </div>
-    
-    <!-- Ошибка -->
-    <ErrorState 
-      v-else-if="error"
-      :message="error"
-      description="Попробуйте обновить страницу или вернуться назад"
-    >
-      <Button @click="goBack" variant="secondary" class="mt-4">
-        Вернуться назад
-      </Button>
-    </ErrorState>
-
-    <!-- Основной контент -->
-    <div v-else-if="mountPointData" class="space-y-8">
-      
-      <!-- Hero секция (теперь без Card, как в EventDetails.vue) -->
-      <section class="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden mb-8">
-        <!-- Градиентная шапка без внутренних отступов -->
-        <div class="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700">
-          <div class="px-8 py-6">
-            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-              <!-- Основная информация: название и статус -->
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-3 mb-3">
-                  <h1 class="text-3xl lg:text-4xl font-bold text-white truncate">
-                    {{ mountPointData.name }}
-                  </h1>
-                  <span
-                    :class="[
-                      'px-3 py-1 rounded-full text-sm font-medium',
-                      readinessStatus.color === 'green' ? 'bg-green-100 text-green-800' :
-                      readinessStatus.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    ]"
-                  >
-                    {{ readinessStatus.label }}
-                  </span>
-                </div>
-                <!-- Метрики на мобильных -->
-                <div class="flex flex-wrap gap-6 text-blue-100 lg:hidden">
-                  <div class="flex items-center gap-2">
-                    <Icon name="Users" set="lucide" size="sm" class="text-white" />
-                    <span>{{ responsibleEngineers.length }} инженеров</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <Icon name="Package" set="lucide" size="sm" class="text-white" />
-                    <span>{{ plannedEquipment.length }} оборудования</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <Icon name="ClipboardCheck" set="lucide" size="sm" class="text-white" />
-                    <span>{{ readinessStatus.progress }}% готово</span>
-                  </div>
-                </div>
-              </div>
-              <!-- Метрики справа на десктопе -->
-              <div class="hidden lg:flex gap-8">
-                <div class="text-center">
-                  <div class="flex items-center justify-center gap-2 mb-1">
-                    <Icon name="Users" set="lucide" size="md" class="text-white" />
-                    <span class="text-2xl font-bold text-white">{{ responsibleEngineers.length }}</span>
-                  </div>
-                  <div class="text-sm text-blue-200">Инженеров</div>
-                </div>
-                <div class="text-center">
-                  <div class="flex items-center justify-center gap-2 mb-1">
-                    <Icon name="Package" set="lucide" size="md" class="text-white" />
-                    <span class="text-2xl font-bold text-white">{{ plannedEquipment.length }}</span>
-                  </div>
-                  <div class="text-sm text-blue-200">Оборудования</div>
-                </div>
-                <div class="text-center">
-                  <div class="flex items-center justify-center gap-2 mb-1">
-                    <Icon name="ClipboardCheck" set="lucide" size="md" class="text-white" />
-                    <span class="text-2xl font-bold text-white">{{ readinessStatus.progress }}%</span>
-                  </div>
-                  <div class="text-sm text-blue-200">Готовность</div>
-                  <!-- Крупный прогрессбар -->
-                  <div class="w-32 h-2 bg-blue-200 rounded-full mt-2 mx-auto">
-                    <div
-                      class="h-2 rounded-full transition-all duration-500"
-                      :class="{
-                        'bg-green-500': readinessStatus.color === 'green',
-                        'bg-yellow-400': readinessStatus.color === 'yellow',
-                        'bg-red-400': readinessStatus.color === 'red' || readinessStatus.color === 'gray'
-                      }"
-                      :style="`width: ${readinessStatus.progress}%`"
-                    ></div>
-              </div>
-            </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <!-- Быстрые действия под секцией -->
-        <div class="px-8 py-4 bg-gray-50 border-t border-gray-200">
-          <div class="flex flex-wrap gap-3">
-            <Button @click="openEditModal" variant="secondary" size="sm">
-              <Icon name="Edit" set="lucide" size="sm" class="mr-2" />
-              Редактировать
-            </Button>
-            <Button 
-              @click="showDeleteModal = true" 
-              variant="danger" 
-              size="sm"
-              :loading="isDeleting"
-              class="ml-auto"
-            >
-              <Icon name="Trash2" set="lucide" size="sm" class="mr-2" />
-              Удалить
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <!-- Табы -->
-      <Card variant="default" size="lg">
-        <!-- Навигация табов -->
-        <div class="border-b border-gray-200">
-          <nav class="flex space-x-8 px-8" aria-label="Tabs">
-            <button
-              @click="handleTabChange('overview')"
-              :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200',
-                activeTab === 'overview'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              ]"
-            >
-              <div class="flex items-center gap-2">
-                <Icon name="Info" set="lucide" size="sm" />
-                Обзор
-              </div>
-            </button>
-            
-            <button
-              @click="handleTabChange('equipment')"
-              :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200',
-                activeTab === 'equipment'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              ]"
-            >
-              <div class="flex items-center gap-2">
-                <Icon name="Package" set="lucide" size="sm" />
-                Оборудование
-              </div>
-            </button>
-            
-            <button
-              @click="handleTabChange('team')"
-              :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200',
-                activeTab === 'team'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              ]"
-            >
-              <div class="flex items-center gap-2">
-                <Icon name="Users" set="lucide" size="sm" />
-                Команда
-              </div>
-            </button>
-            
-            <button
-              @click="handleTabChange('duties')"
-              :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200',
-                activeTab === 'duties'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              ]"
-            >
-              <div class="flex items-center gap-2">
-                <Icon name="ClipboardList" set="lucide" size="sm" />
-                Техзадания
-              </div>
-            </button>
-          </nav>
-        </div>
-        
-        <!-- Контент табов -->
-        <div class="p-8">
-          <!-- Таб Обзор -->
-          <div v-if="activeTab === 'overview'" class="space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <!-- Локация -->
-              <div>
-                <h4 class="font-medium text-gray-900 mb-2 flex items-center gap-2">
-                  <Icon name="MapPin" set="lucide" size="sm" class="text-blue-600" />
-                  Локация
-                </h4>
-                <!-- Если локация указана, показываем её, иначе — подпись -->
-                <p v-if="mountPointData.location" class="text-gray-600">{{ mountPointData.location }}</p>
-                <p v-else class="text-gray-400 italic">ещё не заполнено</p>
-              </div>
-              
-              <!-- Дата начала работы -->
-              <div>
-                <h4 class="font-medium text-gray-900 mb-2 flex items-center gap-2">
-                  <Icon name="Calendar" set="lucide" size="sm" class="text-blue-600" />
-                  Дата начала работы
-                </h4>
-                <!-- Если дата указана, форматируем, иначе — подпись -->
-                <p v-if="mountPointData.start_date" class="text-gray-600">{{ formatDate(mountPointData.start_date) }}</p>
-                <p v-else class="text-gray-400 italic">ещё не заполнено</p>
-              </div>
-              
-              <!-- Пример для дополнительного поля: описание -->
-          <div>
-                <h4 class="font-medium text-gray-900 mb-2 flex items-center gap-2">
-                  <Icon name="FileText" set="lucide" size="sm" class="text-blue-600" />
-                  Описание
-                </h4>
-                <p v-if="mountPointData.description" class="text-gray-600">{{ mountPointData.description }}</p>
-                <p v-else class="text-gray-400 italic">ещё не заполнено</p>
-              </div>
-            </div>
-            
-            <!-- Статистика технических заданий -->
-            <div v-if="mountPointData.technical_duties?.length > 0">
-              <h4 class="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                <Icon name="BarChart3" set="lucide" size="sm" class="text-blue-600" />
-                Статистика заданий
-              </h4>
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div class="flex items-center gap-2 mb-2">
-                    <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <span class="text-sm font-medium text-yellow-800">В работе</span>
-                  </div>
-                  <div class="text-2xl font-bold text-yellow-900">{{ dutiesStats.inProgress }}</div>
-                    </div>
-                
-                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div class="flex items-center gap-2 mb-2">
-                    <div class="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span class="text-sm font-medium text-green-800">Выполнено</span>
-                  </div>
-                  <div class="text-2xl font-bold text-green-900">{{ dutiesStats.completed }}</div>
-                </div>
-                
-                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div class="flex items-center gap-2 mb-2">
-                    <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <span class="text-sm font-medium text-red-800">Проблемы</span>
-                  </div>
-                  <div class="text-2xl font-bold text-red-900">{{ dutiesStats.problem }}</div>
-                </div>
-              </div>
-            </div>
-                  </div>
-          
-          <!-- Таб Оборудование -->
-          <div v-if="activeTab === 'equipment'" class="space-y-6">
-            <!-- Интерактивное управление оборудованием -->
-            <MountPointEquipmentManager
-              :event-id="String(mountPointData.event_id)"
-              :mount-point-id="String(mountPointData.id)"
-              :initial-data="mountPointData"
-              @save="handleEquipmentSave"
-              @change="handleEquipmentChange"
-              @error="handleEquipmentError"
-            />
-          </div>
-          
-          <!-- Таб Команда -->
-          <div v-if="activeTab === 'team'" class="space-y-6">
-            <div>
-              <h3 class="text-lg font-semibold text-gray-900 mb-4">Ответственные инженеры</h3>
-              <div v-if="responsibleEngineers.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div 
-                  v-for="engineer in responsibleEngineers" 
-                  :key="engineer.id"
-                  class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200"
-                >
-                  <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span class="text-blue-600 font-semibold">
-                      {{ engineer.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2) }}
-                    </span>
-                  </div>
-                  <div>
-                    <div class="font-medium text-gray-900">{{ engineer.name }}</div>
-                    <div class="text-sm text-gray-600">{{ engineer.role }}</div>
-                  </div>
-                </div>
-              </div>
-              <!-- Если инженеры не назначены, показываем подпись -->
-              <p v-else class="text-gray-400 italic">ещё не заполнено</p>
-            </div>
-          </div>
-          
-          <!-- Таб Техзадания -->
-          <div v-if="activeTab === 'duties'" class="space-y-6">
-            <div>
-              <h3 class="text-lg font-semibold text-gray-900 mb-4">Технические задания</h3>
-              <div v-if="technicalDuties.length" class="space-y-4">
-                <div 
-                  v-for="(duty, index) in technicalDuties" 
-                  :key="duty.id || index"
-                  class="p-4 rounded-lg border-2 transition-colors duration-200 flex flex-col gap-2 md:flex-row md:items-center"
-                  :class="{
-                    'bg-yellow-50 border-yellow-200': duty.status === 'в работе',
-                    'bg-green-50 border-green-200': duty.status === 'выполнено',
-                    'bg-red-50 border-red-200': duty.status === 'проблема',
-                    'bg-gray-50 border-gray-200': !duty.status
-                  }"
-                >
-                  <div class="flex-1">
-                    <h4 class="text-lg font-medium text-gray-900 mb-1">{{ duty.title }}</h4>
-                    <div class="flex items-center gap-2">
-                      <label :for="`status-${duty.id}`" class="text-sm font-medium text-gray-700">Статус:</label>
-                      <select
-                        :id="`status-${duty.id}`"
-                        v-model="duty.status"
-                        @change="onStatusChange(duty, $event)"
-                        :disabled="loadingDutyId === duty.id"
-                        class="border border-gray-300 rounded-md px-3 py-1 text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors duration-200 cursor-pointer"
-                        aria-label="Изменить статус задания"
-                      >
-                        <option value="в работе">В работе</option>
-                        <option value="выполнено">Выполнено</option>
-                        <option value="проблема">Проблема</option>
-                      </select>
-                      <Spinner v-if="loadingDutyId === duty.id" class="w-4 h-4 text-blue-600 ml-2" />
-                    </div>
-                    <p v-if="duty.error" class="text-xs text-red-600 mt-1">{{ duty.error }}</p>
-                  </div>
-                  <div class="flex-shrink-0 flex items-center gap-2 mt-2 md:mt-0">
-                    <Icon v-if="duty.status === 'выполнено'" name="CheckCircle2" set="lucide" size="md" class="text-green-600" />
-                    <Icon v-else-if="duty.status === 'проблема'" name="AlertCircle" set="lucide" size="md" class="text-red-600" />
-                    <Icon v-else name="Clock" set="lucide" size="md" class="text-yellow-600" />
-                  </div>
-                </div>
-              </div>
-              <!-- Если технические задания не указаны, показываем подпись -->
-              <p v-else class="text-gray-400 italic">ещё не заполнено</p>
-            </div>
-          </div>
-        </div>
-      </Card>
-    </div>
-    
-    <!-- Модальное окно редактирования -->
-    <MountPointFormModal
-      :visible="showEditModal"
-      @update:visible="showEditModal = $event"
-      :mount-point="mountPointData"
-      :event-id="String(mountPointData?.event_id || '')"
-      :event="eventData"
-      @close="closeEditModal"
-      @submit="handleEditSubmit"
-    />
-
-    <!-- Модальное окно подтверждения удаления -->
-    <Modal
-      v-model="showDeleteModal"
-      header="Удалить точку монтажа?"
-      :closable="!isDeleting"
-      size="sm"
-    >
-      <template #default>
-        <div class="flex flex-col items-center text-center gap-4">
-          <Icon name="Trash2" set="lucide" size="lg" class="text-red-500 mb-2" />
-          <p class="text-base text-gray-700">Это действие <span class='font-semibold text-red-600'>необратимо</span>.<br>Вы уверены, что хотите удалить точку монтажа?</p>
-  </div>
-      </template>
-      <template #footer>
-        <Button @click="showDeleteModal = false" variant="secondary" :disabled="isDeleting">Отмена</Button>
-        <Button @click="handleDelete" variant="danger" :loading="isDeleting">Удалить</Button>
-      </template>
-    </Modal>
-  </Layout>
-</template> 
+<style scoped>
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+</style>

@@ -38,6 +38,7 @@ import {
   ListPlus,
   Settings,
   ArrowRight,
+  ArrowLeft,
   Link,
   ExternalLink,
   Inbox,
@@ -52,7 +53,9 @@ import {
   LogIn,
   WifiOff,
   FileText,
-  Palette
+  Palette,
+  ClipboardList,
+  UserX
 } from 'lucide-vue-next';
 
 export const icons = {
@@ -90,6 +93,7 @@ export const icons = {
   'list-plus': ListPlus,
   settings: Settings,
   'arrow-right': ArrowRight,
+  'arrow-left': ArrowLeft,
   link: Link,
   'external-link': ExternalLink,
   inbox: Inbox,
@@ -104,7 +108,9 @@ export const icons = {
   'log-in': LogIn,
   'wifi-off': WifiOff,
   'file-text': FileText,
-  palette: Palette
+  palette: Palette,
+  'clipboard-list': ClipboardList,
+  'user-x': UserX
 };
 
 export function getIcon(name) {

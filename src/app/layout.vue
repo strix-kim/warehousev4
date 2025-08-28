@@ -57,14 +57,7 @@ async function handleLogout() {
   }
 }
 
-// Навигация
-function handleNavigate(route) {
-  const menuItem = menu.find(item => item.route === route)
-  if (menuItem && menuItem.disabled) {
-    return // Не переходим на отключенные страницы
-  }
-  router.push(route)
-}
+// Навигация теперь через router-link - функция больше не нужна
 
 // Управление подменю теперь через CSS :hover
 // JavaScript функции больше не нужны
@@ -132,51 +125,53 @@ onUnmounted(() => {
           <div class="hidden md:flex items-center gap-1">
             <template v-for="item in menu" :key="item.route">
               <!-- Простая кнопка (без подменю) -->
+              <router-link
+                v-if="!item.submenu && !item.disabled"
+                :to="item.route"
+                class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3 py-2 text-secondary hover:text-primary"
+                :class="{ 'bg-gray-100 text-primary': $route.path === item.route }"
+              >
+                {{ item.label }}
+              </router-link>
+              
+              <!-- Отключенная кнопка -->
               <ButtonV2
-                v-if="!item.submenu"
+                v-else-if="!item.submenu && item.disabled"
                 variant="ghost"
                 size="sm"
-                @click="handleNavigate(item.route)"
-                :class="{ 'bg-gray-100': $route.path === item.route }"
-                :disabled="item.disabled"
+                :disabled="true"
                 class="whitespace-nowrap"
               >
                 {{ item.label }}
-                <span
-                  v-if="item.disabled"
-                  class="ml-1 inline-block bg-warning text-white text-xs px-1.5 py-0.5 rounded-full"
-                >
+                <span class="ml-1 inline-block bg-warning text-white text-xs px-1.5 py-0.5 rounded-full">
                   В разработке
                 </span>
               </ButtonV2>
               
               <!-- Dropdown кнопка (с подменю) -->
               <div v-else class="relative nav-dropdown-wrapper">
-                <ButtonV2
-                  variant="ghost"
-                  size="sm"
-                  @click="handleNavigate(item.route)"
-                  :class="{ 'bg-gray-100': $route.path.startsWith(item.route) }"
+                <router-link
+                  :to="item.route"
+                  class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3 py-2 text-secondary hover:text-primary gap-1"
+                  :class="{ 'bg-gray-100 text-primary': $route.path.startsWith(item.route) }"
                 >
                   {{ item.label }}
-                  <template #icon>
-                    <IconV2 name="chevron-down" size="xs" />
-                  </template>
-                </ButtonV2>
+                  <IconV2 name="chevron-down" size="xs" />
+                </router-link>
                 
                 <!-- Dropdown подменю -->
                 <div 
                   class="absolute top-full left-0 bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-48 z-50 nav-dropdown"
                 >
-                  <button
+                  <router-link
                     v-for="subitem in item.submenu"
                     :key="subitem.route"
-                    @click="handleNavigate(subitem.route)"
-                    class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                    :to="subitem.route"
+                    class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 text-secondary hover:text-primary transition-colors"
                     :class="{ 'bg-blue-50 text-blue-600': $route.path === subitem.route }"
                   >
                     {{ subitem.label }}
-                  </button>
+                  </router-link>
                 </div>
               </div>
             </template>
@@ -204,24 +199,31 @@ onUnmounted(() => {
     <!-- Mobile Navigation (if needed) -->
     <div class="md:hidden bg-white border-b border-gray-200">
       <div class="px-4 py-2 space-y-1">
-                    <ButtonV2
-              v-for="item in menu"
-              :key="item.route"
-              variant="ghost"
-              size="sm"
-              @click="handleNavigate(item.route)"
-              :class="{ 'bg-gray-100': $route.path === item.route }"
-              :disabled="item.disabled"
-              class="w-full justify-start whitespace-nowrap"
-            >
-              {{ item.label }}
-              <span
-                v-if="item.disabled"
-                class="ml-1 inline-block bg-warning text-white text-xs px-1.5 py-0.5 rounded-full"
-              >
-                В разработке
-              </span>
-            </ButtonV2>
+        <template v-for="item in menu" :key="item.route">
+          <!-- Активная ссылка -->
+          <router-link
+            v-if="!item.disabled"
+            :to="item.route"
+            class="w-full justify-start whitespace-nowrap inline-flex items-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:bg-accent hover:text-accent-foreground h-9 px-3 py-2 text-secondary hover:text-primary"
+            :class="{ 'bg-gray-100 text-primary': $route.path === item.route }"
+          >
+            {{ item.label }}
+          </router-link>
+          
+          <!-- Отключенная кнопка -->
+          <ButtonV2
+            v-else
+            variant="ghost"
+            size="sm"
+            :disabled="true"
+            class="w-full justify-start whitespace-nowrap"
+          >
+            {{ item.label }}
+            <span class="ml-1 inline-block bg-warning text-white text-xs px-1.5 py-0.5 rounded-full">
+              В разработке
+            </span>
+          </ButtonV2>
+        </template>
       </div>
     </div>
 

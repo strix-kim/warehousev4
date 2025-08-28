@@ -233,7 +233,7 @@ export const useMountPointStore = defineStore('mountPoint', () => {
    * @param {string} newStatus - Новый статус ('в работе', 'выполнено', 'проблема')
    */
   async function updateTechnicalDutyStatus(mountPointId, dutyId, newStatus) {
-    loading.value = true
+    // НЕ устанавливаем loading.value = true для избежания перерисовки всей страницы
     error.value = null
     try {
       // Находим точку монтажа
@@ -249,12 +249,13 @@ export const useMountPointStore = defineStore('mountPoint', () => {
       // Обновляем через API
       const { data, error: apiError } = await updateMountPoint(mountPointId, { technical_duties: duties })
       if (apiError) throw new Error(apiError.message || 'Ошибка обновления статуса задания')
-      // Синхронизируем store
+      // Синхронизируем store - обновляем только technical_duties для минимизации реактивности
       const index = mountPoints.value.findIndex(mp => mp.id === mountPointId)
       if (index >= 0 && data && data[0]) {
-        mountPoints.value[index] = data[0]
+        // Обновляем только technical_duties, а не весь объект
+        mountPoints.value[index].technical_duties = data[0].technical_duties
         if (currentMountPoint.value?.id === mountPointId) {
-          currentMountPoint.value = data[0]
+          currentMountPoint.value.technical_duties = data[0].technical_duties
         }
       }
       return { data: data?.[0] || null, error: null }
@@ -263,7 +264,7 @@ export const useMountPointStore = defineStore('mountPoint', () => {
       console.error('❌ Ошибка updateTechnicalDutyStatus:', err)
       return { data: null, error: err.message }
     } finally {
-      loading.value = false
+      // НЕ сбрасываем loading.value, так как мы его не устанавливали
     }
   }
 
@@ -306,7 +307,95 @@ export const useMountPointStore = defineStore('mountPoint', () => {
       loading.value = false
     }
   }
- 
+
+  /**
+   * Обновить техническое задание
+   * @param {string} mountPointId
+   * @param {string} dutyId
+   * @param {{title?: string, description?: string, status?: string}} updates
+   */
+  async function updateTechnicalDuty(mountPointId, dutyId, updates) {
+    loading.value = true
+    error.value = null
+    try {
+      const mp = getMountPointById.value(mountPointId)
+      if (!mp) throw new Error('Точка монтажа не найдена')
+      
+      const duties = Array.isArray(mp.technical_duties) ? [...mp.technical_duties] : []
+      const dutyIndex = duties.findIndex(d => d.id === dutyId)
+      if (dutyIndex === -1) throw new Error('Техническое задание не найдено')
+      
+      // Обновляем задание
+      duties[dutyIndex] = {
+        ...duties[dutyIndex],
+        ...updates,
+        title: String(updates.title || duties[dutyIndex].title || '').trim(),
+        description: String(updates.description || duties[dutyIndex].description || '').trim()
+      }
+      
+      if (!duties[dutyIndex].title) throw new Error('Название задания обязательно')
+      
+      const { data, error: apiError } = await updateMountPoint(mountPointId, { technical_duties: duties })
+      if (apiError) throw new Error(apiError.message || 'Ошибка обновления задания')
+      
+      // Синхронизируем store
+      const index = mountPoints.value.findIndex(mp => mp.id === mountPointId)
+      if (index >= 0 && data && data[0]) {
+        mountPoints.value[index] = data[0]
+        if (currentMountPoint.value?.id === mountPointId) {
+          currentMountPoint.value = data[0]
+        }
+      }
+      return { data: data?.[0] || null, error: null }
+    } catch (err) {
+      error.value = err.message || 'Ошибка обновления задания'
+      console.error('❌ Ошибка updateTechnicalDuty:', err)
+      return { data: null, error: err.message }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Удалить техническое задание
+   * @param {string} mountPointId
+   * @param {string} dutyId
+   */
+  async function deleteTechnicalDuty(mountPointId, dutyId) {
+    loading.value = true
+    error.value = null
+    try {
+      const mp = getMountPointById.value(mountPointId)
+      if (!mp) throw new Error('Точка монтажа не найдена')
+      
+      const duties = Array.isArray(mp.technical_duties) ? [...mp.technical_duties] : []
+      const dutyIndex = duties.findIndex(d => d.id === dutyId)
+      if (dutyIndex === -1) throw new Error('Техническое задание не найдено')
+      
+      // Удаляем задание из массива
+      duties.splice(dutyIndex, 1)
+      
+      const { data, error: apiError } = await updateMountPoint(mountPointId, { technical_duties: duties })
+      if (apiError) throw new Error(apiError.message || 'Ошибка удаления задания')
+      
+      // Синхронизируем store
+      const index = mountPoints.value.findIndex(mp => mp.id === mountPointId)
+      if (index >= 0 && data && data[0]) {
+        mountPoints.value[index] = data[0]
+        if (currentMountPoint.value?.id === mountPointId) {
+          currentMountPoint.value = data[0]
+        }
+      }
+      return { data: data?.[0] || null, error: null }
+    } catch (err) {
+      error.value = err.message || 'Ошибка удаления задания'
+      console.error('❌ Ошибка deleteTechnicalDuty:', err)
+      return { data: null, error: err.message }
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     // Состояния
     mountPoints,
@@ -328,6 +417,8 @@ export const useMountPointStore = defineStore('mountPoint', () => {
     clearStore,
     clearError,
     updateTechnicalDutyStatus,
-    addTechnicalDuty
+    addTechnicalDuty,
+    updateTechnicalDuty,
+    deleteTechnicalDuty
   }
 }) 

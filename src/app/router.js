@@ -15,7 +15,7 @@ const EquipmentItemsPage = () => import('@/pages/equipment/equipment-items-page.
 const EquipmentListsPage = () => import('@/pages/equipment/equipment-lists-page.vue')
 const EquipmentListsCreatePage = () => import('@/pages/equipment/equipment-lists-create-page.vue')
 const EquipmentListsViewPage = () => import('@/pages/equipment/equipment-lists-view-page.vue')
-const EventsListPage = () => import('@/pages/events/events-page-bento.vue')
+const UtilitiesModulePage = () => import('@/pages/utilities/utilities-module-page.vue')
 const EventsModulePage = () => import('@/pages/events/events-module-page.vue')
 const EventDetails = () => import('@/features/events/EventDetails.vue')
 const ReportsPage = () => import('@/pages/reports/reports-page.vue')
@@ -30,6 +30,12 @@ export const routes = [
     name: 'login',
     component: LoginPage,
     meta: { public: true }, // публичный маршрут
+  },
+  {
+    path: '/utilities',
+    name: 'utilities-module',
+    component: UtilitiesModulePage,
+    // Главная страница модуля утилит
   },
   {
     path: '/',
@@ -140,70 +146,89 @@ export const router = createRouter({
   routes,
   // Настройка поведения скролла при навигации
   scrollBehavior(to, from, savedPosition) {
-    console.log('🔄 Router: scrollBehavior вызван для', to.path)
-    
-    // Если есть якорь (#section), скроллим к нему
+    // Якорные ссылки - плавный скролл к элементу
     if (to.hash) {
-      console.log('🎯 Router: скролл к якорю', to.hash)
-      return {
-        el: to.hash,
-        behavior: 'smooth'
-      }
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({
+            el: to.hash,
+            behavior: 'smooth'
+          })
+        }, 100)
+      })
     }
     
-    // Если есть сохраненная позиция (кнопка "Назад"), восстанавливаем ее
+    // Кнопка "Назад" - восстанавливаем позицию
     if (savedPosition) {
-      console.log('⬅️ Router: восстанавливаем сохраненную позицию', savedPosition)
-      return savedPosition
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(savedPosition)
+        }, 100)
+      })
     }
     
-    // Во всех остальных случаях - скролл наверх
-    console.log('🔝 Router: скролл наверх для новой страницы')
-    return { 
-      top: 0, 
-      left: 0,
-      behavior: 'auto' // Мгновенно, без анимации
-    }
+    // Новая страница - принудительный скролл наверх
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        // Дополнительная проверка
+        if (window.scrollY > 0 || document.documentElement.scrollTop > 0) {
+          window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+          document.documentElement.scrollTop = 0
+        }
+        resolve({ top: 0, left: 0, behavior: 'auto' })
+      }, 50)
+    })
   }
 })
 
 // Оптимизированный guard: используем auth store без дублирования API вызовов
+// Дополнительная гарантия скролла наверх (для случаев, когда scrollBehavior не срабатывает)
+router.afterEach((to, from) => {
+  // Только для переходов без якорей
+  if (!to.hash) {
+    // Немедленный скролл
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+    
+    // Дополнительные проверки с задержками (критично для некоторых случаев)
+    const delays = [50, 150, 300]
+    delays.forEach(delay => {
+      setTimeout(() => {
+        if (window.scrollY > 0 || document.documentElement.scrollTop > 0 || document.body.scrollTop > 0) {
+          window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+          document.documentElement.scrollTop = 0
+          document.body.scrollTop = 0
+        }
+      }, delay)
+    })
+  }
+})
+
 router.beforeEach(async (to, from, next) => {
   // Публичные страницы - пропускаем проверку
   if (to.meta.public) {
-    console.log('🔓 Router: публичная страница, пропускаем auth check')
     return next()
   }
-  
-  console.log('🔒 Router: проверяем аутентификацию для', to.path)
   
   try {
     const authStore = useAuthStore()
     
     // Если store ещё не инициализирован — инициализируем прямо здесь
     if (!authStore.isInitialized) {
-      console.log('⏳ Router: запускаем инициализацию auth store')
       try {
         await authStore.init()
       } catch (err) {
-        console.error('❌ Router: ошибка инициализации auth store', err)
+        console.error('Router: ошибка инициализации auth store', err)
       }
     }
     
-    // Проверяем аутентификацию через store (БЕЗ дополнительных API вызовов)
-    console.log('🔍 Router: состояние auth store:', {
-      isInitialized: authStore.isInitialized,
-      isAuthenticated: authStore.isAuthenticated,
-      hasUser: !!authStore.user,
-      hasSession: !!authStore.session
-    })
-    
+    // Проверяем аутентификацию через store
     if (authStore.isAuthenticated) {
-      console.log('✅ Router: пользователь аутентифицирован')
       return next()
     }
-    
-    console.log('❌ Router: пользователь не аутентифицирован, перенаправляем на /login')
     
     // Предотвращаем бесконечные редиректы
     if (to.path === '/login') {
@@ -212,7 +237,7 @@ router.beforeEach(async (to, from, next) => {
     
     next('/login')
   } catch (error) {
-    console.error('❌ Router: ошибка проверки аутентификации:', error)
+    console.error('Router: ошибка проверки аутентификации:', error)
     next('/login')
   }
 }) 

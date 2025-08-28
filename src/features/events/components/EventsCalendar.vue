@@ -277,10 +277,20 @@ function isToday(day) {
 <template>
   <div class="w-full">
     <!-- Header навигации календаря -->
-    <div class="flex items-center justify-between mb-3">
-      <button class="text-secondary hover:text-primary" @click="prevMonth">‹ Пред</button>
-      <div class="text-primary font-semibold">{{ monthLabel }}</div>
-      <button class="text-secondary hover:text-primary" @click="nextMonth">След ›</button>
+    <div class="flex items-center justify-between mb-3 px-1">
+      <button 
+        class="text-secondary hover:text-primary px-2 py-1 rounded transition-colors duration-150 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)]/30" 
+        @click="prevMonth"
+      >
+        ‹ Пред
+      </button>
+      <div class="text-primary font-semibold text-center flex-1 px-2">{{ monthLabel }}</div>
+      <button 
+        class="text-secondary hover:text-primary px-2 py-1 rounded transition-colors duration-150 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)]/30" 
+        @click="nextMonth"
+      >
+        След ›
+      </button>
     </div>
 
     <!-- Сетка дней недели -->
@@ -304,14 +314,16 @@ function isToday(day) {
         v-for="d in daysInMonth"
         :key="dayKey(d)"
         type="button"
-        class="aspect-[6/5] md:aspect-[4/3] border rounded-lg p-1 sm:p-2 flex flex-col overflow-hidden transition-colors duration-150 ease-out hover:border-[var(--color-brand-red)]/60 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[color-mix(in_oklab,var(--color-brand-deep-red),#000_20%)]"
+        class="aspect-[6/5] md:aspect-[4/3] border rounded-lg p-1 sm:p-2 flex flex-col overflow-hidden transition-colors duration-150 ease-out hover:border-[var(--color-secondary)] hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)]"
         :class="{
-          'bg-[color-mix(in_oklab,var(--color-success),#fff_92%)] border-[color-mix(in_oklab,var(--color-success),#000_15%)]': isToday(d),
-          'bg-white border-gray-200': !isToday(d)
+          'bg-[var(--color-success)] border-green-600': isToday(d) && !isDayActive(d),
+          'bg-[var(--color-success)] border-[var(--color-secondary)]': isToday(d) && isDayActive(d),
+          'border-[var(--color-secondary)]': !isToday(d) && isDayActive(d),
+          'bg-white border-gray-200': !isToday(d) && !isDayActive(d)
         }"
         @click="openDayPreview(d)"
       >
-        <div class="text-xs mb-1" :class="isToday(d) ? 'text-primary' : 'text-secondary'">{{ d.getDate() }}</div>
+        <div class="text-xs mb-1" :class="isToday(d) ? 'text-white' : 'text-secondary'">{{ d.getDate() }}</div>
 
         <!-- Упрощённые индикаторы фаз дня: точки setup/event/teardown -->
         <div v-if="showRanges" class="flex items-center gap-1 mb-1">
@@ -323,16 +335,16 @@ function isToday(day) {
         <!-- Заполнитель, чтобы список был внизу (только ≥ sm) -->
         <div class="flex-1 hidden sm:block"></div>
         <!-- Список мероприятий дня (внизу ячейки, скрыт на мобильных) -->
-        <div class="pt-1 border-t border-gray-100/80 hidden sm:block">
+        <div class="pt-1 hidden sm:block" :class="isToday(d) ? 'border-t border-white/40' : 'border-t border-gray-100/80'">
           <div class="flex flex-col gap-1 overflow-hidden">
             <template v-if="dayToEventsDisplay.get(dayKey(d))?.length">
               <template v-for="(ev, idx) in dayToEventsDisplay.get(dayKey(d)).slice(0, 3)" :key="ev.id + '-' + idx">
                 <div class="w-full text-left text-[11px] flex items-center gap-1 truncate">
                   <StatusBadgeV2 :label="getKindLabel(ev._kind)" :variant="getKindVariant(ev._kind)" size="xs" />
-                  <span class="truncate" :class="isToday(d) ? 'text-primary' : 'text-primary/90'">{{ ev.name }}</span>
+                  <span class="truncate" :class="isToday(d) ? 'text-white' : 'text-primary/90'">{{ ev.name }}</span>
                 </div>
               </template>
-              <div v-if="dayToEventsDisplay.get(dayKey(d)).length > 3" class="text-[10px] text-secondary">+{{ dayToEventsDisplay.get(dayKey(d)).length - 3 }} ещё</div>
+              <div v-if="dayToEventsDisplay.get(dayKey(d)).length > 3" class="text-[10px]" :class="isToday(d) ? 'text-white/80' : 'text-secondary'">+{{ dayToEventsDisplay.get(dayKey(d)).length - 3 }} ещё</div>
             </template>
           </div>
         </div>

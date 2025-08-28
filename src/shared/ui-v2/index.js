@@ -27,6 +27,7 @@ export { default as DropdownV2 } from './molecules/Dropdown.vue'
 export { default as NotificationV2 } from './molecules/Notification.vue'
 export { default as BreadcrumbsV2 } from './molecules/Breadcrumbs.vue'
 export { default as PaginationV2 } from './molecules/Pagination.vue'
+export { default as ConfirmationModalV2 } from './molecules/ConfirmationModal.vue'
 
 // Organisms
 export { default as TableV2 } from './organisms/Table.vue'

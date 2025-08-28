@@ -2,7 +2,7 @@
   <ModalV2
     :model-value="show"
     @update:modelValue="val => emit('update:show', val)"
-    title="Добавить техническое задание"
+    :title="isEditing ? 'Редактировать техническое задание' : 'Добавить техническое задание'"
     size="md"
     :show-close-button="true"
     :require-close-confirm="true"
@@ -42,7 +42,7 @@
           <div class="flex justify-end gap-3">
             <ButtonV2 variant="ghost" @click="emit('update:show', false)">Отмена</ButtonV2>
             <ButtonV2 type="submit" variant="primary" :loading="isSubmitting || isLoading" :disabled="!isValid || isSubmitting || isLoading">
-              Добавить
+              {{ isEditing ? 'Сохранить' : 'Добавить' }}
             </ButtonV2>
           </div>
         </template>
@@ -58,7 +58,8 @@ import { ModalV2, FormV2, FormFieldV2, ButtonV2 } from '@/shared/ui-v2'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
-  mountPoint: { type: Object, required: true }
+  mountPoint: { type: Object, required: true },
+  editingDuty: { type: Object, default: null }
 })
 const emit = defineEmits(['update:show', 'success', 'error'])
 
@@ -69,6 +70,8 @@ const form = ref({
 })
 const titleFieldRef = ref(null)
 
+const isEditing = computed(() => !!props.editingDuty)
+
 const validationRules = {
   title: [
     { rule: 'required', message: 'Укажите название задания' },
@@ -76,13 +79,45 @@ const validationRules = {
   ]
 }
 
+// Отслеживаем изменения показа модального окна
 watch(() => props.show, (val) => {
   if (val) {
-    form.value = { title: '', description: '' }
     nextTick(() => {
       const el = titleFieldRef.value?.$el?.querySelector('input')
       el && el.focus()
     })
+  }
+})
+
+// Отслеживаем изменения editingDuty отдельно
+watch(() => props.editingDuty, (duty) => {
+  if (props.show) {
+    if (duty) {
+      // Заполняем форму данными для редактирования
+      form.value = {
+        title: duty.title || '',
+        description: duty.description || ''
+      }
+    } else {
+      // Очищаем форму для нового задания
+      form.value = { title: '', description: '' }
+    }
+  }
+}, { immediate: true })
+
+// Также отслеживаем комбинацию show + editingDuty
+watch([() => props.show, () => props.editingDuty], ([show, duty]) => {
+  if (show) {
+    if (duty) {
+      // Заполняем форму данными для редактирования
+      form.value = {
+        title: duty.title || '',
+        description: duty.description || ''
+      }
+    } else {
+      // Очищаем форму для нового задания
+      form.value = { title: '', description: '' }
+    }
   }
 })
 
@@ -92,15 +127,31 @@ const mountPointStore = useMountPointStore()
 async function handleSubmit(data) {
   try {
     isSubmitting.value = true
-    const { error } = await mountPointStore.addTechnicalDuty(props.mountPoint.id, {
+    
+    const dutyData = {
       title: String(data.title || '').trim(),
       description: String(data.description || '').trim()
-    })
-    if (error) throw new Error(error)
+    }
+    
+    let result
+    if (isEditing.value) {
+      // Редактируем существующее задание
+      result = await mountPointStore.updateTechnicalDuty(
+        props.mountPoint.id, 
+        props.editingDuty.id, 
+        dutyData
+      )
+    } else {
+      // Добавляем новое задание
+      result = await mountPointStore.addTechnicalDuty(props.mountPoint.id, dutyData)
+    }
+    
+    if (result?.error) throw new Error(result.error)
     emit('success')
     emit('update:show', false)
   } catch (e) {
-    emit('error', e?.message || 'Ошибка добавления задания')
+    const action = isEditing.value ? 'обновления' : 'добавления'
+    emit('error', e?.message || `Ошибка ${action} задания`)
   } finally {
     isSubmitting.value = false
   }

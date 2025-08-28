@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, shallowRef, watchEffect, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 
@@ -11,30 +11,56 @@ import {
   StatusBadgeV2,
   IconV2,
   SpinnerV2,
+  SkeletonV2,
+  TooltipV2,
   NotificationV2
 } from '@/shared/ui-v2'
 
 import { useEventStore } from '@/features/events/store/event-store'
 import { useMountPointStore } from '@/app/store/mount-point-store'
 import { useUserStore } from '@/app/store/user-store'
-import EventEquipmentList from './components/EventEquipmentList.vue'
+import { useEquipmentListsStore } from '@/features/events/store/equipment-lists-store'
+
+// Ленивая загрузка компонентов для улучшения производительности
 import { MountPointFormModal } from '@/features/mount-points'
 import EventFormModalV2 from '@/features/events/components/EventFormModalV2.vue'
-import MountPointCardV2 from '@/features/mount-points/ui/MountPointCardV2.vue'
+
 import AddTechnicalDutyModal from '@/features/mount-points/components/AddTechnicalDutyModal.vue'
+
+// Асинхронная загрузка только для тяжелых компонентов
+const EventEquipmentList = defineAsyncComponent(() => import('./components/EventEquipmentList.vue'))
+
+// Новые компоненты
+import EventTimeline from './components/EventTimeline.vue'
+import EventMountPointsSection from './components/EventMountPointsSection.vue'
+import EventDetailsHeader from './components/EventDetailsHeader.vue'
+import EventDetailsSkeleton from './components/EventDetailsSkeleton.vue'
+import EventOverviewCard from './components/EventOverviewCard.vue'
+import EventTechnicalTaskCard from './components/EventTechnicalTaskCard.vue'
+import EventTeamCard from './components/EventTeamCard.vue'
+import EventEquipmentListsSection from './components/EventEquipmentListsSection.vue'
 
 const route = useRoute()
 const router = useRouter()
 const eventId = String(route.params.id)
 
 const eventStore = useEventStore()
-const { loading: isLoading, error: loadError } = storeToRefs(eventStore)
+const { error: loadError } = storeToRefs(eventStore)
+
+// Собственное состояние загрузки для корректного отображения скелетона
+const isLoading = ref(true)
 
 const mountPointStore = useMountPointStore()
 const { loading: isMountPointsLoading, error: mountPointsError } = storeToRefs(mountPointStore)
 
 const userStore = useUserStore()
 const { users } = storeToRefs(userStore)
+
+const equipmentListsStore = useEquipmentListsStore()
+const { loading: isEquipmentListsLoading, error: equipmentListsError } = storeToRefs(equipmentListsStore)
+
+// Получаем списки оборудования из store
+const equipmentLists = computed(() => equipmentListsStore.getEquipmentListsByEventId(eventId))
 
 const notify = ref(null)
 const expandedMountPoints = ref({})
@@ -48,24 +74,47 @@ const toggleMp = (id) => {
   expandedMountPoints.value = { ...expandedMountPoints.value, [id]: !expandedMountPoints.value[id] }
 }
 
+// Оптимизированные вычисляемые свойства с мемоизацией
+const currentEvent = computed(() => eventStore.getEventById(eventId))
+
+// Кэшируем пользователей для быстрого поиска
+const usersMap = computed(() => {
+  const map = new Map()
+  users.value.forEach(user => {
+    if (user.id && user.name) {
+      map.set(user.id, user.name)
+    }
+  })
+  return map
+})
+
 const responsibleNames = computed(() => {
-  const e = eventStore.getEventById(eventId)
+  const e = currentEvent.value
   if (!e || !Array.isArray(e.responsible_engineers)) return []
   return e.responsible_engineers
-    .map(id => users.value.find(u => u.id === id)?.name)
+    .map(id => usersMap.value.get(id))
     .filter(Boolean)
 })
 
 const teamSize = computed(() => responsibleNames.value.length)
-const mountPointsCount = computed(() => mountPointStore.getMountPointsByEventId(eventId).length)
+
+// Кэшируем точки монтажа
+const mountPoints = computed(() => mountPointStore.getMountPointsByEventId(eventId))
+const mountPointsCount = computed(() => mountPoints.value.length)
+
+// Кэшируем текущее время (обновляется каждую минуту)
+const currentTime = ref(new Date())
+let timeInterval = null
 
 const eventStatus = computed(() => {
-  const e = eventStore.getEventById(eventId)
+  const e = currentEvent.value
   if (!e) return { label: 'Неизвестно', variant: 'info' }
   if (e.is_archived) return { label: 'Архив', variant: 'info' }
-  const now = new Date()
+  
+  const now = currentTime.value
   const start = e.start_date ? new Date(e.start_date) : null
   const end = e.end_date ? new Date(e.end_date) : null
+  
   if (start && end && now >= start && now <= end) return { label: 'Идёт сейчас', variant: 'success' }
   if (start && now < start) return { label: 'Запланировано', variant: 'info' }
   if (end && now > end) return { label: 'Завершено', variant: 'warning' }
@@ -73,22 +122,27 @@ const eventStatus = computed(() => {
 })
 
 const daysUntilEvent = computed(() => {
-  const e = eventStore.getEventById(eventId)
+  const e = currentEvent.value
   if (!e?.start_date) return null
-  const now = new Date()
+  const now = currentTime.value
   const startDate = new Date(e.start_date)
   const diffDays = Math.ceil((startDate - now) / (1000 * 60 * 60 * 24))
   return diffDays
 })
+// Кэшируем форматтер дат
+const dateFormatter = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short' })
+
   const timeline = computed(() => {
-    const e = eventStore.getEventById(eventId)
-    const fmt = (d) => (d ? new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short' }).format(new Date(d)) : '—')
-    const now = new Date()
+    const e = currentEvent.value
+    if (!e) return { setup: { label: '—', active: false }, start: { label: '—', active: false }, end: { label: '—', active: false }, teardown: { label: '—', active: false }, bars: ['bg-secondary/30', 'bg-secondary/30', 'bg-secondary/30'] }
+    
+    const fmt = (d) => (d ? dateFormatter.format(new Date(d)) : '—')
+    const now = currentTime.value
     const toDate = (d) => (d ? new Date(d) : null)
-    const setup = toDate(e?.setup_date)
-    const start = toDate(e?.start_date)
-    const end = toDate(e?.end_date)
-    const teardown = toDate(e?.teardown_date)
+    const setup = toDate(e.setup_date)
+    const start = toDate(e.start_date)
+    const end = toDate(e.end_date)
+    const teardown = toDate(e.teardown_date)
 
     const isPast = (d) => (d ? now >= d : false)
 
@@ -106,25 +160,102 @@ const daysUntilEvent = computed(() => {
     const teardownActive = teardown ? isPast(teardown) : false
 
     return {
-      setup: { label: fmt(e?.setup_date), active: setupActive },
-      start: { label: fmt(e?.start_date), active: startActive },
-      end: { label: fmt(e?.end_date), active: endActive },
-      teardown: { label: fmt(e?.teardown_date), active: teardownActive },
+      setup: { label: fmt(e.setup_date), active: setupActive },
+      start: { label: fmt(e.start_date), active: startActive },
+      end: { label: fmt(e.end_date), active: endActive },
+      teardown: { label: fmt(e.teardown_date), active: teardownActive },
       bars
     }
   })
 
 const mountPointStats = computed(() => {
-  const points = mountPointStore.getMountPointsByEventId(eventId)
+  const points = mountPoints.value
   const total = points.length
-  const ready = points.filter(mp => mp.equipment_fact?.length > 0).length
-  return { total, ready, pending: total - ready }
+  
+  let ready = 0
+  let pending = 0
+  let problems = 0
+  
+  points.forEach(mp => {
+    const duties = Array.isArray(mp.technical_duties) ? mp.technical_duties : []
+    
+    if (duties.length === 0) {
+      // Нет заданий = в работе (требует внимания)
+      pending++
+      return
+    }
+    
+    const problemsCount = duties.filter(d => d.status === 'проблема').length
+    const completedCount = duties.filter(d => d.status === 'выполнено').length
+    const inProgressCount = duties.filter(d => d.status === 'в работе').length
+    
+    if (problemsCount > 0) {
+      // Есть проблемы
+      problems++
+    } else if (completedCount === duties.length) {
+      // Все задания выполнены
+      ready++
+    } else {
+      // Есть задания в работе или не начатые
+      pending++
+    }
+  })
+  
+  return { 
+    total, 
+    ready, 
+    pending, 
+    problems,
+    // Для совместимости со старым API
+    inProgress: pending
+  }
 })
 
 const formatShortDate = (dateStr) => {
   if (!dateStr) return '—'
   const date = new Date(dateStr)
   return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(date)
+}
+
+// UX улучшения: быстрые действия
+const copyEventLink = async () => {
+  try {
+    const url = `${window.location.origin}/events/${eventId}`
+    await navigator.clipboard.writeText(url)
+    notify.value?.success('Ссылка скопирована в буфер обмена')
+  } catch (e) {
+    notify.value?.error('Не удалось скопировать ссылку')
+  }
+}
+
+const copyEventInfo = async () => {
+  try {
+    const event = eventStore.getEventById(eventId)
+    if (!event) return
+    
+    const info = [
+      `📅 ${event.name}`,
+      `📍 ${event.location || 'Место не указано'}`,
+      `👤 ${event.organizer || 'Организатор не указан'}`,
+      `📊 Точек монтажа: ${mountPointsCount.value}`,
+      `👥 Инженеров: ${teamSize.value}`,
+      `🔗 ${window.location.origin}/events/${eventId}`
+    ].join('\n')
+    
+    await navigator.clipboard.writeText(info)
+    notify.value?.success('Информация о мероприятии скопирована')
+  } catch (e) {
+    notify.value?.error('Не удалось скопировать информацию')
+  }
+}
+
+// Hover состояния для timeline
+const hoveredTimelineStep = ref(null)
+const setHoveredStep = (step) => {
+  hoveredTimelineStep.value = step
+}
+const clearHoveredStep = () => {
+  hoveredTimelineStep.value = null
 }
 
 const goToMountPoint = (id) => router.push(`/mount-point/${id}`)
@@ -185,17 +316,62 @@ const handleEditError = (message) => {
   notify.value?.error(message || 'Ошибка сохранения')
 }
 
+// Методы для работы со списками оборудования
+const handleEquipmentListClick = (listId) => {
+  // Переходим к странице списка оборудования в модуле оборудования
+  router.push(`/equipment/lists/${listId}`)
+}
+
+// Оптимизированная загрузка данных
 onMounted(async () => {
+  // Запускаем интервал обновления времени (каждую минуту)
+  timeInterval = setInterval(() => {
+    currentTime.value = new Date()
+  }, 60000) // 1 минута
+
   try {
-    const usersPromise = users.value.length ? Promise.resolve() : userStore.loadUsers()
-    const eventPromise = eventStore.loadEventById(eventId, false, false)
-    const mpPromise = mountPointStore.getMountPointsByEventId(eventId).length
-      ? Promise.resolve()
-      : mountPointStore.loadMountPointsByEventId(eventId)
-    await Promise.all([usersPromise, eventPromise, mpPromise])
+    // Всегда показываем скелетон в начале
+    isLoading.value = true
+    
+    // Параллельная загрузка всех необходимых данных
+    const loadPromises = []
+    
+    // Загружаем пользователей только если их нет
+    if (!users.value.length) {
+      loadPromises.push(userStore.loadUsers())
+    }
+    
+    // Всегда загружаем событие для обеспечения актуальности
+    loadPromises.push(eventStore.loadEventById(eventId, false, false))
+    
+    // Загружаем точки монтажа только если их нет
+    if (!mountPointStore.getMountPointsByEventId(eventId).length) {
+      loadPromises.push(mountPointStore.loadMountPointsByEventId(eventId))
+    }
+    
+    // Загружаем списки оборудования для мероприятия
+    loadPromises.push(equipmentListsStore.loadEquipmentListsByEventId(eventId))
+    
+    // Выполняем загрузки
+    await Promise.all(loadPromises)
+    
+    // Минимальная задержка для плавного UX (показываем скелетон хотя бы 500мс)
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
   } catch (e) {
     // Ошибки уже отражаются в store, уведомление — мягкое
     notify.value?.error(e.message || 'Ошибка загрузки данных')
+  } finally {
+    // Скрываем скелетон после завершения загрузки
+    isLoading.value = false
+  }
+})
+
+// Очистка ресурсов при размонтировании
+onUnmounted(() => {
+  if (timeInterval) {
+    clearInterval(timeInterval)
+    timeInterval = null
   }
 })
 </script>
@@ -204,9 +380,8 @@ onMounted(async () => {
   <div class="min-h-screen bg-accent">
     <NotificationV2 ref="notify" position="top-right" />
 
-    <div v-if="isLoading" class="flex items-center justify-center min-h-screen">
-      <SpinnerV2 size="lg" />
-    </div>
+    <!-- Skeleton Loading State -->
+    <EventDetailsSkeleton v-if="isLoading" />
 
       <div v-else class="max-w-7xl mx-auto">
       <!-- Header / Breadcrumbs -->
@@ -215,7 +390,7 @@ onMounted(async () => {
           <BreadcrumbsV2 :items="[
             { label: 'Главная', href: '/', icon: 'home' },
             { label: 'Мероприятия', href: '/events' },
-            { label: eventStore.getEventById(eventId)?.name || 'Мероприятие', disabled: true }
+            { label: currentEvent?.name || 'Мероприятие', disabled: true }
           ]" variant="minimal" size="sm" />
         </div>
       </div>
@@ -226,252 +401,59 @@ onMounted(async () => {
             <!-- Hero: full width -->
             <BentoCard size="2x1" variant="primary">
             <template #header>
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div class="flex items-start sm:items-center gap-2 min-w-0">
-                  <IconV2 name="calendar" size="sm" />
-                  <h2 class="text-accent text-xl sm:text-2xl lg:text-3xl font-semibold leading-tight break-words">{{ eventStore.getEventById(eventId)?.name }}</h2>
-                </div>
-                <div class="flex items-center gap-2">
-                  <StatusBadgeV2 :label="eventStatus.label" :variant="eventStatus.variant" size="sm" />
-                  <ButtonV2 variant="minimal" size="sm" @click="showEditEventModal = true">
-                    <IconV2 name="edit" size="sm" class="mr-1" /> Редактировать
-                  </ButtonV2>
-                </div>
-              </div>
+              <EventDetailsHeader
+                :event-name="currentEvent?.name || ''"
+                :event-status="eventStatus"
+                @copy-link="copyEventLink"
+                @copy-info="copyEventInfo"
+                @edit="showEditEventModal = true"
+              />
             </template>
 
               <!-- Timeline -->
-              <div class="space-y-4">
-                <!-- Mobile vertical progression -->
-                <div class="sm:hidden">
-                  <div class="grid grid-cols-[20px_1fr] gap-x-3">
-                    <template
-                      v-for="(step, idx) in [
-                        { key: 'setup', title: 'Монтаж', label: timeline.setup.label, active: timeline.setup.active },
-                        { key: 'start', title: 'Старт', label: timeline.start.label, active: timeline.start.active },
-                        { key: 'end', title: 'Финиш', label: timeline.end.label, active: timeline.end.active },
-                        { key: 'teardown', title: 'Демонтаж', label: timeline.teardown.label, active: timeline.teardown.active }
-                      ]"
-                      :key="step.key"
-                    >
-                      <div class="flex flex-col items-center">
-                        <span
-                          :class="[
-                            'inline-block shrink-0 w-2.5 h-2.5 rounded-full ring-2 ring-white/80',
-                            step.active
-                              ? (step.key === 'setup'
-                                  ? 'bg-[var(--color-info)]'
-                                  : step.key === 'teardown'
-                                    ? 'bg-[var(--color-warning)]'
-                                    : 'bg-[var(--color-success)]')
-                              : 'bg-white/30'
-                          ]"
-                        ></span>
-                        <div v-if="idx < 3" :class="['w-px flex-1 mt-1', timeline.bars[idx]]"></div>
-                      </div>
-                      <div class="pb-4">
-                        <div class="text-xs text-accent/80">{{ step.title }}</div>
-                        <div class="text-sm text-accent">{{ step.label }}</div>
-                      </div>
-                    </template>
-                  </div>
-                </div>
-
-                <!-- Desktop/Tablet timeline with lines -->
-                <div class="hidden sm:flex items-center gap-2 text-accent">
-                  <!-- Setup Node -->
-                  <div class="flex items-center gap-2 w-16 sm:w-24 md:w-28 flex-shrink-0">
-                    <span :class="['inline-block shrink-0 w-2.5 h-2.5 rounded-full ring-2 ring-white/80', timeline.setup.active ? 'bg-[var(--color-info)]' : 'bg-white/30']"></span>
-                    <span class="text-xs text-accent/80 whitespace-nowrap">
-                      <span class="hidden md:inline">Монтаж: </span>
-                      <span class="text-accent">{{ timeline.setup.label }}</span>
-                    </span>
-                  </div>
-                  <!-- connector -->
-                  <div :class="['w-8 sm:w-12 md:w-16 lg:w-20 xl:w-24 h-[2px] flex-shrink-0', timeline.bars[0]]"></div>
-                  <!-- Start Node -->
-                  <div class="flex items-center gap-2 w-16 sm:w-24 md:w-28 flex-shrink-0">
-                    <span :class="['inline-block shrink-0 w-2.5 h-2.5 rounded-full ring-2 ring-white/80', timeline.start.active ? 'bg-[var(--color-success)]' : 'bg-white/30']"></span>
-                    <span class="text-xs text-accent/80 whitespace-nowrap">
-                      <span class="hidden md:inline">Старт: </span>
-                      <span class="text-accent">{{ timeline.start.label }}</span>
-                    </span>
-                  </div>
-                  <div :class="['w-8 sm:w-12 md:w-16 lg:w-20 xl:w-24 h-[2px] flex-shrink-0', timeline.bars[1]]"></div>
-                  <!-- End Node -->
-                  <div class="flex items-center gap-2 w-16 sm:w-24 md:w-28 flex-shrink-0">
-                    <span :class="['inline-block shrink-0 w-2.5 h-2.5 rounded-full ring-2 ring-white/80', timeline.end.active ? 'bg-[var(--color-success)]' : 'bg-white/30']"></span>
-                    <span class="text-xs text-accent/80 whitespace-nowrap">
-                      <span class="hidden md:inline">Финиш: </span>
-                      <span class="text-accent">{{ timeline.end.label }}</span>
-                    </span>
-                  </div>
-                  <div :class="['w-8 sm:w-12 md:w-16 lg:w-20 xl:w-24 h-[2px] flex-shrink-0', timeline.bars[2]]"></div>
-                  <!-- Teardown Node -->
-                  <div class="flex items-center gap-2 w-16 sm:w-24 md:w-28 flex-shrink-0">
-                    <span :class="['inline-block shrink-0 w-2.5 h-2.5 rounded-full ring-2 ring-white/80', timeline.teardown.active ? 'bg-[var(--color-warning)]' : 'bg-white/30']"></span>
-                    <span class="text-xs text-accent/80 whitespace-nowrap">
-                      <span class="hidden md:inline">Демонтаж: </span>
-                      <span class="text-accent">{{ timeline.teardown.label }}</span>
-                    </span>
-                  </div>
-                </div>
-
-                <!-- Bottom row: chips + KPIs -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <span v-if="eventStore.getEventById(eventId)?.organizer" class="px-2 py-1 rounded-full border border-secondary/30 bg-white text-sm text-primary inline-flex items-center gap-1">
-                      <IconV2 name="user" size="xs" /> {{ eventStore.getEventById(eventId)?.organizer }}
-                    </span>
-                    <span v-if="eventStore.getEventById(eventId)?.location" class="px-2 py-1 rounded-full border border-secondary/30 bg-white text-sm text-primary inline-flex items-center gap-1">
-                      <IconV2 name="map-pin" size="xs" /> {{ eventStore.getEventById(eventId)?.location }}
-                    </span>
-                  </div>
-                  <div class="rounded-xl border border-secondary/20 bg-white p-4 flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                      <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                        <IconV2 name="map-pin" size="sm" class="text-primary" />
-                      </div>
-                      <div class="text-sm text-secondary">Точек</div>
-                    </div>
-                    <div class="text-2xl font-semibold text-primary">{{ mountPointsCount }}</div>
-                  </div>
-                  <div class="rounded-xl border border-secondary/20 bg-white p-4 flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                      <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                        <IconV2 name="users" size="sm" class="text-primary" />
-                      </div>
-                      <div class="text-sm text-secondary">Инженеров</div>
-                    </div>
-                    <div class="text-2xl font-semibold text-primary">{{ teamSize }}</div>
-                  </div>
-                </div>
-
-                <!-- Accent bar -->
-                <div class="h-1 rounded-full bg-gradient-to-r from-[var(--color-brand-red)] to-[var(--color-brand-deep-red)]"></div>
-              </div>
+              <EventTimeline
+                :timeline="timeline"
+                :event="currentEvent"
+                :mount-points-count="mountPointsCount"
+                :team-size="teamSize"
+                :hovered-step="hoveredTimelineStep"
+                @step-hover="setHoveredStep"
+                @step-leave="clearHoveredStep"
+                @notify="(data) => notify?.value?.[data.type]?.(data.message)"
+              />
           </BentoCard>
 
             <!-- Overview and Tech Task: side by side -->
-            <BentoCard size="1x1" variant="default">
-            <template #header>
-              <div class="flex items-center gap-2">
-                <IconV2 name="file-text" size="sm" />
-                <h3 class="text-base sm:text-lg font-semibold leading-tight">Обзор</h3>
-              </div>
-            </template>
-            <div v-if="eventStore.getEventById(eventId)?.description" class="text-sm text-primary whitespace-pre-line leading-relaxed">
-              {{ eventStore.getEventById(eventId)?.description }}
-            </div>
-            <div v-else class="flex items-center gap-3 text-secondary text-sm">
-              <IconV2 name="info" size="sm" class="text-secondary/70" />
-              <span>Описание не указано</span>
-            </div>
-          </BentoCard>
+            <EventOverviewCard :description="currentEvent?.description" />
 
-          <!-- Tech Task -->
-            <BentoCard size="1x1" variant="minimal" class="self-start">
-            <template #header>
-              <div class="flex items-center justify-between gap-2 w-full">
-                <div class="flex items-center gap-2">
-                  <IconV2 name="file-text" size="sm" />
-                  <h3 class="text-base sm:text-lg font-semibold leading-tight">Техзадание</h3>
-                </div>
-                <ButtonV2
-                  v-if="eventStore.getEventById(eventId)?.technical_task"
-                  variant="minimal"
-                  size="sm"
-                  @click="navigator.clipboard.writeText(String(eventStore.getEventById(eventId)?.technical_task || ''))"
-                >
-                  <IconV2 name="copy" size="sm" class="mr-2" />
-                  Копировать
-                </ButtonV2>
-              </div>
-            </template>
-            <div v-if="eventStore.getEventById(eventId)?.technical_task" class="bg-accent/50 border border-secondary/20 rounded-lg p-3 max-h-56 overflow-auto">
-              <pre class="whitespace-pre-wrap font-mono text-xs text-primary">{{ eventStore.getEventById(eventId)?.technical_task }}</pre>
-            </div>
-            <div v-else class="flex items-center gap-3 text-secondary text-sm">
-              <IconV2 name="info" size="sm" class="text-secondary/70" />
-              <span>Техническое задание не указано</span>
-            </div>
-          </BentoCard>
+            <!-- Tech Task -->
+            <EventTechnicalTaskCard 
+              :technical-task="currentEvent?.technical_task"
+              @copy-success="(msg) => notify?.value?.success?.(msg)"
+              @copy-error="(msg) => notify?.value?.error?.(msg)"
+            />
 
             <!-- Mount Points: full width -->
-            <BentoCard size="2x2" variant="default">
-            <template #header>
-              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div class="min-w-0">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <IconV2 name="map-pin" size="sm" />
-                    <h3 class="text-base sm:text-lg font-semibold leading-tight">Точки монтажа</h3>
-                    <StatusBadgeV2 :label="String(mountPointStats.total)" variant="info" size="xs" />
-                  </div>
-                  <!-- Compact stats for mobile -->
-                  <div class="flex sm:hidden items-center gap-4 text-xs text-secondary mt-1">
-                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-success inline-block"></span> Готово: {{ mountPointStats.ready }}</span>
-                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-warning inline-block"></span> В работе: {{ mountPointStats.pending }}</span>
-                  </div>
-                </div>
-                <div class="flex items-center gap-4">
-                  <div class="text-sm text-secondary hidden sm:flex items-center gap-4">
-                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-success inline-block"></span> Готово: {{ mountPointStats.ready }}</span>
-                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-warning inline-block"></span> В работе: {{ mountPointStats.pending }}</span>
-                  </div>
-                  <ButtonV2 class="w-full sm:w-auto" variant="primary" size="sm" @click="openMountPointForm">
-                    <template #icon><IconV2 name="plus" size="sm" /></template>
-                    Добавить точку монтажа
-                  </ButtonV2>
-                </div>
-              </div>
-            </template>
-            <div v-if="isMountPointsLoading" class="text-secondary">Загрузка точек...</div>
-            <div v-else-if="mountPointsError" class="text-error">{{ mountPointsError }}</div>
-            <div v-else>
-              <div v-if="mountPointStore.getMountPointsByEventId(eventId).length === 0" class="text-center py-10">
-                <IconV2 name="map-pin" size="lg" class="text-secondary/50 mb-3" />
-                <div class="text-primary font-medium mb-2">Точек монтажа пока нет</div>
-                <div class="text-secondary text-sm mb-4">Создайте первую точку для этого мероприятия</div>
-                <ButtonV2 variant="primary" size="sm" @click="openMountPointForm">
-                  <template #icon><IconV2 name="plus" size="sm" /></template>
-                  Добавить точку монтажа
-                </ButtonV2>
-              </div>
-              <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <MountPointCardV2
-                  v-for="mp in mountPointStore.getMountPointsByEventId(eventId)"
-                  :key="mp.id"
-                  :mount-point="mp"
-                  @click="goToMountPoint(mp.id)"
-                  @edit="openEditMountPoint(mp)"
-                  @add-duty="openAddDutyForMountPoint(mp)"
-                />
-              </div>
-            </div>
-          </BentoCard>
+            <EventMountPointsSection
+              :mount-points="mountPoints"
+              :stats="mountPointStats"
+              :is-loading="isMountPointsLoading"
+              :error="mountPointsError"
+              @add-mount-point="openMountPointForm"
+              @mount-point-click="goToMountPoint"
+              @edit-mount-point="openEditMountPoint"
+              @add-duty="openAddDutyForMountPoint"
+            />
 
-            <!-- Team and Equipment Lists: side by side -->
-            <BentoCard v-if="responsibleNames.length" size="1x1" variant="default">
-              <template #header>
-                <div class="flex items-center gap-2"><IconV2 name="users" size="sm" /><h3 class="text-base sm:text-lg font-semibold leading-tight">Команда проекта</h3></div>
-              </template>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div v-for="name in responsibleNames" :key="name" class="flex items-center gap-3 p-3 rounded-xl border border-secondary/20 bg-white">
-                  <div class="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center text-primary font-semibold text-sm">{{ name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) }}</div>
-                  <div>
-                    <div class="font-medium text-primary">{{ name }}</div>
-                    <div class="text-xs text-secondary">Ответственный инженер</div>
-                  </div>
-                </div>
-              </div>
-            </BentoCard>
+            <!-- Team and Equipment Lists: vertical stack -->
+            <EventTeamCard :team-members="responsibleNames" />
 
-            <BentoCard size="1x1" variant="secondary" class="self-start">
-              <template #header>
-                <div class="flex items-center gap-2"><IconV2 name="list" size="sm" /><h3 class="text-base sm:text-lg font-semibold leading-tight">Списки оборудования</h3></div>
-              </template>
-              <div class="text-sm text-secondary">Здесь будут карточки списков, связанные с мероприятием.</div>
-            </BentoCard>
+            <EventEquipmentListsSection
+              :equipment-lists="equipmentLists"
+              :is-loading="isEquipmentListsLoading"
+              :error="equipmentListsError"
+              @list-click="handleEquipmentListClick"
+            />
         </BentoGrid>
       </div>
     </div>
@@ -479,7 +461,7 @@ onMounted(async () => {
     <MountPointFormModal
       v-model:show="showMountPointForm"
       :event-id="eventId"
-      :event="eventStore.getEventById(eventId)"
+      :event="currentEvent"
       :mount-point="selectedMountPoint"
       @close="closeMountPointForm"
       @success="selectedMountPoint ? handleMountPointEditSuccess() : handleMountPointCreateSuccess($event)"
@@ -498,7 +480,7 @@ onMounted(async () => {
     <!-- Edit Event Modal -->
     <EventFormModalV2
       v-model:show="showEditEventModal"
-      :event="eventStore.getEventById(eventId)"
+      :event="currentEvent"
       @success="handleEditSuccess"
       @error="handleEditError"
       @close="showEditEventModal = false"
