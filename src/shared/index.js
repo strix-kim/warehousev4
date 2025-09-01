@@ -26,6 +26,8 @@ export * from './ui/templates/OfflineState.vue'
 // Composables
 export * from './composables/useFormValidation.js'
 export * from './composables/useLocalStorage.js'
+export * from './composables/usePermissions.js'
+export { useExcelExport } from './composables/useExcelExport.js'
 
 // API
 export * from './api/supabase.js' 

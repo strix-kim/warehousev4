@@ -38,8 +38,8 @@
           :id="`duty-status-${duty.id}`"
           :value="duty.status"
           @change.prevent="handleStatusChange"
-          :disabled="loading"
-          class="text-sm border border-secondary/20 rounded-lg px-3 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+          :disabled="loading || !canEdit"
+          class="text-sm border border-secondary/20 rounded-lg px-3 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
         >
           <option value="в работе">В работе</option>
           <option value="выполнено">Выполнено</option>
@@ -48,8 +48,12 @@
       </div>
 
       <!-- Actions -->
-      <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div 
+        v-if="canEdit || canDelete"
+        class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+      >
         <ButtonV2 
+          v-if="canEdit"
           variant="ghost" 
           size="sm" 
           @click="$emit('edit', duty)"
@@ -59,6 +63,7 @@
         </ButtonV2>
         
         <ButtonV2 
+          v-if="canDelete"
           variant="ghost" 
           size="sm" 
           @click="$emit('delete', duty)"
@@ -66,6 +71,15 @@
         >
           <template #icon><IconV2 name="trash-2" size="xs" /></template>
         </ButtonV2>
+      </div>
+      
+      <!-- No permissions indicator -->
+      <div 
+        v-else-if="!canEdit"
+        class="flex items-center gap-1 opacity-50"
+      >
+        <IconV2 name="lock" size="xs" class="text-secondary" />
+        <span class="text-xs text-secondary">Только просмотр</span>
       </div>
     </div>
 
@@ -108,6 +122,14 @@ const props = defineProps({
     required: true
   },
   loading: {
+    type: Boolean,
+    default: false
+  },
+  canEdit: {
+    type: Boolean,
+    default: true
+  },
+  canDelete: {
     type: Boolean,
     default: false
   }

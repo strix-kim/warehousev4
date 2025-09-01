@@ -52,24 +52,31 @@
       </div>
     </template>
 
-    <!-- Loading State -->
-    <div v-if="isLoading" class="flex items-center justify-center py-8">
+    <!-- 🎯 ПРАВИЛЬНО: Initial Loading State (только при первой загрузке) -->
+    <div v-if="initialLoading" class="flex items-center justify-center py-8">
       <div class="flex items-center gap-3 text-secondary">
         <SpinnerV2 size="sm" />
         <span>Загрузка точек...</span>
       </div>
     </div>
 
-    <!-- Error State -->
-    <div v-else-if="error" class="flex items-center justify-center py-8">
+    <!-- Error State (только если нет данных) -->
+    <div v-else-if="error && mountPoints.length === 0" class="flex items-center justify-center py-8">
       <div class="flex items-center gap-3 text-error">
         <IconV2 name="alert-circle" size="sm" />
         <span>{{ error }}</span>
       </div>
     </div>
 
-    <!-- Content -->
-    <div v-else>
+    <!-- Content (всегда показывается если есть данные) -->
+    <div v-else class="relative">
+      <!-- 🔄 Тонкий индикатор обновления (НЕ скрывает контент) -->
+      <div 
+        v-if="refreshing" 
+        class="absolute -top-2 left-0 right-0 h-1 bg-gradient-to-r from-primary/20 via-primary to-primary/20 rounded-full overflow-hidden z-10"
+      >
+        <div class="h-full bg-primary/60 rounded-full animate-pulse"></div>
+      </div>
       <!-- Empty State -->
       <div v-if="mountPoints.length === 0" class="text-center py-10">
         <IconV2 name="map-pin" size="lg" class="text-secondary/50 mb-3" />
@@ -81,8 +88,14 @@
         </ButtonV2>
       </div>
 
-      <!-- Mount Points Grid - Улучшенная адаптивная сетка -->
-      <div v-else class="grid gap-4 sm:gap-6" :class="gridClasses">
+      <!-- Mount Points Grid - Улучшенная адаптивная сетка с плавными переходами -->
+      <TransitionGroup 
+        v-if="mountPoints.length > 0"
+        name="mount-point-update"
+        tag="div" 
+        class="grid gap-4 sm:gap-6" 
+        :class="gridClasses"
+      >
         <MountPointCardV3
           v-for="mp in mountPoints"
           :key="mp.id"
@@ -90,8 +103,9 @@
           @click="handleMountPointClick(mp.id)"
           @edit="handleEditMountPoint(mp)"
           @add-duty="handleAddDuty(mp)"
+          @delete="handleDeleteMountPoint(mp)"
         />
-      </div>
+      </TransitionGroup>
     </div>
   </BentoCard>
 </template>
@@ -130,8 +144,13 @@ const props = defineProps({
     }
   },
   
-  // Состояния загрузки
-  isLoading: {
+  // 🎯 НОВЫЕ СОСТОЯНИЯ (Best Practices)
+  initialLoading: {
+    type: Boolean,
+    default: false
+  },
+  
+  refreshing: {
     type: Boolean,
     default: false
   },
@@ -140,6 +159,12 @@ const props = defineProps({
   error: {
     type: String,
     default: null
+  },
+  
+  // 🗑️ DEPRECATED: Для обратной совместимости (будет удален)
+  isLoading: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -147,7 +172,8 @@ const emit = defineEmits([
   'add-mount-point',
   'mount-point-click', 
   'edit-mount-point',
-  'add-duty'
+  'add-duty',
+  'delete-mount-point'
 ])
 
 // Адаптивная сетка в зависимости от количества карточек
@@ -182,8 +208,63 @@ const handleEditMountPoint = (mountPoint) => {
 const handleAddDuty = (mountPoint) => {
   emit('add-duty', mountPoint)
 }
+
+const handleDeleteMountPoint = (mountPoint) => {
+  emit('delete-mount-point', mountPoint)
+}
 </script>
 
 <style scoped>
-/* Дополнительные стили при необходимости */
+/* 🎨 Плавные переходы для обновления точек монтажа */
+
+/* Обновление существующих карточек (основной переход) */
+.mount-point-update-move,
+.mount-point-update-enter-active,
+.mount-point-update-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 🎨 Новые карточки появляются плавно */
+.mount-point-update-enter-from {
+  opacity: 0;
+  transform: translateY(10px) scale(0.95);
+}
+
+.mount-point-update-enter-to {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* 🎨 Удаляемые карточки исчезают плавно */
+.mount-point-update-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.mount-point-update-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.95);
+}
+
+/* Плавное перемещение при изменении порядка */
+.mount-point-update-move {
+  transition: transform 0.3s ease;
+}
+
+/* 🔧 Предотвращение мерцания при обновлении */
+.mount-point-update-leave-active {
+  position: absolute;
+  z-index: 0;
+}
+
+/* 🎨 Дополнительная оптимизация для плавности */
+.grid {
+  position: relative;
+}
+
+/* Сглаживание для webkit browsers */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 </style>

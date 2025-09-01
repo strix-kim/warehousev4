@@ -10,38 +10,59 @@
           @item-click="handleBreadcrumbClick"
         />
         
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mt-4">
+        <div class="space-y-4 mt-4">
           <div class="flex-1">
-            <div class="flex items-center gap-3 mb-2">
-              <IconV2 name="list" size="lg" color="primary" />
-              <h1 class="text-3xl font-bold text-primary">
-                {{ listData?.name || 'Загрузка...' }}
-              </h1>
-              <StatusBadgeV2 
-                v-if="listData?.type"
-                :variant="getListTypeVariant(listData.type)"
-                :label="getListTypeLabel(listData.type)"
-                size="sm"
-              />
+            <!-- Заголовок с иконкой - адаптивный -->
+            <div class="flex items-start gap-2 sm:gap-3 mb-3">
+              <IconV2 name="list" size="md" color="primary" class="mt-1 flex-shrink-0" />
+              <div class="flex-1 min-w-0">
+                <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-primary leading-tight break-words">
+                  {{ listData?.name || 'Загрузка...' }}
+                </h1>
+                <!-- StatusBadge на отдельной строке на мобильных -->
+                <div class="mt-2">
+                  <StatusBadgeV2 
+                    v-if="listData?.type"
+                    :variant="getListTypeVariant(listData.type)"
+                    :label="getListTypeLabel(listData.type)"
+                    size="sm"
+                  />
+                </div>
+              </div>
             </div>
-            <p class="text-base text-secondary">
+            <!-- Описание -->
+            <p class="text-sm sm:text-base text-secondary leading-relaxed">
               {{ listData?.description || 'Описание отсутствует' }}
             </p>
           </div>
           
-          <!-- Действия -->
-          <div class="flex gap-2 w-full sm:w-auto">
+          <!-- Действия - мобильно-адаптивные -->
+          <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <ButtonV2 
+              variant="primary" 
+              size="md"
+              @click="handleExportToExcel"
+              :disabled="loading || exporting || !equipmentData.length"
+              :loading="exporting"
+              class="w-full sm:w-auto justify-center sm:justify-start"
+            >
+              <template #icon>
+                <IconV2 name="download" size="sm" />
+              </template>
+              <span class="sm:inline">{{ exporting ? 'Экспорт...' : 'Excel' }}</span>
+            </ButtonV2>
+            
             <ButtonV2 
               variant="ghost" 
               size="md"
               @click="navigateToEdit"
               :disabled="loading"
-              class="flex-1 sm:flex-none"
+              class="w-full sm:w-auto justify-center sm:justify-start"
             >
               <template #icon>
                 <IconV2 name="edit" size="sm" />
               </template>
-              Редактировать
+              <span class="sm:inline">Редактировать</span>
             </ButtonV2>
             
             <ButtonV2 
@@ -49,12 +70,12 @@
               size="md"
               @click="handleDelete"
               :disabled="loading"
-              class="flex-1 sm:flex-none"
+              class="w-full sm:w-auto justify-center sm:justify-start"
             >
               <template #icon>
                 <IconV2 name="trash-2" size="sm" />
               </template>
-              Удалить
+              <span class="sm:inline">Удалить</span>
             </ButtonV2>
           </div>
         </div>
@@ -219,85 +240,90 @@
             </ButtonV2>
           </div>
           
-          <!-- Компактные карточки оборудования -->
-          <div v-else class="space-y-3">
-            <div 
-              v-for="equipment in paginatedFilteredEquipment" 
-              :key="equipment.id"
-              class="bg-white rounded-lg border border-gray-200 p-4 hover:border-gray-300 hover:shadow-sm transition-all duration-200"
-            >
-              <div class="flex flex-col sm:flex-row gap-4">
-                <!-- Основная информация -->
-                <div class="flex items-start gap-3 flex-1">
-                  <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <IconV2 name="package" size="md" color="secondary" />
-                  </div>
-                  
-                  <div class="flex-1 min-w-0">
-                    <h3 class="font-semibold text-primary mb-1">
-                      {{ equipment.brand || 'Без бренда' }} {{ equipment.model || 'Без модели' }}
-                    </h3>
-                    
-                    <div class="flex flex-wrap items-center gap-2 mb-2">
-                      <span class="text-sm text-secondary">{{ equipment.type || '—' }}</span>
-                      <span v-if="equipment.subtype" class="text-sm text-secondary">• {{ equipment.subtype }}</span>
-                      <StatusBadgeV2 
-                        :variant="getAvailabilityVariant(equipment.availability)"
-                        :label="equipment.availability || 'Не указано'"
-                        size="xs"
-                      />
-                    </div>
-                    
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      <div v-if="equipment.serialnumber">
-                        <span class="text-secondary">Серийный номер:</span>
-                        <p class="text-primary font-mono text-xs">{{ equipment.serialnumber }}</p>
-                      </div>
-                      
-                      <div v-if="equipment.location">
-                        <span class="text-secondary">Локация:</span>
-                        <p class="text-primary">{{ equipment.location }}</p>
-                      </div>
-                      
-                      <div v-if="equipment.technicalspecification" class="sm:col-span-2">
-                        <span class="text-secondary">Характеристики:</span>
-                        <p class="text-primary text-sm">{{ equipment.technicalspecification }}</p>
-                      </div>
-                      
-                      <div v-if="equipment.lengthinmeters" class="sm:col-span-2">
-                        <span class="text-secondary">Длина:</span>
-                        <p class="text-primary">{{ equipment.lengthinmeters }} м</p>
-                      </div>
-                      
-                      <div v-if="equipment.description" class="sm:col-span-2">
-                        <span class="text-secondary">Описание:</span>
-                        <p class="text-primary text-sm">{{ equipment.description }}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- Количество (если больше 1) -->
-                <div v-if="equipment.count && equipment.count > 1" class="flex-shrink-0 text-center sm:text-right">
-                  <div class="text-xl font-bold text-primary">{{ equipment.count }}</div>
-                  <div class="text-xs text-secondary uppercase tracking-wider">штук</div>
-                </div>
-              </div>
-            </div>
+          <!-- Таблица оборудования (аналогично странице управления) -->
+          <TableV2
+            v-else
+            :data="paginatedFilteredEquipment"
+            :columns="equipmentTableColumns"
+            :loading="false"
+            :clickable-rows="false"
+            class="w-full"
+          >
+            <!-- Кастомные ячейки (точно как в EquipmentTable.vue) -->
+            
+            <!-- Бренд -->
+            <template #cell-brand="{ item }">
+              <span 
+                class="font-semibold text-primary text-sm cursor-help"
+                :title="item.brand"
+              >
+                {{ item.brand || '—' }}
+              </span>
+            </template>
 
-            <!-- Pagination для оборудования -->
-            <div v-if="totalEquipmentPages > 1" class="pt-6 border-t border-gray-100">
-              <PaginationV2
-                :current-page="currentEquipmentPage"
-                :total-pages="totalEquipmentPages"
-                :items-per-page="equipmentItemsPerPage"
-                :total-items="filteredEquipmentData.length"
-                @update:current-page="currentEquipmentPage = $event"
-                @update:items-per-page="equipmentItemsPerPage = $event"
-                variant="minimal"
-                class="justify-center"
-              />
-            </div>
+            <!-- Модель -->
+            <template #cell-model="{ item }">
+              <span 
+                class="text-secondary text-sm cursor-help"
+                :title="item.model"
+              >
+                {{ item.model || '—' }}
+              </span>
+            </template>
+
+            <!-- Серийный номер -->
+            <template #cell-serialnumber="{ item }">
+              <span 
+                class="font-mono text-xs text-secondary cursor-help"
+                :title="item.serialnumber"
+              >
+                {{ item.serialnumber || '—' }}
+              </span>
+            </template>
+
+            <!-- Категория -->
+            <template #cell-type="{ item }">
+              <span 
+                class="text-xs text-secondary cursor-help"
+                :title="item.type"
+              >
+                {{ item.type || '—' }}
+              </span>
+            </template>
+
+            <!-- Подкатегория -->
+            <template #cell-subtype="{ item }">
+              <span 
+                class="text-xs text-secondary cursor-help"
+                :title="item.subtype"
+              >
+                {{ item.subtype || '—' }}
+              </span>
+            </template>
+
+            <!-- Локация -->
+            <template #cell-location="{ item }">
+              <span 
+                class="text-xs text-secondary cursor-help"
+                :title="item.location"
+              >
+                {{ item.location || '—' }}
+              </span>
+            </template>
+          </TableV2>
+
+          <!-- Pagination для оборудования -->
+          <div v-if="totalEquipmentPages > 1" class="pt-6 border-t border-gray-100">
+            <PaginationV2
+              :current-page="currentEquipmentPage"
+              :total-pages="totalEquipmentPages"
+              :items-per-page="equipmentItemsPerPage"
+              :total-items="filteredEquipmentData.length"
+              @update:current-page="currentEquipmentPage = $event"
+              @update:items-per-page="equipmentItemsPerPage = $event"
+              variant="minimal"
+              class="justify-center"
+            />
           </div>
         </BentoCard>
       </BentoGrid>
@@ -363,10 +389,14 @@ import {
   SearchInputV2,
   SelectV2,
   StatusBadgeV2,
-  SpinnerV2
+  SpinnerV2,
+  TableV2
 } from '@/shared/ui-v2'
 import BentoGrid from '@/shared/ui-v2/layouts/BentoGrid.vue'
 import BentoCard from '@/shared/ui-v2/layouts/BentoCard.vue'
+
+// Composables
+import { useExcelExport } from '@/shared/composables/useExcelExport.js'
 
 // API
 import { 
@@ -377,6 +407,9 @@ import { getEquipmentByIds } from '@/features/equipment/api/equipment-external-d
 
 const router = useRouter()
 const route = useRoute()
+
+// ═══ EXCEL EXPORT ═══
+const { exportEquipmentList, exporting } = useExcelExport()
 
 // ═══ NAVIGATION ═══
 const breadcrumbs = computed(() => [
@@ -423,6 +456,40 @@ const uniqueTypesCount = computed(() => {
   })
   return types.size
 })
+
+// ═══ TABLE COLUMNS ═══ (аналогично странице управления оборудованием, но без действий)
+const equipmentTableColumns = [
+  { 
+    key: 'brand', 
+    label: 'Бренд', 
+    sortable: false
+  },
+  { 
+    key: 'model', 
+    label: 'Модель', 
+    sortable: false
+  },
+  { 
+    key: 'serialnumber', 
+    label: 'Серийный номер', 
+    sortable: false
+  },
+  { 
+    key: 'type', 
+    label: 'Категория', 
+    sortable: false
+  },
+  { 
+    key: 'subtype', 
+    label: 'Подкатегория', 
+    sortable: false
+  },
+  { 
+    key: 'location', 
+    label: 'Локация', 
+    sortable: false
+  }
+]
 
 // ═══ EQUIPMENT FILTER OPTIONS ═══
 const equipmentTypeOptions = computed(() => {
@@ -568,6 +635,49 @@ const navigateToEdit = () => {
 const handleDelete = () => {
   listToDelete.value = listData.value
   showDeleteModal.value = true
+}
+
+// ═══ EXCEL EXPORT ═══
+const handleExportToExcel = async () => {
+  if (!listData.value || !equipmentData.value.length) {
+    notificationSystem.value?.warning('Нет данных для экспорта', {
+      title: 'Экспорт невозможен',
+      duration: 3000
+    })
+    return
+  }
+
+  try {
+    console.log('🔄 [Excel Export] Начинаем экспорт списка:', listData.value.name)
+    console.log('🔄 [Excel Export] Количество оборудования:', equipmentData.value.length)
+
+    const result = await exportEquipmentList(
+      listData.value, 
+      equipmentData.value,
+      {
+        includeFiltered: false // Экспортируем все данные, не только отфильтрованные
+      }
+    )
+
+    if (result.success) {
+      notificationSystem.value?.success(`Файл "${result.fileName}" успешно создан и скачан`, {
+        title: 'Экспорт завершен',
+        duration: 4000
+      })
+      
+      console.log('✅ [Excel Export] Экспорт завершен успешно:', result.fileName)
+    } else {
+      throw new Error(result.error)
+    }
+
+  } catch (err) {
+    console.error('❌ [Excel Export] Ошибка экспорта:', err)
+    
+    notificationSystem.value?.error(`Не удалось экспортировать данные: ${err.message}`, {
+      title: 'Ошибка экспорта',
+      duration: 5000
+    })
+  }
 }
 
 const confirmDelete = async () => {

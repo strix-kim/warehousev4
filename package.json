@@ -15,6 +15,7 @@
     "@supabase/supabase-js": "^2.50.2",
     "@tailwindcss/vite": "^4.1.11",
     "@vueuse/core": "^13.6.0",
+    "file-saver": "^2.0.5",
     "html2pdf.js": "^0.10.3",
     "lodash-es": "^4.17.21",
     "lucide-vue-next": "^0.525.0",
@@ -22,7 +23,8 @@
     "tailwindcss": "^4.1.11",
     "uuid": "^11.1.0",
     "vue": "^3.5.17",
-    "vue-router": "^4.5.1"
+    "vue-router": "^4.5.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",

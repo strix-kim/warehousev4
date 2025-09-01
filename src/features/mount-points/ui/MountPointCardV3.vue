@@ -50,8 +50,8 @@
           </div>
         </div>
 
-        <!-- Выпадающее меню действий -->
-        <div v-if="showActions" class="absolute right-4 top-16 bg-white border border-secondary/20 rounded-lg shadow-lg z-10 py-2 min-w-[180px]">
+        <!-- 🎯 ИСПРАВЛЕНО: Smart responsive dropdown без overflow -->
+        <div v-if="showActions" class="absolute right-0 top-16 bg-white border border-secondary/20 rounded-lg shadow-lg z-10 py-2 w-44 max-w-[calc(100vw-2rem)]">
           <button 
             @click.stop="handleGoToPoint"
             class="w-full px-4 py-2 text-left text-sm hover:bg-accent flex items-center gap-2 font-medium text-primary"
@@ -73,6 +73,14 @@
           >
             <IconV2 name="plus" size="xs" />
             Добавить задание
+          </button>
+          <div class="border-t border-secondary/10 my-1"></div>
+          <button 
+            @click.stop="handleDelete"
+            class="w-full px-4 py-2 text-left text-sm hover:bg-red-50 flex items-center gap-2 text-red-600 hover:text-red-700 transition-colors"
+          >
+            <IconV2 name="trash-2" size="xs" />
+            Удалить точку монтажа
           </button>
         </div>
       </div>
@@ -227,15 +235,33 @@
             </div>
           </div>
           
-          <!-- Готово (компактно, только заголовки) -->
-          <div v-for="task in done" :key="task.id" class="p-2 rounded-lg bg-[var(--color-success)]/10 border border-[var(--color-success)]/20">
-            <div class="flex items-center justify-between gap-2">
+          <!-- Готово (с возможностью просмотра деталей) -->
+          <div v-for="task in done" :key="task.id" class="p-3 rounded-lg bg-[var(--color-success)]/10 border border-[var(--color-success)]/20">
+            <div class="flex items-start justify-between gap-2 mb-2">
               <div class="min-w-0 flex-1">
-                <div class="text-sm text-primary truncate" :title="task.title">
+                <div class="text-sm font-medium text-primary" :title="task.title">
                   {{ task.title }}
                 </div>
               </div>
-              <StatusBadgeV2 variant="success" label="✓" size="xs" />
+              <StatusBadgeV2 variant="success" label="Готово" size="xs" />
+            </div>
+            <!-- Детали задания (сворачиваемые) -->
+            <div v-if="task.description">
+              <button 
+                @click.stop="toggleTaskDetails(task.id)"
+                class="text-xs text-secondary hover:text-primary flex items-center gap-1 mb-2"
+              >
+                <IconV2 
+                  name="chevron-down" 
+                  size="xs" 
+                  :class="{ 'rotate-180': expandedTasks[task.id] }"
+                  class="transition-transform"
+                />
+                Детали
+              </button>
+              <div v-if="expandedTasks[task.id]" class="text-xs text-secondary whitespace-pre-wrap">
+                {{ task.description }}
+              </div>
             </div>
           </div>
         </div>
@@ -281,7 +307,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['click', 'add-duty', 'edit'])
+const emit = defineEmits(['click', 'add-duty', 'edit', 'delete'])
 
 // Состояния UI
 const showActions = ref(false)
@@ -403,6 +429,11 @@ const handleAddDuty = () => {
   emit('add-duty', props.mountPoint)
 }
 
+const handleDelete = () => {
+  showActions.value = false
+  emit('delete', props.mountPoint)
+}
+
 // Закрытие меню при клике вне
 const closeActions = () => {
   showActions.value = false
@@ -428,37 +459,37 @@ if (typeof window !== 'undefined') {
   opacity: 1;
 }
 
-/* Анимированные обводки для статусов */
+/* 🎯 ИСПРАВЛЕНО: Анимации БЕЗ overflow с inset shadows */
 @keyframes pulse-border-error {
   0%, 100% {
     border-color: var(--color-error);
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    box-shadow: inset 0 0 0 0 rgba(239, 68, 68, 0.1), 0 0 0 0 rgba(239, 68, 68, 0.05);
   }
   50% {
     border-color: var(--color-error);
-    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+    box-shadow: inset 0 0 0 2px rgba(239, 68, 68, 0.15), 0 0 0 1px rgba(239, 68, 68, 0.1);
   }
 }
 
 @keyframes pulse-border-warning {
   0%, 100% {
     border-color: var(--color-warning);
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+    box-shadow: inset 0 0 0 0 rgba(245, 158, 11, 0.1), 0 0 0 0 rgba(245, 158, 11, 0.05);
   }
   50% {
     border-color: var(--color-warning);
-    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.1);
+    box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.15), 0 0 0 1px rgba(245, 158, 11, 0.1);
   }
 }
 
 @keyframes glow-success {
   0%, 100% {
     border-color: var(--color-success);
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+    box-shadow: inset 0 0 0 0 rgba(34, 197, 94, 0.1), 0 0 0 0 rgba(34, 197, 94, 0.05);
   }
   50% {
     border-color: var(--color-success);
-    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+    box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.2), 0 0 0 1px rgba(34, 197, 94, 0.1);
   }
 }
 

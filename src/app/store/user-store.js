@@ -7,6 +7,7 @@ import { defineStore } from 'pinia'
 import {
   fetchUsers,
   fetchUserById,
+  fetchUsersByIds,
   addUser,
   updateUser,
   deleteUser
@@ -33,6 +34,49 @@ export const useUserStore = defineStore('user', {
       } catch (e) {
         this.error = e.message || 'Ошибка загрузки пользователей'
         this.users = []
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * 🚀 ОПТИМИЗАЦИЯ: Загрузить только определенных пользователей по ID
+     * Используется для загрузки только нужных пользователей (например, ответственных инженеров)
+     * @param {Array<string>} userIds - массив ID пользователей
+     * @param {boolean} mergeWithExisting - добавить к существующим или заменить
+     */
+    async loadUsersByIds(userIds, mergeWithExisting = true) {
+      if (!userIds || userIds.length === 0) return
+
+      // Проверяем, какие пользователи уже загружены
+      const existingIds = new Set(this.users.map(u => u.id))
+      const missingIds = userIds.filter(id => !existingIds.has(id))
+      
+      if (missingIds.length === 0) {
+        console.log('🎯 [Store] Все необходимые пользователи уже загружены')
+        return
+      }
+
+      this.loading = true
+      this.error = null
+      try {
+        console.log(`🎯 [Store] Загружаем ${missingIds.length} недостающих пользователей`)
+        const { data, error } = await fetchUsersByIds(missingIds)
+        if (error) throw error
+
+        if (mergeWithExisting) {
+          // Добавляем к существующим пользователям (избегаем дубликатов)
+          const newUsers = data.filter(user => !existingIds.has(user.id))
+          this.users.push(...newUsers)
+          console.log(`✅ [Store] Добавлено ${newUsers.length} новых пользователей`)
+        } else {
+          // Заменяем весь список
+          this.users = data
+          console.log(`✅ [Store] Загружено ${data.length} пользователей`)
+        }
+      } catch (e) {
+        this.error = e.message || 'Ошибка загрузки пользователей по ID'
+        console.error('❌ [Store] Ошибка loadUsersByIds:', e)
       } finally {
         this.loading = false
       }

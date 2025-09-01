@@ -16,9 +16,13 @@ import {
 export const useMountPointStore = defineStore('mountPoint', () => {
   // Состояния
   const mountPoints = ref([])
-  const loading = ref(false)
+  const initialLoading = ref(false)    // Первичная загрузка - показывает скелетон
+  const refreshing = ref(false)        // Обновление - показывает индикатор, НЕ скрывает данные
   const error = ref(null)
   const currentMountPoint = ref(null)
+  
+  // Computed для обратной совместимости (deprecated, но оставляем на время миграции)
+  const loading = computed(() => initialLoading.value)
 
   // Геттеры
   const getMountPointsByEventId = computed(() => {
@@ -36,20 +40,28 @@ export const useMountPointStore = defineStore('mountPoint', () => {
   // Действия
   
   /**
-   * Загрузить точки монтажа для определенного события
+   * 🚀 BEST PRACTICES: Загрузить точки монтажа для определенного события
    * @param {string} eventId - ID события
-   * @param {boolean} forceReload - принудительная перезагрузка
+   * @param {boolean} forceReload - принудительная перезагрузка (для автообновления)
    */
   async function loadMountPointsByEventId(eventId, forceReload = false) {
+    const existingData = getMountPointsByEventId.value(eventId)
+    
     // Если данные уже загружены и не требуется перезагрузка
-    if (!forceReload && getMountPointsByEventId.value(eventId).length > 0) {
-      return { data: getMountPointsByEventId.value(eventId), error: null }
+    if (!forceReload && existingData.length > 0) {
+      return { data: existingData, error: null }
     }
 
-    loading.value = true
+    // 🎯 ПРАВИЛЬНО: Разделяем initial loading от refreshing
+    const isInitial = existingData.length === 0
+    const loadingState = isInitial ? initialLoading : refreshing
+    
+    loadingState.value = true
     error.value = null
 
     try {
+      console.log(isInitial ? '🆕 [Store] Первичная загрузка точек монтажа' : '🔄 [Store] Обновление точек монтажа')
+      
       const { data, error: apiError } = await fetchMountPoints(eventId)
       
       if (apiError) {
@@ -62,35 +74,41 @@ export const useMountPointStore = defineStore('mountPoint', () => {
         mountPoints.value.push(...data)
       }
 
+      console.log(`✅ [Store] Загружено ${data?.length || 0} точек монтажа ${isInitial ? '(первичная)' : '(обновление)'}`)
       return { data: data || [], error: null }
     } catch (err) {
       error.value = err.message || 'Ошибка загрузки точек монтажа'
-      console.error('❌ Ошибка loadMountPointsByEventId:', err)
+      console.error(`❌ [Store] Ошибка загрузки точек монтажа:`, err)
       return { data: [], error: err.message }
     } finally {
-      loading.value = false
+      loadingState.value = false
     }
   }
 
   /**
-   * Загрузить конкретную точку монтажа по ID
+   * 🚀 BEST PRACTICES: Загрузить конкретную точку монтажа по ID
    * @param {string} mountPointId - ID точки монтажа
-   * @param {boolean} forceReload - принудительная перезагрузка
+   * @param {boolean} forceReload - принудительная перезагрузка (для автообновления)
    */
   async function loadMountPointById(mountPointId, forceReload = false) {
+    const existingData = getMountPointById.value(mountPointId)
+    
     // Проверяем кэш
-    if (!forceReload) {
-      const cached = getMountPointById.value(mountPointId)
-      if (cached) {
-        currentMountPoint.value = cached
-        return { data: cached, error: null }
-      }
+    if (!forceReload && existingData) {
+      currentMountPoint.value = existingData
+      return { data: existingData, error: null }
     }
 
-    loading.value = true
+    // 🎯 ПРАВИЛЬНО: Разделяем initial loading от refreshing
+    const isInitial = !existingData
+    const loadingState = isInitial ? initialLoading : refreshing
+    
+    loadingState.value = true
     error.value = null
 
     try {
+      console.log(isInitial ? '🆕 [Store] Первичная загрузка точки монтажа' : '🔄 [Store] Обновление точки монтажа')
+      
       const data = await fetchMountPointById(mountPointId)
       
       // Обновляем кэш
@@ -102,13 +120,14 @@ export const useMountPointStore = defineStore('mountPoint', () => {
       }
 
       currentMountPoint.value = data
+      console.log(`✅ [Store] Точка монтажа загружена ${isInitial ? '(первичная)' : '(обновление)'}`)
       return { data, error: null }
     } catch (err) {
       error.value = err.message || 'Ошибка загрузки точки монтажа'
-      console.error('❌ Ошибка loadMountPointById:', err)
+      console.error('❌ [Store] Ошибка loadMountPointById:', err)
       return { data: null, error: err.message }
     } finally {
-      loading.value = false
+      loadingState.value = false
     }
   }
 
@@ -396,13 +415,17 @@ export const useMountPointStore = defineStore('mountPoint', () => {
     }
   }
 
-  return {
-    // Состояния
+    return {
+    // Состояния (новые - правильные)
     mountPoints,
-    loading,
+    initialLoading,
+    refreshing,
     error,
     currentMountPoint,
     
+    // Deprecated состояния (для обратной совместимости)
+    loading, // computed: initialLoading
+
     // Геттеры
     getMountPointsByEventId,
     getMountPointById,

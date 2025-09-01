@@ -3,8 +3,8 @@
     <!-- Notification System -->
     <NotificationV2 ref="notify" position="top-right" />
 
-    <!-- Skeleton Loading State -->
-    <div v-if="isLoading" class="max-w-7xl mx-auto px-4 py-6">
+    <!-- 🎯 ПРАВИЛЬНО: Initial Loading State (только при первой загрузке) -->
+    <div v-if="isInitialLoading" class="max-w-7xl mx-auto px-4 py-6">
       <div class="space-y-6">
         <!-- Header Skeleton -->
         <div class="bg-white rounded-xl p-6 animate-pulse">
@@ -29,8 +29,8 @@
       </div>
     </div>
 
-    <!-- Error State -->
-    <div v-else-if="error" class="max-w-7xl mx-auto px-4 py-6">
+    <!-- Error State (только если нет данных) -->
+    <div v-else-if="error && !mountPointData" class="max-w-7xl mx-auto px-4 py-6">
       <BentoCard size="2x1" variant="error">
         <div class="text-center py-8">
           <IconV2 name="alert-circle" size="lg" class="text-error mb-4" />
@@ -43,50 +43,89 @@
       </BentoCard>
     </div>
 
-    <!-- Main Content -->
-    <div v-else-if="mountPointData" class="max-w-7xl mx-auto px-4 py-6">
-      <!-- Header / Breadcrumbs -->
-      <div class="bg-white border-b border-gray-200 -mx-4 px-4 py-4 mb-6">
+    <!-- Header с Breadcrumbs -->
+    <div v-if="mountPointData" class="bg-white border-b border-gray-200">
+      <div class="max-w-7xl mx-auto px-4 py-4">
         <BreadcrumbsV2 
           :items="breadcrumbs" 
           variant="minimal" 
           size="sm" 
           @item-click="handleBreadcrumbClick"
+          @navigate="handleBreadcrumbNavigate"
         />
-      </div>
 
-      <!-- Hero Header -->
-      <BentoCard size="2x1" variant="primary" class="mb-6">
-        <template #header>
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div class="min-w-0 flex-1">
-              <h1 class="text-2xl sm:text-3xl font-bold text-white mb-2">
-                {{ mountPointData.name }}
-              </h1>
-              <div class="flex flex-wrap items-center gap-4 text-white/80">
-                <div class="flex items-center gap-2">
-                  <IconV2 name="map-pin" size="sm" />
-                  <span>{{ mountPointData.location || 'Локация не указана' }}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <IconV2 name="calendar" size="sm" />
-                  <span>{{ formatDate(mountPointData.start_date) || 'Дата не указана' }}</span>
-                </div>
+        <!-- Mobile-first адаптивный хедер -->
+        <div class="mt-4 space-y-4">
+          <!-- Заголовок и информация -->
+          <div>
+            <h1 class="text-xl sm:text-2xl font-bold text-primary leading-tight mb-3">
+              {{ mountPointData?.name || 'Точка монтажа' }}
+            </h1>
+            
+            <!-- Информация: вертикально на мобильных -->
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-secondary">
+              <div class="flex items-center gap-1 min-w-0">
+                <IconV2 name="map-pin" size="xs" class="flex-shrink-0" />
+                <span class="truncate">{{ mountPointData.location || 'Локация не указана' }}</span>
+              </div>
+              <div class="flex items-center gap-1 min-w-0">
+                <IconV2 name="calendar" size="xs" class="flex-shrink-0" />
+                <span class="truncate">{{ formatDate(mountPointData.start_date) || 'Дата не указана' }}</span>
               </div>
             </div>
+          </div>
+          
+          <!-- Кнопки: вертикально на мобильных, горизонтально на десктопе -->
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:justify-end">
+            <!-- Кнопка ручного обновления -->
+            <ButtonV2 
+              v-if="lastRefreshTime" 
+              variant="ghost"
+              size="sm"
+              class="w-full sm:w-auto justify-center sm:justify-start"
+              @click="manualRefresh"
+              :title="`Последнее обновление: ${formatRefreshTime}`"
+            >
+              <template #icon><IconV2 name="refresh-cw" size="xs" /></template>
+              <span class="sm:hidden">Обновлено {{ formatRefreshTime }}</span>
+              <span class="hidden sm:inline">{{ formatRefreshTime }}</span>
+            </ButtonV2>
             
-            <!-- Quick Actions -->
-            <div class="flex items-center gap-2">
-              <ButtonV2 variant="ghost" size="sm" @click="goToEvent">
-                <template #icon><IconV2 name="arrow-left" size="sm" /></template>
-                К мероприятию
-              </ButtonV2>
-            </div>
+            <ButtonV2 
+              variant="secondary" 
+              size="sm"
+              class="w-full sm:w-auto"
+              @click="goToEvent"
+            >
+              <template #icon><IconV2 name="arrow-left" size="sm" /></template>
+              К мероприятию
+            </ButtonV2>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content (всегда показывается если есть данные) -->
+    <div v-if="mountPointData" class="max-w-7xl mx-auto px-4 py-6 relative">
+      <!-- 🔄 Тонкий индикатор обновления (НЕ скрывает контент) -->
+      <div 
+        v-if="isRefreshing || shouldShowRefreshIndicator" 
+        class="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary/20 via-primary to-primary/20 z-50"
+      >
+        <div class="h-full bg-primary/80 animate-pulse"></div>
+      </div>
+
+      <!-- Статистика точки монтажа -->
+      <BentoCard size="2x1" variant="primary" class="mb-6">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <IconV2 name="trending-up" size="sm" class="text-white" />
+            <h3 class="text-lg font-semibold text-white">Статистика работ</h3>
           </div>
         </template>
 
         <!-- Status Overview -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <!-- Technical Duties Progress -->
           <div class="bg-white/10 backdrop-blur-sm rounded-lg p-4">
             <div class="flex items-center justify-between mb-2">
@@ -109,18 +148,40 @@
             </div>
           </div>
 
+          <!-- Completed Tasks -->
+          <div class="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <IconV2 name="check-circle" size="sm" class="text-green-300" />
+              <span class="text-white/80 text-sm">Выполнено</span>
+            </div>
+            <div class="text-2xl font-bold text-green-300 mb-1">
+              {{ dutiesStats.completed }}
+            </div>
+            <div class="text-xs text-white/60">заданий</div>
+          </div>
+
+          <!-- In Progress Tasks -->
+          <div class="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <IconV2 name="refresh-cw" size="sm" class="text-yellow-300" />
+              <span class="text-white/80 text-sm">В работе</span>
+            </div>
+            <div class="text-2xl font-bold text-yellow-300 mb-1">
+              {{ dutiesStats.inProgress }}
+            </div>
+            <div class="text-xs text-white/60">заданий</div>
+          </div>
+
           <!-- Team -->
           <div class="bg-white/10 backdrop-blur-sm rounded-lg p-4">
             <div class="flex items-center gap-2 mb-2">
-              <IconV2 name="users" size="sm" class="text-white/80" />
+              <IconV2 name="users" size="sm" class="text-blue-300" />
               <span class="text-white/80 text-sm">Команда</span>
             </div>
-            <div class="text-2xl font-bold text-white mb-1">
+            <div class="text-2xl font-bold text-blue-300 mb-1">
               {{ responsibleEngineers.length }}
             </div>
-            <div class="text-white/60 text-sm">
-              {{ responsibleEngineers.length === 1 ? 'инженер' : 'инженеров' }}
-            </div>
+            <div class="text-xs text-white/60">инженеров</div>
           </div>
         </div>
       </BentoCard>
@@ -136,10 +197,25 @@
                 <h2 class="text-xl font-semibold text-primary">Технические задания</h2>
                 <StatusBadgeV2 :label="String(dutiesStats.total)" variant="info" size="xs" />
               </div>
-              <ButtonV2 variant="primary" size="sm" @click="showAddDutyModal = true">
+              <ButtonV2 
+                v-if="canAddTask(mountPointData)"
+                variant="primary" 
+                size="sm" 
+                @click="showAddDutyModal = true"
+              >
                 <template #icon><IconV2 name="plus" size="sm" /></template>
                 Добавить задание
               </ButtonV2>
+              <TooltipV2 
+                v-else-if="!canAddTask(mountPointData) && getPermissionMessage(mountPointData)"
+                :content="getPermissionMessage(mountPointData)"
+                position="top"
+              >
+                <ButtonV2 variant="secondary" size="sm" disabled>
+                  <template #icon><IconV2 name="lock" size="sm" /></template>
+                  Нет доступа
+                </ButtonV2>
+              </TooltipV2>
             </div>
           </template>
 
@@ -150,6 +226,8 @@
               :key="duty.id"
               :duty="duty"
               :loading="loadingDutyId === duty.id"
+              :can-edit="canEditTaskStatus(mountPointData)"
+              :can-delete="canDeleteTask(mountPointData)"
               @status-change="handleDutyStatusChange"
               @edit="handleEditDuty"
               @delete="handleDeleteDuty"
@@ -161,10 +239,17 @@
             <IconV2 name="clipboard-list" size="lg" class="text-secondary/50 mb-4" />
             <h3 class="text-lg font-medium text-primary mb-2">Нет технических заданий</h3>
             <p class="text-secondary mb-4">Добавьте первое техническое задание для этой точки монтажа</p>
-            <ButtonV2 variant="primary" @click="showAddDutyModal = true">
+            <ButtonV2 
+              v-if="canAddTask(mountPointData)"
+              variant="primary" 
+              @click="showAddDutyModal = true"
+            >
               <template #icon><IconV2 name="plus" size="sm" /></template>
               Добавить задание
             </ButtonV2>
+            <p v-else class="text-secondary text-sm">
+              {{ getPermissionMessage(mountPointData) }}
+            </p>
           </div>
         </BentoCard>
 
@@ -359,7 +444,8 @@ import {
   StatusBadgeV2,
   IconV2,
   NotificationV2,
-  ConfirmationModalV2
+  ConfirmationModalV2,
+  TooltipV2
 } from '@/shared/ui-v2'
 
 // Stores
@@ -373,13 +459,67 @@ import TechnicalDutyCard from '@/features/mount-points/components/TechnicalDutyC
 import AddTechnicalDutyModal from '@/features/mount-points/components/AddTechnicalDutyModal.vue'
 import { MountPointFormModal } from '@/features/mount-points'
 
+// 🔄 Простое автообновление данных
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
+
+// 🔐 Система разрешений
+import { usePermissions } from '@/shared/composables/usePermissions'
+
 const route = useRoute()
 const router = useRouter()
 const mountPointId = route.params.id
 
+// 🔄 Автообновление данных точки монтажа каждую минуту  
+const refreshMountPointData = async () => {
+  try {
+    await mountPointStore.loadMountPointById(mountPointId, true) // force reload
+    console.log('✅ [AutoRefresh] Данные точки монтажа обновлены')
+  } catch (error) {
+    console.error('❌ [AutoRefresh] Ошибка обновления точки:', error)
+  }
+}
+
+const { 
+  isAutoRefreshActive, 
+  lastRefreshTime, 
+  currentTime,
+  shouldShowRefreshIndicator,
+  manualRefresh 
+} = useAutoRefresh(refreshMountPointData, 1) // каждую минуту
+
+// 🔐 Система разрешений
+const { 
+  canEditTaskStatus, 
+  canAddTask, 
+  canDeleteTask, 
+  canEditMountPoint,
+  getPermissionMessage,
+  getUserRoleDisplay,
+  isAdmin,
+  currentUser
+} = usePermissions()
+
+// Форматирование времени последнего обновления (реактивное)
+const formatRefreshTime = computed(() => {
+  if (!lastRefreshTime.value) return 'Обновить'
+  
+  // Используем реактивное время для автообновления счетчика
+  const diff = Math.floor((currentTime.value - lastRefreshTime.value) / 1000) // секунды
+  
+  if (diff < 60) return `${diff}с назад`
+  const minutes = Math.floor(diff / 60)
+  if (minutes < 60) return `${minutes}м назад`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}ч назад`
+})
+
 // Stores
 const mountPointStore = useMountPointStore()
-const { loading: isLoading, error } = storeToRefs(mountPointStore)
+const { 
+  initialLoading: isInitialLoading, 
+  refreshing: isRefreshing,
+  error 
+} = storeToRefs(mountPointStore)
 const userStore = useUserStore()
 const { users } = storeToRefs(userStore)
 const eventStore = useEventStore()
@@ -444,6 +584,9 @@ const dutiesStats = computed(() => {
     progress: total > 0 ? Math.round((completed / total) * 100) : 0
   }
 })
+
+const completedTasksCount = computed(() => dutiesStats.value.completed)
+const pendingTasksCount = computed(() => dutiesStats.value.inProgress + dutiesStats.value.problems)
 
 const dutiesStatus = computed(() => {
   const stats = dutiesStats.value
@@ -554,9 +697,21 @@ const goToEquipmentList = (listId) => {
   router.push(`/equipment/lists/${listId}`)
 }
 
-const handleBreadcrumbClick = (item) => {
-  if (item.href && !item.disabled) {
-    router.push(item.href)
+const handleBreadcrumbClick = (data) => {
+  if (data.isSubmenu) {
+    if (data.item.href) {
+      router.push(data.item.href)
+    }
+    return
+  }
+  if (data.item.href && !data.item.disabled) {
+    router.push(data.item.href)
+  }
+}
+
+const handleBreadcrumbNavigate = (data) => {
+  if (data.href) {
+    router.push(data.href)
   }
 }
 
@@ -568,6 +723,14 @@ const handleDutyStatusChange = async (duty, newStatus) => {
     newStatus,
     mountPointId
   })
+
+  // 🔐 Проверка разрешений
+  if (!canEditTaskStatus(mountPointData.value)) {
+    const message = getPermissionMessage(mountPointData.value)
+    console.log('❌ [Permissions] Доступ запрещен:', message)
+    notify.value?.error(message || 'У вас нет прав на изменение статуса задания')
+    return
+  }
   
   loadingDutyId.value = duty.id
   

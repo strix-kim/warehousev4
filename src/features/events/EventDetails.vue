@@ -13,7 +13,8 @@ import {
   SpinnerV2,
   SkeletonV2,
   TooltipV2,
-  NotificationV2
+  NotificationV2,
+  ConfirmationModalV2
 } from '@/shared/ui-v2'
 
 import { useEventStore } from '@/features/events/store/event-store'
@@ -33,12 +34,14 @@ const EventEquipmentList = defineAsyncComponent(() => import('./components/Event
 // Новые компоненты
 import EventTimeline from './components/EventTimeline.vue'
 import EventMountPointsSection from './components/EventMountPointsSection.vue'
-import EventDetailsHeader from './components/EventDetailsHeader.vue'
 import EventDetailsSkeleton from './components/EventDetailsSkeleton.vue'
 import EventOverviewCard from './components/EventOverviewCard.vue'
 import EventTechnicalTaskCard from './components/EventTechnicalTaskCard.vue'
 import EventTeamCard from './components/EventTeamCard.vue'
 import EventEquipmentListsSection from './components/EventEquipmentListsSection.vue'
+
+// 🔄 Простое автообновление данных
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
 
 const route = useRoute()
 const router = useRouter()
@@ -51,7 +54,11 @@ const { error: loadError } = storeToRefs(eventStore)
 const isLoading = ref(true)
 
 const mountPointStore = useMountPointStore()
-const { loading: isMountPointsLoading, error: mountPointsError } = storeToRefs(mountPointStore)
+const { 
+  initialLoading: isMountPointsInitialLoading, 
+  refreshing: isMountPointsRefreshing,
+  error: mountPointsError 
+} = storeToRefs(mountPointStore)
 
 const userStore = useUserStore()
 const { users } = storeToRefs(userStore)
@@ -68,6 +75,10 @@ const showMountPointForm = ref(false)
 const selectedMountPoint = ref(null)
 const showEditEventModal = ref(false)
 const showAddDutyModal = ref(false)
+const showDeleteConfirmModal = ref(false)
+const mountPointToDelete = ref(null)
+const showArchiveConfirmModal = ref(false)
+const showRestoreConfirmModal = ref(false)
 
 const isMpExpanded = (id) => !!expandedMountPoints.value[id]
 const toggleMp = (id) => {
@@ -76,6 +87,68 @@ const toggleMp = (id) => {
 
 // Оптимизированные вычисляемые свойства с мемоизацией
 const currentEvent = computed(() => eventStore.getEventById(eventId))
+
+// Breadcrumbs для навигации
+const breadcrumbs = computed(() => [
+  { label: 'Главная', href: '/', icon: 'home' },
+  { label: 'Мероприятия', href: '/events' },
+  { label: currentEvent.value?.name || 'Мероприятие', disabled: true }
+])
+
+// Обработчики навигации хлебных крошек
+const handleBreadcrumbClick = (data) => {
+  // Обрабатываем клики по submenu
+  if (data.isSubmenu) {
+    if (data.item.href) {
+      router.push(data.item.href)
+    }
+    return
+  }
+  
+  // Обычные breadcrumbs
+  if (data.item.href && !data.item.disabled) {
+    router.push(data.item.href)
+  }
+}
+
+const handleBreadcrumbNavigate = (data) => {
+  if (data.href) {
+    router.push(data.href)
+  }
+}
+
+// 🔄 Автообновление точек монтажа каждую минуту
+const refreshMountPoints = async () => {
+  try {
+    await mountPointStore.loadMountPointsByEventId(eventId, true) // force reload
+    console.log('✅ [AutoRefresh] Точки монтажа обновлены')
+  } catch (error) {
+    console.error('❌ [AutoRefresh] Ошибка обновления точек:', error)
+  }
+}
+
+const { 
+  isAutoRefreshActive, 
+  lastRefreshTime, 
+  currentTime,
+  isRefreshing,
+  shouldShowRefreshIndicator,
+  manualRefresh 
+} = useAutoRefresh(refreshMountPoints, 1) // каждую минуту
+
+// Форматирование времени последнего обновления (реактивное)
+const formatRefreshTime = computed(() => {
+  if (!lastRefreshTime.value) return 'Обновить'
+  
+  // Используем реактивное время для автообновления счетчика
+  const diff = Math.floor((currentTime.value - lastRefreshTime.value) / 1000) // секунды
+  
+  if (diff < 60) return `${diff}с назад`
+  const minutes = Math.floor(diff / 60)
+  if (minutes < 60) return `${minutes}м назад`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}ч назад`
+})
 
 // Кэшируем пользователей для быстрого поиска
 const usersMap = computed(() => {
@@ -102,9 +175,7 @@ const teamSize = computed(() => responsibleNames.value.length)
 const mountPoints = computed(() => mountPointStore.getMountPointsByEventId(eventId))
 const mountPointsCount = computed(() => mountPoints.value.length)
 
-// Кэшируем текущее время (обновляется каждую минуту)
-const currentTime = ref(new Date())
-let timeInterval = null
+// currentTime уже импортируется из useAutoRefresh composable
 
 const eventStatus = computed(() => {
   const e = currentEvent.value
@@ -277,14 +348,70 @@ const openAddDutyForMountPoint = (mp) => {
   showAddDutyModal.value = true
 }
 
+const handleDeleteMountPoint = (mp) => {
+  mountPointToDelete.value = mp
+  showDeleteConfirmModal.value = true
+}
+
+const confirmDeleteMountPoint = async () => {
+  if (!mountPointToDelete.value) return
+  
+  try {
+    await mountPointStore.removeMountPoint(mountPointToDelete.value.id)
+    await mountPointStore.loadMountPointsByEventId(eventId, true)
+    notify.value?.success('Точка монтажа удалена')
+  } catch (error) {
+    notify.value?.error(error.message || 'Ошибка удаления точки монтажа')
+  } finally {
+    showDeleteConfirmModal.value = false
+    mountPointToDelete.value = null
+  }
+}
+
+const handleArchiveEvent = () => {
+  showArchiveConfirmModal.value = true
+}
+
+const handleRestoreEvent = () => {
+  showRestoreConfirmModal.value = true
+}
+
+const confirmArchiveEvent = async () => {
+  if (!currentEvent.value) return
+  
+  try {
+    await eventStore.deleteEvent(currentEvent.value.id)
+    notify.value?.success('Мероприятие архивировано')
+    // Перенаправляем на список мероприятий
+    router.push('/events')
+  } catch (error) {
+    notify.value?.error(error.message || 'Ошибка архивации мероприятия')
+  } finally {
+    showArchiveConfirmModal.value = false
+  }
+}
+
+const confirmRestoreEvent = async () => {
+  if (!currentEvent.value) return
+  
+  try {
+    await eventStore.restoreEvent(currentEvent.value.id)
+    notify.value?.success('Мероприятие восстановлено из архива')
+    // Обновляем текущее мероприятие
+    await eventStore.loadEventById(eventId, true, true)
+  } catch (error) {
+    notify.value?.error(error.message || 'Ошибка восстановления мероприятия')
+  } finally {
+    showRestoreConfirmModal.value = false
+  }
+}
+
 const handleMountPointCreateSuccess = async (created) => {
   try {
     await mountPointStore.loadMountPointsByEventId(eventId, true)
-    if (created?.id) {
-      router.push(`/mount-point/${created.id}`)
-    } else {
-      notify.value?.success('Точка монтажа создана')
-    }
+    notify.value?.success('Точка монтажа создана')
+    // Закрываем модальное окно
+    closeMountPointForm()
   } catch (e) {
     notify.value?.error(e?.message || 'Ошибка обновления списка точек')
   }
@@ -324,22 +451,14 @@ const handleEquipmentListClick = (listId) => {
 
 // Оптимизированная загрузка данных
 onMounted(async () => {
-  // Запускаем интервал обновления времени (каждую минуту)
-  timeInterval = setInterval(() => {
-    currentTime.value = new Date()
-  }, 60000) // 1 минута
-
+  // Автообновление времени теперь в useAutoRefresh composable
+  
   try {
     // Всегда показываем скелетон в начале
     isLoading.value = true
     
     // Параллельная загрузка всех необходимых данных
     const loadPromises = []
-    
-    // Загружаем пользователей только если их нет
-    if (!users.value.length) {
-      loadPromises.push(userStore.loadUsers())
-    }
     
     // Всегда загружаем событие для обеспечения актуальности
     loadPromises.push(eventStore.loadEventById(eventId, false, false))
@@ -352,8 +471,19 @@ onMounted(async () => {
     // Загружаем списки оборудования для мероприятия
     loadPromises.push(equipmentListsStore.loadEquipmentListsByEventId(eventId))
     
-    // Выполняем загрузки
+    // Выполняем основные загрузки
     await Promise.all(loadPromises)
+    
+    // 🚀 ОПТИМИЗАЦИЯ: Загружаем только нужных пользователей после получения события
+    const event = eventStore.getEventById(eventId)
+    if (event?.responsible_engineers?.length > 0) {
+      console.log('🎯 Загружаем только ответственных инженеров:', event.responsible_engineers)
+      await userStore.loadUsersByIds(event.responsible_engineers, true)
+    } else if (!users.value.length) {
+      // Fallback: загружаем всех пользователей только если совсем никого нет
+      console.log('🔄 Fallback: загружаем всех пользователей')
+      await userStore.loadUsers()
+    }
     
     // Минимальная задержка для плавного UX (показываем скелетон хотя бы 500мс)
     await new Promise(resolve => setTimeout(resolve, 500))
@@ -367,13 +497,7 @@ onMounted(async () => {
   }
 })
 
-// Очистка ресурсов при размонтировании
-onUnmounted(() => {
-  if (timeInterval) {
-    clearInterval(timeInterval)
-    timeInterval = null
-  }
-})
+// Очистка ресурсов теперь в useAutoRefresh composable
 </script>
 
 <template>
@@ -383,31 +507,87 @@ onUnmounted(() => {
     <!-- Skeleton Loading State -->
     <EventDetailsSkeleton v-if="isLoading" />
 
-      <div v-else class="max-w-7xl mx-auto">
-      <!-- Header / Breadcrumbs -->
-      <div class="bg-white border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 py-4">
-          <BreadcrumbsV2 :items="[
-            { label: 'Главная', href: '/', icon: 'home' },
-            { label: 'Мероприятия', href: '/events' },
-            { label: currentEvent?.name || 'Мероприятие', disabled: true }
-          ]" variant="minimal" size="sm" />
+    <!-- Header с Breadcrumbs -->
+    <div v-if="!isLoading" class="bg-white border-b border-gray-200">
+      <div class="max-w-7xl mx-auto px-4 py-4">
+        <BreadcrumbsV2 
+          :items="breadcrumbs" 
+          variant="minimal" 
+          size="sm"
+          @item-click="handleBreadcrumbClick"
+          @navigate="handleBreadcrumbNavigate"
+        />
+        
+        <!-- Mobile-first адаптивный хедер -->
+        <div class="mt-4">
+          <!-- Заголовок всегда на полную ширину -->
+          <div class="mb-4 sm:mb-0">
+            <h1 class="text-xl sm:text-2xl font-bold text-primary leading-tight">
+              {{ currentEvent?.name || 'Мероприятие' }}
+            </h1>
+          </div>
+          
+          <!-- Кнопки: вертикально на мобильных, горизонтально на десктопе -->
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:justify-end">
+            <ButtonV2 
+              variant="secondary" 
+              size="sm"
+              class="w-full sm:w-auto"
+              @click="showEditEventModal = true"
+            >
+              <template #icon><IconV2 name="edit" size="sm" /></template>
+              Редактировать
+            </ButtonV2>
+            <ButtonV2 
+              v-if="currentEvent && !currentEvent.is_archived"
+              variant="warning" 
+              size="sm"
+              class="w-full sm:w-auto"
+              @click="handleArchiveEvent"
+            >
+              <template #icon><IconV2 name="inbox" size="sm" /></template>
+              Архивировать
+            </ButtonV2>
+            <ButtonV2 
+              v-else-if="currentEvent && currentEvent.is_archived"
+              variant="primary" 
+              size="sm"
+              class="w-full sm:w-auto"
+              @click="handleRestoreEvent"
+            >
+              <template #icon><IconV2 name="refresh-cw" size="sm" /></template>
+              Восстановить
+            </ButtonV2>
+          </div>
         </div>
       </div>
+    </div>
+
+    <div v-if="!isLoading" class="max-w-7xl mx-auto">
 
         <!-- Main -->
         <div class="px-4 py-6">
           <BentoGrid columns="2" gap="6" minRowHeight="md">
-            <!-- Hero: full width -->
-            <BentoCard size="2x1" variant="primary">
+            <!-- Hero: Обзор мероприятия -->
+            <BentoCard size="2x1" variant="primary" title="Обзор мероприятия">
             <template #header>
-              <EventDetailsHeader
-                :event-name="currentEvent?.name || ''"
-                :event-status="eventStatus"
-                @copy-link="copyEventLink"
-                @copy-info="copyEventInfo"
-                @edit="showEditEventModal = true"
-              />
+              <!-- 🔄 Индикатор автообновления -->
+              <div class="flex items-center gap-4 text-xs">
+                <div v-if="isAutoRefreshActive" class="flex items-center gap-2 text-success">
+                  <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
+                  <span>Обновляется каждую минуту</span>
+                </div>
+                
+                <button 
+                  v-if="lastRefreshTime" 
+                  @click="manualRefresh"
+                  class="flex items-center gap-1 text-secondary hover:text-primary text-xs cursor-pointer transition-colors"
+                  title="Обновить сейчас"
+                >
+                  <IconV2 name="refresh-cw" size="xs" />
+                  <span>{{ formatRefreshTime }}</span>
+                </button>
+              </div>
             </template>
 
               <!-- Timeline -->
@@ -437,12 +617,14 @@ onUnmounted(() => {
             <EventMountPointsSection
               :mount-points="mountPoints"
               :stats="mountPointStats"
-              :is-loading="isMountPointsLoading"
+              :initial-loading="isMountPointsInitialLoading"
+              :refreshing="isMountPointsRefreshing || shouldShowRefreshIndicator"
               :error="mountPointsError"
               @add-mount-point="openMountPointForm"
               @mount-point-click="goToMountPoint"
               @edit-mount-point="openEditMountPoint"
               @add-duty="openAddDutyForMountPoint"
+              @delete-mount-point="handleDeleteMountPoint"
             />
 
             <!-- Team and Equipment Lists: vertical stack -->
@@ -475,6 +657,42 @@ onUnmounted(() => {
       :mount-point="selectedMountPoint"
       @success="async () => { await mountPointStore.loadMountPointsByEventId(eventId, true); notify?.value?.success?.('Задание добавлено') }"
       @error="(msg) => notify?.value?.error?.(msg)"
+    />
+
+    <!-- Delete Mount Point Confirmation Modal -->
+    <ConfirmationModalV2
+      v-model:show="showDeleteConfirmModal"
+      title="Удалить точку монтажа"
+      :message="`Вы уверены, что хотите удалить точку монтажа '${mountPointToDelete?.name}'? Это действие нельзя отменить.`"
+      confirm-text="Удалить"
+      cancel-text="Отмена"
+      variant="danger"
+      @confirm="confirmDeleteMountPoint"
+      @cancel="showDeleteConfirmModal = false; mountPointToDelete = null"
+    />
+
+    <!-- Archive Event Confirmation Modal -->
+    <ConfirmationModalV2
+      v-model:show="showArchiveConfirmModal"
+      title="Архивировать мероприятие"
+      :message="`Вы уверены, что хотите архивировать мероприятие '${currentEvent?.name}'? Архивные мероприятия скрываются из основного списка, но их можно восстановить.`"
+      confirm-text="Архивировать"
+      cancel-text="Отмена"
+      variant="warning"
+      @confirm="confirmArchiveEvent"
+      @cancel="showArchiveConfirmModal = false"
+    />
+
+    <!-- Restore Event Confirmation Modal -->
+    <ConfirmationModalV2
+      v-model:show="showRestoreConfirmModal"
+      title="Восстановить мероприятие"
+      :message="`Вы уверены, что хотите восстановить мероприятие '${currentEvent?.name}' из архива? Оно снова будет отображаться в основном списке.`"
+      confirm-text="Восстановить"
+      cancel-text="Отмена"
+      variant="primary"
+      @confirm="confirmRestoreEvent"
+      @cancel="showRestoreConfirmModal = false"
     />
 
     <!-- Edit Event Modal -->

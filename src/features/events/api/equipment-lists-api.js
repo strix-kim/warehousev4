@@ -40,36 +40,58 @@ export async function fetchEquipmentListsByEventId(eventId) {
       throw error
     }
 
-    // Для каждого списка получаем детальную информацию об оборудовании
-    const listsWithEquipment = await Promise.all(
-      (lists || []).map(async (list) => {
-        if (!list.equipment_ids || list.equipment_ids.length === 0) {
-          return {
-            ...list,
-            equipment_items: []
-          }
-        }
+    // 🚀 ОПТИМИЗАЦИЯ: Batch-запрос для всего оборудования
+    let allEquipmentData = []
+    
+    // Собираем все уникальные equipment_ids из всех списков
+    const allEquipmentIds = [
+      ...new Set(
+        (lists || [])
+          .filter(list => list.equipment_ids && list.equipment_ids.length > 0)
+          .flatMap(list => list.equipment_ids)
+      )
+    ]
 
-        // Получаем информацию об оборудовании по ID
-        const { data: equipment, error: equipmentError } = await supabase
-          .from('equipment')
-          .select('id, brand, model, type, subtype, serialnumber, availability')
-          .in('id', list.equipment_ids)
+    // Один запрос для всего оборудования (вместо N запросов)
+    if (allEquipmentIds.length > 0) {
+      const { data: equipment, error: equipmentError } = await supabase
+        .from('equipment')
+        .select('id, brand, model, type, subtype, serialnumber, availability')
+        .in('id', allEquipmentIds)
 
-        if (equipmentError) {
-          console.warn('⚠️ [API] Ошибка загрузки оборудования для списка:', list.id, equipmentError)
-          return {
-            ...list,
-            equipment_items: []
-          }
-        }
+      if (equipmentError) {
+        console.warn('⚠️ [API] Ошибка batch-загрузки оборудования:', equipmentError)
+      } else {
+        allEquipmentData = equipment || []
+        console.log(`🚀 [API] Batch-загружено ${allEquipmentData.length} единиц оборудования одним запросом`)
+      }
+    }
 
+    // Создаем Map для быстрого поиска оборудования по ID
+    const equipmentMap = new Map()
+    allEquipmentData.forEach(item => {
+      equipmentMap.set(item.id, item)
+    })
+
+    // Распределяем оборудование по спискам
+    const listsWithEquipment = (lists || []).map(list => {
+      if (!list.equipment_ids || list.equipment_ids.length === 0) {
         return {
           ...list,
-          equipment_items: equipment || []
+          equipment_items: []
         }
-      })
-    )
+      }
+
+      // Ищем оборудование в Map (O(1) вместо O(n) поиска)
+      const equipment_items = list.equipment_ids
+        .map(id => equipmentMap.get(id))
+        .filter(Boolean) // Убираем undefined значения
+
+      return {
+        ...list,
+        equipment_items
+      }
+    })
 
     console.log('✅ [API] Списки оборудования загружены:', listsWithEquipment?.length || 0)
     return { data: listsWithEquipment || [], error: null }
@@ -128,6 +150,7 @@ export async function fetchEquipmentListById(listId) {
         console.warn('⚠️ [API] Ошибка загрузки оборудования для списка:', listId, equipmentError)
       } else {
         equipment_items = equipment || []
+        console.log(`✅ [API] Загружено ${equipment_items.length} единиц оборудования для списка ${listId}`)
       }
     }
 
