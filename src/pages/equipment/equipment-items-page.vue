@@ -238,6 +238,12 @@ const handleView = (item) => {
 // === LIFECYCLE ===
 onMounted(async () => {
   console.log('🚀 [Page] Equipment page mounted')
-  await equipmentStore.loadEquipments()
+  // Сбрасываем состояние поиска и фильтров при повторном входе на страницу
+  await equipmentStore.resetState()
+  
+  // Синхронизируем локальное состояние с store
+  searchQuery.value = equipmentStore.searchQuery
+  selectedCategory.value = equipmentStore.filters.type || ''
+  selectedSubcategory.value = equipmentStore.filters.subtype || ''
 })
 </script>

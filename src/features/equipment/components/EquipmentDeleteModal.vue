@@ -86,7 +86,7 @@
  * Использует UI Kit v2 и показывает детали удаляемого элемента
  */
 
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 // UI Kit v2
 import { 
@@ -126,18 +126,41 @@ const show = computed({
 const loading = ref(false)
 const error = ref(null)
 
+// === ОТЛАДОЧНЫЕ WATCHERS (можно убрать после тестирования) ===
+watch(() => props.modelValue, (newValue) => {
+  if (newValue) {
+    console.log('🔍 [DeleteModal] Modal opened with equipment:', props.equipment)
+    console.log('🔍 [DeleteModal] Equipment keys:', props.equipment ? Object.keys(props.equipment) : 'null')
+  }
+})
+
+watch(() => props.equipment, (newEquipment) => {
+  console.log('🔍 [DeleteModal] Equipment prop changed:', newEquipment)
+}, { deep: true })
+
 // === МЕТОДЫ ===
 const handleConfirm = async () => {
-  if (!props.equipment?.id) return
+  console.log('🔍 [DeleteModal] Props equipment:', props.equipment)
+  console.log('🔍 [DeleteModal] Equipment ID:', props.equipment?.id)
+  
+  if (!props.equipment?.id) {
+    console.error('❌ [DeleteModal] Нет ID оборудования для удаления')
+    console.error('❌ [DeleteModal] Полный объект equipment:', JSON.stringify(props.equipment, null, 2))
+    return
+  }
   
   loading.value = true
   error.value = null
 
   try {
+    console.log('🗑️ [DeleteModal] Удаляем оборудование:', props.equipment.id)
     await equipmentStore.deleteEquipment(props.equipment.id)
+    
+    console.log('✅ [DeleteModal] Оборудование успешно удалено')
     emit('deleted', props.equipment)
     handleClose()
   } catch (err) {
+    console.error('❌ [DeleteModal] Ошибка удаления:', err)
     error.value = err.message || 'Ошибка удаления оборудования'
   } finally {
     loading.value = false

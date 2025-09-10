@@ -213,17 +213,24 @@ export const equipmentApi = {
    */
   async deleteEquipment(id) {
     try {
-      const { error } = await supabase
+      console.log('🗑️ [API] Начинаем удаление оборудования с ID:', id)
+      
+      const { data, error, count } = await supabase
         .from('equipment')
         .delete()
         .eq('id', id)
+        .select()
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ [API] Supabase ошибка при удалении:', error)
+        throw error
+      }
 
-      return { success: true }
+      console.log('✅ [API] Оборудование успешно удалено из БД:', { data, count })
+      return { success: true, deletedItem: data?.[0] }
     } catch (error) {
-      console.error('Equipment API error:', error)
-      throw new Error('Ошибка удаления оборудования')
+      console.error('❌ [API] Equipment API error:', error)
+      throw new Error(`Ошибка удаления оборудования: ${error.message}`)
     }
   },
 

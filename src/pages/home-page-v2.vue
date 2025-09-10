@@ -91,21 +91,36 @@
           </div>
         </BentoCard>
 
-        <!-- Модули в разработке - средние карточки -->
+        <!-- Модуль Мероприятий - активная карточка -->
         <BentoCard 
           title="Мероприятия" 
           size="1x1" 
           variant="default"
-          :disabled="true"
-          class="opacity-60"
+          :loading="isLoading"
+          @click="navigateTo('/events')"
+          class="cursor-pointer hover:shadow-lg transition-shadow"
         >
           <template #icon>
-            <IconV2 name="calendar" size="md" color="secondary" />
+            <IconV2 name="calendar" size="md" color="primary" />
+          </template>
+          <template #actions>
+            <ButtonV2 
+              variant="ghost" 
+              size="sm"
+              @click.stop="navigateTo('/events')"
+            >
+              <template #icon>
+                <IconV2 name="external-link" size="xs" />
+              </template>
+              Открыть
+            </ButtonV2>
           </template>
           
           <div class="text-center space-y-3">
-            <div class="text-2xl font-bold text-secondary">—</div>
-            <StatusBadgeV2 label="В разработке" variant="warning" size="sm" />
+            <div class="text-2xl font-bold text-primary">
+              {{ stats.eventsTotal || '—' }}
+            </div>
+            <StatusBadgeV2 label="Доступно" variant="success" size="sm" />
             <p class="text-sm text-secondary">
               Планирование и управление мероприятиями
             </p>

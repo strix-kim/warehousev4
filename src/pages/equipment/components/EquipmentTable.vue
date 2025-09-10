@@ -302,12 +302,16 @@ const handleFormClosed = () => {
   selectedEquipment.value = null
 }
 
-const handleDeleted = () => {
+const handleDeleted = (equipment) => {
   // Обновление произойдет автоматически через store reactivity
-  console.log('🗑️ Equipment deleted!')
+  console.log('🗑️ [Table] Equipment deleted:', equipment?.brand, equipment?.model)
+  
+  // Эмитим событие для показа уведомления в родительском компоненте
+  // или можно добавить ref на NotificationV2 и показывать уведомление здесь
 }
 
 const handleDeleteClosed = () => {
+  console.log('🔍 [Table] Delete modal closed, clearing selectedEquipment')
   selectedEquipment.value = null
 }
 
@@ -325,17 +329,41 @@ const handleViewEdit = (equipment) => {
   })
 }
 
+// Флаг для предотвращения очистки selectedEquipment при переходе к удалению
+const navigatingToDelete = ref(false)
+
 const handleViewDelete = (equipment) => {
-  console.log('🗑️ [Table] Delete from view modal:', equipment.id)
+  console.log('🗑️ [Table] Delete from view modal:', equipment?.id)
+  console.log('🗑️ [Table] Equipment object:', equipment)
+  
+  // Устанавливаем флаг, что переходим к удалению
+  navigatingToDelete.value = true
+  
+  // Сначала устанавливаем оборудование
   selectedEquipment.value = equipment
+  
+  // Закрываем ViewModal
   showViewModal.value = false
-  setTimeout(() => {
+  
+  // Используем nextTick для надежного обновления
+  nextTick(() => {
+    console.log('🗑️ [Table] Opening delete modal with equipment:', selectedEquipment.value)
+    console.log('🗑️ [Table] Equipment ID:', selectedEquipment.value?.id)
     showDeleteModal.value = true
-  }, 100)
+    // Сбрасываем флаг после открытия модального окна удаления
+    navigatingToDelete.value = false
+  })
 }
 
 const handleViewClosed = () => {
-  selectedEquipment.value = null
+  console.log('🔍 [Table] View modal closed')
+  // Очищаем selectedEquipment только если не переходим к удалению
+  if (!navigatingToDelete.value) {
+    console.log('🔍 [Table] Clearing selectedEquipment')
+    selectedEquipment.value = null
+  } else {
+    console.log('🔍 [Table] Not clearing selectedEquipment (navigating to delete)')
+  }
 }
 
 // ✅ Обработчик клика по строке (особенно важен для мобильных)

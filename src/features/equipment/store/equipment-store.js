@@ -137,8 +137,12 @@ export const useEquipmentStore = defineStore('equipment', () => {
 
     try {
       await equipmentApi.deleteEquipment(id)
-      equipments.value = equipments.value.filter(e => e.id !== id)
-      total.value--
+      
+      // После успешного удаления перезагружаем данные с сервера
+      // Это обеспечивает корректную пагинацию и актуальное состояние
+      await loadEquipments()
+      
+      console.log('✅ [Store] Оборудование удалено и данные перезагружены')
     } catch (err) {
       error.value = err.message || 'Ошибка удаления оборудования'
       throw err
@@ -176,6 +180,14 @@ export const useEquipmentStore = defineStore('equipment', () => {
   const clearFilters = async () => {
     filters.value = {}
     await resetPageAndReload() // ✅ Используем helper
+  }
+
+  const resetState = async () => {
+    console.log('🔄 [Store] Сброс состояния поиска и фильтров')
+    searchQuery.value = ''
+    filters.value = {}
+    currentPage.value = 1
+    await loadEquipments()
   }
 
   const setSorting = async (field, order = null) => {
@@ -277,6 +289,7 @@ export const useEquipmentStore = defineStore('equipment', () => {
     setItemsPerPage,
     clearError,
     clearFilters,
+    resetState,
     setSorting
   }
 })
