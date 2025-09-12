@@ -18,7 +18,7 @@
                 {{ equipment.brand }} {{ equipment.model }}
               </h3>
               <p class="text-xs text-secondary">
-                S/N: {{ equipment.serial_number }}
+                S/N: {{ equipment.serialnumber }}
               </p>
             </div>
           </div>

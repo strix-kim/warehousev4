@@ -22,7 +22,7 @@ export function useEquipmentForm() {
   const formData = reactive({
     brand: '',
     model: '',
-    serial_number: '',
+    serialnumber: '', // Исправлено: используем serialnumber как в API
     category: '',
     subcategory: '',
     status: 'available',
@@ -92,8 +92,8 @@ export function useEquipmentForm() {
       isValid = false
     }
 
-    if (!formData.serial_number?.trim()) {
-      validationErrors.serial_number = 'Серийный номер обязателен'
+    if (!formData.serialnumber?.trim()) {
+      validationErrors.serialnumber = 'Серийный номер обязателен'
       isValid = false
     }
 
@@ -104,12 +104,12 @@ export function useEquipmentForm() {
 
     // Проверка уникальности серийного номера
     const existingEquipment = store.equipments.find(e => 
-      e.serial_number === formData.serial_number && 
+      e.serialnumber === formData.serialnumber && 
       e.id !== editingEquipment.value?.id
     )
     
     if (existingEquipment) {
-      validationErrors.serial_number = 'Серийный номер уже существует'
+      validationErrors.serialnumber = 'Серийный номер уже существует'
       isValid = false
     }
 

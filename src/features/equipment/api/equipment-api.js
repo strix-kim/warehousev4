@@ -85,6 +85,30 @@ export const equipmentApi = {
   },
 
   /**
+   * Получить статистику оборудования (оптимизированный запрос только для счетчика)
+   */
+  async getEquipmentStats() {
+    try {
+      console.log('📊 [API] Загрузка статистики оборудования...')
+      
+      const { count, error } = await supabase
+        .from('equipment')
+        .select('*', { count: 'exact', head: true })
+
+      if (error) throw error
+
+      console.log('✅ [API] Статистика оборудования получена:', { total: count })
+
+      return {
+        total: count || 0
+      }
+    } catch (error) {
+      console.error('❌ [API] Equipment stats error:', error)
+      throw new Error('Ошибка загрузки статистики оборудования')
+    }
+  },
+
+  /**
    * Получить предложения для бренда (уникальные значения brand)
    */
   async getBrandSuggestions(query, limit = 7) {
@@ -242,7 +266,7 @@ export const equipmentApi = {
       const { data, error } = await supabase
         .from('equipment')
         .select('*')
-        .or(`brand.ilike.%${query}%,model.ilike.%${query}%,serial_number.ilike.%${query}%`)
+        .or(`brand.ilike.%${query}%,model.ilike.%${query}%,serialnumber.ilike.%${query}%`)
         .limit(10)
         .order('created_at', { ascending: false })
 

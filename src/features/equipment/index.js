@@ -18,6 +18,7 @@ export * from './constants/index.js'
 export { useEquipmentList } from './composables/useEquipmentList.js'
 export { useEquipmentForm } from './composables/useEquipmentForm.js'
 export { useEquipmentSearch } from './composables/useEquipmentSearch.js'
+export { useEquipmentStats } from './composables/useEquipmentStats.js'
 
 // Components  
 export { default as EquipmentFormModal } from './components/EquipmentFormModal.vue'

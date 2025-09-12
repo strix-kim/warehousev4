@@ -12,7 +12,7 @@ export async function fetchDashboardStats() {
     const now = new Date().toISOString()
     // Загружаем статистику параллельно
     const [equipmentRes, eventsRes, eventsActiveRes, reportsRes, usersRes] = await Promise.all([
-      supabase.from('equipments').select('*', { count: 'exact', head: true }),
+      supabase.from('equipment').select('*', { count: 'exact', head: true }),
       supabase.from('events').select('*', { count: 'exact', head: true }),
       supabase
         .from('events')

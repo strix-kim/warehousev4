@@ -188,7 +188,7 @@
  * Содержит навигационные карточки к основным функциям модуля
  */
 
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 // UI Kit v2
@@ -202,10 +202,24 @@ import {
 } from '@/shared/ui-v2'
 
 // Equipment module
-import { useEquipmentStore } from '@/features/equipment'
+import { useEquipmentStore, useEquipmentStats } from '@/features/equipment'
 
 const router = useRouter()
 const equipmentStore = useEquipmentStore()
+
+// === COMPOSABLES ===
+const { 
+  stats,
+  loading: statsLoading,
+  error: statsError,
+  equipmentStats,
+  listsStats,
+  loadStats,
+  clearError
+} = useEquipmentStats()
+
+// Notification system
+const notificationSystem = ref(null)
 
 // === BREADCRUMBS ===
 const breadcrumbs = [
@@ -220,17 +234,6 @@ const breadcrumbs = [
     ]
   }
 ]
-
-// === СТАТИСТИКА ===
-const equipmentStats = ref({
-  total: 0,
-  categories: 0
-})
-
-const listsStats = ref({
-  total: 0,
-  linked: 0
-})
 
 // === НАВИГАЦИЯ ===
 const navigateToItems = () => {
@@ -272,30 +275,43 @@ const handleBreadcrumbNavigate = (data) => {
 }
 
 // === ЗАГРУЗКА ДАННЫХ ===
-const loadStats = async () => {
+const initializeModule = async () => {
   try {
-    // Загружаем статистику оборудования
-    await equipmentStore.loadEquipments({ page: 1, limit: 1 })
-    equipmentStats.value.total = equipmentStore.total
+    clearError() // Очищаем предыдущие ошибки
+    await loadStats()
     
-    // Загружаем статистику категорий
-    equipmentStats.value.categories = 8 // Статическое значение - 8 основных категорий
-    
-    // Загружаем статистику списков оборудования
-    const { getEquipmentListsStats } = await import('@/features/equipment/api/equipment-lists-api.js')
-    const listsStatsData = await getEquipmentListsStats()
-    
-    listsStats.value.total = listsStatsData.total || 0
-    listsStats.value.linked = listsStatsData.linked || 0
-    
-    console.log('✅ Загружена статистика списков:', listsStatsData)
+    console.log('✅ [Module] Статистика успешно загружена:', {
+      equipment: equipmentStats.value,
+      lists: listsStats.value
+    })
     
   } catch (error) {
-    console.error('Ошибка загрузки статистики:', error)
+    console.error('❌ [Module] Ошибка инициализации модуля:', error)
+    
+    // Показываем ошибку пользователю через NotificationV2
+    notificationSystem.value?.add({
+      type: 'error',
+      title: 'Ошибка загрузки',
+      message: 'Не удалось загрузить статистику модуля. Попробуйте обновить страницу.',
+      duration: 5000
+    })
   }
 }
 
+// === ОБРАБОТКА ОШИБОК ===
+// Отслеживаем изменения ошибок статистики
+watch(statsError, (newError) => {
+  if (newError && notificationSystem.value) {
+    notificationSystem.value.add({
+      type: 'error',
+      title: 'Ошибка статистики',
+      message: newError,
+      duration: 5000
+    })
+  }
+})
+
 onMounted(() => {
-  loadStats()
+  initializeModule()
 })
 </script>

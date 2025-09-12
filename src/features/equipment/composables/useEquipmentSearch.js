@@ -35,7 +35,7 @@ export function useEquipmentSearch() {
       const localResults = store.equipments.filter(equipment => 
         equipment.brand?.toLowerCase().includes(query.toLowerCase()) ||
         equipment.model?.toLowerCase().includes(query.toLowerCase()) ||
-        equipment.serial_number?.toLowerCase().includes(query.toLowerCase())
+        equipment.serialnumber?.toLowerCase().includes(query.toLowerCase())
       ).slice(0, 5)
 
       searchResults.value = localResults

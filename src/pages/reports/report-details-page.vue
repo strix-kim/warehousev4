@@ -39,7 +39,7 @@ async function loadEquipmentsForReport(reportData) {
       isEquipmentsLoading.value = false
       return
     }
-    const { data, error } = await supabase.from('equipments').select('*').in('id', ids)
+    const { data, error } = await supabase.from('equipment').select('*').in('id', ids)
     if (error) throw error
     equipments.value = data || []
   } catch (e) {
