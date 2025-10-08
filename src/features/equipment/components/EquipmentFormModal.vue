@@ -63,12 +63,25 @@
             <p v-if="validationErrors.model" class="text-error text-sm mt-1">{{ validationErrors.model }}</p>
           </div>
           
-          <InputV2
-            v-model="formData.serialnumber"
-            label="Серийный номер *"
-            placeholder="Введите серийный номер"
-            :error="validationErrors.serialnumber"
-          />
+          <div class="space-y-3">
+            <!-- Checkbox для автогенерации -->
+            <FormFieldV2
+              v-model="autoGenerateSerial"
+              type="checkbox"
+              checkbox-label="Автогенерировать серийный номер"
+              helper-text="Создаст уникальный серийный номер в формате AUTO-ДДММГГ-ЧЧММСС"
+            />
+            
+            <!-- Поле серийного номера -->
+            <InputV2
+              v-model="formData.serialnumber"
+              label="Серийный номер *"
+              :placeholder="autoGenerateSerial ? 'Номер сгенерируется автоматически' : 'Введите серийный номер'"
+              :error="validationErrors.serialnumber"
+              :disabled="autoGenerateSerial"
+              :helper-text="autoGenerateSerial ? 'Формат: AUTO-ДДММГГ-ЧЧММСС (например, AUTO-251208-143022)' : 'Уникальный серийный номер оборудования'"
+            />
+          </div>
           
           <SelectV2
             v-model="formData.type"
@@ -289,6 +302,9 @@ const formData = reactive({
   description: ''
 })
 
+// === АВТОГЕНЕРАЦИЯ СЕРИЙНОГО НОМЕРА ===
+const autoGenerateSerial = ref(false)
+
 // === ВАЛИДАЦИЯ ===
 const validationErrors = reactive({})
 
@@ -315,12 +331,26 @@ const hasUnsavedChanges = computed(() => {
 const shouldConfirmClose = computed(() => hasUnsavedChanges.value)
 
 const isFormValid = computed(() => {
-  return formData.brand?.trim() && 
-         formData.model?.trim() && 
-         formData.serialnumber?.trim() && 
-         formData.type?.trim() && 
-         formData.availability?.trim() &&
-         Object.keys(validationErrors).length === 0
+  const hasRequiredFields = formData.brand?.trim() && 
+                           formData.model?.trim() && 
+                           (autoGenerateSerial.value || formData.serialnumber?.trim()) && // серийник не нужен если автогенерация
+                           formData.type?.trim() && 
+                           formData.availability?.trim()
+  
+  const hasNoErrors = Object.keys(validationErrors).length === 0
+  
+  const isValid = hasRequiredFields && hasNoErrors
+  
+  console.log('🔍 [FormModal] Form validation check:', {
+    hasRequiredFields,
+    hasNoErrors,
+    isValid,
+    autoGenerate: autoGenerateSerial.value,
+    errors: Object.keys(validationErrors),
+    serialnumber: formData.serialnumber
+  })
+  
+  return isValid
 })
 
 // === ОПЦИИ ДЛЯ СЕЛЕКТОВ ===
@@ -334,6 +364,19 @@ const subcategoryOptions = computed(() => {
 const statusOptions = computed(() => getStatusOptions())
 
 // === МЕТОДЫ ===
+
+// Генерация автоматического серийного номера
+const generateSerialNumber = () => {
+  const now = new Date()
+  const dateStr = now.getFullYear().toString().slice(-2) + // 24 (для 2024)
+                  String(now.getMonth() + 1).padStart(2, '0') + // 01-12
+                  String(now.getDate()).padStart(2, '0') // 01-31
+  const timeStr = String(now.getHours()).padStart(2, '0') +
+                  String(now.getMinutes()).padStart(2, '0') +
+                  String(now.getSeconds()).padStart(2, '0')
+  
+  return `AUTO-${dateStr}-${timeStr}`
+}
 
 // Инициализация формы
 const initializeForm = () => {
@@ -385,6 +428,7 @@ const resetForm = () => {
       formData[key] = ''
     }
   })
+  autoGenerateSerial.value = false
   clearErrors()
 }
 
@@ -424,15 +468,17 @@ const validateForm = () => {
     isValid = false
   }
 
-  // Проверка уникальности серийного номера
-  const existingEquipment = equipmentStore.equipments.find(e => 
-    e.serialnumber === formData.serialnumber && 
-    e.id !== editingEquipment.value?.id
-  )
-  
-  if (existingEquipment) {
-    validationErrors.serialnumber = 'Серийный номер уже существует'
-    isValid = false
+  // Проверка уникальности серийного номера (только если не автогенерируется)
+  if (!autoGenerateSerial.value && formData.serialnumber?.trim()) {
+    const existingEquipment = equipmentStore.equipments.find(e => 
+      e.serialnumber === formData.serialnumber && 
+      e.id !== editingEquipment.value?.id
+    )
+    
+    if (existingEquipment) {
+      validationErrors.serialnumber = 'Серийный номер уже существует'
+      isValid = false
+    }
   }
 
   return isValid
@@ -466,6 +512,13 @@ const handleSubmit = async () => {
 
   try {
     const equipmentData = { ...formData }
+    
+    // Генерируем серийный номер если включена автогенерация
+    if (autoGenerateSerial.value) {
+      equipmentData.serialnumber = generateSerialNumber()
+      console.log('🤖 [FormModal] Auto-generated serial number:', equipmentData.serialnumber)
+    }
+    
     console.log('📦 [FormModal] Prepared equipment data:', equipmentData)
     
     if (editingEquipment.value) {
@@ -613,6 +666,75 @@ watch(() => equipmentStore.loading, (newLoading, oldLoading) => {
 watch(() => equipmentStore.error, (newError) => {
   if (newError) {
     console.error('🚨 [FormModal] Store error detected:', newError)
+  }
+})
+
+// === АВТОМАТИЧЕСКАЯ ОЧИСТКА ОШИБОК ВАЛИДАЦИИ ===
+// При изменении ключевых полей очищаем соответствующие ошибки
+watch(() => formData.brand, () => {
+  if (validationErrors.brand) {
+    console.log('🧹 [FormModal] Clearing brand validation error')
+    delete validationErrors.brand
+  }
+})
+
+watch(() => formData.model, () => {
+  if (validationErrors.model) {
+    console.log('🧹 [FormModal] Clearing model validation error')
+    delete validationErrors.model
+  }
+})
+
+watch(() => formData.serialnumber, (newValue) => {
+  if (validationErrors.serialnumber) {
+    console.log('🧹 [FormModal] Clearing serialnumber validation error for:', newValue)
+    delete validationErrors.serialnumber
+  }
+})
+
+watch(() => formData.type, () => {
+  if (validationErrors.type) {
+    console.log('🧹 [FormModal] Clearing type validation error')
+    delete validationErrors.type
+  }
+})
+
+watch(() => formData.subtype, () => {
+  if (validationErrors.subtype) {
+    console.log('🧹 [FormModal] Clearing subtype validation error')
+    delete validationErrors.subtype
+  }
+})
+
+watch(() => formData.availability, () => {
+  if (validationErrors.availability) {
+    console.log('🧹 [FormModal] Clearing availability validation error')
+    delete validationErrors.availability
+  }
+})
+
+watch(() => formData.count, () => {
+  if (validationErrors.count) {
+    console.log('🧹 [FormModal] Clearing count validation error')
+    delete validationErrors.count
+  }
+})
+
+// === WATCHER ДЛЯ АВТОГЕНЕРАЦИИ ===
+watch(autoGenerateSerial, (newValue) => {
+  if (newValue) {
+    // При включении автогенерации - генерируем номер для предпросмотра
+    formData.serialnumber = generateSerialNumber()
+    console.log('🤖 [FormModal] Auto-generation enabled, generated:', formData.serialnumber)
+    
+    // Очищаем ошибки серийного номера
+    if (validationErrors.serialnumber) {
+      delete validationErrors.serialnumber
+    }
+  } else {
+    // При выключении автогенерации - очищаем поле
+    formData.serialnumber = ''
+    console.log('🔄 [FormModal] Auto-generation disabled, cleared serial number')
   }
 })
 </script>
