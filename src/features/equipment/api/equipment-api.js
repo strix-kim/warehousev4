@@ -195,19 +195,77 @@ export const equipmentApi = {
    * Создать оборудование
    */
   async createEquipment(equipmentData) {
+    console.log('🚀 [API] Starting equipment creation...')
+    console.log('📦 [API] Equipment data to create:', equipmentData)
+    
+    // Создаем timeout промис
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Превышено время ожидания (15 сек). Попробуйте снова.'))
+      }, 15000) // 15 секунд таймаут
+    })
+    
     try {
-      const { data, error } = await supabase
+      console.log('📡 [API] Sending request to Supabase with 15s timeout...')
+      
+      // Гонка между запросом и таймаутом
+      const supabasePromise = supabase
         .from('equipment')
         .insert([equipmentData])
         .select()
         .single()
+        
+      const { data, error } = await Promise.race([supabasePromise, timeoutPromise])
 
-      if (error) throw error
+      console.log('📥 [API] Supabase response received')
+      console.log('📄 [API] Response data:', data)
+      console.log('❌ [API] Response error:', error)
 
+      if (error) {
+        console.error('❌ [API] Supabase error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        
+        // Более детальные сообщения об ошибках
+        if (error.code === '23505') {
+          throw new Error('Оборудование с таким серийным номером уже существует')
+        } else if (error.code === '23514') {
+          throw new Error('Некорректные данные оборудования')
+        } else if (error.message?.includes('duplicate key')) {
+          throw new Error('Дублирование данных: оборудование с такими параметрами уже существует')
+        } else if (error.message?.includes('violates check constraint')) {
+          throw new Error('Нарушение ограничений: проверьте корректность введенных данных')
+        } else {
+          throw new Error(`Ошибка базы данных: ${error.message || 'неизвестная ошибка'}`)
+        }
+      }
+
+      console.log('✅ [API] Equipment created successfully:', data)
       return { data }
     } catch (error) {
-      console.error('Equipment API error:', error)
-      throw new Error('Ошибка создания оборудования')
+      console.error('❌ [API] Equipment creation error:', error)
+      
+      // Если это уже наша кастомная ошибка, пробрасываем как есть
+      if (error.message?.includes('Оборудование с таким серийным номером') ||
+          error.message?.includes('Некорректные данные') ||
+          error.message?.includes('Дублирование данных') ||
+          error.message?.includes('Нарушение ограничений') ||
+          error.message?.includes('Ошибка базы данных')) {
+        throw error
+      }
+      
+      // Для неизвестных ошибок
+      console.error('❌ [API] Unexpected error type:', typeof error, error.constructor.name)
+      if (error.name === 'AbortError') {
+        throw new Error('Запрос прерван: проверьте соединение с интернетом')
+      } else if (error.name === 'TypeError' && error.message?.includes('fetch')) {
+        throw new Error('Ошибка сети: не удается подключиться к серверу')
+      } else {
+        throw new Error(`Неожиданная ошибка при создании оборудования: ${error.message || 'неизвестная ошибка'}`)
+      }
     }
   },
 

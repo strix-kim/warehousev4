@@ -199,7 +199,7 @@
             class="w-full sm:w-auto"
             :loading="formLoading"
             :disabled="!isFormValid || formLoading"
-            @click="handleSubmit"
+            @click="debouncedHandleSubmit"
           >
             <template #icon>
               <IconV2 name="save" size="xs" />
@@ -221,6 +221,7 @@
  */
 
 import { ref, reactive, computed, watch, nextTick } from 'vue'
+import { debounce } from 'lodash-es'
 
 // UI Kit v2
 import { 
@@ -443,32 +444,62 @@ const handleCategoryChange = (category) => {
 }
 
 const handleSubmit = async () => {
+  console.log('🚀 [FormModal] Starting submit process...')
+  
   if (!validateForm()) {
+    console.log('❌ [FormModal] Validation failed, aborting submit')
+    return
+  }
+
+  console.log('✅ [FormModal] Validation passed, proceeding with submit')
+  console.log('📄 [FormModal] Form data:', formData)
+  
+  // Проверяем, не выполняется ли уже запрос
+  if (formLoading.value) {
+    console.log('⚠️ [FormModal] Submit already in progress, ignoring')
     return
   }
 
   formLoading.value = true
   formError.value = null
+  console.log('🔄 [FormModal] Set loading state to true')
 
   try {
     const equipmentData = { ...formData }
+    console.log('📦 [FormModal] Prepared equipment data:', equipmentData)
     
     if (editingEquipment.value) {
       // Обновление
+      console.log('📝 [FormModal] Updating existing equipment:', editingEquipment.value.id)
       await equipmentStore.updateEquipment(editingEquipment.value.id, equipmentData)
+      console.log('✅ [FormModal] Equipment updated successfully')
     } else {
       // Создание
-      await equipmentStore.createEquipment(equipmentData)
+      console.log('➕ [FormModal] Creating new equipment')
+      const result = await equipmentStore.createEquipment(equipmentData)
+      console.log('✅ [FormModal] Equipment created successfully:', result)
     }
 
+    console.log('📢 [FormModal] Emitting saved event')
     emit('saved')
+    console.log('🚪 [FormModal] Closing modal')
     handleClose()
   } catch (error) {
+    console.error('❌ [FormModal] Submit error:', error)
+    console.error('❌ [FormModal] Error stack:', error.stack)
     formError.value = error.message || 'Ошибка сохранения оборудования'
+    console.log('🚨 [FormModal] Set form error:', formError.value)
   } finally {
+    console.log('🏁 [FormModal] Submit process finished, setting loading to false')
     formLoading.value = false
   }
 }
+
+// Создаем debounced версию для защиты от повторных нажатий
+const debouncedHandleSubmit = debounce(handleSubmit, 300, { 
+  leading: true, 
+  trailing: false 
+})
 
 const handleDelete = async () => {
   if (!editingEquipment.value) return
@@ -566,5 +597,22 @@ watch(() => props.equipment, (newEquipment, oldEquipment) => {
 }, { 
   deep: true,
   flush: 'post' // Выполняем после DOM обновлений
+})
+
+// Мониторинг состояния store для диагностики
+watch(() => equipmentStore.loading, (newLoading, oldLoading) => {
+  if (newLoading !== oldLoading) {
+    console.log('🔍 [FormModal] Store loading state changed:', { 
+      from: oldLoading, 
+      to: newLoading,
+      modalLoading: formLoading.value 
+    })
+  }
+})
+
+watch(() => equipmentStore.error, (newError) => {
+  if (newError) {
+    console.error('🚨 [FormModal] Store error detected:', newError)
+  }
 })
 </script>

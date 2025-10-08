@@ -96,18 +96,32 @@ export const useEquipmentStore = defineStore('equipment', () => {
   }
 
   const createEquipment = async (equipmentData) => {
+    console.log('🏪 [Store] Starting equipment creation in store...')
+    console.log('📦 [Store] Equipment data received:', equipmentData)
+    
     loading.value = true
     error.value = null
+    console.log('🔄 [Store] Set store loading to true')
 
     try {
+      console.log('📞 [Store] Calling equipment API...')
       const response = await equipmentApi.createEquipment(equipmentData)
+      console.log('📥 [Store] API response received:', response)
+      
+      console.log('➕ [Store] Adding equipment to local store')
       equipments.value.push(response.data)
       total.value++
+      console.log('📊 [Store] Updated totals - count:', equipments.value.length, 'total:', total.value)
+      
+      console.log('✅ [Store] Equipment creation completed successfully')
       return response.data
     } catch (err) {
+      console.error('❌ [Store] Equipment creation error:', err)
       error.value = err.message || 'Ошибка создания оборудования'
+      console.log('🚨 [Store] Set store error:', error.value)
       throw err
     } finally {
+      console.log('🏁 [Store] Setting store loading to false')
       loading.value = false
     }
   }
