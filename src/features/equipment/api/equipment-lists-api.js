@@ -12,12 +12,23 @@ export const createEquipmentList = async (listData) => {
       name: listData.name,
       description: listData.description || null,
       type: listData.type,
-      equipment_ids: listData.equipment_ids || [],
+      list_mode: listData.list_mode || 'specific', // 'specific' | 'abstract'
       event_id: listData.event_id || null,
       mount_point_id: listData.mount_point_id || null,
       metadata: listData.metadata || {},
       created_by: listData.created_by || null,
       is_archived: false
+    }
+    
+    // В зависимости от режима добавляем разные поля
+    if (listData.list_mode === 'abstract') {
+      // Абстрактный режим - массив объектов с типами оборудования
+      insertData.equipment_items = listData.equipment_items || []
+      insertData.equipment_ids = [] // Пустой массив для совместимости
+    } else {
+      // Конкретный режим - массив ID конкретных единиц
+      insertData.equipment_ids = listData.equipment_ids || []
+      insertData.equipment_items = [] // Пустой массив для совместимости
     }
     
     const { data, error } = await supabase

@@ -581,9 +581,18 @@ const loadListDetails = async () => {
     listData.value = list
     console.log('✅ Список загружен:', list)
     
-    // Загружаем оборудование если есть IDs
-    if (list.equipment_ids && Array.isArray(list.equipment_ids) && list.equipment_ids.length > 0) {
-      await loadEquipmentDetails(list.equipment_ids)
+    // Загружаем оборудование в зависимости от режима списка
+    if (list.list_mode === 'abstract') {
+      // Абстрактный режим - используем equipment_items напрямую
+      if (list.equipment_items && Array.isArray(list.equipment_items) && list.equipment_items.length > 0) {
+        equipmentData.value = list.equipment_items
+        console.log('✅ Абстрактный список загружен:', list.equipment_items.length, 'позиций')
+      }
+    } else {
+      // Конкретный режим - загружаем по equipment_ids
+      if (list.equipment_ids && Array.isArray(list.equipment_ids) && list.equipment_ids.length > 0) {
+        await loadEquipmentDetails(list.equipment_ids)
+      }
     }
     
     // Загружаем связанные данные для security списков

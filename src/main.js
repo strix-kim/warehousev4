@@ -7,6 +7,12 @@ import { createPinia } from 'pinia'
 // Импорт роутера (feature-sliced: src/app/router.js)
 import { router } from './app/router'
 
+// Полифилы для Node.js API (нужны для xlsx-populate в браузере)
+import { Buffer } from 'buffer'
+import process from 'process'
+window.Buffer = Buffer
+window.process = process
+
 
 // Создаём экземпляр приложения и подключаем Pinia и роутер
 const app = createApp(App)

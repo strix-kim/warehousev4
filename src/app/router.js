@@ -14,6 +14,7 @@ const EquipmentModulePage = () => import('@/pages/equipment/equipment-module-pag
 const EquipmentItemsPage = () => import('@/pages/equipment/equipment-items-page.vue')
 const EquipmentListsPage = () => import('@/pages/equipment/equipment-lists-page.vue')
 const EquipmentListsCreatePage = () => import('@/pages/equipment/equipment-lists-create-page.vue')
+const EquipmentListsCreateAbstractPage = () => import('@/pages/equipment/equipment-lists-create-abstract-page.vue')
 const EquipmentListsViewPage = () => import('@/pages/equipment/equipment-lists-view-page.vue')
 const UtilitiesModulePage = () => import('@/pages/utilities/utilities-module-page.vue')
 const EventsModulePage = () => import('@/pages/events/events-module-page.vue')
@@ -73,7 +74,13 @@ export const routes = [
       path: '/equipment/lists/create',
       name: 'equipment-lists-create',
       component: EquipmentListsCreatePage,
-      // Создание нового списка оборудования
+      // Создание нового списка оборудования (конкретные единицы)
+    },
+    {
+      path: '/equipment/lists/create-abstract',
+      name: 'equipment-lists-create-abstract',
+      component: EquipmentListsCreateAbstractPage,
+      // Создание нового списка оборудования (по типам)
     },
     {
       path: '/equipment/lists/:id',

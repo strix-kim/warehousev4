@@ -28,17 +28,51 @@
             >
               🧪
             </ButtonV2>
-            <ButtonV2 
-              variant="primary" 
-              size="md"
-              @click="navigateToCreate"
-              class="w-full sm:w-auto"
-            >
-              <template #icon>
-                <IconV2 name="plus" size="sm" />
-              </template>
-              Создать список
-            </ButtonV2>
+            
+            <!-- Dropdown для выбора типа создания -->
+            <div class="relative">
+              <ButtonV2 
+                variant="primary" 
+                size="md"
+                @click="showCreateDropdown = !showCreateDropdown"
+                class="w-full sm:w-auto"
+              >
+                <template #icon>
+                  <IconV2 name="plus" size="sm" />
+                </template>
+                Создать список
+                <IconV2 name="chevron-down" size="sm" class="ml-2" />
+              </ButtonV2>
+
+              <!-- Dropdown меню -->
+              <div
+                v-if="showCreateDropdown"
+                class="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+                @click="showCreateDropdown = false"
+              >
+                <div class="p-2 space-y-1">
+                  <button
+                    @click="navigateToCreate"
+                    class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div class="font-medium text-primary">По конкретным единицам</div>
+                    <div class="text-xs text-secondary mt-1">
+                      Выбор конкретного оборудования с серийными номерами
+                    </div>
+                  </button>
+
+                  <button
+                    @click="navigateToCreateAbstract"
+                    class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div class="font-medium text-primary">По типам оборудования</div>
+                    <div class="text-xs text-secondary mt-1">
+                      Выбор моделей и указание необходимого количества
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -466,8 +500,15 @@ const loadLists = async () => {
   }
 }
 
+// Dropdown состояние
+const showCreateDropdown = ref(false)
+
 const navigateToCreate = () => {
   router.push('/equipment/lists/create')
+}
+
+const navigateToCreateAbstract = () => {
+  router.push('/equipment/lists/create-abstract')
 }
 
 // ТЕСТИРОВАНИЕ УВЕДОМЛЕНИЙ (временно)

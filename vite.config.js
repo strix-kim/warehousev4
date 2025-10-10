@@ -9,7 +9,22 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'), // Алиас '@' указывает на папку src
+      'buffer': 'buffer/', // Полифил для Buffer (нужен для xlsx-populate)
+      'process': 'process/browser', // Полифил для process (нужен для xlsx-populate)
     },
+  },
+  define: {
+    // Глобальные полифилы для Node.js API в браузере
+    'global': 'globalThis',
+    'process.env': {},
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      // Определяем глобальные переменные Node.js для браузера
+      define: {
+        global: 'globalThis'
+      }
+    }
   },
   build: {
     // Настройки для стабильной работы динамических импортов на Vercel

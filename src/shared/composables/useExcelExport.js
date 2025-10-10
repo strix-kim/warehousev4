@@ -1,12 +1,12 @@
 /**
  * useExcelExport.js - Композабл для экспорта данных в Excel формат
  * 
- * Использует библиотеки xlsx и file-saver для генерации и скачивания Excel файлов
- * Поддерживает форматирование, стили и мета-информацию
+ * Использует библиотеки xlsx-populate и file-saver для генерации и скачивания Excel файлов
+ * Полностью поддерживает форматирование, стили, изображения и мета-информацию из шаблонов
  */
 
 import { ref } from 'vue'
-import * as XLSX from 'xlsx'
+import XlsxPopulate from 'xlsx-populate'
 import { saveAs } from 'file-saver'
 
 export function useExcelExport() {
@@ -14,7 +14,7 @@ export function useExcelExport() {
   const error = ref(null)
 
   /**
-   * Экспорт списка оборудования в Excel для печати на A4 (заезды на мероприятия)
+   * Экспорт списка оборудования в Excel на основе шаблона
    * @param {Object} listData - Данные списка оборудования
    * @param {Array} equipmentData - Массив оборудования
    * @param {Object} options - Дополнительные опции
@@ -24,146 +24,44 @@ export function useExcelExport() {
     error.value = null
 
     try {
-      // Создаем новую книгу Excel
-      const wb = XLSX.utils.book_new()
-
-      // === СОЗДАЕМ ДОКУМЕНТ ДЛЯ ПЕЧАТИ НА A4 ===
-      const currentDate = formatDate(new Date().toISOString())
+      // === ЗАГРУЖАЕМ ШАБЛОН ИЗ PUBLIC ===
+      const templatePath = '/Exel.xlsx'
+      const response = await fetch(templatePath)
       
-      const documentData = [
-        // === ОФИЦИАЛЬНАЯ ШАПКА ===
-        ['СПИСОК ОБОРУДОВАНИЯ ДЛЯ МЕРОПРИЯТИЯ'],
-        [''],
-        ['Название списка:', listData.name || '—', '', '', 'Дата:', currentDate],
-        ['Тип:', getListTypeLabel(listData.type), '', '', 'Всего единиц:', equipmentData.length],
-        ['Описание:', listData.description || '—'],
-        [''],
-        
-        // === ЗАГОЛОВКИ ТАБЛИЦЫ (ОПТИМИЗИРОВАНЫ ДЛЯ A4) ===
-        ['№', 'Модель', 'Бренд', 'Категория', 'Подкатегория', 'Кол-во'],
-        []
-      ]
-
-      // === ДОБАВЛЯЕМ ОБОРУДОВАНИЕ ===
+      if (!response.ok) {
+        throw new Error(`Не удалось загрузить шаблон: ${response.statusText}`)
+      }
+      
+      const arrayBuffer = await response.arrayBuffer()
+      
+      // Загружаем шаблон с помощью xlsx-populate
+      const workbook = await XlsxPopulate.fromDataAsync(arrayBuffer)
+      
+      // Получаем первый лист
+      const sheet = workbook.sheet(0)
+      
+      // === ЗАПОЛНЯЕМ ДАННЫЕ ОБОРУДОВАНИЯ ===
+      // Начинаем со строки 14, так как строка 13 - заголовки
+      const startRow = 14
+      
       equipmentData.forEach((item, index) => {
-        documentData.push([
-          index + 1, // Номер по порядку
-          item.model || '—', // Модель
-          item.brand || '—', // Бренд
-          item.type || '—', // Категория
-          item.subtype || '—', // Подкатегория
-          item.count || 1 // Количество
-        ])
+        const rowNumber = startRow + index
+        
+        // Заполняем ячейки (xlsx-populate автоматически сохраняет форматирование)
+        sheet.cell(`B${rowNumber}`).value(item.model || '—')       // Model
+        sheet.cell(`C${rowNumber}`).value(item.brand || '—')       // Brand
+        sheet.cell(`D${rowNumber}`).value(item.type || '—')        // Type (Category)
+        sheet.cell(`E${rowNumber}`).value(item.subtype || '—')     // Subtype (Subcategory)
+        sheet.cell(`F${rowNumber}`).value(item.count || 1)         // Count
       })
-
-      // === ДОБАВЛЯЕМ ПОДПИСИ ===
-      const signatureRows = Math.max(3, Math.ceil((documentData.length - 8) / 20)) // Минимум 3 пустых строки
-      
-      for (let i = 0; i < signatureRows; i++) {
-        documentData.push(['', '', '', '', '', ''])
-      }
-
-      documentData.push(
-        [''],
-        ['ПОДПИСИ:'],
-        [''],
-        ['Ответственный за выдачу:', '________________________', '', 'Дата:', '______________'],
-        ['', '(подпись, ФИО)'],
-        [''],
-        ['Ответственный за получение:', '________________________', '', 'Дата:', '______________'],
-        ['', '(подпись, ФИО)'],
-        [''],
-        ['Примечания:', '________________________________________________________________']
-      )
-
-      // Создаем лист
-      const ws = XLSX.utils.aoa_to_sheet(documentData)
-
-      // === НАСТРОЙКИ ДЛЯ ПЕЧАТИ НА A4 ===
-      
-      // Фиксированная ширина колонок для A4
-      ws['!cols'] = [
-        { wch: 4 },   // № - узкая
-        { wch: 20 },  // Модель
-        { wch: 15 },  // Бренд
-        { wch: 20 },  // Категория
-        { wch: 20 },  // Подкатегория
-        { wch: 6 }    // Количество
-      ]
-
-      // === ФОРМАТИРОВАНИЕ ===
-      
-      // Главный заголовок
-      if (ws['A1']) {
-        ws['A1'].s = {
-          font: { color: { rgb: 'FFFFFF' }, bold: true, size: 16 },
-          alignment: { horizontal: 'center' },
-          fill: { fgColor: { rgb: '2B2D42' } } // Фирменный цвет primary
-        }
-        // Объединяем ячейки для заголовка
-        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }]
-      }
-
-      // Заголовки таблицы (строка 7, индекс 6)
-      const tableHeaderRow = 6
-      const tableHeaders = ['№', 'Модель', 'Бренд', 'Категория', 'Подкатегория', 'Кол-во']
-      
-      tableHeaders.forEach((header, colIndex) => {
-        const cellRef = XLSX.utils.encode_cell({ r: tableHeaderRow, c: colIndex })
-        if (ws[cellRef]) {
-          ws[cellRef].s = {
-            font: { bold: true, size: 12 },
-            fill: { fgColor: { rgb: 'F5F5F5' } },
-            alignment: { horizontal: 'center' },
-            border: {
-              top: { style: 'thin' },
-              bottom: { style: 'thin' },
-              left: { style: 'thin' },
-              right: { style: 'thin' }
-            }
-          }
-        }
-      })
-
-      // Границы для таблицы с оборудованием
-      for (let rowIndex = tableHeaderRow; rowIndex < tableHeaderRow + equipmentData.length + 1; rowIndex++) {
-        for (let colIndex = 0; colIndex < 6; colIndex++) {
-          const cellRef = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex })
-          if (ws[cellRef]) {
-            ws[cellRef].s = {
-              ...ws[cellRef].s,
-              border: {
-                top: { style: 'thin' },
-                bottom: { style: 'thin' },
-                left: { style: 'thin' },
-                right: { style: 'thin' }
-              },
-              alignment: { 
-                horizontal: colIndex === 0 || colIndex === 5 ? 'center' : 'left',
-                vertical: 'center'
-              }
-            }
-          }
-        }
-      }
-
-      // Настройки печати
-      ws['!printHeader'] = [{ s: { r: 0, c: 0 }, e: { r: 6, c: 5 } }]
-      ws['!margins'] = { 
-        left: 0.5, right: 0.5, top: 0.75, bottom: 0.75, 
-        header: 0.3, footer: 0.3 
-      }
-
-      XLSX.utils.book_append_sheet(wb, ws, 'Список оборудования')
 
       // === ГЕНЕРАЦИЯ И СКАЧИВАНИЕ ФАЙЛА ===
       const fileName = `Список_оборудования_${sanitizeFileName(listData.name || 'Мероприятие')}_${formatDateForFilename(new Date())}.xlsx`
       
-      // Генерируем бинарные данные
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+      // Генерируем blob (xlsx-populate полностью сохраняет шаблон)
+      const blob = await workbook.outputAsync()
       
-      // Создаем Blob и сохраняем файл
-      const blob = new Blob([wbout], { type: 'application/octet-stream' })
+      // Сохраняем файл
       saveAs(blob, fileName)
 
       return { success: true, fileName }
@@ -187,13 +85,31 @@ export function useExcelExport() {
     error.value = null
 
     try {
-      const ws = XLSX.utils.json_to_sheet(data)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Data')
+      // Создаем новую книгу Excel
+      const workbook = await XlsxPopulate.fromBlankAsync()
+      const sheet = workbook.sheet(0)
+      sheet.name('Data')
+
+      // Если есть данные, добавляем их
+      if (data && data.length > 0) {
+        // Получаем заголовки из первого объекта
+        const headers = Object.keys(data[0])
+        
+        // Добавляем заголовки в первую строку
+        headers.forEach((header, colIndex) => {
+          sheet.cell(1, colIndex + 1).value(header)
+        })
+
+        // Добавляем данные
+        data.forEach((row, rowIndex) => {
+          headers.forEach((header, colIndex) => {
+            sheet.cell(rowIndex + 2, colIndex + 1).value(row[header])
+          })
+        })
+      }
 
       const fileName = `${sanitizeFileName(filename)}_${formatDateForFilename(new Date())}.xlsx`
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-      const blob = new Blob([wbout], { type: 'application/octet-stream' })
+      const blob = await workbook.outputAsync()
       saveAs(blob, fileName)
 
       return { success: true, fileName }
