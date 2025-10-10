@@ -1,7 +1,7 @@
 <template>
   <!-- Notification Container using Teleport -->
   <Teleport to="body">
-    <div :class="containerClass">
+    <div :class="containerClass" :style="containerStyle">
       <TransitionGroup
         enter-active-class="transition ease-out duration-300"
         enter-from-class="opacity-0 scale-95 translate-x-full"
@@ -28,7 +28,7 @@
           />
           
           <!-- Notification Content -->
-          <div class="flex items-start gap-4 p-6 min-h-[80px]">
+          <div class="flex items-start gap-3 p-4">
             <!-- Icon -->
             <div class="flex-shrink-0">
               <IconV2
@@ -39,11 +39,12 @@
             </div>
             
             <!-- Content -->
-            <div class="flex-1 min-w-0 space-y-1">
+            <div class="flex-1 min-w-0 space-y-1 overflow-visible">
               <!-- Title -->
               <h4
                 v-if="notification.title"
                 :class="titleClass"
+                class="break-words"
               >
                 {{ notification.title }}
               </h4>
@@ -52,6 +53,7 @@
               <div
                 v-if="notification.message"
                 :class="messageClass"
+                class="break-words"
                 v-html="notification.message"
               />
               
@@ -135,22 +137,36 @@ const timers = ref(new Map())
 // Computed
 const containerClass = computed(() => {
   const baseClasses = [
-    'fixed z-[9999] pointer-events-none',
-    'w-full max-w-lg sm:max-w-xl md:max-w-2xl'
+    'fixed z-[9999] pointer-events-none'
   ]
   
-  // Position classes
+  // Position classes (без width - используем inline стили)
   const positionClasses = {
     'top-left': 'top-4 left-4',
     'top-right': 'top-4 right-4',
-    'top-center': 'top-4 left-1/2 transform -translate-x-1/2',
+    'top-center': 'top-4',
     'bottom-left': 'bottom-4 left-4',
     'bottom-right': 'bottom-4 right-4',
-    'bottom-center': 'bottom-4 left-1/2 transform -translate-x-1/2'
+    'bottom-center': 'bottom-4'
   }
   baseClasses.push(positionClasses[props.position] || positionClasses['top-right'])
   
   return baseClasses
+})
+
+const containerStyle = computed(() => {
+  const styles = {}
+  
+  // Для центральных позиций используем inline стили для точного позиционирования
+  if (props.position === 'top-center' || props.position === 'bottom-center') {
+    styles.left = '50%'
+    styles.transform = 'translateX(-50%)'
+    styles.width = 'min(90vw, 600px)' // 90% ширины экрана, максимум 600px
+  } else {
+    styles.width = 'min(90vw, 400px)'
+  }
+  
+  return styles
 })
 
 const iconSize = computed(() => {
@@ -234,7 +250,7 @@ const getNotificationClass = (notification) => {
   const baseClasses = [
     'relative pointer-events-auto rounded-lg shadow-lg backdrop-blur-sm',
     'transform transition-all duration-300 ease-out',
-    'min-w-[400px] w-full shadow-xl'
+    'w-full shadow-xl'
   ]
   
   // Size classes

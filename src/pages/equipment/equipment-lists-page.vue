@@ -236,7 +236,7 @@
                   <div class="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-secondary">
                     <span class="flex items-center gap-1">
                       <IconV2 name="package" size="xs" />
-                      {{ list.equipment_ids?.length || 0 }} единиц
+                      {{ getEquipmentCount(list) }} единиц
                     </span>
                     <span class="flex items-center gap-1">
                       <IconV2 name="calendar" size="xs" />
@@ -258,7 +258,7 @@
               <div class="flex items-center justify-between sm:justify-end sm:flex-col sm:items-end gap-3 flex-shrink-0">
                 <!-- Количество оборудования -->
                 <div class="text-left sm:text-right">
-                  <div class="text-xl sm:text-2xl font-bold text-primary">{{ list.equipment_ids?.length || 0 }}</div>
+                  <div class="text-xl sm:text-2xl font-bold text-primary">{{ getEquipmentCount(list) }}</div>
                   <div class="text-xs text-secondary uppercase tracking-wider">единиц</div>
                 </div>
                 
@@ -345,7 +345,7 @@
               <div class="flex items-center gap-3 mt-2 text-xs text-secondary">
                 <span class="flex items-center gap-1">
                   <IconV2 name="package" size="xs" />
-                  {{ listToDelete.equipment_ids?.length || 0 }} единиц оборудования
+                  {{ getEquipmentCount(listToDelete) }} единиц оборудования
                 </span>
                 <span class="flex items-center gap-1">
                   <IconV2 name="calendar" size="xs" />
@@ -481,7 +481,7 @@ const securityListsCount = computed(() =>
 )
 const totalEquipmentCount = computed(() => 
   equipmentLists.value.reduce((total, list) => 
-    total + (list.equipment_ids?.length || 0), 0
+    total + getEquipmentCount(list), 0
   )
 )
 
@@ -509,6 +509,19 @@ const navigateToCreate = () => {
 
 const navigateToCreateAbstract = () => {
   router.push('/equipment/lists/create-abstract')
+}
+
+// Helper функция для подсчета единиц оборудования
+const getEquipmentCount = (list) => {
+  if (!list) return 0
+  
+  // Для абстрактных списков считаем сумму count из equipment_items
+  if (list.list_mode === 'abstract' && list.equipment_items && Array.isArray(list.equipment_items)) {
+    return list.equipment_items.reduce((sum, item) => sum + (item.count || 0), 0)
+  }
+  
+  // Для конкретных списков считаем длину equipment_ids
+  return list.equipment_ids?.length || 0
 }
 
 // ТЕСТИРОВАНИЕ УВЕДОМЛЕНИЙ (временно)

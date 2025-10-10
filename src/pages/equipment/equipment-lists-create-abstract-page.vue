@@ -13,10 +13,13 @@
         <div class="flex justify-between items-center mt-4">
           <div>
             <h1 class="text-2xl font-bold text-primary">
-              Создание списка оборудования (по типам)
+              {{ isEditMode ? 'Редактирование списка оборудования' : 'Создание списка оборудования (по типам)' }}
             </h1>
             <p class="text-sm text-secondary mt-1">
-              Выберите модели оборудования и укажите необходимое количество
+              {{ isEditMode 
+                ? 'Измените название и состав оборудования'
+                : 'Выберите модели оборудования и укажите необходимое количество' 
+              }}
             </p>
           </div>
           
@@ -36,7 +39,15 @@
 
     <!-- Main Content -->
     <div class="max-w-7xl mx-auto px-4 py-6">
-      <div class="space-y-6">
+      <!-- Индикатор загрузки в режиме редактирования -->
+      <div v-if="loadingListData" class="flex justify-center items-center py-12">
+        <div class="text-center space-y-3">
+          <SpinnerV2 size="lg" />
+          <p class="text-secondary">Загрузка данных списка...</p>
+        </div>
+      </div>
+
+      <div v-else class="space-y-6">
           <!-- Основная информация о списке -->
           <BentoCard title="Основная информация" size="1x1">
             <div class="space-y-4">
@@ -166,9 +177,20 @@
               <div
                 v-for="group in groupedEquipment"
                 :key="group.group_id"
-                class="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer"
+                :class="[
+                  'border rounded-lg p-4 hover:shadow-sm transition-all cursor-pointer',
+                  isInList(group) 
+                    ? 'border-green-400 bg-green-50' 
+                    : 'border-gray-200 hover:border-blue-300'
+                ]"
                 @click="openQuantityModal(group)"
               >
+                <!-- Индикатор, что уже в списке -->
+                <div v-if="isInList(group)" class="mb-2 flex items-center gap-2 text-xs font-medium text-green-700">
+                  <IconV2 name="check-circle" size="xs" color="success" />
+                  <span>Уже в списке: {{ getItemInList(group).count }} шт</span>
+                </div>
+
                 <div class="flex justify-between items-start">
                   <div class="flex-1">
                     <div class="font-medium text-primary">
@@ -191,15 +213,15 @@
                 </div>
 
                 <ButtonV2
-                  variant="primary"
+                  :variant="isInList(group) ? 'success' : 'primary'"
                   size="sm"
                   class="mt-3 w-full"
                   @click.stop="openQuantityModal(group)"
                 >
                   <template #icon>
-                    <IconV2 name="plus" size="sm" />
+                    <IconV2 :name="isInList(group) ? 'check' : 'plus'" size="sm" />
                   </template>
-                  Добавить в список
+                  {{ isInList(group) ? 'Добавить еще' : 'Добавить в список' }}
                 </ButtonV2>
               </div>
             </div>
@@ -241,37 +263,76 @@
             <p class="text-sm mt-1">Добавьте оборудование из таблицы выше</p>
           </div>
 
-          <div v-else class="space-y-3">
-            <div
-              v-for="(item, index) in selectedItems"
-              :key="index"
-              class="border border-gray-200 rounded-lg p-3"
-            >
-              <div class="flex justify-between items-start">
-                <div class="flex-1 pr-3">
-                  <div class="font-medium text-primary text-sm">
-                    {{ item.brand }} {{ item.model }}
-                  </div>
-                  <div class="text-xs text-secondary mt-1">
-                    {{ item.type }}
-                  </div>
-                  <div class="text-xs text-secondary">
-                    {{ item.subtype }}
-                  </div>
-                  <div class="text-sm font-bold text-primary mt-2">
-                    Количество: {{ item.count }} шт
-                  </div>
+          <div v-else class="space-y-4">
+            <!-- Поиск в выбранном -->
+            <div v-if="selectedItems.length > 3" class="pb-3 border-b border-gray-200">
+              <div class="relative">
+                <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style="z-index: 10;">
+                  <IconV2 name="search" size="sm" color="secondary" />
                 </div>
-
+                <InputV2
+                  v-model="selectedItemsSearchQuery"
+                  placeholder="Поиск в выбранном списке..."
+                  type="text"
+                  style="padding-left: 2.5rem;"
+                />
+              </div>
+              
+              <div v-if="selectedItemsSearchQuery" class="mt-2 flex items-center justify-between text-xs">
+                <span class="text-secondary">
+                  Найдено: {{ filteredSelectedItems.length }} из {{ selectedItems.length }}
+                </span>
                 <ButtonV2
-                  variant="error"
+                  variant="ghost"
                   size="sm"
-                  @click="removeItem(index)"
+                  @click="selectedItemsSearchQuery = ''"
                 >
                   <template #icon>
-                    <IconV2 name="trash-2" size="xs" />
+                    <IconV2 name="x" size="xs" />
                   </template>
+                  Очистить
                 </ButtonV2>
+              </div>
+            </div>
+
+            <!-- Список выбранного оборудования -->
+            <div v-if="filteredSelectedItems.length === 0 && selectedItemsSearchQuery" class="text-center py-4 text-secondary">
+              <IconV2 name="search-x" size="md" color="secondary" class="mb-2" />
+              <p class="text-sm">Ничего не найдено по запросу "{{ selectedItemsSearchQuery }}"</p>
+            </div>
+
+            <div v-else class="space-y-3">
+              <div
+                v-for="(item, index) in filteredSelectedItems"
+                :key="index"
+                class="border border-gray-200 rounded-lg p-3"
+              >
+                <div class="flex justify-between items-start">
+                  <div class="flex-1 pr-3">
+                    <div class="font-medium text-primary text-sm">
+                      {{ item.brand }} {{ item.model }}
+                    </div>
+                    <div class="text-xs text-secondary mt-1">
+                      {{ item.type }}
+                    </div>
+                    <div class="text-xs text-secondary">
+                      {{ item.subtype }}
+                    </div>
+                    <div class="text-sm font-bold text-primary mt-2">
+                      Количество: {{ item.count }} шт
+                    </div>
+                  </div>
+
+                  <ButtonV2
+                    variant="error"
+                    size="sm"
+                    @click="removeItem(item)"
+                  >
+                    <template #icon>
+                      <IconV2 name="trash-2" size="xs" />
+                    </template>
+                  </ButtonV2>
+                </div>
               </div>
             </div>
           </div>
@@ -283,13 +344,13 @@
               size="md"
               class="flex-1"
               @click="handleCreateList"
-              :disabled="!canCreate"
-              :loading="creating"
+              :disabled="!canCreate || loadingListData"
+              :loading="creating || loadingListData"
             >
               <template #icon>
                 <IconV2 name="save" size="sm" />
               </template>
-              Создать список
+              {{ isEditMode ? 'Сохранить изменения' : 'Создать список' }}
             </ButtonV2>
 
             <ButtonV2
@@ -317,7 +378,7 @@
     />
 
     <!-- Система уведомлений -->
-    <NotificationV2 ref="notificationSystem" position="top-right" />
+    <NotificationV2 ref="notificationSystem" position="top-center" />
   </div>
 </template>
 
@@ -345,20 +406,39 @@ import EquipmentQuantityModal from './components/EquipmentQuantityModal.vue'
 import { useEquipmentStore } from '@/features/equipment'
 import { useAuthStore } from '@/app/store/auth-store'
 import { EQUIPMENT_CATEGORIES } from '@/features/equipment/constants/categories.js'
-import { createEquipmentList } from '@/features/equipment/api/equipment-lists-api.js'
+import { 
+  createEquipmentList, 
+  updateEquipmentList,
+  getEquipmentListById 
+} from '@/features/equipment/api/equipment-lists-api.js'
 import { useEquipmentGrouping } from './composables/useEquipmentGrouping.js'
 
 const router = useRouter()
 const equipmentStore = useEquipmentStore()
 const authStore = useAuthStore()
 
+// Пропсы для режима редактирования
+const props = defineProps({
+  id: {
+    type: String,
+    default: null
+  }
+})
+
+// Режим работы
+const isEditMode = computed(() => !!props.id)
+const listId = ref(props.id)
+
 // Breadcrumbs
-const breadcrumbs = [
+const breadcrumbs = computed(() => [
   { label: 'Главная', href: '/', icon: 'home' },
   { label: 'Модуль оборудования', href: '/equipment' },
   { label: 'Списки оборудования', href: '/equipment/lists' },
-  { label: 'Создание списка (по типам)', disabled: true }
-]
+  { 
+    label: isEditMode.value ? 'Редактирование списка' : 'Создание списка (по типам)', 
+    disabled: true 
+  }
+])
 
 // (Адаптивность убрана, так как теперь одна колонка)
 
@@ -371,6 +451,7 @@ const formData = ref({
 
 const formErrors = ref({})
 const creating = ref(false)
+const loadingListData = ref(false)
 const notificationSystem = ref(null)
 
 // Поиск и фильтры
@@ -382,6 +463,9 @@ const searchLoading = ref(false)
 
 // Выбранное оборудование
 const selectedItems = ref([])
+
+// Поиск в выбранном оборудовании
+const selectedItemsSearchQuery = ref('')
 
 // Модальное окно
 const showQuantityModal = ref(false)
@@ -418,10 +502,38 @@ const totalPages = computed(() => equipmentStore.totalPages)
 // Группировка оборудования
 const { groupedEquipment, groupsStats } = useEquipmentGrouping(equipments)
 
+// Фильтрация выбранного оборудования
+const filteredSelectedItems = computed(() => {
+  if (!selectedItemsSearchQuery.value.trim()) {
+    return selectedItems.value
+  }
+  
+  const query = selectedItemsSearchQuery.value.toLowerCase()
+  
+  return selectedItems.value.filter(item => {
+    const searchString = `${item.brand} ${item.model} ${item.type} ${item.subtype}`.toLowerCase()
+    return searchString.includes(query)
+  })
+})
+
 // Валидация
 const canCreate = computed(() => {
   return formData.value.name.trim().length > 0 && selectedItems.value.length > 0
 })
+
+// Helper для проверки, добавлено ли оборудование в список
+const getItemInList = (group) => {
+  return selectedItems.value.find(item =>
+    item.model === group.model &&
+    item.brand === group.brand &&
+    item.type === group.type &&
+    item.subtype === group.subtype
+  )
+}
+
+const isInList = (group) => {
+  return !!getItemInList(group)
+}
 
 // Методы поиска
 const debouncedSearch = debounce(async (query) => {
@@ -496,6 +608,25 @@ const handlePageChange = async (page) => {
 
 // Модальное окно
 const openQuantityModal = (group) => {
+  // Проверяем, есть ли уже это оборудование в списке
+  const existingItem = selectedItems.value.find(item =>
+    item.model === group.model &&
+    item.brand === group.brand &&
+    item.type === group.type &&
+    item.subtype === group.subtype
+  )
+  
+  if (existingItem) {
+    // Показываем уведомление, что оборудование уже добавлено
+    notificationSystem.value?.warning(
+      `Текущее количество в списке: ${existingItem.count} шт. Вы можете добавить еще.`,
+      { 
+        title: `${group.brand} ${group.model} уже в списке`, 
+        duration: 5000 
+      }
+    )
+  }
+  
   selectedEquipmentForModal.value = group
   showQuantityModal.value = true
 }
@@ -515,12 +646,17 @@ const addEquipmentToList = ({ equipment, quantity }) => {
   )
 
   if (existingIndex !== -1) {
-    // Увеличиваем количество
+    // Оборудование уже в списке - увеличиваем количество
+    const oldCount = selectedItems.value[existingIndex].count
     selectedItems.value[existingIndex].count += quantity
+    const newCount = selectedItems.value[existingIndex].count
     
     notificationSystem.value?.success(
-      `Количество увеличено до ${selectedItems.value[existingIndex].count} шт`,
-      { title: 'Обновлено', duration: 2000 }
+      `Было: ${oldCount} шт → Стало: ${newCount} шт (добавлено +${quantity})`,
+      { 
+        title: `${equipment.brand} ${equipment.model} - количество обновлено`, 
+        duration: 4000 
+      }
     )
   } else {
     // Добавляем новую позицию
@@ -533,31 +669,81 @@ const addEquipmentToList = ({ equipment, quantity }) => {
     })
     
     notificationSystem.value?.success(
-      `Добавлено: ${equipment.brand} ${equipment.model} (${quantity} шт)`,
-      { title: 'Успешно', duration: 2000 }
+      `Добавлено в список: ${quantity} шт`,
+      { 
+        title: `${equipment.brand} ${equipment.model}`, 
+        duration: 3000 
+      }
     )
   }
 }
 
-const removeItem = (index) => {
-  const item = selectedItems.value[index]
-  selectedItems.value.splice(index, 1)
-  
-  notificationSystem.value?.info(
-    `Удалено: ${item.brand} ${item.model}`,
-    { title: 'Удалено', duration: 2000 }
+const removeItem = (item) => {
+  // Находим индекс в оригинальном массиве
+  const index = selectedItems.value.findIndex(i =>
+    i.model === item.model &&
+    i.brand === item.brand &&
+    i.type === item.type &&
+    i.subtype === item.subtype
   )
+  
+  if (index !== -1) {
+    selectedItems.value.splice(index, 1)
+    
+    notificationSystem.value?.info(
+      `Удалено: ${item.brand} ${item.model}`,
+      { title: 'Удалено', duration: 2000 }
+    )
+  }
 }
 
 const clearAll = () => {
   selectedItems.value = []
+  selectedItemsSearchQuery.value = '' // Очищаем поиск
   notificationSystem.value?.info(
     'Все позиции удалены из списка',
     { title: 'Очищено', duration: 2000 }
   )
 }
 
-// Создание списка
+// Загрузка данных списка при редактировании
+const loadListData = async () => {
+  if (!listId.value) return
+  
+  loadingListData.value = true
+  
+  try {
+    console.log('📋 Загрузка данных списка для редактирования:', listId.value)
+    
+    const list = await getEquipmentListById(listId.value)
+    
+    if (!list) {
+      throw new Error('Список не найден')
+    }
+    
+    // Заполняем форму
+    formData.value.name = list.name || ''
+    formData.value.description = list.description || ''
+    
+    // Загружаем выбранное оборудование
+    if (list.equipment_items && Array.isArray(list.equipment_items)) {
+      selectedItems.value = [...list.equipment_items]
+      console.log('✅ Загружено позиций оборудования:', selectedItems.value.length)
+    }
+    
+  } catch (error) {
+    console.error('❌ Ошибка загрузки данных списка:', error)
+    notificationSystem.value?.error(
+      `Не удалось загрузить данные списка: ${error.message}`,
+      { title: 'Ошибка загрузки', duration: 5000 }
+    )
+    router.push('/equipment/lists')
+  } finally {
+    loadingListData.value = false
+  }
+}
+
+// Создание/обновление списка
 const handleCreateList = async () => {
   // Валидация
   formErrors.value = {}
@@ -582,10 +768,6 @@ const handleCreateList = async () => {
   creating.value = true
 
   try {
-    if (!authStore.user?.id) {
-      throw new Error('Пользователь не авторизован')
-    }
-
     const listData = {
       name: formData.value.name,
       description: formData.value.description || null,
@@ -594,9 +776,17 @@ const handleCreateList = async () => {
       equipment_items: selectedItems.value,
       equipment_ids: [],
       event_id: null,
-      mount_point_id: null,
-      created_by: authStore.user.id,
-      metadata: {
+      mount_point_id: null
+    }
+    
+    // В режиме создания добавляем метаданные
+    if (!isEditMode.value) {
+      if (!authStore.user?.id) {
+        throw new Error('Пользователь не авторизован')
+      }
+      
+      listData.created_by = authStore.user.id
+      listData.metadata = {
         created_by_name: authStore.user.name || authStore.user.email || 'Неизвестный пользователь',
         created_by_role: authStore.role,
         version: '1.0',
@@ -604,21 +794,26 @@ const handleCreateList = async () => {
       }
     }
 
-    console.log('Создание абстрактного списка:', listData)
+    console.log(isEditMode.value ? '📝 Обновление абстрактного списка:' : '✨ Создание абстрактного списка:', listData)
 
-    const result = await createEquipmentList(listData)
+    let result
+    if (isEditMode.value) {
+      result = await updateEquipmentList(listId.value, listData)
+    } else {
+      result = await createEquipmentList(listData)
+    }
 
     notificationSystem.value?.success(
-      'Список оборудования успешно создан!',
+      isEditMode.value ? 'Список оборудования успешно обновлен!' : 'Список оборудования успешно создан!',
       { title: 'Успех', duration: 4000 }
     )
 
     router.push('/equipment/lists')
 
   } catch (error) {
-    console.error('Ошибка создания списка:', error)
+    console.error(isEditMode.value ? '❌ Ошибка обновления списка:' : '❌ Ошибка создания списка:', error)
     notificationSystem.value?.error(
-      `Не удалось создать список: ${error.message}`,
+      `Не удалось ${isEditMode.value ? 'обновить' : 'создать'} список: ${error.message}`,
       { title: 'Ошибка', duration: 5000 }
     )
   } finally {
@@ -638,6 +833,12 @@ const handleBreadcrumbClick = (data) => {
 
 // Инициализация
 onMounted(async () => {
+  // В режиме редактирования сначала загружаем данные списка
+  if (isEditMode.value) {
+    await loadListData()
+  }
+  
+  // Загружаем оборудование для выбора
   await equipmentStore.loadEquipments()
 })
 </script>

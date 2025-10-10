@@ -444,7 +444,15 @@ const equipmentItemsPerPage = ref(10)
 
 // ═══ COMPUTED ═══
 const equipmentCount = computed(() => {
-  return listData.value?.equipment_ids?.length || 0
+  if (!listData.value) return 0
+  
+  // Для абстрактных списков считаем сумму count из equipment_items
+  if (listData.value.list_mode === 'abstract' && listData.value.equipment_items && Array.isArray(listData.value.equipment_items)) {
+    return listData.value.equipment_items.reduce((sum, item) => sum + (item.count || 0), 0)
+  }
+  
+  // Для конкретных списков считаем длину equipment_ids
+  return listData.value.equipment_ids?.length || 0
 })
 
 const uniqueTypesCount = computed(() => {
@@ -638,7 +646,14 @@ const loadEquipmentDetails = async (equipmentIds) => {
 }
 
 const navigateToEdit = () => {
-  router.push(`/equipment/lists/edit/${listId}`)
+  // Проверяем режим списка и перенаправляем на правильную страницу редактирования
+  if (listData.value?.list_mode === 'abstract') {
+    // Абстрактный список - редактирование по типам
+    router.push(`/equipment/lists/edit-abstract/${listId}`)
+  } else {
+    // Конкретный список - редактирование по единицам
+    router.push(`/equipment/lists/edit/${listId}`)
+  }
 }
 
 const handleDelete = () => {

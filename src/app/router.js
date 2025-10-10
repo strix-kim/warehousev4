@@ -83,6 +83,13 @@ export const routes = [
       // Создание нового списка оборудования (по типам)
     },
     {
+      path: '/equipment/lists/edit-abstract/:id',
+      name: 'equipment-lists-edit-abstract',
+      component: EquipmentListsCreateAbstractPage,
+      props: true,
+      // Редактирование списка оборудования (по типам)
+    },
+    {
       path: '/equipment/lists/:id',
       name: 'equipment-lists-view',
       component: EquipmentListsViewPage,

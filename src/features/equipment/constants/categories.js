@@ -34,7 +34,8 @@ export const EQUIPMENT_CATEGORIES = {
     "Экраны (разборные, натяжные, LED-панели)",
     "Аксессуары для камер",
     "PTZ-контроллер",
-    "ТВ"
+    "ТВ",
+    "IP Video encode/decoder"
   ],
   "Кабельная продукция и коммутация": [
     "Аудиокабели (XLR, Jack, RCA, SpeakON и т.д.)",
