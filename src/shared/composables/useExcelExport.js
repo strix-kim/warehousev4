@@ -34,28 +34,25 @@ export function useExcelExport() {
         // === ОФИЦИАЛЬНАЯ ШАПКА ===
         ['СПИСОК ОБОРУДОВАНИЯ ДЛЯ МЕРОПРИЯТИЯ'],
         [''],
-        ['Название списка:', listData.name || '—', '', '', '', 'Дата:', currentDate],
-        ['Тип:', getListTypeLabel(listData.type), '', '', '', 'Всего единиц:', equipmentData.length],
+        ['Название списка:', listData.name || '—', '', '', 'Дата:', currentDate],
+        ['Тип:', getListTypeLabel(listData.type), '', '', 'Всего единиц:', equipmentData.length],
         ['Описание:', listData.description || '—'],
         [''],
         
         // === ЗАГОЛОВКИ ТАБЛИЦЫ (ОПТИМИЗИРОВАНЫ ДЛЯ A4) ===
-        ['№', 'Оборудование', 'Серийный номер', 'Тип', 'Локация', 'Кол-во', 'Отметка'],
+        ['№', 'Модель', 'Бренд', 'Категория', 'Подкатегория', 'Кол-во'],
         []
       ]
 
       // === ДОБАВЛЯЕМ ОБОРУДОВАНИЕ ===
       equipmentData.forEach((item, index) => {
-        const equipmentName = [item.brand, item.model].filter(Boolean).join(' ') || 'Без названия'
-        
         documentData.push([
           index + 1, // Номер по порядку
-          equipmentName, // Бренд + модель
-          item.serialnumber || '—', // Серийный номер
+          item.model || '—', // Модель
+          item.brand || '—', // Бренд
           item.type || '—', // Категория
-          item.location || '—', // Локация
-          item.count || 1, // Количество
-          '' // Пустая колонка для отметок при заезде
+          item.subtype || '—', // Подкатегория
+          item.count || 1 // Количество
         ])
       })
 
@@ -63,7 +60,7 @@ export function useExcelExport() {
       const signatureRows = Math.max(3, Math.ceil((documentData.length - 8) / 20)) // Минимум 3 пустых строки
       
       for (let i = 0; i < signatureRows; i++) {
-        documentData.push(['', '', '', '', '', '', ''])
+        documentData.push(['', '', '', '', '', ''])
       }
 
       documentData.push(
@@ -87,12 +84,11 @@ export function useExcelExport() {
       // Фиксированная ширина колонок для A4
       ws['!cols'] = [
         { wch: 4 },   // № - узкая
-        { wch: 25 },  // Оборудование - широкая
-        { wch: 15 },  // Серийный номер
-        { wch: 12 },  // Тип
-        { wch: 12 },  // Локация  
-        { wch: 6 },   // Количество
-        { wch: 10 }   // Отметка
+        { wch: 20 },  // Модель
+        { wch: 15 },  // Бренд
+        { wch: 20 },  // Категория
+        { wch: 20 },  // Подкатегория
+        { wch: 6 }    // Количество
       ]
 
       // === ФОРМАТИРОВАНИЕ ===
@@ -105,12 +101,12 @@ export function useExcelExport() {
           fill: { fgColor: { rgb: '2B2D42' } } // Фирменный цвет primary
         }
         // Объединяем ячейки для заголовка
-        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }]
+        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }]
       }
 
       // Заголовки таблицы (строка 7, индекс 6)
       const tableHeaderRow = 6
-      const tableHeaders = ['№', 'Оборудование', 'Серийный номер', 'Тип', 'Локация', 'Кол-во', 'Отметка']
+      const tableHeaders = ['№', 'Модель', 'Бренд', 'Категория', 'Подкатегория', 'Кол-во']
       
       tableHeaders.forEach((header, colIndex) => {
         const cellRef = XLSX.utils.encode_cell({ r: tableHeaderRow, c: colIndex })
@@ -131,7 +127,7 @@ export function useExcelExport() {
 
       // Границы для таблицы с оборудованием
       for (let rowIndex = tableHeaderRow; rowIndex < tableHeaderRow + equipmentData.length + 1; rowIndex++) {
-        for (let colIndex = 0; colIndex < 7; colIndex++) {
+        for (let colIndex = 0; colIndex < 6; colIndex++) {
           const cellRef = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex })
           if (ws[cellRef]) {
             ws[cellRef].s = {
@@ -152,7 +148,7 @@ export function useExcelExport() {
       }
 
       // Настройки печати
-      ws['!printHeader'] = [{ s: { r: 0, c: 0 }, e: { r: 6, c: 6 } }]
+      ws['!printHeader'] = [{ s: { r: 0, c: 0 }, e: { r: 6, c: 5 } }]
       ws['!margins'] = { 
         left: 0.5, right: 0.5, top: 0.75, bottom: 0.75, 
         header: 0.3, footer: 0.3 
