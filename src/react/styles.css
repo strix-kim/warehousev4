@@ -43,8 +43,8 @@ h1, h2, h3, .brand-name { font-family: -apple-system, BlinkMacSystemFont, 'Segoe
 h1 { margin-bottom: 8px; font-size: clamp(28px, 3vw, 40px); line-height: 1.08; letter-spacing: -0.035em; }
 h2 { letter-spacing: -0.025em; }
 
-.app-shell { min-height: 100vh; display: grid; grid-template-columns: 256px minmax(0, 1fr); }
-.sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; padding: 22px 16px 16px; color: #f8faf8; background: radial-gradient(circle at 16% 70%, rgba(239,18,54,.12), transparent 28%), linear-gradient(160deg, #10171d 0%, var(--sidebar) 56%, #080c10 100%); }
+.app-shell { min-height: 100vh; display: grid; grid-template-columns: 256px minmax(0, 1fr); transition: grid-template-columns .22s ease; }
+.sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; padding: 22px 16px 16px; color: #f8faf8; background: radial-gradient(circle at 16% 70%, rgba(239,18,54,.12), transparent 28%), linear-gradient(160deg, #10171d 0%, var(--sidebar) 56%, #080c10 100%); transition: padding .22s ease; }
 .sidebar::before { content: ''; position: absolute; inset: 0; opacity: .34; pointer-events: none; background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: 28px 28px; mask-image: linear-gradient(to bottom, transparent 9%, #000 38%, #000 78%, transparent 96%); }
 .sidebar::after { content: ''; position: absolute; left: 26px; bottom: 190px; width: 1px; height: 210px; opacity: .7; pointer-events: none; background: linear-gradient(transparent, rgba(239,18,54,.72), transparent); box-shadow: 46px 25px 0 rgba(255,255,255,.045), 92px -12px 0 rgba(255,255,255,.045), 138px 38px 0 rgba(255,255,255,.045), 184px 4px 0 rgba(255,255,255,.045); transform: rotate(68deg); }
 .sidebar > * { position: relative; z-index: 1; }
@@ -101,6 +101,19 @@ h2 { letter-spacing: -0.025em; }
 .user-copy { min-width: 0; display: flex; flex-direction: column; }
 .user-copy strong { overflow: hidden; color: #fff; font-size: 12px; text-overflow: ellipsis; }
 .user-copy span { overflow: hidden; color: #66727a; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+
+.app-shell--sidebar-collapsed { grid-template-columns: 76px minmax(0, 1fr); }
+.app-shell--sidebar-collapsed .sidebar { padding-inline: 10px; }
+.app-shell--sidebar-collapsed .sidebar__brand { justify-content: center; }
+.app-shell--sidebar-collapsed .sidebar__brand .brand-lockup, .app-shell--sidebar-collapsed .nav-section-label, .app-shell--sidebar-collapsed .sidebar__nav a span, .app-shell--sidebar-collapsed .sidebar__scope span, .app-shell--sidebar-collapsed .sidebar__scope > svg:last-child, .app-shell--sidebar-collapsed .user-copy { display: none; }
+.app-shell--sidebar-collapsed .sidebar__brand > button { display: grid; }
+.app-shell--sidebar-collapsed .sidebar__nav a { justify-content: center; padding: 0; }
+.app-shell--sidebar-collapsed .sidebar__scope { justify-content: center; padding: 12px 0; }
+.app-shell--sidebar-collapsed .sidebar__footer { grid-template-columns: 1fr; justify-items: center; }
+.app-shell--sidebar-collapsed .sidebar__utility, .app-shell--sidebar-collapsed .sidebar__signal--bottom { display: none; }
+.app-shell--sidebar-collapsed .sidebar__language { width: 100%; }
+.app-shell--sidebar-collapsed .language-switch--compact { grid-template-columns: 1fr; }
+.app-shell--sidebar-collapsed .language-switch--compact button { width: 100%; min-width: 0; padding-inline: 0; }
 
 .app-content { width: 100%; max-width: 1700px; min-width: 0; margin: 0 auto; padding: 40px clamp(24px, 4vw, 64px) 56px; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
@@ -623,6 +636,11 @@ h2 { letter-spacing: -0.025em; }
   .sidebar__footer { grid-template-columns: 1fr; justify-items: center; }
   .sidebar__utility { display: none; }
   .sidebar__signal--bottom { display: none; }
+  .app-shell--sidebar-collapsed .sidebar__brand .brand-lockup { display: flex; }
+  .app-shell--sidebar-collapsed .sidebar__brand > button { display: none; }
+  .sidebar__language { width: 100%; overflow: hidden; }
+  .language-switch--compact { grid-template-columns: 1fr; }
+  .language-switch--compact button { width: 100%; min-width: 0; padding-inline: 0; }
   .list-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric-strip { grid-template-columns: minmax(190px, .65fr) minmax(0, 1.35fr); }
   .metric--context { display: none; }
@@ -646,9 +664,10 @@ h2 { letter-spacing: -0.025em; }
   .sidebar__nav { width: auto; min-width: 0; display: flex; flex: 1; justify-content: center; gap: 4px; padding: 0; }
   .sidebar__nav a { width: auto; min-width: 0; height: 50px; margin: 0; flex: 1; flex-direction: column; gap: 2px; font-size: 9px; }
   .sidebar__nav a span { display: block; }
+  .app-shell--sidebar-collapsed .sidebar__nav a span { display: block; }
   .sidebar__nav a.active::before { left: 50%; top: -7px; width: 30px; height: 3px; transform: translateX(-50%); }
   .sidebar__language { width: 66px; display: flex; flex: 0 0 auto; align-items: center; margin: 0 0 0 4px; }
-  .language-switch--compact { height: 50px; align-content: center; border: 0; background: transparent; }
+  .language-switch--compact, .app-shell--sidebar-collapsed .language-switch--compact { height: 50px; grid-template-columns: 1fr 1fr; align-content: center; border: 0; background: transparent; }
   .language-switch--compact button { min-width: 28px; height: 36px; padding: 0; }
   .app-content { padding: 25px 15px calc(90px + env(safe-area-inset-bottom)); }
   .page-header { flex-direction: column; }
@@ -822,8 +841,8 @@ h2 { letter-spacing: -0.025em; }
 
 @media (max-width: 820px) {
   .sidebar__nav a { font-size: 11px; }
-  .sidebar__language { width: 92px; }
-  .language-switch--compact button { min-width: 44px; height: 44px; }
+  .sidebar__language { width: clamp(72px, 23vw, 92px); }
+  .language-switch--compact button { width: 100%; min-width: 0; height: 44px; }
   .language-switch--compact button { font-size: 11px; }
   .icon-button { width: 44px; height: 44px; }
   .editor-header { grid-template-columns: 44px 1fr; }

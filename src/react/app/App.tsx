@@ -1,5 +1,5 @@
-import { ArrowUpRight, Boxes, ChevronDown, ClipboardList, House, ListPlus, LogOut, PanelLeftClose, RadioTower, Warehouse } from 'lucide-react'
-import { lazy, Suspense, useEffect, type ReactNode } from 'react'
+import { ArrowUpRight, Boxes, ChevronDown, ClipboardList, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, RadioTower, Warehouse } from 'lucide-react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthProvider'
 import { LanguageSwitcher, useLanguage } from '../lib/i18n'
@@ -41,6 +41,11 @@ function AppShell() {
   const { session, signOut } = useAuth()
   const { tr } = useLanguage()
   const email = session?.user.email ?? tr('Сотрудник ARGO', 'ARGO xodimi')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('argo:sidebar-collapsed') === 'true')
+
+  useEffect(() => {
+    window.localStorage.setItem('argo:sidebar-collapsed', String(sidebarCollapsed))
+  }, [sidebarCollapsed])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -56,14 +61,22 @@ function AppShell() {
   }, [])
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${sidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`}>
       <aside className="sidebar">
         <div className="sidebar__brand">
           <Link className="brand-lockup brand-lockup--light brand-lockup--home" to="/" aria-label={tr('Вернуться на главную', 'Bosh sahifaga qaytish')}>
             <span className="brand-mark">A</span>
             <span className="brand-name">ARGO</span>
           </Link>
-          <button className="icon-button icon-button--dark" aria-label={tr('Свернуть меню', 'Menyuni yig‘ish')} disabled><PanelLeftClose size={18} /></button>
+          <button
+            className="icon-button icon-button--dark sidebar__toggle"
+            onClick={() => setSidebarCollapsed((current) => !current)}
+            aria-label={sidebarCollapsed ? tr('Развернуть меню', 'Menyuni ochish') : tr('Свернуть меню', 'Menyuni yig‘ish')}
+            aria-expanded={!sidebarCollapsed}
+            title={sidebarCollapsed ? tr('Развернуть меню', 'Menyuni ochish') : tr('Свернуть меню', 'Menyuni yig‘ish')}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
         </div>
 
         <nav className="sidebar__nav" aria-label={tr('Основная навигация', 'Asosiy navigatsiya')}>
