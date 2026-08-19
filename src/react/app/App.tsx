@@ -31,6 +31,7 @@ export function App() {
         <Route path="/equipment/new" element={<RouteBoundary><EquipmentCreatePage /></RouteBoundary>} />
         <Route path="/lists" element={<RouteBoundary><ListsPage /></RouteBoundary>} />
         <Route path="/lists/new" element={<RouteBoundary><ListEditorPage /></RouteBoundary>} />
+        <Route path="/lists/:listId/edit" element={<RouteBoundary><ListEditorPage /></RouteBoundary>} />
       </Route>
       <Route path="*" element={<Navigate to={session ? '/' : '/login'} replace />} />
     </Routes>

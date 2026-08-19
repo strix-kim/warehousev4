@@ -96,7 +96,18 @@ export async function fetchEquipmentLists({ bypassCache = false } = {}) {
   }, { bypass: bypassCache })
 }
 
-type CreateEquipmentListInput = {
+export async function fetchEquipmentList(listId: string) {
+  if (!supabase) throw new Error('Supabase не настроен')
+  const { data, error } = await supabase
+    .from('equipment_lists')
+    .select(listColumns)
+    .eq('id', listId)
+    .single()
+  if (error) throw error
+  return { ...data, advanced_features: true } as unknown as EquipmentList
+}
+
+export type EquipmentListDocumentInput = {
   name: string
   description: string
   clientName: string
@@ -107,10 +118,30 @@ type CreateEquipmentListInput = {
   equipmentItems: EquipmentListItem[]
 }
 
-export async function createEquipmentList(input: CreateEquipmentListInput) {
+export async function createEquipmentList(input: EquipmentListDocumentInput) {
   if (!supabase) throw new Error('Supabase не настроен')
 
   const { data, error } = await supabase.rpc('create_equipment_list_document', {
+    p_name: input.name.trim(),
+    p_description: input.description.trim(),
+    p_client_name: input.clientName.trim(),
+    p_venue: input.venue.trim(),
+    p_list_mode: input.listMode,
+    p_reservation_start: input.reservationStart,
+    p_reservation_end: input.reservationEnd,
+    p_items: input.equipmentItems,
+  })
+
+  if (error) throw error
+  invalidateCachePrefix('equipment-lists:')
+  return data as string
+}
+
+export async function updateEquipmentList(listId: string, input: EquipmentListDocumentInput) {
+  if (!supabase) throw new Error('Supabase не настроен')
+
+  const { data, error } = await supabase.rpc('update_equipment_list_document', {
+    p_list_id: listId,
     p_name: input.name.trim(),
     p_description: input.description.trim(),
     p_client_name: input.clientName.trim(),

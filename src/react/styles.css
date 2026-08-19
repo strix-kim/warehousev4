@@ -428,7 +428,7 @@ h2 { letter-spacing: -0.025em; }
 .catalog-preview-drawer .equipment-thumb--large { margin: 22px 0 16px; }
 .catalog-preview-drawer__add { width: 100%; margin-top: 18px; }
 
-.reservation-drawer { width: min(560px, 100%); }
+.reservation-drawer { width: min(640px, 100%); }
 .reservation-summary { display: flex; align-items: center; gap: 12px; margin: 22px 0 14px; padding: 15px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
 .reservation-summary > svg { flex: 0 0 auto; color: var(--accent); }
 .reservation-summary > div { display: flex; flex-direction: column; gap: 4px; }
@@ -440,6 +440,32 @@ h2 { letter-spacing: -0.025em; }
 .optional-tracking-note span { display: flex; flex-direction: column; gap: 4px; }
 .optional-tracking-note strong { color: var(--ink); font-size: 13px; }
 .optional-tracking-note small { font-size: 12px; line-height: 1.5; }
+.saved-list-contents { margin: 0 0 12px; border: 1px solid var(--line); border-radius: 11px; background: #fff; overflow: hidden; }
+.saved-list-contents__heading { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 15px; border-bottom: 1px solid var(--line); background: var(--surface-soft); }
+.saved-list-contents__heading h3 { margin: 0 0 3px; font-size: 15px; }
+.saved-list-contents__heading p { margin: 0; color: var(--ink-faint); font-size: 12px; }
+.saved-list-contents__heading > strong { min-width: 34px; height: 34px; display: grid; place-items: center; border-radius: 8px; color: #fff; background: var(--ink); font-size: 13px; }
+.saved-list-items { max-height: 310px; overflow-y: auto; scrollbar-gutter: stable; }
+.saved-list-item { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 15px; border-bottom: 1px solid var(--line); }
+.saved-list-item:last-child { border-bottom: 0; }
+.saved-list-item > span { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.saved-list-item strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.saved-list-item small { overflow: hidden; color: var(--ink-faint); font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.saved-list-item > b { flex: 0 0 auto; color: var(--accent); font-size: 14px; }
+.saved-list-contents > .muted, .saved-list-contents > .detail-skeleton { margin: 14px; }
+.saved-list-edit { margin-bottom: 12px; }
+.tracking-details { margin-top: 12px; border: 1px solid var(--line); border-radius: 11px; background: #fff; overflow: hidden; }
+.tracking-details > summary { min-height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 15px; cursor: pointer; list-style: none; }
+.tracking-details > summary::-webkit-details-marker { display: none; }
+.tracking-details > summary > span { display: flex; flex-direction: column; gap: 4px; }
+.tracking-details > summary strong { color: var(--ink); font-size: 13px; }
+.tracking-details > summary small { color: var(--ink-faint); font-size: 11px; line-height: 1.4; }
+.tracking-details > summary > svg { flex: 0 0 auto; color: var(--ink-faint); transition: transform .18s ease; }
+.tracking-details[open] > summary { border-bottom: 1px solid var(--line); background: var(--surface-soft); }
+.tracking-details[open] > summary > svg { transform: rotate(90deg); }
+.tracking-details__body { padding: 14px; }
+.tracking-details__body .optional-tracking-note { margin-top: 0; }
+.editor-open-error { margin-bottom: 18px; border: 1px solid #efc6c6; border-radius: var(--radius-md); }
 .shortage-panel { margin-bottom: 14px; border: 1px solid #f0d99d; border-radius: 10px; background: #fffaf0; overflow: hidden; }
 .shortage-panel > div { display: flex; gap: 10px; padding: 13px; color: var(--warning); }
 .shortage-panel > div svg { flex: 0 0 auto; }

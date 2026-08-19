@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { AppDatePicker } from '../../components/AppDatePicker'
 import { AppSelect } from '../../components/AppSelect'
 import { useLanguage } from '../../lib/i18n'
@@ -25,7 +25,7 @@ import { useModalLayer } from '../../lib/useModalLayer'
 import { fetchAllEquipment, readCachedAllEquipment } from '../equipment/api'
 import { EquipmentVisual, preloadEquipmentImages } from '../equipment/EquipmentVisual'
 import type { Equipment } from '../equipment/types'
-import { createEquipmentList, type EquipmentListItem } from './api'
+import { createEquipmentList, fetchEquipmentList, updateEquipmentList, type EquipmentList, type EquipmentListItem } from './api'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
 type CatalogGroup = {
@@ -82,6 +82,7 @@ function isAvailable(item: Equipment) {
 
 export function ListEditorPage() {
   const navigate = useNavigate()
+  const { listId } = useParams<{ listId: string }>()
   const { tr, language, locale } = useLanguage()
   const defaults = listDefaults[language]
   const [name, setName] = useState<string>(() => listDefaults[language].name)
@@ -100,6 +101,9 @@ export function ListEditorPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [openError, setOpenError] = useState('')
+  const [isOpening, setIsOpening] = useState(Boolean(listId))
+  const [listToEdit, setListToEdit] = useState<EquipmentList | null>(null)
   const [saveError, setSaveError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [savedId, setSavedId] = useState('')
@@ -108,6 +112,7 @@ export function ListEditorPage() {
   const [catalogLimit, setCatalogLimit] = useState(60)
   const catalogRef = useRef<HTMLElement>(null)
   const selectionRef = useRef<HTMLElement>(null)
+  const hydratedListRef = useRef('')
 
   useEffect(() => {
     let current = true
@@ -123,6 +128,32 @@ export function ListEditorPage() {
       .finally(() => { if (current) setIsLoading(false) })
     return () => { current = false }
   }, [tr])
+
+  useEffect(() => {
+    if (!listId) {
+      setIsOpening(false)
+      setListToEdit(null)
+      setOpenError('')
+      return
+    }
+    let current = true
+    setIsOpening(true)
+    setOpenError('')
+    fetchEquipmentList(listId)
+      .then((list) => {
+        if (!current) return
+        if (list.reservation_status !== 'draft') throw new Error('not-draft')
+        setListToEdit(list)
+      })
+      .catch((error) => {
+        if (!current) return
+        setOpenError(error instanceof Error && error.message === 'not-draft'
+          ? tr('Изменять можно только черновики. Подтверждённый или выданный список доступен в режиме просмотра.', 'Faqat qoralamalarni o‘zgartirish mumkin. Tasdiqlangan yoki berilgan ro‘yxat faqat ko‘rish rejimida mavjud.')
+          : tr('Не удалось открыть сохранённый список.', 'Saqlangan ro‘yxatni ochib bo‘lmadi.'))
+      })
+      .finally(() => { if (current) setIsOpening(false) })
+    return () => { current = false }
+  }, [listId, tr])
 
   useEffect(() => {
     const allDefaults = Object.values(listDefaults)
@@ -181,13 +212,45 @@ export function ListEditorPage() {
   }, [category, groups, search, subcategory])
   const visibleGroups = filteredGroups.slice(0, catalogLimit)
 
+  useEffect(() => {
+    if (!listToEdit || groups.length === 0 || hydratedListRef.current === listToEdit.id) return
+    const groupsByKey = new Map(groups.map((group) => [group.key, group]))
+    const equipmentById = new Map(equipment.map((item) => [item.id, item]))
+    const restored = new Map<string, SelectedGroup>()
+    const addRestored = (group: CatalogGroup, count: number, serialId?: string) => {
+      const current = restored.get(group.key) ?? { group, count: 0, serialIds: [], serialPickerOpen: false }
+      current.count += count
+      if (serialId && group.serializedItems.some((item) => item.id === serialId)) current.serialIds.push(serialId)
+      restored.set(group.key, current)
+    }
+
+    for (const equipmentId of listToEdit.equipment_ids ?? []) {
+      const item = equipmentById.get(equipmentId)
+      const group = item ? groupsByKey.get(groupKey(item)) : undefined
+      if (group) addRestored(group, 1, equipmentId)
+    }
+    for (const item of listToEdit.equipment_items ?? []) {
+      const group = groupsByKey.get(groupKey(item))
+      if (group) addRestored(group, Math.max(1, Number(item.count) || 1), item.tracking_mode === 'serialized' ? item.equipment_id : undefined)
+    }
+
+    setName(listToEdit.name)
+    setClientName(listToEdit.client_name ?? defaults.clientName)
+    setVenue(listToEdit.venue ?? defaults.venue)
+    setDescription(listToEdit.description ?? '')
+    setEventDate(listToEdit.reservation_start ?? todayDateValue())
+    setSelected([...restored.values()])
+    setSavedId(listToEdit.id)
+    hydratedListRef.current = listToEdit.id
+  }, [defaults.clientName, defaults.venue, equipment, groups, listToEdit])
+
   useEffect(() => { setSubcategory(''); setCatalogLimit(60) }, [category])
   useEffect(() => setCatalogLimit(60), [search, subcategory])
 
   const selectedCount = selected.reduce((sum, item) => sum + item.count, 0)
   const selectedKeys = useMemo(() => new Set(selected.map((item) => item.group.key)), [selected])
   const selectedByKey = useMemo(() => new Map(selected.map((item) => [item.group.key, item])), [selected])
-  const canSubmit = selectedCount > 0
+  const canSubmit = selectedCount > 0 && !isOpening && !openError
 
   function moveToMobilePanel(panel: 'catalog' | 'selection') {
     setMobilePanel(panel)
@@ -284,8 +347,8 @@ export function ListEditorPage() {
   async function persistList() {
     if (savedId) return savedId
     const items = buildItems()
-    const listMode = items.every((item) => item.tracking_mode !== 'planned') ? 'specific' : 'abstract'
-    const id = await createEquipmentList({
+    const listMode: 'specific' | 'abstract' = items.every((item) => item.tracking_mode !== 'planned') ? 'specific' : 'abstract'
+    const input = {
       name: name.trim() || defaults.name,
       description,
       clientName: clientName.trim() || defaults.clientName,
@@ -294,7 +357,8 @@ export function ListEditorPage() {
       reservationStart: eventDate || null,
       reservationEnd: eventDate || null,
       equipmentItems: items,
-    })
+    }
+    const id = listId ? await updateEquipmentList(listId, input) : await createEquipmentList(input)
     setSavedId(id)
     return id
   }
@@ -306,7 +370,7 @@ export function ListEditorPage() {
     setSuccessMessage('')
     try {
       await persistList()
-      setSuccessMessage(tr('Список сохранён в системе.', 'Ro‘yxat tizimda saqlandi.'))
+      setSuccessMessage(listId ? tr('Изменения сохранены.', 'O‘zgarishlar saqlandi.') : tr('Список сохранён в системе.', 'Ro‘yxat tizimda saqlandi.'))
     } catch {
       setSaveError(tr('Не удалось сохранить список. Файл всё ещё можно скачать.', 'Ro‘yxatni saqlab bo‘lmadi. Faylni baribir yuklab olish mumkin.'))
     } finally {
@@ -355,8 +419,8 @@ export function ListEditorPage() {
           <ArrowLeft size={18} />
         </button>
         <div>
-          <p className="eyebrow">{tr('Быстрый рабочий документ', 'Tezkor ish hujjati')}</p>
-          <h1>{tr('Список оборудования', 'Uskunalar ro‘yxati')}</h1>
+          <p className="eyebrow">{listId ? tr('Редактирование черновика', 'Qoralamani tahrirlash') : tr('Быстрый рабочий документ', 'Tezkor ish hujjati')}</p>
+          <h1>{listId ? tr('Открытый список', 'Ochiq ro‘yxat') : tr('Список оборудования', 'Uskunalar ro‘yxati')}</h1>
         </div>
         <div className="editor-header__actions">
           <button className="button button--secondary" onClick={() => void saveList()} disabled={!canSubmit || isSaving || isExporting}>
@@ -367,6 +431,8 @@ export function ListEditorPage() {
           </button>
         </div>
       </header>
+
+      {openError && <div className="state-block state-block--error editor-open-error"><CircleAlert size={23} /><strong>{tr('Список не открыт', 'Ro‘yxat ochilmadi')}</strong><span>{openError}</span><button className="button button--secondary" onClick={() => navigate('/lists')}>{tr('Вернуться к спискам', 'Ro‘yxatlarga qaytish')}</button></div>}
 
       <section className="quick-list-meta data-panel">
         <label className="field quick-list-meta__name">

@@ -8,6 +8,7 @@ import {
   FileCheck2,
   ListChecks,
   PackageCheck,
+  PencilLine,
   Plus,
   RotateCcw,
   Search,
@@ -66,6 +67,34 @@ function listSize(list: EquipmentList) {
 
 function formatDate(value: string | null, locale: string, tr: Tr) {
   return value ? new Intl.DateTimeFormat(locale).format(new Date(`${value}T12:00:00`)) : tr('дата не указана', 'sana ko‘rsatilmagan')
+}
+
+async function buildSavedListRows(list: EquipmentList) {
+  const serialized = await fetchEquipmentByIds(list.equipment_ids ?? [])
+  const grouped = new Map<string, ExportListRow>()
+  const addRow = (row: ExportListRow) => {
+    const key = `${row.category}::${row.equipment}::${row.subtype}`.toLocaleLowerCase('ru')
+    const current = grouped.get(key)
+    if (current) {
+      current.count += row.count
+      current.serialNumbers.push(...row.serialNumbers)
+    } else grouped.set(key, { ...row, serialNumbers: [...row.serialNumbers] })
+  }
+  for (const item of serialized) addRow({
+    category: item.type,
+    equipment: `${item.brand} ${item.model}`.trim(),
+    subtype: item.subtype,
+    count: 1,
+    serialNumbers: item.serialnumber ? [item.serialnumber] : [],
+  })
+  for (const item of list.equipment_items ?? []) addRow({
+    category: item.type,
+    equipment: `${item.brand} ${item.model}`.trim(),
+    subtype: item.subtype,
+    count: item.count,
+    serialNumbers: [],
+  })
+  return [...grouped.values()]
 }
 
 export function ListsPage() {
@@ -128,30 +157,7 @@ export function ListsPage() {
     setExporting({ id: list.id, mode: documentMode })
     setExportError('')
     try {
-      const serialized = await fetchEquipmentByIds(list.equipment_ids ?? [])
-      const grouped = new Map<string, ExportListRow>()
-      const addRow = (row: ExportListRow) => {
-        const key = `${row.category}::${row.equipment}::${row.subtype}`.toLocaleLowerCase('ru')
-        const current = grouped.get(key)
-        if (current) {
-          current.count += row.count
-          current.serialNumbers.push(...row.serialNumbers)
-        } else grouped.set(key, { ...row, serialNumbers: [...row.serialNumbers] })
-      }
-      for (const item of serialized) addRow({
-        category: item.type,
-        equipment: `${item.brand} ${item.model}`.trim(),
-        subtype: item.subtype,
-        count: 1,
-        serialNumbers: item.serialnumber ? [item.serialnumber] : [],
-      })
-      for (const item of list.equipment_items ?? []) addRow({
-        category: item.type,
-        equipment: `${item.brand} ${item.model}`.trim(),
-        subtype: item.subtype,
-        count: item.count,
-        serialNumbers: [],
-      })
+      const rows = await buildSavedListRows(list)
       downloadEquipmentListXlsx({
         name: list.name,
         clientName: list.client_name ?? '',
@@ -161,7 +167,7 @@ export function ListsPage() {
         locale,
         language,
         documentMode,
-        rows: [...grouped.values()],
+        rows,
       })
     } catch {
       setExportError(tr('Не удалось подготовить Excel для сохранённого списка.', 'Saqlangan ro‘yxat uchun Excelni tayyorlab bo‘lmadi.'))
@@ -281,12 +287,14 @@ export function ListsPage() {
 }
 
 function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; onClose: () => void; onChanged: () => Promise<void> }) {
+  const navigate = useNavigate()
   const { tr, locale } = useLanguage()
   useModalLayer(onClose)
   const statusView = getStatusView(tr)
   const transitionCopy = getTransitionCopy(tr)
   const [shortages, setShortages] = useState<ReservationShortage[]>([])
   const [history, setHistory] = useState<ReservationHistory[]>([])
+  const [composition, setComposition] = useState<ExportListRow[]>([])
   const [note, setNote] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -297,22 +305,19 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   const missingLegacyDates = list.reservation_status === 'draft' && (!list.reservation_start || !list.reservation_end)
 
   async function loadDetails() {
-    if (!list.advanced_features) {
-      setHistory([])
-      setShortages([])
-      setIsLoading(false)
-      return
-    }
     setIsLoading(true)
+    setError('')
     try {
-      const [nextHistory, nextShortages] = await Promise.all([
-        fetchReservationHistory(list.id),
-        list.reservation_start && list.reservation_end ? fetchReservationShortages(list.id) : Promise.resolve([]),
+      const [nextComposition, nextHistory, nextShortages] = await Promise.all([
+        buildSavedListRows(list),
+        list.advanced_features ? fetchReservationHistory(list.id) : Promise.resolve([]),
+        list.advanced_features && list.reservation_start && list.reservation_end ? fetchReservationShortages(list.id) : Promise.resolve([]),
       ])
+      setComposition(nextComposition)
       setHistory(nextHistory)
       setShortages(nextShortages)
     } catch {
-      setError(tr('Не удалось загрузить проверку доступности или историю.', 'Mavjudlik tekshiruvi yoki tarixni yuklab bo‘lmadi.'))
+      setError(tr('Не удалось загрузить состав или служебную информацию списка.', 'Ro‘yxat tarkibi yoki xizmat ma’lumotlarini yuklab bo‘lmadi.'))
     } finally {
       setIsLoading(false)
     }
@@ -350,48 +355,69 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
           <div><strong>{formatDate(list.reservation_start, locale, tr)} — {formatDate(list.reservation_end, locale, tr)}</strong><span>{list.list_mode === 'specific' ? tr('Фактический комплект', 'Haqiqiy jamlanma') : tr('План по моделям', 'Modellar bo‘yicha reja')} · {listSize(list)} {tr('единиц', 'birlik')}</span></div>
         </div>
 
-        {list.advanced_features && (
-          <div className="optional-tracking-note"><CircleAlert size={18} /><span><strong>{tr('Учёт выдачи — необязательно', 'Berish hisobi — ixtiyoriy')}</strong><small>{tr('Excel уже готов к работе. Меняйте статус ниже только если хотите учитывать подтверждение, выдачу и возврат оборудования в системе.', 'Excel ishlashga tayyor. Tizimda tasdiqlash, berish va qaytarishni hisobga olmoqchi bo‘lsangizgina quyidagi holatni o‘zgartiring.')}</small></span></div>
-        )}
+        <section className="saved-list-contents">
+          <div className="saved-list-contents__heading"><div><h3>{tr('Оборудование в списке', 'Ro‘yxatdagi uskunalar')}</h3><p>{tr('Полный сохранённый состав документа', 'Hujjatning to‘liq saqlangan tarkibi')}</p></div><strong>{listSize(list)}</strong></div>
+          {isLoading ? <div className="detail-skeleton" /> : composition.length > 0 ? (
+            <div className="saved-list-items">{composition.map((item) => (
+              <div className="saved-list-item" key={`${item.category}-${item.equipment}-${item.subtype}`}>
+                <span><strong>{item.equipment}</strong><small>{item.category} · {item.subtype}{item.serialNumbers.length > 0 ? ` · S/N ${item.serialNumbers.join(', ')}` : ''}</small></span>
+                <b>×{item.count}</b>
+              </div>
+            ))}</div>
+          ) : <p className="muted">{tr('В этом списке нет оборудования.', 'Bu ro‘yxatda uskuna yo‘q.')}</p>}
+        </section>
 
-        {!list.advanced_features ? (
-          <p className="availability-warning"><CircleAlert size={16} />{tr('Этот список сохранён как обычный документ. Учёт подтверждения, выдачи и возврата для него не включён.', 'Bu ro‘yxat oddiy hujjat sifatida saqlangan. Tasdiqlash, berish va qaytarish hisobi yoqilmagan.')}</p>
-        ) : isLoading ? <div className="detail-skeleton" /> : shortages.length > 0 ? (
-          <section className="shortage-panel">
-            <div><TriangleAlert size={19} /><span><strong>{tr('Есть прогнозируемая нехватка', 'Kutilayotgan yetishmovchilik bor')}</strong><small>{tr('Список можно подтвердить. Перед выдачей потребуется фактическое наличие.', 'Ro‘yxatni tasdiqlash mumkin. Berishdan oldin haqiqiy mavjudlik talab qilinadi.')}</small></span></div>
-            <ul>{shortages.map((item) => <li key={`${item.brand}-${item.model}-${item.type}-${item.subtype}`}><span>{item.brand} {item.model}</span><strong>−{item.shortage} {tr('шт.', 'dona')}</strong><small>{tr('нужно', 'kerak')} {item.requested}, {tr('доступно на даты', 'sanalarda mavjud')} {item.available}</small></li>)}</ul>
-          </section>
-        ) : (
-          <div className="availability-ok"><PackageCheck size={18} /><span>{tr('По текущим данным комплект доступен на выбранные даты.', 'Joriy ma’lumotlarga ko‘ra jamlanma tanlangan sanalarda mavjud.')}</span></div>
-        )}
-
-        {missingLegacyDates && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Исторический список без дат', 'Sanasiz tarixiy ro‘yxat')}</strong><br />{tr('Он сохранён без выдуманного периода. Для нового резерва создайте новый список.', 'U taxminiy davrsiz saqlangan. Yangi bandlov uchun yangi ro‘yxat yarating.')}</p></div>}
-        {cannotIssuePlan && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Сначала назначьте конкретные единицы', 'Avval aniq birliklarni belgilang')}</strong><br />{tr('План по моделям можно подтвердить, но выдавать допустимо только фактический комплект.', 'Modellar bo‘yicha rejani tasdiqlash mumkin, ammo faqat haqiqiy jamlanmani berish mumkin.')}</p></div>}
-
-        {action && !missingLegacyDates && !cannotIssuePlan && (
-          <section className="transition-panel">
-            <div><strong>{action.label}</strong><p>{action.description}</p></div>
-            <label className="field"><span>{tr('Комментарий к смене статуса (необязательно)', 'Holat o‘zgarishiga izoh (ixtiyoriy)')}</span><textarea value={note} onChange={(event) => setNote(event.target.value)} rows={2} placeholder={tr('Например: выдал Алексей, комплект проверен', 'Masalan: Aleksey berdi, jamlanma tekshirildi')} /></label>
-            <button className="button button--primary button--wide" onClick={() => void runTransition()} disabled={isTransitioning}>
-              {action.target === 'returned' ? <RotateCcw size={17} /> : <PackageCheck size={17} />}
-              {isTransitioning ? tr('Обновляем…', 'Yangilanmoqda…') : action.label}
-            </button>
-          </section>
+        {list.reservation_status === 'draft' && (
+          <button className="button button--primary button--wide saved-list-edit" onClick={() => navigate(`/lists/${list.id}/edit`)}><PencilLine size={17} />{tr('Открыть и изменить список', 'Ro‘yxatni ochish va o‘zgartirish')}</button>
         )}
         {error && <p className="form-error"><CircleAlert size={15} /> {error}</p>}
 
-        {list.advanced_features && <section className="history-section">
-          <div className="panel-heading"><div><h3>{tr('История выдачи и возврата', 'Berish va qaytarish tarixi')}</h3><p>{tr('Здесь сохраняются только изменения статуса и комментарии сотрудников', 'Bu yerda faqat holat o‘zgarishlari va xodim izohlari saqlanadi')}</p></div></div>
-          <div className="timeline">
-            {history.map((entry) => (
-              <div className="timeline__item" key={entry.id}>
-                <i />
-                <div><strong>{statusView[entry.to_status].label}</strong><span>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(entry.changed_at))}</span>{entry.note && <p>{entry.note}</p>}</div>
-              </div>
-            ))}
-            {!isLoading && history.length === 0 && <p className="muted">{tr('История пока пуста.', 'Tarix hozircha bo‘sh.')}</p>}
-          </div>
-        </section>}
+        {!list.advanced_features ? (
+          <p className="availability-warning"><CircleAlert size={16} />{tr('Этот список сохранён как обычный документ. Учёт выдачи и возврата для него не включён.', 'Bu ro‘yxat oddiy hujjat sifatida saqlangan. Berish va qaytarish hisobi yoqilmagan.')}</p>
+        ) : (
+          <details className="tracking-details">
+            <summary><span><strong>{tr('Учёт выдачи и возврата', 'Berish va qaytarish hisobi')}</strong><small>{tr('Необязательно — открывайте только для складского учёта', 'Ixtiyoriy — faqat ombor hisobi uchun oching')}</small></span><ChevronRight size={18} /></summary>
+            <div className="tracking-details__body">
+              <div className="optional-tracking-note"><CircleAlert size={18} /><span><strong>{tr('Что это такое', 'Bu nima')}</strong><small>{tr('Здесь можно подтвердить комплект, отметить его выдачу и возврат. Для обычного списка и скачивания Excel этот раздел не нужен.', 'Bu yerda jamlanmani tasdiqlash, berish va qaytarishni belgilash mumkin. Oddiy ro‘yxat va Excel yuklash uchun bu bo‘lim kerak emas.')}</small></span></div>
+
+              {isLoading ? <div className="detail-skeleton" /> : shortages.length > 0 ? (
+                <section className="shortage-panel">
+                  <div><TriangleAlert size={19} /><span><strong>{tr('Есть прогнозируемая нехватка', 'Kutilayotgan yetishmovchilik bor')}</strong><small>{tr('Список можно подтвердить. Перед выдачей потребуется фактическое наличие.', 'Ro‘yxatni tasdiqlash mumkin. Berishdan oldin haqiqiy mavjudlik talab qilinadi.')}</small></span></div>
+                  <ul>{shortages.map((item) => <li key={`${item.brand}-${item.model}-${item.type}-${item.subtype}`}><span>{item.brand} {item.model}</span><strong>−{item.shortage} {tr('шт.', 'dona')}</strong><small>{tr('нужно', 'kerak')} {item.requested}, {tr('доступно на даты', 'sanalarda mavjud')} {item.available}</small></li>)}</ul>
+                </section>
+              ) : (
+                <div className="availability-ok"><PackageCheck size={18} /><span>{tr('По текущим данным комплект доступен на выбранные даты.', 'Joriy ma’lumotlarga ko‘ra jamlanma tanlangan sanalarda mavjud.')}</span></div>
+              )}
+
+              {missingLegacyDates && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Исторический список без дат', 'Sanasiz tarixiy ro‘yxat')}</strong><br />{tr('Он сохранён без выдуманного периода. Для нового учёта создайте новый список.', 'U taxminiy davrsiz saqlangan. Yangi hisob uchun yangi ro‘yxat yarating.')}</p></div>}
+              {cannotIssuePlan && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Сначала назначьте конкретные единицы', 'Avval aniq birliklarni belgilang')}</strong><br />{tr('План по моделям можно подтвердить, но выдавать допустимо только фактический комплект.', 'Modellar bo‘yicha rejani tasdiqlash mumkin, ammo faqat haqiqiy jamlanmani berish mumkin.')}</p></div>}
+
+              {action && !missingLegacyDates && !cannotIssuePlan && (
+                <section className="transition-panel">
+                  <div><strong>{action.label}</strong><p>{action.description}</p></div>
+                  <label className="field"><span>{tr('Комментарий к смене статуса (необязательно)', 'Holat o‘zgarishiga izoh (ixtiyoriy)')}</span><textarea value={note} onChange={(event) => setNote(event.target.value)} rows={2} placeholder={tr('Например: выдал Алексей, комплект проверен', 'Masalan: Aleksey berdi, jamlanma tekshirildi')} /></label>
+                  <button className="button button--primary button--wide" onClick={() => void runTransition()} disabled={isTransitioning}>
+                    {action.target === 'returned' ? <RotateCcw size={17} /> : <PackageCheck size={17} />}
+                    {isTransitioning ? tr('Обновляем…', 'Yangilanmoqda…') : action.label}
+                  </button>
+                </section>
+              )}
+
+              <section className="history-section">
+                <div className="panel-heading"><div><h3>{tr('История выдачи и возврата', 'Berish va qaytarish tarixi')}</h3><p>{tr('Изменения статуса и комментарии сотрудников', 'Holat o‘zgarishlari va xodim izohlari')}</p></div></div>
+                <div className="timeline">
+                  {history.map((entry) => (
+                    <div className="timeline__item" key={entry.id}>
+                      <i />
+                      <div><strong>{statusView[entry.to_status].label}</strong><span>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(entry.changed_at))}</span>{entry.note && <p>{entry.note}</p>}</div>
+                    </div>
+                  ))}
+                  {!isLoading && history.length === 0 && <p className="muted">{tr('История пока пуста.', 'Tarix hozircha bo‘sh.')}</p>}
+                </div>
+              </section>
+            </div>
+          </details>
+        )}
       </aside>
     </div>
   )
