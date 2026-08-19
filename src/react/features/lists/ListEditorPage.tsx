@@ -70,6 +70,10 @@ function todayDateValue() {
   return `${year}-${month}-${day}`
 }
 
+function selectDefaultInputValue(input: HTMLInputElement, defaultValue: string) {
+  if (input.value === defaultValue) input.select()
+}
+
 function groupKey(item: Pick<Equipment, 'brand' | 'model' | 'type' | 'subtype'>) {
   return [item.brand, item.model, item.type, item.subtype].map((value) => value.trim().toLocaleLowerCase('ru')).join('::')
 }
@@ -437,7 +441,18 @@ export function ListEditorPage() {
       <section className="quick-list-meta data-panel">
         <label className="field quick-list-meta__name">
           <span>{tr('Проект или мероприятие', 'Loyiha yoki tadbir')} <small>{tr('можно не менять', 'o‘zgartirish shart emas')}</small></span>
-          <input value={name} onChange={(event) => { setName(event.target.value); setSavedId('') }} placeholder={tr('Например, Форум в Hyatt', 'Masalan, Hyatt forumi')} />
+          <input
+            value={name}
+            onFocus={(event) => selectDefaultInputValue(event.currentTarget, defaults.name)}
+            onClick={(event) => selectDefaultInputValue(event.currentTarget, defaults.name)}
+            onBlur={(event) => {
+              if (event.currentTarget.value.trim()) return
+              setName(defaults.name)
+              setSavedId('')
+            }}
+            onChange={(event) => { setName(event.target.value); setSavedId('') }}
+            placeholder={tr('Например, Форум в Hyatt', 'Masalan, Hyatt forumi')}
+          />
         </label>
         <div className="field">
           <span><CalendarDays size={13} /> {tr('Дата', 'Sana')} <small>{tr('сегодня по умолчанию', 'standart — bugun')}</small></span>
@@ -455,11 +470,33 @@ export function ListEditorPage() {
         </div>
         <label className="field quick-list-meta__client">
           <span>{tr('Заказчик / организатор', 'Buyurtmachi / tashkilotchi')} <small>{tr('можно уточнить', 'aniqlashtirish mumkin')}</small></span>
-          <input value={clientName} onChange={(event) => { setClientName(event.target.value); setSavedId('') }} placeholder={tr('Например, ARGO Media', 'Masalan, ARGO Media')} />
+          <input
+            value={clientName}
+            onFocus={(event) => selectDefaultInputValue(event.currentTarget, defaults.clientName)}
+            onClick={(event) => selectDefaultInputValue(event.currentTarget, defaults.clientName)}
+            onBlur={(event) => {
+              if (event.currentTarget.value.trim()) return
+              setClientName(defaults.clientName)
+              setSavedId('')
+            }}
+            onChange={(event) => { setClientName(event.target.value); setSavedId('') }}
+            placeholder={tr('Например, ARGO Media', 'Masalan, ARGO Media')}
+          />
         </label>
         <label className="field quick-list-meta__venue">
           <span>{tr('Площадка / локация', 'Maydon / joylashuv')} <small>{tr('можно уточнить', 'aniqlashtirish mumkin')}</small></span>
-          <input value={venue} onChange={(event) => { setVenue(event.target.value); setSavedId('') }} placeholder={tr('Например, Hyatt Regency', 'Masalan, Hyatt Regency')} />
+          <input
+            value={venue}
+            onFocus={(event) => selectDefaultInputValue(event.currentTarget, defaults.venue)}
+            onClick={(event) => selectDefaultInputValue(event.currentTarget, defaults.venue)}
+            onBlur={(event) => {
+              if (event.currentTarget.value.trim()) return
+              setVenue(defaults.venue)
+              setSavedId('')
+            }}
+            onChange={(event) => { setVenue(event.target.value); setSavedId('') }}
+            placeholder={tr('Например, Hyatt Regency', 'Masalan, Hyatt Regency')}
+          />
         </label>
         <label className="field quick-list-meta__notes">
           <span>{tr('Комментарий к документу', 'Hujjatga izoh')}</span>
