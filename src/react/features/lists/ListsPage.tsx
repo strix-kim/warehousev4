@@ -300,6 +300,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   const [composition, setComposition] = useState<ExportListRow[]>([])
   const [note, setNote] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [isTrackingLoading, setIsTrackingLoading] = useState(true)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -311,15 +312,28 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
 
   async function loadDetails() {
     setIsLoading(true)
+    setIsTrackingLoading(true)
     setError('')
-    const [compositionResult, historyResult, shortagesResult] = await Promise.allSettled([
-      buildSavedListRows(list),
+    const trackingRequest = Promise.allSettled([
       list.advanced_features ? fetchReservationHistory(list.id) : Promise.resolve([]),
       list.advanced_features && list.reservation_start && list.reservation_end ? fetchReservationShortages(list.id) : Promise.resolve([]),
     ])
 
-    if (compositionResult.status === 'fulfilled') setComposition(compositionResult.value)
-    else setComposition([])
+    let compositionLoaded = false
+    try {
+      setComposition(await buildSavedListRows(list))
+      compositionLoaded = true
+    } catch {
+      setComposition([])
+      setError(tr(
+        'Не удалось загрузить состав списка. Закройте детали и попробуйте открыть их ещё раз.',
+        'Ro‘yxat tarkibini yuklab bo‘lmadi. Tafsilotlarni yoping va yana ochib ko‘ring.',
+      ))
+    } finally {
+      setIsLoading(false)
+    }
+
+    const [historyResult, shortagesResult] = await trackingRequest
 
     if (historyResult.status === 'fulfilled') setHistory(historyResult.value)
     else setHistory([])
@@ -327,19 +341,14 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
     if (shortagesResult.status === 'fulfilled') setShortages(shortagesResult.value)
     else setShortages([])
 
-    if (compositionResult.status === 'rejected') {
-      setError(tr(
-        'Не удалось загрузить состав списка. Закройте детали и попробуйте открыть их ещё раз.',
-        'Ro‘yxat tarkibini yuklab bo‘lmadi. Tafsilotlarni yoping va yana ochib ko‘ring.',
-      ))
-    } else if (historyResult.status === 'rejected' || shortagesResult.status === 'rejected') {
+    if (compositionLoaded && (historyResult.status === 'rejected' || shortagesResult.status === 'rejected')) {
       setError(tr(
         'Состав загружен. Временно недоступны только история или расчёт резерва.',
         'Tarkib yuklandi. Faqat tarix yoki bandlov hisobi vaqtincha ishlamayapti.',
       ))
     }
 
-    setIsLoading(false)
+    setIsTrackingLoading(false)
   }
 
   useEffect(() => { void loadDetails() }, [list.id, list.reservation_status, tr])
@@ -422,7 +431,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
             <div className="tracking-details__body">
               <div className="optional-tracking-note"><CircleAlert size={18} /><span><strong>{tr('Что это такое', 'Bu nima')}</strong><small>{tr('Здесь можно подтвердить комплект, отметить его выдачу и возврат. Для обычного списка и скачивания Excel этот раздел не нужен.', 'Bu yerda jamlanmani tasdiqlash, berish va qaytarishni belgilash mumkin. Oddiy ro‘yxat va Excel yuklash uchun bu bo‘lim kerak emas.')}</small></span></div>
 
-              {isLoading ? <div className="detail-skeleton" /> : shortages.length > 0 ? (
+              {isTrackingLoading ? <div className="detail-skeleton" /> : shortages.length > 0 ? (
                 <section className="shortage-panel">
                   <div><TriangleAlert size={19} /><span><strong>{tr('Есть прогнозируемая нехватка', 'Kutilayotgan yetishmovchilik bor')}</strong><small>{tr('Список можно подтвердить. Перед выдачей потребуется фактическое наличие.', 'Ro‘yxatni tasdiqlash mumkin. Berishdan oldin haqiqiy mavjudlik talab qilinadi.')}</small></span></div>
                   <ul>{shortages.map((item) => <li key={`${item.brand}-${item.model}-${item.type}-${item.subtype}`}><span>{item.brand} {item.model}</span><strong>−{item.shortage} {tr('шт.', 'dona')}</strong><small>{tr('нужно', 'kerak')} {item.requested}, {tr('доступно на даты', 'sanalarda mavjud')} {item.available}</small></li>)}</ul>
@@ -454,7 +463,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
                       <div><strong>{statusView[entry.to_status].label}</strong><span>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(entry.changed_at))}</span>{entry.note && <p>{entry.note}</p>}</div>
                     </div>
                   ))}
-                  {!isLoading && history.length === 0 && <p className="muted">{tr('История пока пуста.', 'Tarix hozircha bo‘sh.')}</p>}
+                  {!isTrackingLoading && history.length === 0 && <p className="muted">{tr('История пока пуста.', 'Tarix hozircha bo‘sh.')}</p>}
                 </div>
               </section>
             </div>
