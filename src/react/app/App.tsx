@@ -1,6 +1,6 @@
 import { ArrowUpRight, Boxes, ChevronDown, ClipboardList, House, ListPlus, LogOut, PanelLeftClose, RadioTower, Warehouse } from 'lucide-react'
 import { lazy, Suspense, useEffect, type ReactNode } from 'react'
-import { Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom'
+import { Link, Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthProvider'
 import { LanguageSwitcher, useLanguage } from '../lib/i18n'
 
@@ -59,10 +59,10 @@ function AppShell() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar__brand">
-          <div className="brand-lockup brand-lockup--light">
+          <Link className="brand-lockup brand-lockup--light brand-lockup--home" to="/" aria-label={tr('Вернуться на главную', 'Bosh sahifaga qaytish')}>
             <span className="brand-mark">A</span>
             <span className="brand-name">ARGO</span>
-          </div>
+          </Link>
           <button className="icon-button icon-button--dark" aria-label={tr('Свернуть меню', 'Menyuni yig‘ish')} disabled><PanelLeftClose size={18} /></button>
         </div>
 

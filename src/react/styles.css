@@ -51,6 +51,12 @@ h2 { letter-spacing: -0.025em; }
 .sidebar__brand { display: flex; align-items: center; justify-content: space-between; padding: 0 6px 22px; border-bottom: 1px solid rgba(255,255,255,.08); }
 .brand-lockup { display: flex; align-items: center; gap: 10px; color: var(--ink); }
 .brand-lockup--light { color: #fff; }
+.brand-lockup--home { margin: -4px; padding: 4px; border-radius: 10px; text-decoration: none; transition: background .18s ease, transform .18s ease; }
+.brand-lockup--home:hover { background: rgba(255,255,255,.055); transform: translateY(-1px); }
+.brand-lockup--home:active { transform: translateY(0); }
+.brand-lockup--home:focus-visible { outline: 3px solid rgba(239,18,54,.28); outline-offset: 3px; }
+.brand-lockup--home .brand-mark { transition: transform .18s ease, box-shadow .18s ease; }
+.brand-lockup--home:hover .brand-mark { transform: scale(1.04); box-shadow: 0 6px 18px rgba(239,18,54,.22); }
 .brand-mark { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 7px; color: #fff; background: var(--accent); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-size: 18px; font-weight: 800; }
 .brand-name { font-size: 19px; letter-spacing: .09em; }
 .sidebar__nav { flex: 0 0 auto; padding: 24px 0 10px; }
