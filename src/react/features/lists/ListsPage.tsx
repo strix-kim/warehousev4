@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Search,
   SlidersHorizontal,
+  Trash2,
   TriangleAlert,
   X,
 } from 'lucide-react'
@@ -23,6 +24,7 @@ import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useModalLayer } from '../../lib/useModalLayer'
 import { fetchEquipmentByIds } from '../equipment/api'
 import {
+  deleteEquipmentList,
   fetchEquipmentLists,
   fetchReservationHistory,
   fetchReservationShortages,
@@ -299,6 +301,8 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   const [note, setNote] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState('')
   const action = list.advanced_features ? transitionCopy[list.reservation_status] : undefined
   const lifecycle = statusView[list.reservation_status]
@@ -340,6 +344,24 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
         : tr('Не удалось изменить этап. Данные не были изменены.', 'Bosqichni o‘zgartirib bo‘lmadi. Ma’lumotlar o‘zgartirilmadi.'))
     } finally {
       setIsTransitioning(false)
+    }
+  }
+
+  async function runDelete() {
+    if (list.reservation_status !== 'draft') return
+    setIsDeleting(true)
+    setError('')
+    try {
+      await deleteEquipmentList(list.id)
+      await onChanged()
+      onClose()
+    } catch {
+      setError(tr(
+        'Не удалось удалить список. Удалять можно только собственные черновики.',
+        'Ro‘yxatni o‘chirib bo‘lmadi. Faqat o‘zingiz yaratgan qoralamalarni o‘chirish mumkin.',
+      ))
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -419,6 +441,32 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
               </section>
             </div>
           </details>
+        )}
+
+        {list.reservation_status === 'draft' && (
+          <section className={`saved-list-delete ${deleteConfirmOpen ? 'saved-list-delete--open' : ''}`}>
+            {!deleteConfirmOpen ? (
+              <button className="button button--danger-ghost button--wide" onClick={() => setDeleteConfirmOpen(true)}>
+                <Trash2 size={17} />{tr('Удалить список', 'Ro‘yxatni o‘chirish')}
+              </button>
+            ) : (
+              <>
+                <div>
+                  <Trash2 size={19} />
+                  <span>
+                    <strong>{tr('Удалить этот список?', 'Bu ro‘yxat o‘chirilsinmi?')}</strong>
+                    <small>{tr('Список и его резерв будут удалены без возможности восстановления.', 'Ro‘yxat va uning bandlovi qayta tiklash imkonisiz o‘chiriladi.')}</small>
+                  </span>
+                </div>
+                <div className="saved-list-delete__actions">
+                  <button className="button button--secondary" onClick={() => setDeleteConfirmOpen(false)} disabled={isDeleting}>{tr('Отмена', 'Bekor qilish')}</button>
+                  <button className="button button--danger" onClick={() => void runDelete()} disabled={isDeleting}>
+                    <Trash2 size={16} />{isDeleting ? tr('Удаляем…', 'O‘chirilmoqda…') : tr('Да, удалить', 'Ha, o‘chirish')}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
         )}
       </aside>
     </div>

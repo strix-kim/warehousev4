@@ -175,6 +175,22 @@ export async function updateEquipmentList(listId: string, input: EquipmentListDo
   return data as string
 }
 
+export async function deleteEquipmentList(listId: string) {
+  if (!supabase) throw new Error('Supabase не настроен')
+
+  const { data, error } = await supabase
+    .from('equipment_lists')
+    .delete()
+    .eq('id', listId)
+    .select('id')
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error('Equipment list cannot be deleted')
+  invalidateCachePrefix('equipment-lists:')
+  return data.id as string
+}
+
 export async function fetchReservationShortages(listId: string) {
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase.rpc('reservation_shortages', { p_list_id: listId })
