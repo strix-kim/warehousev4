@@ -96,33 +96,60 @@ export async function fetchEquipmentLists({ bypassCache = false } = {}) {
   }, { bypass: bypassCache })
 }
 
-export async function fetchEquipmentList(listId: string) {
+function equipmentListCacheKey(listId: string) {
+  return `equipment-lists:detail:${listId}`
+}
+
+function reservationShortagesCacheKey(listId: string) {
+  return `equipment-lists:shortages:${listId}`
+}
+
+function reservationHistoryCacheKey(listId: string) {
+  return `equipment-lists:history:${listId}`
+}
+
+export function readCachedEquipmentList(listId: string) {
+  return readCachedQuery<EquipmentList>(equipmentListCacheKey(listId))
+}
+
+export function readCachedReservationShortages(listId: string) {
+  return readCachedQuery<ReservationShortage[]>(reservationShortagesCacheKey(listId))
+}
+
+export function readCachedReservationHistory(listId: string) {
+  return readCachedQuery<ReservationHistory[]>(reservationHistoryCacheKey(listId))
+}
+
+export async function fetchEquipmentList(listId: string, { bypassCache = false } = {}) {
   if (!supabase) throw new Error('Supabase не настроен')
-  const modern = await supabase
-    .from('equipment_lists')
-    .select(listColumns)
-    .eq('id', listId)
-    .single()
+  const client = supabase
+  return cachedQuery(equipmentListCacheKey(listId), 10 * 60 * 1000, async () => {
+    const modern = await client
+      .from('equipment_lists')
+      .select(listColumns)
+      .eq('id', listId)
+      .single()
 
-  if (!modern.error) return { ...modern.data, advanced_features: true } as unknown as EquipmentList
+    if (!modern.error) return { ...modern.data, advanced_features: true } as unknown as EquipmentList
 
-  const legacy = await supabase
-    .from('equipment_lists')
-    .select('id,name,description,type,list_mode,equipment_ids,equipment_items,created_at,is_archived')
-    .eq('id', listId)
-    .single()
+    const legacy = await client
+      .from('equipment_lists')
+      .select('id,name,description,type,list_mode,equipment_ids,equipment_items,created_at,is_archived')
+      .eq('id', listId)
+      .single()
 
-  if (legacy.error) throw modern.error
-  return {
-    ...legacy.data,
-    reservation_status: 'draft' as const,
-    reservation_start: null,
-    reservation_end: null,
-    shortage_snapshot: null,
-    client_name: null,
-    venue: null,
-    advanced_features: false,
-  } as unknown as EquipmentList
+    if (legacy.error) throw modern.error
+    return {
+      ...legacy.data,
+      reservation_status: 'draft' as const,
+      reservation_start: null,
+      reservation_end: null,
+      shortage_snapshot: null,
+      client_name: null,
+      venue: null,
+      advanced_features: false,
+    } as unknown as EquipmentList
+  }, { bypass: bypassCache })
 }
 
 export type EquipmentListDocumentInput = {
@@ -191,12 +218,15 @@ export async function deleteEquipmentList(listId: string) {
   return data.id as string
 }
 
-export async function fetchReservationShortages(listId: string) {
+export async function fetchReservationShortages(listId: string, { bypassCache = false } = {}) {
   if (!supabase) throw new Error('Supabase не настроен')
-  const { data, error } = await supabase.rpc('reservation_shortages', { p_list_id: listId })
-  if (error && (error.code === 'PGRST202' || error.code === '42883')) return []
-  if (error) throw error
-  return ((data ?? []) as ReservationShortage[]).filter((item) => item.shortage > 0)
+  const client = supabase
+  return cachedQuery(reservationShortagesCacheKey(listId), 5 * 60 * 1000, async () => {
+    const { data, error } = await client.rpc('reservation_shortages', { p_list_id: listId })
+    if (error && (error.code === 'PGRST202' || error.code === '42883')) return []
+    if (error) throw error
+    return ((data ?? []) as ReservationShortage[]).filter((item) => item.shortage > 0)
+  }, { bypass: bypassCache })
 }
 
 export async function transitionEquipmentList(listId: string, targetStatus: ReservationStatus, note = '') {
@@ -212,14 +242,17 @@ export async function transitionEquipmentList(listId: string, targetStatus: Rese
   return data as { id: string; status: ReservationStatus; shortages: ReservationShortage[] }
 }
 
-export async function fetchReservationHistory(listId: string) {
+export async function fetchReservationHistory(listId: string, { bypassCache = false } = {}) {
   if (!supabase) throw new Error('Supabase не настроен')
-  const { data, error } = await supabase
-    .from('reservation_status_history')
-    .select('id,from_status,to_status,note,shortage_snapshot,changed_at')
-    .eq('list_id', listId)
-    .order('changed_at', { ascending: false })
-  if (error && (error.code === 'PGRST205' || error.code === '42P01')) return []
-  if (error) throw error
-  return (data ?? []) as ReservationHistory[]
+  const client = supabase
+  return cachedQuery(reservationHistoryCacheKey(listId), 5 * 60 * 1000, async () => {
+    const { data, error } = await client
+      .from('reservation_status_history')
+      .select('id,from_status,to_status,note,shortage_snapshot,changed_at')
+      .eq('list_id', listId)
+      .order('changed_at', { ascending: false })
+    if (error && (error.code === 'PGRST205' || error.code === '42P01')) return []
+    if (error) throw error
+    return (data ?? []) as ReservationHistory[]
+  }, { bypass: bypassCache })
 }

@@ -218,14 +218,18 @@ export async function serialNumberExists(serialNumber: string) {
 
 export async function countEquipmentModelUnits(brand: string, model: string) {
   if (!supabase) throw new Error('Supabase не настроен')
-  const { count, error } = await supabase
-    .from('equipment')
-    .select('id', { count: 'exact', head: true })
-    .eq('brand', brand)
-    .eq('model', model)
+  const client = supabase
+  const cacheKey = `equipment:model-count:${brand.trim().toLocaleLowerCase('ru')}::${model.trim().toLocaleLowerCase('ru')}`
+  return cachedQuery(cacheKey, 10 * 60 * 1000, async () => {
+    const { count, error } = await client
+      .from('equipment')
+      .select('id', { count: 'exact', head: true })
+      .eq('brand', brand)
+      .eq('model', model)
 
-  if (error) throw error
-  return count ?? 0
+    if (error) throw error
+    return count ?? 0
+  })
 }
 
 export type UpdateEquipmentInput = {
@@ -269,6 +273,7 @@ export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput) {
 
   invalidateCachePrefix('equipment:')
   invalidateCachePrefix('equipment-taxonomy')
+  invalidateCachePrefix('equipment-lists:composition:')
   return normalizeEquipment(data)
 }
 
@@ -285,15 +290,26 @@ export type EquipmentMovement = {
   changed_at: string
 }
 
-export async function fetchEquipmentMovements(equipmentId: string) {
+function equipmentMovementsCacheKey(equipmentId: string) {
+  return `equipment:movements:${equipmentId}`
+}
+
+export function readCachedEquipmentMovements(equipmentId: string) {
+  return readCachedQuery<EquipmentMovement[]>(equipmentMovementsCacheKey(equipmentId))
+}
+
+export async function fetchEquipmentMovements(equipmentId: string, { bypassCache = false } = {}) {
   if (!supabase) throw new Error('Supabase не настроен')
-  const { data, error } = await supabase
-    .from('equipment_movements')
-    .select('id,list_id,movement_type,quantity_delta,quantity_before,quantity_after,status_before,status_after,note,changed_at')
-    .eq('equipment_id', equipmentId)
-    .order('changed_at', { ascending: false })
-    .limit(50)
-  if (error && (error.code === 'PGRST205' || error.code === '42P01')) return []
-  if (error) throw error
-  return (data ?? []) as EquipmentMovement[]
+  const client = supabase
+  return cachedQuery(equipmentMovementsCacheKey(equipmentId), 5 * 60 * 1000, async () => {
+    const { data, error } = await client
+      .from('equipment_movements')
+      .select('id,list_id,movement_type,quantity_delta,quantity_before,quantity_after,status_before,status_after,note,changed_at')
+      .eq('equipment_id', equipmentId)
+      .order('changed_at', { ascending: false })
+      .limit(50)
+    if (error && (error.code === 'PGRST205' || error.code === '42P01')) return []
+    if (error) throw error
+    return (data ?? []) as EquipmentMovement[]
+  }, { bypass: bypassCache })
 }

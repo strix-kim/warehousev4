@@ -26,7 +26,7 @@ import { useModalLayer } from '../../lib/useModalLayer'
 import { fetchAllEquipment, readCachedAllEquipment } from '../equipment/api'
 import { EquipmentVisual, preloadEquipmentImages } from '../equipment/EquipmentVisual'
 import type { Equipment } from '../equipment/types'
-import { createEquipmentList, fetchEquipmentList, updateEquipmentList, type EquipmentList, type EquipmentListItem } from './api'
+import { createEquipmentList, fetchEquipmentList, readCachedEquipmentList, updateEquipmentList, type EquipmentList, type EquipmentListItem } from './api'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
 type CatalogGroup = {
@@ -100,6 +100,7 @@ export function ListEditorPage() {
   const [category, setCategory] = useState('')
   const [subcategory, setSubcategory] = useState('')
   const [cachedEquipment] = useState(readCachedAllEquipment)
+  const [cachedList] = useState(() => listId ? readCachedEquipmentList(listId) : null)
   const [equipment, setEquipment] = useState<Equipment[]>(() => cachedEquipment ?? [])
   const [selected, setSelected] = useState<SelectedGroup[]>([])
   const [isLoading, setIsLoading] = useState(() => !cachedEquipment)
@@ -107,8 +108,8 @@ export function ListEditorPage() {
   const [isExporting, setIsExporting] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [openError, setOpenError] = useState('')
-  const [isOpening, setIsOpening] = useState(Boolean(listId))
-  const [listToEdit, setListToEdit] = useState<EquipmentList | null>(null)
+  const [isOpening, setIsOpening] = useState(Boolean(listId && !cachedList))
+  const [listToEdit, setListToEdit] = useState<EquipmentList | null>(() => cachedList?.reservation_status === 'draft' ? cachedList : null)
   const [saveError, setSaveError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [savedId, setSavedId] = useState('')
@@ -121,15 +122,15 @@ export function ListEditorPage() {
 
   useEffect(() => {
     let current = true
-    setIsLoading(true)
+    setIsLoading(!cachedEquipment)
     setLoadError('')
-    fetchAllEquipment()
+    fetchAllEquipment({ bypassCache: Boolean(cachedEquipment) })
       .then((result) => {
         if (!current) return
         setEquipment(result)
         preloadEquipmentImages(result, 32)
       })
-      .catch(() => { if (current) setLoadError(tr('Не удалось загрузить каталог.', 'Katalogni yuklab bo‘lmadi.')) })
+      .catch(() => { if (current && !cachedEquipment) setLoadError(tr('Не удалось загрузить каталог.', 'Katalogni yuklab bo‘lmadi.')) })
       .finally(() => { if (current) setIsLoading(false) })
     return () => { current = false }
   }, [tr])
@@ -142,9 +143,11 @@ export function ListEditorPage() {
       return
     }
     let current = true
-    setIsOpening(true)
+    const cached = readCachedEquipmentList(listId)
+    if (cached?.reservation_status === 'draft') setListToEdit(cached)
+    setIsOpening(!cached)
     setOpenError('')
-    fetchEquipmentList(listId)
+    fetchEquipmentList(listId, { bypassCache: Boolean(cached) })
       .then((list) => {
         if (!current) return
         if (list.reservation_status !== 'draft') throw new Error('not-draft')
@@ -152,6 +155,12 @@ export function ListEditorPage() {
       })
       .catch((error) => {
         if (!current) return
+        if (error instanceof Error && error.message === 'not-draft') {
+          setListToEdit(null)
+          setOpenError(tr('Изменять можно только черновики. Подтверждённый или выданный список доступен в режиме просмотра.', 'Faqat qoralamalarni o‘zgartirish mumkin. Tasdiqlangan yoki berilgan ro‘yxat faqat ko‘rish rejimida mavjud.'))
+          return
+        }
+        if (cached?.reservation_status === 'draft') return
         setOpenError(error instanceof Error && error.message === 'not-draft'
           ? tr('Изменять можно только черновики. Подтверждённый или выданный список доступен в режиме просмотра.', 'Faqat qoralamalarni o‘zgartirish mumkin. Tasdiqlangan yoki berilgan ro‘yxat faqat ko‘rish rejimida mavjud.')
           : tr('Не удалось открыть сохранённый список.', 'Saqlangan ro‘yxatni ochib bo‘lmadi.'))

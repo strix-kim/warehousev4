@@ -48,7 +48,7 @@ function AppShell() {
   }, [sidebarCollapsed])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    const moduleTimer = window.setTimeout(() => {
       void Promise.allSettled([
         loadHomePage(),
         loadEquipmentPage(),
@@ -56,8 +56,38 @@ function AppShell() {
         loadListsPage(),
         loadListEditorPage(),
       ])
-    }, 350)
-    return () => window.clearTimeout(timer)
+    }, 0)
+    const primaryDataTimer = window.setTimeout(() => {
+      void Promise.all([
+        import('../features/equipment/api'),
+        import('../features/lists/api'),
+      ]).then(([equipmentApi, listsApi]) => Promise.allSettled([
+        equipmentApi.fetchEquipment({
+          page: 1,
+          search: '',
+          availability: '',
+          pageSize: window.matchMedia('(max-width: 820px)').matches ? 8 : equipmentApi.EQUIPMENT_PAGE_SIZE,
+        }),
+        listsApi.fetchEquipmentLists(),
+      ])).catch(() => undefined)
+    }, 120)
+    const editorDataTimer = window.setTimeout(() => {
+      void Promise.all([
+        import('../features/equipment/api'),
+        import('../features/equipment/EquipmentVisual'),
+      ]).then(async ([equipmentApi, visuals]) => {
+        const [equipment] = await Promise.all([
+          equipmentApi.fetchAllEquipment(),
+          equipmentApi.fetchEquipmentTaxonomy(),
+        ])
+        visuals.preloadEquipmentImages(equipment, 32)
+      }).catch(() => undefined)
+    }, 700)
+    return () => {
+      window.clearTimeout(moduleTimer)
+      window.clearTimeout(primaryDataTimer)
+      window.clearTimeout(editorDataTimer)
+    }
   }, [])
 
   return (

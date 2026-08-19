@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'argo-warehouse:v3:'
-const MAX_PERSISTED_ENTRIES = 24
+const MAX_PERSISTED_ENTRIES = 64
 
 type CacheEntry<T> = {
   value: T
@@ -83,7 +83,7 @@ export async function cachedQuery<T>(
   if (!options.bypass && cached && cached.expiresAt > Date.now()) return cached.value
 
   const pending = pendingLoads.get(key) as Promise<T> | undefined
-  if (!options.bypass && pending) return pending
+  if (pending) return pending
 
   const load = loader()
     .then((value) => {

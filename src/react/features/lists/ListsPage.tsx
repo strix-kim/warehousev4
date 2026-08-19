@@ -20,13 +20,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
+import { cachedQuery, readCachedQuery } from '../../lib/persistentCache'
 import { useModalLayer } from '../../lib/useModalLayer'
 import { fetchEquipmentByIds } from '../equipment/api'
 import {
   deleteEquipmentList,
+  fetchEquipmentList,
   fetchEquipmentLists,
   fetchReservationHistory,
   fetchReservationShortages,
+  readCachedReservationHistory,
+  readCachedReservationShortages,
   readCachedEquipmentLists,
   transitionEquipmentList,
   type EquipmentList,
@@ -71,7 +75,15 @@ function formatDate(value: string | null, locale: string, tr: Tr) {
   return value ? new Intl.DateTimeFormat(locale).format(new Date(`${value}T12:00:00`)) : tr('дата не указана', 'sana ko‘rsatilmagan')
 }
 
-async function buildSavedListRows(list: EquipmentList) {
+function savedListRowsCacheKey(listId: string) {
+  return `equipment-lists:composition:${listId}`
+}
+
+function readCachedSavedListRows(listId: string) {
+  return readCachedQuery<ExportListRow[]>(savedListRowsCacheKey(listId))
+}
+
+async function loadSavedListRows(list: EquipmentList) {
   const serialized = await fetchEquipmentByIds(list.equipment_ids ?? [])
   const grouped = new Map<string, ExportListRow>()
   const addRow = (row: ExportListRow) => {
@@ -99,6 +111,19 @@ async function buildSavedListRows(list: EquipmentList) {
   return [...grouped.values()]
 }
 
+function buildSavedListRows(list: EquipmentList, { bypassCache = false } = {}) {
+  return cachedQuery(savedListRowsCacheKey(list.id), 10 * 60 * 1000, () => loadSavedListRows(list), { bypass: bypassCache })
+}
+
+function prefetchSavedListDetails(list: EquipmentList) {
+  return Promise.allSettled([
+    buildSavedListRows(list),
+    fetchEquipmentList(list.id),
+    list.advanced_features ? fetchReservationHistory(list.id) : Promise.resolve([]),
+    list.advanced_features && list.reservation_start && list.reservation_end ? fetchReservationShortages(list.id) : Promise.resolve([]),
+  ])
+}
+
 export function ListsPage() {
   const navigate = useNavigate()
   const { tr, locale, language } = useLanguage()
@@ -117,15 +142,20 @@ export function ListsPage() {
   const [exportError, setExportError] = useState('')
 
   async function loadLists(bypassCache = false) {
-    setIsLoading(true)
+    const cached = readCachedEquipmentLists()
+    if (cached && !bypassCache) {
+      setRows(cached.rows)
+      setTotal(cached.total)
+    }
+    setIsLoading(!cached && rows.length === 0)
     setError('')
     try {
-      const result = await fetchEquipmentLists({ bypassCache })
+      const result = await fetchEquipmentLists({ bypassCache: bypassCache || Boolean(cached) })
       setRows(result.rows)
       setTotal(result.total)
       if (selected) setSelected(result.rows.find((item) => item.id === selected.id) ?? null)
     } catch {
-      setError(tr('Не удалось загрузить сохранённые списки.', 'Saqlangan ro‘yxatlarni yuklab bo‘lmadi.'))
+      if (!cached && rows.length === 0) setError(tr('Не удалось загрузить сохранённые списки.', 'Saqlangan ro‘yxatlarni yuklab bo‘lmadi.'))
     } finally {
       setIsLoading(false)
     }
@@ -152,8 +182,16 @@ export function ListsPage() {
   }, [rows, search, status])
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize))
   const visibleRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
+  const visibleListIds = visibleRows.map((list) => list.id).join(':')
 
   useEffect(() => setPage(1), [search, status])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      visibleRows.slice(0, 6).forEach((list) => { void prefetchSavedListDetails(list) })
+    }, 500)
+    return () => window.clearTimeout(timer)
+  }, [visibleListIds])
 
   async function exportSavedList(list: EquipmentList, documentMode: 'working' | 'approval') {
     setExporting({ id: list.id, mode: documentMode })
@@ -235,7 +273,12 @@ export function ListsPage() {
                   const isExporting = exporting?.id === list.id
                   const listNumber = (page - 1) * pageSize + index + 1
                   return (
-                    <article className="list-card" key={list.id}>
+                    <article
+                      className="list-card"
+                      key={list.id}
+                      onPointerEnter={() => { void prefetchSavedListDetails(list) }}
+                      onFocusCapture={() => { void prefetchSavedListDetails(list) }}
+                    >
                       <div className="list-card__top">
                         <span className="list-card__number" aria-label={`${tr('Список', 'Ro‘yxat')} ${listNumber}`}>{String(listNumber).padStart(2, '0')}</span>
                         <span className={`badge badge--${lifecycle.tone}`}><i />{lifecycle.label}</span>
@@ -295,12 +338,17 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   useModalLayer(onClose)
   const statusView = getStatusView(tr)
   const transitionCopy = getTransitionCopy(tr)
-  const [shortages, setShortages] = useState<ReservationShortage[]>([])
-  const [history, setHistory] = useState<ReservationHistory[]>([])
-  const [composition, setComposition] = useState<ExportListRow[]>([])
+  const [shortages, setShortages] = useState<ReservationShortage[]>(() => readCachedReservationShortages(list.id) ?? [])
+  const [history, setHistory] = useState<ReservationHistory[]>(() => readCachedReservationHistory(list.id) ?? [])
+  const [composition, setComposition] = useState<ExportListRow[]>(() => readCachedSavedListRows(list.id) ?? [])
   const [note, setNote] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
-  const [isTrackingLoading, setIsTrackingLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(() => readCachedSavedListRows(list.id) === null)
+  const [isTrackingLoading, setIsTrackingLoading] = useState(() => {
+    if (!list.advanced_features) return false
+    const hasHistory = readCachedReservationHistory(list.id) !== null
+    const hasShortages = !list.reservation_start || !list.reservation_end || readCachedReservationShortages(list.id) !== null
+    return !hasHistory || !hasShortages
+  })
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -311,20 +359,27 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   const missingLegacyDates = list.reservation_status === 'draft' && (!list.reservation_start || !list.reservation_end)
 
   async function loadDetails() {
-    setIsLoading(true)
-    setIsTrackingLoading(true)
+    const cachedComposition = readCachedSavedListRows(list.id)
+    const cachedHistory = list.advanced_features ? readCachedReservationHistory(list.id) : []
+    const needsShortages = Boolean(list.advanced_features && list.reservation_start && list.reservation_end)
+    const cachedShortages = needsShortages ? readCachedReservationShortages(list.id) : []
+    if (cachedComposition !== null) setComposition(cachedComposition)
+    if (cachedHistory !== null) setHistory(cachedHistory)
+    if (cachedShortages !== null) setShortages(cachedShortages)
+    setIsLoading(cachedComposition === null)
+    setIsTrackingLoading(cachedHistory === null || cachedShortages === null)
     setError('')
     const trackingRequest = Promise.allSettled([
-      list.advanced_features ? fetchReservationHistory(list.id) : Promise.resolve([]),
-      list.advanced_features && list.reservation_start && list.reservation_end ? fetchReservationShortages(list.id) : Promise.resolve([]),
+      list.advanced_features ? fetchReservationHistory(list.id, { bypassCache: cachedHistory !== null }) : Promise.resolve([]),
+      needsShortages ? fetchReservationShortages(list.id, { bypassCache: cachedShortages !== null }) : Promise.resolve([]),
     ])
 
     let compositionLoaded = false
     try {
-      setComposition(await buildSavedListRows(list))
+      setComposition(await buildSavedListRows(list, { bypassCache: cachedComposition !== null }))
       compositionLoaded = true
     } catch {
-      setComposition([])
+      if (cachedComposition === null) setComposition([])
       setError(tr(
         'Не удалось загрузить состав списка. Закройте детали и попробуйте открыть их ещё раз.',
         'Ro‘yxat tarkibini yuklab bo‘lmadi. Tafsilotlarni yoping va yana ochib ko‘ring.',

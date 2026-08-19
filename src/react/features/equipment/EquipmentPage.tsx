@@ -19,6 +19,7 @@ import {
   fetchEquipment,
   fetchEquipmentMovements,
   readCachedEquipment,
+  readCachedEquipmentMovements,
   updateEquipmentModelAndUnit,
   type EquipmentMovement,
 } from './api'
@@ -99,18 +100,30 @@ export function EquipmentPage() {
 
   useEffect(() => {
     let isCurrent = true
-    setIsLoading(true)
+    const cached = readCachedEquipment({ page, search, availability, pageSize })
+    if (cached) {
+      setRows(cached.rows)
+      setTotal(cached.total)
+      preloadEquipmentImages(cached.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 24)
+    }
+    setIsLoading(!cached)
     setError('')
 
-    fetchEquipment({ page, search, availability, pageSize, bypassCache: reloadKey > 0 })
+    fetchEquipment({ page, search, availability, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
       .then((result) => {
         if (!isCurrent) return
         setRows(result.rows)
         setTotal(result.total)
         preloadEquipmentImages(result.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 24)
+        const nextPage = page + 1
+        if (nextPage <= Math.ceil(result.total / pageSize)) {
+          void fetchEquipment({ page: nextPage, search, availability, pageSize })
+            .then((nextResult) => preloadEquipmentImages(nextResult.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 16))
+            .catch(() => undefined)
+        }
       })
       .catch(() => {
-        if (isCurrent) setError(tr('Не удалось загрузить оборудование. Повторите попытку.', 'Uskunalarni yuklab bo‘lmadi. Qayta urinib ko‘ring.'))
+        if (isCurrent && !cached) setError(tr('Не удалось загрузить оборудование. Повторите попытку.', 'Uskunalarni yuklab bo‘lmadi. Qayta urinib ko‘ring.'))
       })
       .finally(() => {
         if (isCurrent) setIsLoading(false)
@@ -289,7 +302,7 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
   const { tr, locale, language } = useLanguage()
   useModalLayer(onClose)
   const status = availabilityView(item.availability, tr)
-  const [movements, setMovements] = useState<EquipmentMovement[]>([])
+  const [movements, setMovements] = useState<EquipmentMovement[]>(() => readCachedEquipmentMovements(item.id) ?? [])
   const [historyError, setHistoryError] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -331,9 +344,22 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
 
   useEffect(() => {
     let current = true
-    fetchEquipmentMovements(item.id)
-      .then((data) => { if (current) setMovements(data) })
-      .catch(() => { if (current) setHistoryError(tr('История временно недоступна.', 'Tarix vaqtincha mavjud emas.')) })
+    const cached = readCachedEquipmentMovements(item.id)
+    if (cached) {
+      setMovements(cached)
+      setHistoryError('')
+    } else {
+      setMovements([])
+    }
+    fetchEquipmentMovements(item.id, { bypassCache: Boolean(cached) })
+      .then((data) => {
+        if (!current) return
+        setMovements(data)
+        setHistoryError('')
+      })
+      .catch(() => {
+        if (current && !cached) setHistoryError(tr('История временно недоступна.', 'Tarix vaqtincha mavjud emas.'))
+      })
     return () => { current = false }
   }, [item.id, tr])
 
