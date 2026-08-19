@@ -348,7 +348,6 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   }
 
   async function runDelete() {
-    if (list.reservation_status !== 'draft') return
     setIsDeleting(true)
     setError('')
     try {
@@ -357,8 +356,8 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
       onClose()
     } catch {
       setError(tr(
-        'Не удалось удалить список. Удалять можно только собственные черновики.',
-        'Ro‘yxatni o‘chirib bo‘lmadi. Faqat o‘zingiz yaratgan qoralamalarni o‘chirish mumkin.',
+        'Не удалось удалить список. Попробуйте ещё раз.',
+        'Ro‘yxatni o‘chirib bo‘lmadi. Qayta urinib ko‘ring.',
       ))
     } finally {
       setIsDeleting(false)
@@ -443,31 +442,29 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
           </details>
         )}
 
-        {list.reservation_status === 'draft' && (
-          <section className={`saved-list-delete ${deleteConfirmOpen ? 'saved-list-delete--open' : ''}`}>
-            {!deleteConfirmOpen ? (
-              <button className="button button--danger-ghost button--wide" onClick={() => setDeleteConfirmOpen(true)}>
-                <Trash2 size={17} />{tr('Удалить список', 'Ro‘yxatni o‘chirish')}
-              </button>
-            ) : (
-              <>
-                <div>
-                  <Trash2 size={19} />
-                  <span>
-                    <strong>{tr('Удалить этот список?', 'Bu ro‘yxat o‘chirilsinmi?')}</strong>
-                    <small>{tr('Список и его резерв будут удалены без возможности восстановления.', 'Ro‘yxat va uning bandlovi qayta tiklash imkonisiz o‘chiriladi.')}</small>
-                  </span>
-                </div>
-                <div className="saved-list-delete__actions">
-                  <button className="button button--secondary" onClick={() => setDeleteConfirmOpen(false)} disabled={isDeleting}>{tr('Отмена', 'Bekor qilish')}</button>
-                  <button className="button button--danger" onClick={() => void runDelete()} disabled={isDeleting}>
-                    <Trash2 size={16} />{isDeleting ? tr('Удаляем…', 'O‘chirilmoqda…') : tr('Да, удалить', 'Ha, o‘chirish')}
-                  </button>
-                </div>
-              </>
-            )}
-          </section>
-        )}
+        <section className={`saved-list-delete ${deleteConfirmOpen ? 'saved-list-delete--open' : ''}`}>
+          {!deleteConfirmOpen ? (
+            <button className="button button--danger-ghost button--wide" onClick={() => setDeleteConfirmOpen(true)}>
+              <Trash2 size={17} />{tr('Удалить список', 'Ro‘yxatni o‘chirish')}
+            </button>
+          ) : (
+            <>
+              <div>
+                <Trash2 size={19} />
+                <span>
+                  <strong>{tr('Удалить этот список?', 'Bu ro‘yxat o‘chirilsinmi?')}</strong>
+                  <small>{tr('Список, его резерв и история будут удалены без возможности восстановления.', 'Ro‘yxat, uning bandlovi va tarixi qayta tiklash imkonisiz o‘chiriladi.')}</small>
+                </span>
+              </div>
+              <div className="saved-list-delete__actions">
+                <button className="button button--secondary" onClick={() => setDeleteConfirmOpen(false)} disabled={isDeleting}>{tr('Отмена', 'Bekor qilish')}</button>
+                <button className="button button--danger" onClick={() => void runDelete()} disabled={isDeleting}>
+                  <Trash2 size={16} />{isDeleting ? tr('Удаляем…', 'O‘chirilmoqda…') : tr('Да, удалить', 'Ha, o‘chirish')}
+                </button>
+              </div>
+            </>
+          )}
+        </section>
       </aside>
     </div>
   )
