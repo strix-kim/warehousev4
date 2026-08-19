@@ -4,7 +4,6 @@ import {
   ChevronRight,
   CircleAlert,
   Clock3,
-  Download,
   FileSpreadsheet,
   FileCheck2,
   ListChecks,
@@ -48,8 +47,8 @@ function getStatusView(tr: Tr): Record<ReservationStatus, { label: string; tone:
 
 function getTransitionCopy(tr: Tr): Partial<Record<ReservationStatus, { target: ReservationStatus; label: string; description: string }>> {
   return {
-    draft: { target: 'confirmed', label: tr('Подтвердить резерв', 'Bandlovni tasdiqlash'), description: tr('Резерв зафиксируется на выбранные даты. Нехватка останется предупреждением.', 'Bandlov tanlangan sanalarga belgilanadi. Yetishmovchilik ogohlantirish bo‘lib qoladi.') },
-    confirmed: { target: 'issued', label: tr('Отметить как выданный', 'Berilgan deb belgilash'), description: tr('Фактическое количество на складе уменьшится, серийные единицы получат статус «Выдан».', 'Ombordagi haqiqiy miqdor kamayadi, seriyali birliklar «Berilgan» holatini oladi.') },
+    draft: { target: 'confirmed', label: tr('Подтвердить комплект', 'Jamlanmani tasdiqlash'), description: tr('Оборудование будет учтено за этим списком на выбранную дату. Нехватка останется предупреждением.', 'Uskunalar tanlangan sana uchun shu ro‘yxatga biriktiriladi. Yetishmovchilik ogohlantirish bo‘lib qoladi.') },
+    confirmed: { target: 'issued', label: tr('Отметить выдачу', 'Berishni belgilash'), description: tr('Остаток на складе уменьшится, а серийные единицы будут отмечены как выданные.', 'Ombordagi qoldiq kamayadi, seriyali birliklar berilgan deb belgilanadi.') },
     issued: { target: 'returned', label: tr('Принять возврат', 'Qaytarishni qabul qilish'), description: tr('Количество вернётся на склад, серийные единицы снова станут доступными.', 'Miqdor omborga qaytadi, seriyali birliklar yana mavjud bo‘ladi.') },
   }
 }
@@ -83,7 +82,7 @@ export function ListsPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(preferredPageSize)
   const [selected, setSelected] = useState<EquipmentList | null>(null)
-  const [exportingId, setExportingId] = useState('')
+  const [exporting, setExporting] = useState<{ id: string; mode: 'working' | 'approval' } | null>(null)
   const [exportError, setExportError] = useState('')
 
   async function loadLists(bypassCache = false) {
@@ -126,7 +125,7 @@ export function ListsPage() {
   useEffect(() => setPage(1), [search, status])
 
   async function exportSavedList(list: EquipmentList, documentMode: 'working' | 'approval') {
-    setExportingId(list.id)
+    setExporting({ id: list.id, mode: documentMode })
     setExportError('')
     try {
       const serialized = await fetchEquipmentByIds(list.equipment_ids ?? [])
@@ -167,7 +166,7 @@ export function ListsPage() {
     } catch {
       setExportError(tr('Не удалось подготовить Excel для сохранённого списка.', 'Saqlangan ro‘yxat uchun Excelni tayyorlab bo‘lmadi.'))
     } finally {
-      setExportingId('')
+      setExporting(null)
     }
   }
 
@@ -225,6 +224,7 @@ export function ListsPage() {
               ? Array.from({ length: 6 }, (_, index) => <div className="list-card list-card--loading" key={index} />)
               : visibleRows.map((list) => {
                   const lifecycle = list.advanced_features ? statusView[list.reservation_status] : { label: tr('Сохранён', 'Saqlangan'), tone: 'neutral' }
+                  const isExporting = exporting?.id === list.id
                   return (
                     <article className="list-card" key={list.id}>
                       <div className="list-card__top">
@@ -242,9 +242,9 @@ export function ListsPage() {
                         <span>{new Intl.DateTimeFormat(locale).format(new Date(list.created_at))}</span>
                       </div>
                       <div className="list-card__actions">
-                        <button className="button button--secondary" onClick={() => setSelected(list)}><Clock3 size={16} /> {tr('Детали', 'Tafsilotlar')}</button>
-                        <button className="icon-button icon-button--bordered" onClick={() => void exportSavedList(list, 'working')} disabled={exportingId === list.id || listSize(list) === 0} title={tr('Скачать рабочий Excel', 'Ishchi Excelni yuklash')} aria-label={tr('Скачать рабочий Excel', 'Ishchi Excelni yuklash')}><FileSpreadsheet size={17} /><Download size={12} /></button>
-                        <button className="icon-button icon-button--bordered" onClick={() => void exportSavedList(list, 'approval')} disabled={exportingId === list.id || listSize(list) === 0} title={tr('Скачать Excel на согласование', 'Tasdiqlash uchun Excelni yuklash')} aria-label={tr('Скачать Excel на согласование', 'Tasdiqlash uchun Excelni yuklash')}><FileCheck2 size={17} /><Download size={12} /></button>
+                        <button className="button button--secondary list-card__details" onClick={() => setSelected(list)}><Clock3 size={16} /> {tr('Открыть детали списка', 'Ro‘yxat tafsilotlarini ochish')}</button>
+                        <button className="button button--secondary list-export-button" onClick={() => void exportSavedList(list, 'working')} disabled={isExporting || listSize(list) === 0} title={tr('Только список оборудования — для команды и работы', 'Faqat uskunalar ro‘yxati — jamoa va ish uchun')}><FileSpreadsheet size={17} />{isExporting && exporting?.mode === 'working' ? tr('Готовим…', 'Tayyorlanmoqda…') : tr('Рабочий Excel', 'Ishchi Excel')}</button>
+                        <button className="button button--secondary list-export-button" onClick={() => void exportSavedList(list, 'approval')} disabled={isExporting || listSize(list) === 0} title={tr('Документ для заказчика: с реквизитами и подписями', 'Buyurtmachi uchun hujjat: rekvizitlar va imzolar bilan')}><FileCheck2 size={17} />{isExporting && exporting?.mode === 'approval' ? tr('Готовим…', 'Tayyorlanmoqda…') : tr('С реквизитами', 'Rekvizitlar bilan')}</button>
                       </div>
                     </article>
                   )
@@ -338,10 +338,10 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   }
 
   return (
-    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Управление резервом', 'Bandlovni boshqarish')} onMouseDown={onClose}>
+    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Детали списка', 'Ro‘yxat tafsilotlari')} onMouseDown={onClose}>
       <aside className="drawer reservation-drawer" onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
-          <div><p className="eyebrow">{tr('Резерв оборудования', 'Uskunalarni bandlash')}</p><h2>{list.name}</h2></div>
+          <div><p className="eyebrow">{tr('Детали списка', 'Ro‘yxat tafsilotlari')}</p><h2>{list.name}</h2><p className="drawer__lead">{tr('Состав, доступность и необязательный учёт выдачи', 'Tarkib, mavjudlik va ixtiyoriy berish hisobi')}</p></div>
           <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
         </div>
         <span className={`badge badge--${lifecycle.tone}`}><i />{lifecycle.label}</span>
@@ -350,8 +350,12 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
           <div><strong>{formatDate(list.reservation_start, locale, tr)} — {formatDate(list.reservation_end, locale, tr)}</strong><span>{list.list_mode === 'specific' ? tr('Фактический комплект', 'Haqiqiy jamlanma') : tr('План по моделям', 'Modellar bo‘yicha reja')} · {listSize(list)} {tr('единиц', 'birlik')}</span></div>
         </div>
 
+        {list.advanced_features && (
+          <div className="optional-tracking-note"><CircleAlert size={18} /><span><strong>{tr('Учёт выдачи — необязательно', 'Berish hisobi — ixtiyoriy')}</strong><small>{tr('Excel уже готов к работе. Меняйте статус ниже только если хотите учитывать подтверждение, выдачу и возврат оборудования в системе.', 'Excel ishlashga tayyor. Tizimda tasdiqlash, berish va qaytarishni hisobga olmoqchi bo‘lsangizgina quyidagi holatni o‘zgartiring.')}</small></span></div>
+        )}
+
         {!list.advanced_features ? (
-          <p className="availability-warning"><CircleAlert size={16} />{tr('Список доступен в совместимом режиме. Резервирование и история появятся после подключения подготовленной миграции.', 'Ro‘yxat moslik rejimida mavjud. Bandlash va tarix tayyorlangan migratsiya ulangach paydo bo‘ladi.')}</p>
+          <p className="availability-warning"><CircleAlert size={16} />{tr('Этот список сохранён как обычный документ. Учёт подтверждения, выдачи и возврата для него не включён.', 'Bu ro‘yxat oddiy hujjat sifatida saqlangan. Tasdiqlash, berish va qaytarish hisobi yoqilmagan.')}</p>
         ) : isLoading ? <div className="detail-skeleton" /> : shortages.length > 0 ? (
           <section className="shortage-panel">
             <div><TriangleAlert size={19} /><span><strong>{tr('Есть прогнозируемая нехватка', 'Kutilayotgan yetishmovchilik bor')}</strong><small>{tr('Список можно подтвердить. Перед выдачей потребуется фактическое наличие.', 'Ro‘yxatni tasdiqlash mumkin. Berishdan oldin haqiqiy mavjudlik talab qilinadi.')}</small></span></div>
@@ -367,7 +371,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
         {action && !missingLegacyDates && !cannotIssuePlan && (
           <section className="transition-panel">
             <div><strong>{action.label}</strong><p>{action.description}</p></div>
-            <label className="field"><span>{tr('Комментарий в историю', 'Tarix uchun izoh')}</span><textarea value={note} onChange={(event) => setNote(event.target.value)} rows={2} placeholder={tr('Необязательно', 'Ixtiyoriy')} /></label>
+            <label className="field"><span>{tr('Комментарий к смене статуса (необязательно)', 'Holat o‘zgarishiga izoh (ixtiyoriy)')}</span><textarea value={note} onChange={(event) => setNote(event.target.value)} rows={2} placeholder={tr('Например: выдал Алексей, комплект проверен', 'Masalan: Aleksey berdi, jamlanma tekshirildi')} /></label>
             <button className="button button--primary button--wide" onClick={() => void runTransition()} disabled={isTransitioning}>
               {action.target === 'returned' ? <RotateCcw size={17} /> : <PackageCheck size={17} />}
               {isTransitioning ? tr('Обновляем…', 'Yangilanmoqda…') : action.label}
@@ -376,8 +380,8 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
         )}
         {error && <p className="form-error"><CircleAlert size={15} /> {error}</p>}
 
-        <section className="history-section">
-          <div className="panel-heading"><div><h3>{tr('История этапов', 'Bosqichlar tarixi')}</h3><p>{tr('Неизменяемый журнал действий', 'O‘zgarmas harakatlar jurnali')}</p></div></div>
+        {list.advanced_features && <section className="history-section">
+          <div className="panel-heading"><div><h3>{tr('История выдачи и возврата', 'Berish va qaytarish tarixi')}</h3><p>{tr('Здесь сохраняются только изменения статуса и комментарии сотрудников', 'Bu yerda faqat holat o‘zgarishlari va xodim izohlari saqlanadi')}</p></div></div>
           <div className="timeline">
             {history.map((entry) => (
               <div className="timeline__item" key={entry.id}>
@@ -387,7 +391,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
             ))}
             {!isLoading && history.length === 0 && <p className="muted">{tr('История пока пуста.', 'Tarix hozircha bo‘sh.')}</p>}
           </div>
-        </section>
+        </section>}
       </aside>
     </div>
   )
