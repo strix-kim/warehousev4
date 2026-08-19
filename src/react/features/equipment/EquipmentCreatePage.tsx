@@ -9,6 +9,7 @@ import {
   type EquipmentTaxonomy,
 } from './api'
 import { EquipmentVisual } from './EquipmentVisual'
+import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
 
 type RecordKind = 'serialized' | 'quantity'
@@ -17,7 +18,7 @@ const initialTaxonomy: EquipmentTaxonomy = { types: [], subtypes: [] }
 
 export function EquipmentCreatePage() {
   const navigate = useNavigate()
-  const { tr } = useLanguage()
+  const { tr, language } = useLanguage()
   const [kind, setKind] = useState<RecordKind>('serialized')
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
@@ -195,8 +196,8 @@ export function EquipmentCreatePage() {
               <label className="field"><span>{tr('Количество', 'Miqdor')} *</span><input type="number" min="1" max="9999" value={kind === 'serialized' ? 1 : count} onChange={(event) => setCount(Number(event.target.value))} disabled={kind === 'serialized'} required /></label>
               <label className="field"><span>{tr('Категория', 'Toifa')} *</span><input list="equipment-types" value={type} onChange={(event) => setType(event.target.value)} placeholder={tr('Выберите или введите', 'Tanlang yoki kiriting')} required /></label>
               <label className="field"><span>{tr('Подкатегория', 'Quyi toifa')} *</span><input list="equipment-subtypes" value={subtype} onChange={(event) => setSubtype(event.target.value)} placeholder={tr('Выберите или введите', 'Tanlang yoki kiriting')} required /></label>
-              <datalist id="equipment-types">{taxonomy.types.map((value) => <option value={value} key={value} />)}</datalist>
-              <datalist id="equipment-subtypes">{taxonomy.subtypes.map((value) => <option value={value} key={value} />)}</datalist>
+              <datalist id="equipment-types">{taxonomy.types.map((value) => <option value={value} label={translateEquipmentTaxonomy(value, language)} key={value} />)}</datalist>
+              <datalist id="equipment-subtypes">{taxonomy.subtypes.map((value) => <option value={value} label={translateEquipmentTaxonomy(value, language)} key={value} />)}</datalist>
             </div>
           </div>
 
@@ -224,7 +225,7 @@ export function EquipmentCreatePage() {
           <p className="eyebrow">{tr('Предпросмотр', 'Oldindan ko‘rish')}</p>
           <EquipmentVisual item={{ brand, model, type, subtype }} size="large" alt={brand && model ? `${brand} ${model}` : ''} />
           <h2>{brand || tr('Бренд', 'Brend')} {model || tr('Модель', 'Model')}</h2>
-          <p>{subtype || tr('Подкатегория', 'Quyi toifa')}</p>
+          <p>{subtype ? translateEquipmentTaxonomy(subtype, language) : tr('Подкатегория', 'Quyi toifa')}</p>
           <dl>
             <div><dt>{tr('Тип учёта', 'Hisob turi')}</dt><dd>{kind === 'serialized' ? tr('По серийному номеру', 'Seriya raqami bo‘yicha') : tr('По количеству', 'Miqdor bo‘yicha')}</dd></div>
             <div><dt>{kind === 'serialized' ? tr('Серийный номер', 'Seriya raqami') : tr('Внутренний код', 'Ichki kod')}</dt><dd className="mono">{kind === 'serialized' ? serialNumber || '—' : inventoryCode || tr('Без кода', 'Kodsiz')}</dd></div>

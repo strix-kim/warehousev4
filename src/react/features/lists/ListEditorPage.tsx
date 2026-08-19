@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AppDatePicker } from '../../components/AppDatePicker'
 import { AppSelect } from '../../components/AppSelect'
+import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
 import { useModalLayer } from '../../lib/useModalLayer'
 import { fetchAllEquipment, readCachedAllEquipment } from '../equipment/api'
@@ -201,19 +202,21 @@ export function ListEditorPage() {
       .sort((a, b) => `${a.type} ${a.brand} ${a.model}`.localeCompare(`${b.type} ${b.brand} ${b.model}`, 'ru'))
   }, [equipment])
 
-  const categories = useMemo(() => [...new Set(groups.map((group) => group.type))].sort((a, b) => a.localeCompare(b, 'ru')), [groups])
+  const categories = useMemo(() => [...new Set(groups.map((group) => group.type))]
+    .sort((a, b) => translateEquipmentTaxonomy(a, language).localeCompare(translateEquipmentTaxonomy(b, language), locale)), [groups, language, locale])
   const subcategories = useMemo(() => category
-    ? [...new Set(groups.filter((group) => group.type === category).map((group) => group.subtype))].sort((a, b) => a.localeCompare(b, 'ru'))
-    : [], [category, groups])
+    ? [...new Set(groups.filter((group) => group.type === category).map((group) => group.subtype))]
+      .sort((a, b) => translateEquipmentTaxonomy(a, language).localeCompare(translateEquipmentTaxonomy(b, language), locale))
+    : [], [category, groups, language, locale])
   const filteredGroups = useMemo(() => {
-    const terms = search.trim().toLocaleLowerCase('ru').split(/\s+/).filter(Boolean)
+    const terms = search.trim().toLocaleLowerCase(locale).split(/\s+/).filter(Boolean)
     return groups.filter((group) => {
       if (category && group.type !== category) return false
       if (subcategory && group.subtype !== subcategory) return false
-      const haystack = `${group.brand} ${group.model} ${group.type} ${group.subtype}`.toLocaleLowerCase('ru')
+      const haystack = `${group.brand} ${group.model} ${group.type} ${group.subtype} ${translateEquipmentTaxonomy(group.type, language)} ${translateEquipmentTaxonomy(group.subtype, language)}`.toLocaleLowerCase(locale)
       return terms.every((term) => haystack.includes(term))
     })
-  }, [category, groups, search, subcategory])
+  }, [category, groups, language, locale, search, subcategory])
   const visibleGroups = filteredGroups.slice(0, catalogLimit)
 
   useEffect(() => {
@@ -555,14 +558,14 @@ export function ListEditorPage() {
             </label>
             <AppSelect
               value={category}
-              options={[{ value: '', label: tr('Все категории', 'Barcha toifalar') }, ...categories.map((value) => ({ value, label: value }))]}
+              options={[{ value: '', label: tr('Все категории', 'Barcha toifalar') }, ...categories.map((value) => ({ value, label: translateEquipmentTaxonomy(value, language) }))]}
               onChange={setCategory}
               ariaLabel={tr('Категория', 'Toifa')}
             />
             {category && subcategories.length > 1 && (
               <AppSelect
                 value={subcategory}
-                options={[{ value: '', label: tr('Все подкатегории', 'Barcha quyi toifalar') }, ...subcategories.map((value) => ({ value, label: value }))]}
+                options={[{ value: '', label: tr('Все подкатегории', 'Barcha quyi toifalar') }, ...subcategories.map((value) => ({ value, label: translateEquipmentTaxonomy(value, language) }))]}
                 onChange={setSubcategory}
                 ariaLabel={tr('Подкатегория', 'Quyi toifa')}
               />
@@ -584,7 +587,7 @@ export function ListEditorPage() {
                     <EquipmentVisual item={group} />
                     <span className="picker-item__copy">
                       <strong>{group.brand} {group.model}</strong>
-                      <small>{group.subtype} · {tracking}</small>
+                      <small>{translateEquipmentTaxonomy(group.subtype, language)} · {tracking}</small>
                     </span>
                     <span className={`picker-item__count ${group.availableCount === 0 ? 'picker-item__count--empty' : ''}`}>{group.availableCount > 0 ? `${tr('доступно', 'mavjud')} ${group.availableCount}` : tr('нет на складе', 'omborda yo‘q')}</span>
                   </button>
@@ -626,7 +629,7 @@ export function ListEditorPage() {
                   <span className="equipment-row-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                   <div className="quick-selection-item__copy">
                     <strong>{item.group.brand} {item.group.model}</strong>
-                    <small>{item.group.subtype} · {tr('на складе', 'omborda')} {item.group.availableCount}</small>
+                    <small>{translateEquipmentTaxonomy(item.group.subtype, language)} · {tr('на складе', 'omborda')} {item.group.availableCount}</small>
                   </div>
                   <div className="quantity-stepper">
                     <button onClick={() => changeCount(item.group.key, -1)} aria-label={tr('Уменьшить', 'Kamaytirish')}><Minus size={14} /></button>
@@ -685,7 +688,7 @@ export function ListEditorPage() {
 }
 
 function CatalogPreviewDrawer({ group, onClose, onAdd }: { group: CatalogGroup; onClose: () => void; onAdd: () => void }) {
-  const { tr } = useLanguage()
+  const { tr, language } = useLanguage()
   useModalLayer(onClose)
   const representative = group.allItems[0]
   const hasSerialized = group.allItems.some((item) => item.tracking_mode === 'serialized')
@@ -698,14 +701,14 @@ function CatalogPreviewDrawer({ group, onClose, onAdd }: { group: CatalogGroup; 
     <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Описание модели', 'Model tavsifi')} onMouseDown={onClose}>
       <aside className="drawer catalog-preview-drawer" onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
-          <div><p className="eyebrow">{group.type}</p><h2>{group.brand} {group.model}</h2></div>
+          <div><p className="eyebrow">{translateEquipmentTaxonomy(group.type, language)}</p><h2>{group.brand} {group.model}</h2></div>
           <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
         </div>
         <span className={`badge badge--${group.availableCount > 0 ? 'success' : 'neutral'}`}><i />{group.availableCount > 0 ? tr(`На складе: ${group.availableCount}`, `Omborda: ${group.availableCount}`) : tr('Сейчас нет на складе', 'Hozir omborda yo‘q')}</span>
         <EquipmentVisual item={group} size="large" alt={`${group.brand} ${group.model}`} />
         <dl className="detail-list">
-          <div><dt>{tr('Категория', 'Toifa')}</dt><dd>{group.type}</dd></div>
-          <div><dt>{tr('Подкатегория', 'Quyi toifa')}</dt><dd>{group.subtype}</dd></div>
+          <div><dt>{tr('Категория', 'Toifa')}</dt><dd>{translateEquipmentTaxonomy(group.type, language)}</dd></div>
+          <div><dt>{tr('Подкатегория', 'Quyi toifa')}</dt><dd>{translateEquipmentTaxonomy(group.subtype, language)}</dd></div>
           <div><dt>{tr('Способ учёта', 'Hisob turi')}</dt><dd>{tracking}</dd></div>
           <div><dt>{tr('Всего заведено', 'Jami kiritilgan')}</dt><dd>{group.totalCount} {tr('шт.', 'dona')}</dd></div>
           <div className="detail-list__wide"><dt>{tr('Характеристики', 'Xususiyatlar')}</dt><dd>{representative?.technicalspecification || tr('Не указаны', 'Ko‘rsatilmagan')}</dd></div>

@@ -19,6 +19,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
+import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useModalLayer } from '../../lib/useModalLayer'
 import { fetchEquipmentByIds } from '../equipment/api'
 import {
@@ -288,7 +289,7 @@ export function ListsPage() {
 
 function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; onClose: () => void; onChanged: () => Promise<void> }) {
   const navigate = useNavigate()
-  const { tr, locale } = useLanguage()
+  const { tr, locale, language } = useLanguage()
   useModalLayer(onClose)
   const statusView = getStatusView(tr)
   const transitionCopy = getTransitionCopy(tr)
@@ -361,7 +362,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
             <div className="saved-list-items">{composition.map((item, index) => (
               <div className="saved-list-item" key={`${item.category}-${item.equipment}-${item.subtype}`}>
                 <span className="equipment-row-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
-                <span className="saved-list-item__copy"><strong>{item.equipment}</strong><small>{item.category} · {item.subtype}{item.serialNumbers.length > 0 ? ` · S/N ${item.serialNumbers.join(', ')}` : ''}</small></span>
+                <span className="saved-list-item__copy"><strong>{item.equipment}</strong><small>{translateEquipmentTaxonomy(item.category, language)} · {translateEquipmentTaxonomy(item.subtype, language)}{item.serialNumbers.length > 0 ? ` · S/N ${item.serialNumbers.join(', ')}` : ''}</small></span>
                 <b className="saved-list-item__count">×{item.count}</b>
               </div>
             ))}</div>

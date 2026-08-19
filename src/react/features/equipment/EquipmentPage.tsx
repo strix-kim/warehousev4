@@ -24,6 +24,7 @@ import {
 } from './api'
 import { EquipmentVisual, preloadEquipmentImages } from './EquipmentVisual'
 import type { Equipment } from './types'
+import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
 import { useModalLayer } from '../../lib/useModalLayer'
 
@@ -57,7 +58,7 @@ function equipmentIdentifier(item: Equipment, tr: (ru: string, uz: string) => st
 
 export function EquipmentPage() {
   const navigate = useNavigate()
-  const { tr, locale } = useLanguage()
+  const { tr, locale, language } = useLanguage()
   const availabilityOptions = [
     { value: '', label: tr('Все статусы', 'Barcha holatlar') },
     { value: 'available', label: tr('В наличии', 'Mavjud') },
@@ -230,11 +231,11 @@ export function EquipmentPage() {
                               <EquipmentVisual item={item} />
                               <span>
                                 <strong>{item.brand} {item.model}</strong>
-                                <small>{equipmentCode(item.id)} · {item.subtype}</small>
+                                <small>{equipmentCode(item.id)} · {translateEquipmentTaxonomy(item.subtype, language)}</small>
                               </span>
                             </div>
                           </td>
-                          <td data-label={tr('Категория', 'Toifa')}>{item.type}</td>
+                          <td data-label={tr('Категория', 'Toifa')}>{translateEquipmentTaxonomy(item.type, language)}</td>
                           <td data-label={item.tracking_mode === 'quantity' ? tr('Количественный учёт', 'Miqdor bo‘yicha hisob') : tr('Серийный номер', 'Seriya raqami')} className="mono">{equipmentIdentifier(item, tr)}</td>
                           <td data-label={tr('Количество', 'Miqdor')}><strong>{item.count}</strong> {tr('шт.', 'dona')}</td>
                           <td data-label={tr('Статус', 'Holat')}><span className={`badge badge--${status.tone}`}><i />{status.label}</span></td>
@@ -285,7 +286,7 @@ export function EquipmentPage() {
 }
 
 function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClose: () => void; onUpdated: (item: Equipment) => void }) {
-  const { tr, locale } = useLanguage()
+  const { tr, locale, language } = useLanguage()
   useModalLayer(onClose)
   const status = availabilityView(item.availability, tr)
   const [movements, setMovements] = useState<EquipmentMovement[]>([])
@@ -439,8 +440,8 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
             </div>
           </div>
         ) : <><dl className="detail-list">
-          <div><dt>{tr('Категория', 'Toifa')}</dt><dd>{item.type}</dd></div>
-          <div><dt>{tr('Подкатегория', 'Quyi toifa')}</dt><dd>{item.subtype}</dd></div>
+          <div><dt>{tr('Категория', 'Toifa')}</dt><dd>{translateEquipmentTaxonomy(item.type, language)}</dd></div>
+          <div><dt>{tr('Подкатегория', 'Quyi toifa')}</dt><dd>{translateEquipmentTaxonomy(item.subtype, language)}</dd></div>
           <div><dt>{tr('Способ учёта', 'Hisob turi')}</dt><dd>{item.tracking_mode === 'quantity' ? tr('По количеству', 'Miqdor bo‘yicha') : tr('По серийному номеру', 'Seriya raqami bo‘yicha')}</dd></div>
           <div><dt>{item.tracking_mode === 'quantity' ? tr('Внутренний код', 'Ichki kod') : tr('Серийный номер', 'Seriya raqami')}</dt><dd className="mono">{equipmentIdentifier(item, tr)}</dd></div>
           <div><dt>{tr('Количество', 'Miqdor')}</dt><dd>{item.count} {tr('шт.', 'dona')}</dd></div>
