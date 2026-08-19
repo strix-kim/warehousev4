@@ -1,0 +1,1304 @@
+[
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Acer",
+    "model": "VG240Y",
+    "subtype": "Мониторы"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "AGL",
+    "model": "AGL-3512-IP",
+    "subtype": "Видеокамеры (ENG, PTZ, DSLR)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "AGL",
+    "model": "AGL-3512-IP-4K",
+    "subtype": "Видеокамеры (ENG, PTZ, DSLR)"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "AGL",
+    "model": "AGL-45 (Optical Fiber Cable)",
+    "subtype": "Адаптеры и переходники"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "AGL",
+    "model": "AGL‑50‑NDI",
+    "subtype": "PTZ-контроллер"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "AJA",
+    "model": "DANTE-12GAM",
+    "subtype": "Видеоинтерфейсы (конвертеры HDMI/SDI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "AJA",
+    "model": "KUMO 1616-12G",
+    "subtype": "Видеопроцессоры"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Akai Professional",
+    "model": "APC Mini",
+    "subtype": "MIDI-контроллеры"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "AMOONSKY",
+    "model": "AMS-MTX 16x16",
+    "subtype": "Видеопроцессоры"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "AMOONSKY",
+    "model": "AMS-MTX 8x8",
+    "subtype": "Видеопроцессоры"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Apple",
+    "model": "iMac Pro",
+    "subtype": "Компьютеры"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Apple",
+    "model": "Mac Mini",
+    "subtype": "Компьютеры"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Apple",
+    "model": "Mac Studio",
+    "subtype": "Компьютеры"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Apple",
+    "model": "MacBook Pro A1398",
+    "subtype": "Ноутбуки"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Apple",
+    "model": "Magic Keyboard",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Apple",
+    "model": "Magic Mouse",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "ASUS",
+    "model": "TUF FX506HM-HN009",
+    "subtype": "Ноутбуки"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "ASUS",
+    "model": "TUF FX607J",
+    "subtype": "Ноутбуки"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Atomos",
+    "model": "Shogun Inferno",
+    "subtype": "Захват видео (capture-карты)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "AVMATRIX",
+    "model": "PKC3000",
+    "subtype": "Видеомикшеры (switcher'ы)"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Baseus",
+    "model": "BS-OH081",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Baseus",
+    "model": "CAHUB-CW0G",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Baseus",
+    "model": "CAHUB-CX0G",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Baseus",
+    "model": "PD 240W FAST CHARGING",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Baseus",
+    "model": "WKWG000103",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Behringer",
+    "model": "B210D",
+    "subtype": "Активные акустические системы"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Behringer",
+    "model": "FLOW8",
+    "subtype": "Микшерные пульты (аналоговые/цифровые)"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Behringer",
+    "model": "UMC202HD",
+    "subtype": "Аудиоинтерфейсы"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Behringer",
+    "model": "UMC204HD",
+    "subtype": "Аудиоинтерфейсы"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Behringer",
+    "model": "UMC404HD",
+    "subtype": "Аудиоинтерфейсы"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Behringer",
+    "model": "X32",
+    "subtype": "Микшерные пульты (аналоговые/цифровые)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Benro",
+    "model": "KH26PCN",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "Beterva",
+    "model": "SP-BE-1000",
+    "subtype": "Цифровой контроллер конференц-системы"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Beterva",
+    "model": "SP-BE-2300D",
+    "subtype": "Микрофоны (проводные, беспроводные, головные, петличные)"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "Blackmagic Design",
+    "model": "6G-SDI Cable",
+    "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Blackmagic Design",
+    "model": "6G-SDI Optical Transceiver",
+    "subtype": "SFP-модуль"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "ATEM 1 M/E Advanced Panel 10",
+    "subtype": "Видеомикшеры (switcher'ы)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "ATEM 2 M/E Constellation 4K",
+    "subtype": "Видеомикшеры (switcher'ы)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "ATEM 2 M/E Constellation HD",
+    "subtype": "Видеомикшеры (switcher'ы)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "ATEM Camera Control Panel",
+    "subtype": "Видеомикшеры (switcher'ы)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "ATEM Micro Camera Panel",
+    "subtype": "Видеомикшеры (switcher'ы)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "ATEM Mini Extreme",
+    "subtype": "Видеомикшеры (switcher'ы)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "ATEM Mini Extreme ISO",
+    "subtype": "Видеомикшеры (switcher'ы)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "ATEM Mini Pro",
+    "subtype": "Видеомикшеры (switcher'ы)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "ATEM SDI Extreme ISO",
+    "subtype": "Видеомикшеры (switcher'ы)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Blackmagic 2110 IP Converter 4x12G PWR",
+    "subtype": "Видеоинтерфейсы (конвертеры HDMI/SDI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Blackmagic 2110 IP Converter 8x12G SFP",
+    "subtype": "Видеоинтерфейсы (конвертеры HDMI/SDI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Blackmagic Videohub 20x20 12G",
+    "subtype": "Видеомикшеры (switcher'ы)"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Blackmagic Design",
+    "model": "DeckLink 4k Extreme 12G",
+    "subtype": "PCI-карты"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Blackmagic Design",
+    "model": "DeckLink 8K Pro ",
+    "subtype": "PCI-карты"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Blackmagic Design",
+    "model": "DeckLink 8K Pro G2 ",
+    "subtype": "PCI-карты"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Blackmagic Design",
+    "model": "DeckLink Quad HDMI Recorder",
+    "subtype": "PCI-карты"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Blackmagic Design",
+    "model": "DeckLink Quad2",
+    "subtype": "PCI-карты"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "ethernet switch 360P",
+    "subtype": "Видеомикшеры (switcher'ы)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "HyperDeck Studio HD Mini",
+    "subtype": "Видеорекордеры"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "HyperDeck Studio HD Plus",
+    "subtype": "Видеорекордеры"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "HyperDeck Studio HD Pro",
+    "subtype": "Видеорекордеры"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Blackmagic Design",
+    "model": "IntensityPro 4K",
+    "subtype": "PCI-карты"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Micro Converter BiDirectional SDI/HDMI 12G",
+    "subtype": "Видеоинтерфейсы (конвертеры HDMI/SDI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Micro Converter BiDirectional SDI/HDMI 3G",
+    "subtype": "Видеоинтерфейсы (конвертеры HDMI/SDI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Micro Converter HDMI to SDI 3G",
+    "subtype": "Видеоинтерфейсы (конвертеры HDMI/SDI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Micro Converter SDI to HDMI 12G",
+    "subtype": "Видеоинтерфейсы (конвертеры HDMI/SDI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Micro Converter SDI to HDMI 3G",
+    "subtype": "Видеоинтерфейсы (конвертеры HDMI/SDI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Mini Converter Optical Fiber 12G",
+    "subtype": "Видеоинтерфейсы (конвертеры HDMI/SDI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Mini converter sync generator",
+    "subtype": "Видеоинтерфейсы (конвертеры HDMI/SDI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Studio Camera 4K Pro",
+    "subtype": "Видеокамеры (ENG, PTZ, DSLR)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Studio Converter",
+    "subtype": "Захват видео (capture-карты)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Teranex Mini SDI to HDMI 8K HDR",
+    "subtype": "Видеоинтерфейсы (конвертеры HDMI/SDI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "UltraStudio Monitor 3G",
+    "subtype": "Видеоинтерфейсы (конвертеры HDMI/SDI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Blackmagic Design",
+    "model": "Video Assist 7″ 12G HDR",
+    "subtype": "Мониторы (режиссёрские, трансляционные)"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "BNC",
+    "model": "BNC cabel",
+    "subtype": "BNC-кабели"
+  },
+  {
+    "type": "Транспортировочные и кейс-системы",
+    "brand": "CABLE BOX",
+    "model": "Custom",
+    "subtype": "Кейсы (rack-case, flight-case)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Canon",
+    "model": "EF 16–35 mm f/2.8 L III USM",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Canon",
+    "model": "Ultrasonic-1635",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Commlite",
+    "model": "Mount adapter AEF - MFT (AF)",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Custom",
+    "model": "Camera mount",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Custom",
+    "model": "Hackintosh-PC",
+    "subtype": "Компьютеры"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Custom",
+    "model": "Windows-PC",
+    "subtype": "Компьютеры"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "DeckLink",
+    "model": "Mini Recroder 4K",
+    "subtype": "Видеорекордеры"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "DELL",
+    "model": "S2721QS",
+    "subtype": "Мониторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Dongle HUB",
+    "model": "Dongle HUB",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "DP Cabel",
+    "model": "DP 8k to HDMI",
+    "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "DP Cabel",
+    "model": "DP to DP",
+    "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "DP Cabel",
+    "model": "DP to WGA",
+    "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "DP out to HDMI adapter",
+    "model": "DP out to HDMI adapter",
+    "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Electro-Voice",
+    "model": "ELX200-15P-EU",
+    "subtype": "Активные акустические системы"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Electro-Voice",
+    "model": "ELX200-18SP-EU",
+    "subtype": "Активные акустические системы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Elgato",
+    "model": "Stream Deck XL",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Focusrite",
+    "model": "Scarlett 18i20",
+    "subtype": "Аудиоинтерфейсы"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Focusrite",
+    "model": "Scarlett 18i8",
+    "subtype": "Аудиоинтерфейсы"
+  },
+  {
+    "type": "Транспортировочные и кейс-системы",
+    "brand": "GATOR",
+    "model": "GRR-8L",
+    "subtype": "Кейсы (rack-case, flight-case)"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Gembird",
+    "model": "KB-2000M",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "HDMI Cabel",
+    "model": "HDMI to HDMI",
+    "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "HDMI Optic",
+    "model": "HDMI Optic to HDMI Optic",
+    "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "HOCO",
+    "model": "HDMI to HDMI Cabel",
+    "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Hollyland",
+    "model": "Cosmo C1",
+    "subtype": "Захват видео (capture-карты)"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "HP",
+    "model": "250 G9",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "HP",
+    "model": "ENVY 17-CE1000UR",
+    "subtype": "Ноутбуки"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "HP",
+    "model": "Laptop 15s-fq5318TU",
+    "subtype": "Ноутбуки"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Intenso",
+    "model": "Portable SSD 256 GB",
+    "subtype": "Внешние устройства хранения данных"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "ION",
+    "model": "IONG-10000LCD",
+    "subtype": "UPS"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "ITC",
+    "model": "TS-01F",
+    "subtype": "Периферийное оборудование для конференц-систем"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "ITC",
+    "model": "TS-0310A",
+    "subtype": "Пульт делегата"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "ITC",
+    "model": "TS-0370HC",
+    "subtype": "Кейс для зарядки и хранения инфракрасных приемников"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "ITC",
+    "model": "TS-0370HY",
+    "subtype": "Стол переводчика"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "ITC",
+    "model": "TS‑0300M",
+    "subtype": "Цифровой контроллер конференц-системы"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "ITC",
+    "model": "TS‑0370H‑16",
+    "subtype": "Цифровой контроллер конференц-системы"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "ITC",
+    "model": "TS‑0370HD",
+    "subtype": "Приемники синхронного перевода"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "ITC",
+    "model": "TS‑0370HS",
+    "subtype": "ИК-передатчик"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "ITC",
+    "model": "TS‑3400MIX",
+    "subtype": "Аудиопроцессоры"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "ITC",
+    "model": "TS‑DP880",
+    "subtype": "Аудиопроцессоры"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "ITC",
+    "model": "TV-711C4K",
+    "subtype": "IP Video encode/decoder"
+  },
+  {
+    "type": "Транспортировочные и кейс-системы",
+    "brand": "Kraynov Tech",
+    "model": "Red Bastard",
+    "subtype": "Катушки, стойки, сумки, рюкзаки"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "LAN",
+    "model": "1GB Lan to USB",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Lenovo",
+    "model": "G27-20",
+    "subtype": "Мониторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Lenovo",
+    "model": "Idea Pad L315ITL6",
+    "subtype": "Ноутбуки"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Lenovo",
+    "model": "LEGION 7 16ITHG6",
+    "subtype": "Ноутбуки"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Lenovo",
+    "model": "V15G41AH",
+    "subtype": "Ноутбуки"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Lenovo",
+    "model": "Y530",
+    "subtype": "Ноутбуки"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "LG",
+    "model": "24MP400-B",
+    "subtype": "Мониторы"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "LG",
+    "model": "OLED55B7V - T",
+    "subtype": "ТВ"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Libec",
+    "model": "H38B",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "LR-LINK",
+    "model": "PCIe x4 Quad-Port Server Adapter",
+    "subtype": "PCI-карты"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Magnimage",
+    "model": "MIG-F4H",
+    "subtype": "Видеоинтерфейсы (конвертеры HDMI/SDI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Manfrotto",
+    "model": "504X",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Manfrotto",
+    "model": "Nitrotech N12",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Metabones",
+    "model": "EF Lens to Micro Four Thirds T Speed Booster ULTRA 0.71× Adapter",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Metabones",
+    "model": "EF to Sony E-Mount T Speed Booster ULTRA 0.71×",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Metabones",
+    "model": "T Cine Speed Booster ULTRA 0.71×",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "MikroTik",
+    "model": "CCR2116-12G-4S+",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "MikroTik",
+    "model": "hEX S",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "MikroTik",
+    "model": "RB4011iGS+RM",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Разное / Служебное",
+    "brand": "MileStone",
+    "model": "MHT-L5801",
+    "subtype": "Термальный принтер"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "mini DP to HDMI adapter",
+    "model": "mini DP to HDMI adapter",
+    "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "Mini HDMI",
+    "model": "Mini HDMI to HDMI",
+    "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "miniDP",
+    "model": "Mini DP to DP",
+    "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "MSI",
+    "model": "Pro MP161 E2",
+    "subtype": "Портативные мониторы"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Noname",
+    "model": "Noname",
+    "subtype": "Штативы для колонок"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "ORICO",
+    "model": "USB-C TO C PD",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Panasonic",
+    "model": "H-PS45175",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Pixietech",
+    "model": "PXT-S2780G-24T-POE",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Pixietech",
+    "model": "PXT-S2790G-24TX",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Pixietech",
+    "model": "PXT-S2790G-48TX",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Pixietech",
+    "model": "PXT-SFP+T",
+    "subtype": "SFP-модуль"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Pixietech",
+    "model": "PXT-SFP+W37-3",
+    "subtype": "SFP-модуль"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Powercom",
+    "model": "SMK-2000A RM",
+    "subtype": "UPS"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "PreSonus",
+    "model": "Studio 1824c",
+    "subtype": "Аудиоинтерфейсы"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "PreSonus",
+    "model": "Studio 68c",
+    "subtype": "Аудиоинтерфейсы"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "PTZ OPTICS",
+    "model": "PT-SUPERJOY-G1",
+    "subtype": "PTZ-контроллер"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "PTZ OPTICS",
+    "model": "PT12X-4K‑GY‑G3",
+    "subtype": "Видеокамеры (ENG, PTZ, DSLR)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "PTZ OPTICS",
+    "model": "PT30X-4K-GY-G3",
+    "subtype": "Видеокамеры (ENG, PTZ, DSLR)"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "QNAP",
+    "model": "QXG-10G1T",
+    "subtype": "PCI-карты"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "QTECH",
+    "model": "QSC-SFP3GEW-5531-DDM",
+    "subtype": "SFP-модуль"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Rapoo",
+    "model": "9900M",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Rapoo",
+    "model": "NX2000",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Rapoo",
+    "model": "X1800S",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Redmi",
+    "model": "Redmi Display 1A (RMMNT238NF)",
+    "subtype": "Мониторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Redmi",
+    "model": "Redmi Display A27 IPS",
+    "subtype": "Мониторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "REDRAGON",
+    "model": "Mitra K551RGB-1",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "RGBlink",
+    "model": "Mini-Pro V3",
+    "subtype": "Видеомикшеры (switcher'ы)"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Samsung",
+    "model": "F24T450FQI",
+    "subtype": "Мониторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Samsung",
+    "model": "S24F350FHI",
+    "subtype": "Мониторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Samsung",
+    "model": "T7",
+    "subtype": "Внешние устройства хранения данных"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Samsung",
+    "model": "T7 Shield",
+    "subtype": "Внешние устройства хранения данных"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Samsung",
+    "model": "U28H750UQI",
+    "subtype": "Мониторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "SanDisk",
+    "model": "Extreme",
+    "subtype": "Внешние устройства хранения данных"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Sennheiser",
+    "model": "ew G3 100 Series (EW 100 ENG G3)",
+    "subtype": "Радиосистемы"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "SmallRig",
+    "model": "LQ-P206-01",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "SmallRig",
+    "model": "LQ-P217-01",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "SmallRig",
+    "model": "LQ-P228-01",
+    "subtype": "Видеокамеры (ENG, PTZ, DSLR)"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "SNR",
+    "model": "SNR-S5210G-24TX",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "SNR",
+    "model": "SNR-SFP+LR-20",
+    "subtype": "SFP-модуль"
+  },
+  {
+    "type": "Транспортировочные и кейс-системы",
+    "brand": "Sonnet Technologies",
+    "model": " Sonnet xMac Studio / Echo II DV",
+    "subtype": "Кейсы (rack-case, flight-case)"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Sonnet Technologies",
+    "model": "Echo Express SE I",
+    "subtype": "Внешние PCIe-корпуса (Expansion Chassis)"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Sonnet Technologies",
+    "model": "Echo Express SE3e",
+    "subtype": "Внешние PCIe-корпуса (Expansion Chassis)"
+  },
+  {
+    "type": "Транспортировочные и кейс-системы",
+    "brand": "Sonnet Technologies",
+    "model": "Sonnet xMac Studio Echo III",
+    "subtype": "Кейсы (rack-case, flight-case)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Sony",
+    "model": "PXW-FS5M2",
+    "subtype": "Видеокамеры (ENG, PTZ, DSLR)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Sony",
+    "model": "Sigma 70–200 mm F2.8 DG OS HSM | Sports",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "SUPER CUE",
+    "model": "Intelligent PPT Clicker",
+    "subtype": "USB-интерфейсы, HDMI-сплиттеры, контроллеры"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "Televic",
+    "model": "Confidea BP G4",
+    "subtype": "Аккумуляторные батареи"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "Televic",
+    "model": "Confidea CHT G4",
+    "subtype": "Периферийное оборудование для конференц-систем"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "Televic",
+    "model": "Confidea FLEX",
+    "subtype": "Проводной конференц-пульт"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "Televic",
+    "model": "Confidea FLEX G4",
+    "subtype": "Беспроводной конференц-пульт"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "Televic",
+    "model": "Confidea FLEX TC",
+    "subtype": "Транспортировочные и кейс-системы"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "Televic",
+    "model": "Confidea WAP G4",
+    "subtype": "Беспроводная точка доступа"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "Televic",
+    "model": "Confidea WAP G4 with Dante",
+    "subtype": "Беспроводная точка доступа с Dante"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "Televic",
+    "model": "Confidea WAP PS G4",
+    "subtype": "Периферийное оборудование для конференц-систем"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "Televic",
+    "model": "Lingua ID-MM",
+    "subtype": "Стол переводчика"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "Televic",
+    "model": "Plixus MME",
+    "subtype": "Мультимедийный процессор"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "Televic",
+    "model": "Plixus NEXT",
+    "subtype": "Сетевой расширитель для конференц-систем"
+  },
+  {
+    "type": "Системы синхронного перевода",
+    "brand": "Televic",
+    "model": "Plixus V-IN",
+    "subtype": "Видеовходной блок"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Teleview",
+    "model": "TLW-LCD24 Conference Mobile",
+    "subtype": "Портативные мониторы"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Tilta",
+    "model": "Nucleus-Nano",
+    "subtype": "Видеокамеры (ENG, PTZ, DSLR)"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "TP-Link",
+    "model": "MC220L(UN)",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "TP-Link",
+    "model": "TG-3468",
+    "subtype": "PCI-карты"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "TP-Link",
+    "model": "TL-SG1008P",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "TP-Link",
+    "model": "TL-SG1016D",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "TP-Link",
+    "model": "TL-SG1024D",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "TP-Link",
+    "model": "TL-SG1218MPE",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "TP-Link",
+    "model": "TL-SX3008F",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "TP-Link",
+    "model": "TL-SX3206HPP",
+    "subtype": "Wi-Fi роутеры, коммутаторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "TP-Link",
+    "model": "UE200",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "TP-Link",
+    "model": "UE300",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Transcend",
+    "model": "25H3",
+    "subtype": "Внешние устройства хранения данных"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Type C",
+    "model": "Type C to HDMI",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "Type C",
+    "model": "Type C to Lan",
+    "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "ULINE",
+    "model": "PT-WM-3-WH",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "Unew",
+    "model": "CX156-C",
+    "subtype": "Портативные мониторы"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "UniFi",
+    "model": "U6-LR",
+    "subtype": "Wi-Fi трансмиттеры"
+  },
+  {
+    "type": "Компьютерное и сетевое оборудование",
+    "brand": "USB Mouse",
+    "model": "Computer Mouse",
+    "subtype": "Периферия"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "UTP",
+    "model": "UTP cabel",
+    "subtype": "UTP-кабели"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "UTP",
+    "model": "UTP cabel long",
+    "subtype": "UTP-кабели"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "Weifeng",
+    "model": "WF-717",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Кабельная продукция и коммутация",
+    "brand": "WiWU",
+    "model": "Alpha HDMI",
+    "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)"
+  },
+  {
+    "type": "Аудиооборудование",
+    "brand": "Yamaha",
+    "model": "DM3",
+    "subtype": "Микшерные пульты (аналоговые/цифровые)"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "YUNTENG",
+    "model": "VCT-999RM",
+    "subtype": "Аксессуары для камер"
+  },
+  {
+    "type": "Видеотехника",
+    "brand": "ZowieTek",
+    "model": "4K NDI VIDEO ENCODER/DECODER",
+    "subtype": "Видеопроцессоры"
+  }
+]

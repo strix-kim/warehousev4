@@ -1,0 +1,135 @@
+import { ArrowUpRight, Boxes, ChevronDown, ClipboardList, House, ListPlus, LogOut, PanelLeftClose, RadioTower, Warehouse } from 'lucide-react'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
+import { Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom'
+import { useAuth } from '../features/auth/AuthProvider'
+import { LanguageSwitcher, useLanguage } from '../lib/i18n'
+
+const loadLoginPage = () => import('../features/auth/LoginPage').then((module) => ({ default: module.LoginPage }))
+const loadEquipmentPage = () => import('../features/equipment/EquipmentPage').then((module) => ({ default: module.EquipmentPage }))
+const loadEquipmentCreatePage = () => import('../features/equipment/EquipmentCreatePage').then((module) => ({ default: module.EquipmentCreatePage }))
+const loadListsPage = () => import('../features/lists/ListsPage').then((module) => ({ default: module.ListsPage }))
+const loadListEditorPage = () => import('../features/lists/ListEditorPage').then((module) => ({ default: module.ListEditorPage }))
+const loadHomePage = () => import('../features/home/HomePage').then((module) => ({ default: module.HomePage }))
+
+const LoginPage = lazy(loadLoginPage)
+const EquipmentPage = lazy(loadEquipmentPage)
+const EquipmentCreatePage = lazy(loadEquipmentCreatePage)
+const ListsPage = lazy(loadListsPage)
+const ListEditorPage = lazy(loadListEditorPage)
+const HomePage = lazy(loadHomePage)
+
+export function App() {
+  const { isLoading, session } = useAuth()
+
+  if (isLoading) return <AppLoader />
+
+  return <Routes>
+      <Route path="/login" element={<Suspense fallback={<AppLoader />}><LoginPage /></Suspense>} />
+      <Route element={session ? <AppShell /> : <Navigate to="/login" replace />}>
+        <Route index element={<RouteBoundary><HomePage /></RouteBoundary>} />
+        <Route path="/equipment" element={<RouteBoundary><EquipmentPage /></RouteBoundary>} />
+        <Route path="/equipment/new" element={<RouteBoundary><EquipmentCreatePage /></RouteBoundary>} />
+        <Route path="/lists" element={<RouteBoundary><ListsPage /></RouteBoundary>} />
+        <Route path="/lists/new" element={<RouteBoundary><ListEditorPage /></RouteBoundary>} />
+      </Route>
+      <Route path="*" element={<Navigate to={session ? '/' : '/login'} replace />} />
+    </Routes>
+}
+
+function AppShell() {
+  const { session, signOut } = useAuth()
+  const { tr } = useLanguage()
+  const email = session?.user.email ?? tr('Сотрудник ARGO', 'ARGO xodimi')
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void Promise.allSettled([
+        loadHomePage(),
+        loadEquipmentPage(),
+        loadEquipmentCreatePage(),
+        loadListsPage(),
+        loadListEditorPage(),
+      ])
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="sidebar__brand">
+          <div className="brand-lockup brand-lockup--light">
+            <span className="brand-mark">A</span>
+            <span className="brand-name">ARGO</span>
+          </div>
+          <button className="icon-button icon-button--dark" aria-label={tr('Свернуть меню', 'Menyuni yig‘ish')} disabled><PanelLeftClose size={18} /></button>
+        </div>
+
+        <nav className="sidebar__nav" aria-label={tr('Основная навигация', 'Asosiy navigatsiya')}>
+          <p className="nav-section-label">{tr('Склад', 'Ombor')}</p>
+          <NavLink to="/" end><House size={19} /><span>{tr('Главная', 'Bosh sahifa')}</span></NavLink>
+          <NavLink to="/equipment"><Boxes size={19} /><span>{tr('Оборудование', 'Uskunalar')}</span></NavLink>
+          <NavLink to="/lists"><ClipboardList size={19} /><span>{tr('Списки', 'Ro‘yxatlar')}</span></NavLink>
+        </nav>
+
+        <div className="sidebar__utility">
+          <NavLink className="sidebar__quick-action" to="/lists/new">
+            <span><ListPlus size={19} /></span>
+            <div><strong>{tr('Новый список', 'Yangi ro‘yxat')}</strong><small>{tr('Собрать комплект', 'Jamlanma tuzish')}</small></div>
+            <ArrowUpRight size={16} />
+          </NavLink>
+          <div className="sidebar__flow" aria-hidden="true">
+            <p>{tr('Быстрый процесс', 'Tezkor jarayon')}</p>
+            <ol>
+              <li><i>01</i><span>{tr('Найти технику', 'Uskunani topish')}</span></li>
+              <li><i>02</i><span>{tr('Собрать комплект', 'Jamlanma tuzish')}</span></li>
+              <li><i>03</i><span>{tr('Скачать Excel', 'Excel yuklash')}</span></li>
+            </ol>
+          </div>
+        </div>
+
+        <div className="sidebar__signal sidebar__signal--bottom"><RadioTower size={14} /><span>{tr('Склад в рабочем режиме', 'Ombor ish rejimida')}</span><i /></div>
+
+        <div className="sidebar__scope">
+          <Warehouse size={18} />
+          <span><small>{tr('Текущая локация', 'Joriy joylashuv')}</small><strong>{tr('Офис · Ташкент', 'Ofis · Toshkent')}</strong></span>
+          <ChevronDown size={16} />
+        </div>
+
+        <div className="sidebar__language"><LanguageSwitcher compact /></div>
+
+        <div className="sidebar__footer">
+          <div className="user-avatar"><img src="/brand/video-engineer-avatar.png" alt={tr('Видеоинженер', 'Video muhandis')} loading="eager" decoding="async" /></div>
+          <div className="user-copy"><strong>{email.split('@')[0]}</strong><span>{email}</span></div>
+          <button className="icon-button icon-button--dark" onClick={() => void signOut()} aria-label={tr('Выйти', 'Chiqish')}><LogOut size={18} /></button>
+        </div>
+      </aside>
+
+      <main className="app-content">
+        <Outlet />
+      </main>
+    </div>
+  )
+}
+
+function RouteBoundary({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<RouteLoader />}>{children}</Suspense>
+}
+
+function RouteLoader() {
+  return (
+    <div className="route-loader" role="status" aria-label="Загрузка раздела">
+      <span className="route-loader__title" />
+      <span className="route-loader__panel" />
+    </div>
+  )
+}
+
+function AppLoader() {
+  return (
+    <main className="app-loader">
+      <div className="brand-lockup"><span className="brand-mark">A</span><span className="brand-name">ARGO</span></div>
+      <span className="loader-line" />
+    </main>
+  )
+}

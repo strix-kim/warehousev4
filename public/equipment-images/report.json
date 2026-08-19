@@ -1,0 +1,295 @@
+{
+  "generatedAt": "2026-08-19T12:16:36.189Z",
+  "total": 217,
+  "downloaded": 176,
+  "missing": 41,
+  "missingItems": [
+    {
+      "brand": "AGL",
+      "model": "AGL-3512-IP",
+      "type": "Видеотехника",
+      "subtype": "Видеокамеры (ENG, PTZ, DSLR)",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "AGL",
+      "model": "AGL-45 (Optical Fiber Cable)",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "Адаптеры и переходники",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "AMOONSKY",
+      "model": "AMS-MTX 16x16",
+      "type": "Видеотехника",
+      "subtype": "Видеопроцессоры",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "AMOONSKY",
+      "model": "AMS-MTX 8x8",
+      "type": "Видеотехника",
+      "subtype": "Видеопроцессоры",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "ASUS",
+      "model": "TUF FX607J",
+      "type": "Компьютерное и сетевое оборудование",
+      "subtype": "Ноутбуки",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "Beterva",
+      "model": "SP-BE-1000",
+      "type": "Системы синхронного перевода",
+      "subtype": "Цифровой контроллер конференц-системы",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "Beterva",
+      "model": "SP-BE-2300D",
+      "type": "Аудиооборудование",
+      "subtype": "Микрофоны (проводные, беспроводные, головные, петличные)",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "Blackmagic Design",
+      "model": "6G-SDI Optical Transceiver",
+      "type": "Компьютерное и сетевое оборудование",
+      "subtype": "SFP-модуль",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "BNC",
+      "model": "BNC cabel",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "BNC-кабели",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "CABLE BOX",
+      "model": "Custom",
+      "type": "Транспортировочные и кейс-системы",
+      "subtype": "Кейсы (rack-case, flight-case)",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "Canon",
+      "model": "Ultrasonic-1635",
+      "type": "Видеотехника",
+      "subtype": "Аксессуары для камер",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "Custom",
+      "model": "Camera mount",
+      "type": "Видеотехника",
+      "subtype": "Аксессуары для камер",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "Custom",
+      "model": "Hackintosh-PC",
+      "type": "Компьютерное и сетевое оборудование",
+      "subtype": "Компьютеры",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "Custom",
+      "model": "Windows-PC",
+      "type": "Компьютерное и сетевое оборудование",
+      "subtype": "Компьютеры",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "DeckLink",
+      "model": "Mini Recroder 4K",
+      "type": "Видеотехника",
+      "subtype": "Видеорекордеры",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "Dongle HUB",
+      "model": "Dongle HUB",
+      "type": "Компьютерное и сетевое оборудование",
+      "subtype": "Периферия",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "DP Cabel",
+      "model": "DP 8k to HDMI",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "DP Cabel",
+      "model": "DP to DP",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "DP Cabel",
+      "model": "DP to WGA",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "DP out to HDMI adapter",
+      "model": "DP out to HDMI adapter",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "HDMI Cabel",
+      "model": "HDMI to HDMI",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "HDMI Optic",
+      "model": "HDMI Optic to HDMI Optic",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "HOCO",
+      "model": "HDMI to HDMI Cabel",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "ION",
+      "model": "IONG-10000LCD",
+      "type": "Компьютерное и сетевое оборудование",
+      "subtype": "UPS",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "LAN",
+      "model": "1GB Lan to USB",
+      "type": "Компьютерное и сетевое оборудование",
+      "subtype": "Периферия",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "Lenovo",
+      "model": "V15G41AH",
+      "type": "Компьютерное и сетевое оборудование",
+      "subtype": "Ноутбуки",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "mini DP to HDMI adapter",
+      "model": "mini DP to HDMI adapter",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "Mini HDMI",
+      "model": "Mini HDMI to HDMI",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "miniDP",
+      "model": "Mini DP to DP",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "Noname",
+      "model": "Noname",
+      "type": "Аудиооборудование",
+      "subtype": "Штативы для колонок",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "Pixietech",
+      "model": "PXT-SFP+T",
+      "type": "Компьютерное и сетевое оборудование",
+      "subtype": "SFP-модуль",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "Pixietech",
+      "model": "PXT-SFP+W37-3",
+      "type": "Компьютерное и сетевое оборудование",
+      "subtype": "SFP-модуль",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "SmallRig",
+      "model": "LQ-P206-01",
+      "type": "Видеотехника",
+      "subtype": "Аксессуары для камер",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "SmallRig",
+      "model": "LQ-P217-01",
+      "type": "Видеотехника",
+      "subtype": "Аксессуары для камер",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "SmallRig",
+      "model": "LQ-P228-01",
+      "type": "Видеотехника",
+      "subtype": "Видеокамеры (ENG, PTZ, DSLR)",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "Televic",
+      "model": "Confidea FLEX G4",
+      "type": "Системы синхронного перевода",
+      "subtype": "Беспроводной конференц-пульт",
+      "reason": "No reliable downloadable image found"
+    },
+    {
+      "brand": "Type C",
+      "model": "Type C to HDMI",
+      "type": "Компьютерное и сетевое оборудование",
+      "subtype": "Периферия",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "Type C",
+      "model": "Type C to Lan",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "Видеокабели (HDMI, SDI, VGA, DVI)",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "USB Mouse",
+      "model": "Computer Mouse",
+      "type": "Компьютерное и сетевое оборудование",
+      "subtype": "Периферия",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "UTP",
+      "model": "UTP cabel",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "UTP-кабели",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    },
+    {
+      "brand": "UTP",
+      "model": "UTP cabel long",
+      "type": "Кабельная продукция и коммутация",
+      "subtype": "UTP-кабели",
+      "reason": "Generic inventory record; category icon is safer than an arbitrary product photo"
+    }
+  ]
+}
