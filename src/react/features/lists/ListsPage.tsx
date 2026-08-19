@@ -381,38 +381,43 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   return (
     <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Детали списка', 'Ro‘yxat tafsilotlari')} onMouseDown={onClose}>
       <aside className="drawer reservation-drawer" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="drawer__header">
-          <div><p className="eyebrow">{tr('Детали списка', 'Ro‘yxat tafsilotlari')}</p><h2>{list.name}</h2><p className="drawer__lead">{tr('Состав, доступность и необязательный учёт выдачи', 'Tarkib, mavjudlik va ixtiyoriy berish hisobi')}</p></div>
-          <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+        <div className="reservation-drawer__top">
+          <div className="drawer__header">
+            <div><p className="eyebrow">{tr('Детали списка', 'Ro‘yxat tafsilotlari')}</p><h2>{list.name}</h2><p className="drawer__lead">{tr('Состав, доступность и необязательный учёт выдачи', 'Tarkib, mavjudlik va ixtiyoriy berish hisobi')}</p></div>
+            <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+          </div>
+          <span className={`badge badge--${lifecycle.tone}`}><i />{lifecycle.label}</span>
+          <div className="reservation-summary">
+            <CalendarRange size={19} />
+            <div><strong>{formatDate(list.reservation_start, locale, tr)} — {formatDate(list.reservation_end, locale, tr)}</strong><span>{list.list_mode === 'specific' ? tr('Фактический комплект', 'Haqiqiy jamlanma') : tr('План по моделям', 'Modellar bo‘yicha reja')} · {listSize(list)} {tr('единиц', 'birlik')}</span></div>
+          </div>
         </div>
-        <span className={`badge badge--${lifecycle.tone}`}><i />{lifecycle.label}</span>
-        <div className="reservation-summary">
-          <CalendarRange size={19} />
-          <div><strong>{formatDate(list.reservation_start, locale, tr)} — {formatDate(list.reservation_end, locale, tr)}</strong><span>{list.list_mode === 'specific' ? tr('Фактический комплект', 'Haqiqiy jamlanma') : tr('План по моделям', 'Modellar bo‘yicha reja')} · {listSize(list)} {tr('единиц', 'birlik')}</span></div>
+
+        <div className="reservation-drawer__body">
+          <section className="saved-list-contents">
+            <div className="saved-list-contents__heading"><div><h3>{tr('Оборудование в списке', 'Ro‘yxatdagi uskunalar')}</h3><p>{tr('Полный сохранённый состав документа', 'Hujjatning to‘liq saqlangan tarkibi')}</p></div><strong>{listSize(list)}</strong></div>
+            {isLoading ? <div className="detail-skeleton" /> : composition.length > 0 ? (
+              <div className="saved-list-items">{composition.map((item, index) => (
+                <div className="saved-list-item" key={`${item.category}-${item.equipment}-${item.subtype}`}>
+                  <span className="equipment-row-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                  <span className="saved-list-item__copy"><strong>{item.equipment}</strong><small>{translateEquipmentTaxonomy(item.category, language)} · {translateEquipmentTaxonomy(item.subtype, language)}{item.serialNumbers.length > 0 ? ` · S/N ${item.serialNumbers.join(', ')}` : ''}</small></span>
+                  <b className="saved-list-item__count">×{item.count}</b>
+                </div>
+              ))}</div>
+            ) : <p className="muted">{tr('В этом списке нет оборудования.', 'Bu ro‘yxatda uskuna yo‘q.')}</p>}
+          </section>
+          {error && <p className="form-error"><CircleAlert size={15} /> {error}</p>}
         </div>
 
-        <section className="saved-list-contents">
-          <div className="saved-list-contents__heading"><div><h3>{tr('Оборудование в списке', 'Ro‘yxatdagi uskunalar')}</h3><p>{tr('Полный сохранённый состав документа', 'Hujjatning to‘liq saqlangan tarkibi')}</p></div><strong>{listSize(list)}</strong></div>
-          {isLoading ? <div className="detail-skeleton" /> : composition.length > 0 ? (
-            <div className="saved-list-items">{composition.map((item, index) => (
-              <div className="saved-list-item" key={`${item.category}-${item.equipment}-${item.subtype}`}>
-                <span className="equipment-row-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
-                <span className="saved-list-item__copy"><strong>{item.equipment}</strong><small>{translateEquipmentTaxonomy(item.category, language)} · {translateEquipmentTaxonomy(item.subtype, language)}{item.serialNumbers.length > 0 ? ` · S/N ${item.serialNumbers.join(', ')}` : ''}</small></span>
-                <b className="saved-list-item__count">×{item.count}</b>
-              </div>
-            ))}</div>
-          ) : <p className="muted">{tr('В этом списке нет оборудования.', 'Bu ro‘yxatda uskuna yo‘q.')}</p>}
-        </section>
+        <div className="reservation-drawer__footer">
+          {list.reservation_status === 'draft' && (
+            <button className="button button--primary button--wide saved-list-edit" onClick={() => navigate(`/lists/${list.id}/edit`)}><PencilLine size={17} />{tr('Открыть и изменить список', 'Ro‘yxatni ochish va o‘zgartirish')}</button>
+          )}
 
-        {list.reservation_status === 'draft' && (
-          <button className="button button--primary button--wide saved-list-edit" onClick={() => navigate(`/lists/${list.id}/edit`)}><PencilLine size={17} />{tr('Открыть и изменить список', 'Ro‘yxatni ochish va o‘zgartirish')}</button>
-        )}
-        {error && <p className="form-error"><CircleAlert size={15} /> {error}</p>}
-
-        {!list.advanced_features ? (
-          <p className="availability-warning"><CircleAlert size={16} />{tr('Этот список сохранён как обычный документ. Учёт выдачи и возврата для него не включён.', 'Bu ro‘yxat oddiy hujjat sifatida saqlangan. Berish va qaytarish hisobi yoqilmagan.')}</p>
-        ) : (
-          <details className="tracking-details">
+          {!list.advanced_features ? (
+            <p className="availability-warning"><CircleAlert size={16} />{tr('Этот список сохранён как обычный документ. Учёт выдачи и возврата для него не включён.', 'Bu ro‘yxat oddiy hujjat sifatida saqlangan. Berish va qaytarish hisobi yoqilmagan.')}</p>
+          ) : (
+            <details className="tracking-details">
             <summary><span><strong>{tr('Учёт выдачи и возврата', 'Berish va qaytarish hisobi')}</strong><small>{tr('Необязательно — открывайте только для складского учёта', 'Ixtiyoriy — faqat ombor hisobi uchun oching')}</small></span><ChevronRight size={18} /></summary>
             <div className="tracking-details__body">
               <div className="optional-tracking-note"><CircleAlert size={18} /><span><strong>{tr('Что это такое', 'Bu nima')}</strong><small>{tr('Здесь можно подтвердить комплект, отметить его выдачу и возврат. Для обычного списка и скачивания Excel этот раздел не нужен.', 'Bu yerda jamlanmani tasdiqlash, berish va qaytarishni belgilash mumkin. Oddiy ro‘yxat va Excel yuklash uchun bu bo‘lim kerak emas.')}</small></span></div>
@@ -453,10 +458,10 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
                 </div>
               </section>
             </div>
-          </details>
-        )}
+            </details>
+          )}
 
-        <section className={`saved-list-delete ${deleteConfirmOpen ? 'saved-list-delete--open' : ''}`}>
+          <section className={`saved-list-delete ${deleteConfirmOpen ? 'saved-list-delete--open' : ''}`}>
           {!deleteConfirmOpen ? (
             <button className="button button--danger-ghost button--wide" onClick={() => setDeleteConfirmOpen(true)}>
               <Trash2 size={17} />{tr('Удалить список', 'Ro‘yxatni o‘chirish')}
@@ -478,7 +483,8 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
               </div>
             </>
           )}
-        </section>
+          </section>
+        </div>
       </aside>
     </div>
   )
