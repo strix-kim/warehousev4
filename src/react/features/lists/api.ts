@@ -98,13 +98,31 @@ export async function fetchEquipmentLists({ bypassCache = false } = {}) {
 
 export async function fetchEquipmentList(listId: string) {
   if (!supabase) throw new Error('Supabase не настроен')
-  const { data, error } = await supabase
+  const modern = await supabase
     .from('equipment_lists')
     .select(listColumns)
     .eq('id', listId)
     .single()
-  if (error) throw error
-  return { ...data, advanced_features: true } as unknown as EquipmentList
+
+  if (!modern.error) return { ...modern.data, advanced_features: true } as unknown as EquipmentList
+
+  const legacy = await supabase
+    .from('equipment_lists')
+    .select('id,name,description,type,list_mode,equipment_ids,equipment_items,created_at,is_archived')
+    .eq('id', listId)
+    .single()
+
+  if (legacy.error) throw modern.error
+  return {
+    ...legacy.data,
+    reservation_status: 'draft' as const,
+    reservation_start: null,
+    reservation_end: null,
+    shortage_snapshot: null,
+    client_name: null,
+    venue: null,
+    advanced_features: false,
+  } as unknown as EquipmentList
 }
 
 export type EquipmentListDocumentInput = {
