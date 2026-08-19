@@ -312,20 +312,34 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   async function loadDetails() {
     setIsLoading(true)
     setError('')
-    try {
-      const [nextComposition, nextHistory, nextShortages] = await Promise.all([
-        buildSavedListRows(list),
-        list.advanced_features ? fetchReservationHistory(list.id) : Promise.resolve([]),
-        list.advanced_features && list.reservation_start && list.reservation_end ? fetchReservationShortages(list.id) : Promise.resolve([]),
-      ])
-      setComposition(nextComposition)
-      setHistory(nextHistory)
-      setShortages(nextShortages)
-    } catch {
-      setError(tr('Не удалось загрузить состав или служебную информацию списка.', 'Ro‘yxat tarkibi yoki xizmat ma’lumotlarini yuklab bo‘lmadi.'))
-    } finally {
-      setIsLoading(false)
+    const [compositionResult, historyResult, shortagesResult] = await Promise.allSettled([
+      buildSavedListRows(list),
+      list.advanced_features ? fetchReservationHistory(list.id) : Promise.resolve([]),
+      list.advanced_features && list.reservation_start && list.reservation_end ? fetchReservationShortages(list.id) : Promise.resolve([]),
+    ])
+
+    if (compositionResult.status === 'fulfilled') setComposition(compositionResult.value)
+    else setComposition([])
+
+    if (historyResult.status === 'fulfilled') setHistory(historyResult.value)
+    else setHistory([])
+
+    if (shortagesResult.status === 'fulfilled') setShortages(shortagesResult.value)
+    else setShortages([])
+
+    if (compositionResult.status === 'rejected') {
+      setError(tr(
+        'Не удалось загрузить состав списка. Закройте детали и попробуйте открыть их ещё раз.',
+        'Ro‘yxat tarkibini yuklab bo‘lmadi. Tafsilotlarni yoping va yana ochib ko‘ring.',
+      ))
+    } else if (historyResult.status === 'rejected' || shortagesResult.status === 'rejected') {
+      setError(tr(
+        'Состав загружен. Временно недоступны только история или расчёт резерва.',
+        'Tarkib yuklandi. Faqat tarix yoki bandlov hisobi vaqtincha ishlamayapti.',
+      ))
     }
+
+    setIsLoading(false)
   }
 
   useEffect(() => { void loadDetails() }, [list.id, list.reservation_status, tr])
