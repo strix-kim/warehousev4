@@ -353,6 +353,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState('')
+  const [trackingWarning, setTrackingWarning] = useState('')
   const action = list.advanced_features ? transitionCopy[list.reservation_status] : undefined
   const lifecycle = statusView[list.reservation_status]
   const cannotIssuePlan = list.reservation_status === 'confirmed' && list.list_mode === 'abstract'
@@ -369,15 +370,14 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
     setIsLoading(cachedComposition === null)
     setIsTrackingLoading(cachedHistory === null || cachedShortages === null)
     setError('')
+    setTrackingWarning('')
     const trackingRequest = Promise.allSettled([
       list.advanced_features ? fetchReservationHistory(list.id, { bypassCache: cachedHistory !== null }) : Promise.resolve([]),
       needsShortages ? fetchReservationShortages(list.id, { bypassCache: cachedShortages !== null }) : Promise.resolve([]),
     ])
 
-    let compositionLoaded = false
     try {
       setComposition(await buildSavedListRows(list, { bypassCache: cachedComposition !== null }))
-      compositionLoaded = true
     } catch {
       if (cachedComposition === null) setComposition([])
       setError(tr(
@@ -396,10 +396,10 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
     if (shortagesResult.status === 'fulfilled') setShortages(shortagesResult.value)
     else setShortages([])
 
-    if (compositionLoaded && (historyResult.status === 'rejected' || shortagesResult.status === 'rejected')) {
-      setError(tr(
-        'Состав загружен. Временно недоступны только история или расчёт резерва.',
-        'Tarkib yuklandi. Faqat tarix yoki bandlov hisobi vaqtincha ishlamayapti.',
+    if (historyResult.status === 'rejected' || shortagesResult.status === 'rejected') {
+      setTrackingWarning(tr(
+        'Дополнительный складской учёт временно не обновился. Состав списка и Excel доступны как обычно.',
+        'Qo‘shimcha ombor hisobi vaqtincha yangilanmadi. Ro‘yxat tarkibi va Excel odatdagidek mavjud.',
       ))
     }
 
@@ -485,6 +485,8 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
             <summary><span><strong>{tr('Учёт выдачи и возврата', 'Berish va qaytarish hisobi')}</strong><small>{tr('Необязательно — открывайте только для складского учёта', 'Ixtiyoriy — faqat ombor hisobi uchun oching')}</small></span><ChevronRight size={18} /></summary>
             <div className="tracking-details__body">
               <div className="optional-tracking-note"><CircleAlert size={18} /><span><strong>{tr('Что это такое', 'Bu nima')}</strong><small>{tr('Здесь можно подтвердить комплект, отметить его выдачу и возврат. Для обычного списка и скачивания Excel этот раздел не нужен.', 'Bu yerda jamlanmani tasdiqlash, berish va qaytarishni belgilash mumkin. Oddiy ro‘yxat va Excel yuklash uchun bu bo‘lim kerak emas.')}</small></span></div>
+
+              {trackingWarning && <p className="availability-warning"><CircleAlert size={16} />{trackingWarning}</p>}
 
               {isTrackingLoading ? <div className="detail-skeleton" /> : shortages.length > 0 ? (
                 <section className="shortage-panel">
