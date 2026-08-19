@@ -620,10 +620,11 @@ export function ListEditorPage() {
                 <span>{tr('Нажмите на нужную модель в каталоге.', 'Katalogdagi kerakli modelni bosing.')}</span>
               </div>
             )}
-            {selected.map((item) => (
+            {selected.map((item, index) => (
               <article className="quick-selection-item" key={item.group.key}>
                 <div className="quick-selection-item__main">
-                  <div>
+                  <span className="equipment-row-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                  <div className="quick-selection-item__copy">
                     <strong>{item.group.brand} {item.group.model}</strong>
                     <small>{item.group.subtype} · {tr('на складе', 'omborda')} {item.group.availableCount}</small>
                   </div>

@@ -358,10 +358,11 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
         <section className="saved-list-contents">
           <div className="saved-list-contents__heading"><div><h3>{tr('Оборудование в списке', 'Ro‘yxatdagi uskunalar')}</h3><p>{tr('Полный сохранённый состав документа', 'Hujjatning to‘liq saqlangan tarkibi')}</p></div><strong>{listSize(list)}</strong></div>
           {isLoading ? <div className="detail-skeleton" /> : composition.length > 0 ? (
-            <div className="saved-list-items">{composition.map((item) => (
+            <div className="saved-list-items">{composition.map((item, index) => (
               <div className="saved-list-item" key={`${item.category}-${item.equipment}-${item.subtype}`}>
-                <span><strong>{item.equipment}</strong><small>{item.category} · {item.subtype}{item.serialNumbers.length > 0 ? ` · S/N ${item.serialNumbers.join(', ')}` : ''}</small></span>
-                <b>×{item.count}</b>
+                <span className="equipment-row-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                <span className="saved-list-item__copy"><strong>{item.equipment}</strong><small>{item.category} · {item.subtype}{item.serialNumbers.length > 0 ? ` · S/N ${item.serialNumbers.join(', ')}` : ''}</small></span>
+                <b className="saved-list-item__count">×{item.count}</b>
               </div>
             ))}</div>
           ) : <p className="muted">{tr('В этом списке нет оборудования.', 'Bu ro‘yxatda uskuna yo‘q.')}</p>}
