@@ -71,7 +71,10 @@ function todayDateValue() {
 }
 
 function selectDefaultInputValue(input: HTMLInputElement, defaultValue: string) {
-  if (input.value === defaultValue) input.select()
+  if (input.value !== defaultValue) return
+  requestAnimationFrame(() => {
+    if (document.activeElement === input && input.value === defaultValue) input.select()
+  })
 }
 
 function groupKey(item: Pick<Equipment, 'brand' | 'model' | 'type' | 'subtype'>) {
