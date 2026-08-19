@@ -1,4 +1,4 @@
-import { ArrowUpRight, Boxes, ClipboardList, Plus } from 'lucide-react'
+import { ArrowUpRight, Boxes, ClipboardList, Clock3, Plus, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../../lib/i18n'
 
@@ -33,6 +33,16 @@ export function HomePage() {
           <p>{tr('Быстро собрать комплект, указать количество и скачать готовый Excel.', 'Jamlanmani tez yig‘ish, miqdorni ko‘rsatish va tayyor Excelni yuklash.')}</p>
           <span className="home-destination__action"><Plus size={16} /> {tr('Создать список', 'Ro‘yxat yaratish')}</span>
         </Link>
+
+        <article className="home-destination home-destination--employees home-destination--coming-soon" aria-label={tr('Сотрудники — раздел готовится', 'Xodimlar — bo‘lim tayyorlanmoqda')}>
+          <img className="home-destination__art home-destination__art--employees" src="/illustrations/av-team.webp" alt="" aria-hidden="true" loading="eager" decoding="async" fetchPriority="high" />
+          <span className="home-destination__icon"><UsersRound size={34} /></span>
+          <span className="home-destination__status">{tr('Скоро', 'Tez orada')}</span>
+          <span className="eyebrow">{tr('Команда и доступ', 'Jamoa va ruxsat')}</span>
+          <strong>{tr('Сотрудники', 'Xodimlar')}</strong>
+          <p>{tr('Добавлять сотрудников, назначать роли и управлять доступом к складу и спискам.', 'Xodimlarni qo‘shish, rollarni belgilash hamda ombor va ro‘yxatlarga kirishni boshqarish.')}</p>
+          <span className="home-destination__action"><Clock3 size={16} /> {tr('Раздел готовится', 'Bo‘lim tayyorlanmoqda')}</span>
+        </article>
       </div>
     </section>
   )
