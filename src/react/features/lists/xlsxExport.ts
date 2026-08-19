@@ -41,6 +41,10 @@ function numberCell(reference: string, value: number, style: number) {
   return `<c r="${reference}" s="${style}"><v>${value}</v></c>`
 }
 
+function formulaCell(reference: string, formula: string, cachedValue: number, style: number) {
+  return `<c r="${reference}" s="${style}"><f>${xml(formula)}</f><v>${cachedValue}</v></c>`
+}
+
 function getSheetMetrics(input: ExportListInput) {
   const metadataStart = input.documentMode === 'approval' ? 7 : 3
   const headerRow = metadataStart + 8
@@ -69,8 +73,8 @@ function buildSheet(input: ExportListInput) {
       : `УТВЕРЖДАЮ\nДиректор ООО «ARGO MEDIA»\n_____________ Шарапова С.Ш.\n«___» __________ ${year} г.`
     rows.push(
       `<row r="1" ht="42" customHeight="1">${textCell('A1', 'A', 12)}${textCell('B1', companyName, 13)}${textCell('D1', approvalText, 11)}</row>`,
-      `<row r="2" ht="30" customHeight="1">${textCell('A2', companyDetails, 10)}</row>`,
-      '<row r="3" ht="30" customHeight="1"/>',
+      `<row r="2" ht="25" customHeight="1">${textCell('A2', companyDetails, 19)}</row>`,
+      '<row r="3" ht="25" customHeight="1"/>',
       '<row r="4" ht="8" customHeight="1"/>',
       `<row r="5" ht="38" customHeight="1">${textCell('A5', `ARGO MEDIA · ${t.title}`, 1)}</row>`,
       '<row r="6" ht="9" customHeight="1"/>',
@@ -109,23 +113,21 @@ function buildSheet(input: ExportListInput) {
     const rowLines = Math.max(1, item.serialNumbers.length, Math.ceil(item.equipment.length / 42), Math.ceil((item.note?.length ?? 0) / 30))
     const rowHeight = Math.min(96, 30 + ((rowLines - 1) * 15))
     const alternating = index % 2 === 1
-    const textStyle = alternating ? 19 : 16
-    const numberStyle = alternating ? 20 : 17
-    const serialStyle = alternating ? 21 : 18
+    const textStyle = alternating ? 16 : 6
+    const numberStyle = alternating ? 17 : 7
+    const serialStyle = alternating ? 18 : 8
     rows.push(`<row r="${rowNumber}" ht="${rowHeight}" customHeight="1">${numberCell(`A${rowNumber}`, index + 1, numberStyle)}${textCell(`B${rowNumber}`, item.equipment, textStyle)}${numberCell(`C${rowNumber}`, item.count, numberStyle)}${textCell(`D${rowNumber}`, item.serialNumbers.length ? item.serialNumbers.join('\n') : t.noSerials, serialStyle)}${textCell(`E${rowNumber}`, item.note || '', textStyle)}</row>`)
   })
-  rows.push(`<row r="${totalRow}" ht="32" customHeight="1">${textCell(`A${totalRow}`, t.total, 7)}${numberCell(`C${totalRow}`, total, 8)}${textCell(`D${totalRow}`, '', 7)}</row>`)
-  merges.push(`A${totalRow}:B${totalRow}`, `D${totalRow}:E${totalRow}`)
+  rows.push(`<row r="${totalRow}" ht="32" customHeight="1">${textCell(`A${totalRow}`, '', 9)}${textCell(`B${totalRow}`, t.total, 9)}${formulaCell(`C${totalRow}`, `SUM(C${dataStart}:C${Math.max(dataStart, totalRow - 1)})`, total, 10)}${textCell(`D${totalRow}`, '', 9)}${textCell(`E${totalRow}`, '', 9)}</row>`)
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
   <dimension ref="A1:E${totalRow}"/>
-  <sheetViews><sheetView workbookViewId="0" showGridLines="0" zoomScale="90"><pane ySplit="${headerRow}" topLeftCell="A${dataStart}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
+  <sheetViews><sheetView workbookViewId="0" showGridLines="0" zoomScale="90"/></sheetViews>
   <sheetFormatPr defaultRowHeight="20"/>
   <cols><col min="1" max="1" width="6" customWidth="1"/><col min="2" max="2" width="44" customWidth="1"/><col min="3" max="3" width="10" customWidth="1"/><col min="4" max="4" width="30" customWidth="1"/><col min="5" max="5" width="28" customWidth="1"/></cols>
   <sheetData>${rows.join('')}</sheetData>
-  <autoFilter ref="A${headerRow}:E${Math.max(headerRow, totalRow - 1)}"/>
   <mergeCells count="${merges.length}">${merges.map((reference) => `<mergeCell ref="${reference}"/>`).join('')}</mergeCells>
   <printOptions horizontalCentered="1"/>
   <pageMargins left="0.35" right="0.35" top="0.55" bottom="0.55" header="0.25" footer="0.25"/>
@@ -136,33 +138,51 @@ function buildSheet(input: ExportListInput) {
 
 const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <fonts count="6"><font><sz val="10"/><name val="Arial"/><family val="2"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="16"/><name val="Arial"/><family val="2"/></font><font><b/><color rgb="FF171C20"/><sz val="9"/><name val="Arial"/><family val="2"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="10"/><name val="Arial"/><family val="2"/></font><font><b/><color rgb="FF171C20"/><sz val="13"/><name val="Arial"/><family val="2"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="18"/><name val="Arial"/><family val="2"/></font></fonts>
-  <fills count="8"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEF1236"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF0F2EF"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF171C20"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF8F9F6"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFE9ED"/><bgColor indexed="64"/></patternFill></fill></fills>
-  <borders count="5"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFE2E5E1"/></left><right style="thin"><color rgb="FFE2E5E1"/></right><top style="thin"><color rgb="FFE2E5E1"/></top><bottom style="thin"><color rgb="FFE2E5E1"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFE2E5E1"/></bottom><diagonal/></border><border><left/><right/><top style="medium"><color rgb="FFEF1236"/></top><bottom style="thin"><color rgb="FFD8DDD7"/></bottom><diagonal/></border><border><left style="medium"><color rgb="FFEF1236"/></left><right/><top/><bottom style="thin"><color rgb="FFE2E5E1"/></bottom><diagonal/></border></borders>
+  <fonts count="7">
+    <font><color rgb="FF22282C"/><sz val="10"/><name val="Arial"/><family val="2"/></font>
+    <font><b/><color rgb="FFFFFFFF"/><sz val="16"/><name val="Arial"/><family val="2"/></font>
+    <font><b/><color rgb="FF22282C"/><sz val="9"/><name val="Arial"/><family val="2"/></font>
+    <font><b/><color rgb="FFFFFFFF"/><sz val="10"/><name val="Arial"/><family val="2"/></font>
+    <font><b/><color rgb="FF22282C"/><sz val="13"/><name val="Arial"/><family val="2"/></font>
+    <font><b/><color rgb="FFFFFFFF"/><sz val="18"/><name val="Arial"/><family val="2"/></font>
+    <font><color rgb="FF687178"/><sz val="9"/><name val="Arial"/><family val="2"/></font>
+  </fonts>
+  <fills count="8">
+    <fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFEF1236"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFF2F4F1"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF171C20"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFFAFBF9"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFFFF1F4"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="3">
+    <border><left/><right/><top/><bottom/><diagonal/></border>
+    <border><left/><right/><top/><bottom style="thin"><color rgb="FFDDE2DD"/></bottom><diagonal/></border>
+    <border><left/><right/><top style="medium"><color rgb="FFEF1236"/></top><bottom/><diagonal/></border>
+  </borders>
   <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-  <cellXfs count="22">
+  <cellXfs count="20">
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
     <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="2" fillId="3" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>
     <xf numFmtId="0" fontId="3" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="5" borderId="2" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="5" borderId="2" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="5" borderId="2" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
-    <xf numFmtId="0" fontId="2" fillId="3" borderId="3" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>
-    <xf numFmtId="0" fontId="4" fillId="7" borderId="3" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1" indent="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="3" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="7" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
     <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1"/></xf>
     <xf numFmtId="0" fontId="5" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
     <xf numFmtId="0" fontId="1" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" indent="1"/></xf>
-    <xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>
-    <xf numFmtId="0" fontId="2" fillId="7" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="5" borderId="2" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="5" borderId="2" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="5" borderId="2" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="6" borderId="2" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="6" borderId="2" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="6" borderId="2" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
   </cellXfs>
   <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`
@@ -225,7 +245,7 @@ export function createEquipmentListXlsxBlob(input: ExportListInput) {
     { name: '_rels/.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>` },
     { name: 'docProps/app.xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>ARGO Warehouse</Application></Properties>` },
     { name: 'docProps/core.xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xml(input.name)}</dc:title><dc:creator>ARGO Warehouse</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created></cp:coreProperties>` },
-    { name: 'xl/workbook.xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${sheetName}" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">&apos;${sheetName}&apos;!$A$1:$E$${totalRow}</definedName><definedName name="_xlnm.Print_Titles" localSheetId="0">&apos;${sheetName}&apos;!$${headerRow}:$${headerRow}</definedName></definedNames></workbook>` },
+    { name: 'xl/workbook.xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${sheetName}" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">&apos;${sheetName}&apos;!$A$1:$E$${totalRow}</definedName><definedName name="_xlnm.Print_Titles" localSheetId="0">&apos;${sheetName}&apos;!$${headerRow}:$${headerRow}</definedName></definedNames><calcPr fullCalcOnLoad="1" forceFullCalc="1"/></workbook>` },
     { name: 'xl/_rels/workbook.xml.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
     { name: 'xl/styles.xml', content: styles },
     { name: 'xl/worksheets/sheet1.xml', content: buildSheet(input) },
