@@ -6,7 +6,6 @@ import {
   Clock3,
   FileSpreadsheet,
   FileCheck2,
-  ListChecks,
   PackageCheck,
   PencilLine,
   Plus,
@@ -231,13 +230,14 @@ export function ListsPage() {
           <div className="list-grid">
             {isLoading && rows.length === 0
               ? Array.from({ length: 6 }, (_, index) => <div className="list-card list-card--loading" key={index} />)
-              : visibleRows.map((list) => {
+              : visibleRows.map((list, index) => {
                   const lifecycle = list.advanced_features ? statusView[list.reservation_status] : { label: tr('Сохранён', 'Saqlangan'), tone: 'neutral' }
                   const isExporting = exporting?.id === list.id
+                  const listNumber = (page - 1) * pageSize + index + 1
                   return (
                     <article className="list-card" key={list.id}>
                       <div className="list-card__top">
-                        <span className="list-icon"><ListChecks size={20} /></span>
+                        <span className="list-card__number" aria-label={`${tr('Список', 'Ro‘yxat')} ${listNumber}`}>{String(listNumber).padStart(2, '0')}</span>
                         <span className={`badge badge--${lifecycle.tone}`}><i />{lifecycle.label}</span>
                       </div>
                       <div>
