@@ -71,10 +71,7 @@ function todayDateValue() {
 }
 
 function selectDefaultInputValue(input: HTMLInputElement, defaultValue: string) {
-  if (input.value !== defaultValue) return
-  requestAnimationFrame(() => {
-    if (document.activeElement === input && input.value === defaultValue) input.select()
-  })
+  if (input.value === defaultValue) input.select()
 }
 
 function groupKey(item: Pick<Equipment, 'brand' | 'model' | 'type' | 'subtype'>) {
@@ -447,7 +444,12 @@ export function ListEditorPage() {
           <input
             value={name}
             onFocus={(event) => selectDefaultInputValue(event.currentTarget, defaults.name)}
-            onClick={(event) => selectDefaultInputValue(event.currentTarget, defaults.name)}
+            onPointerDown={(event) => {
+              if (event.currentTarget.value !== defaults.name) return
+              event.preventDefault()
+              event.currentTarget.focus()
+              event.currentTarget.select()
+            }}
             onBlur={(event) => {
               if (event.currentTarget.value.trim()) return
               setName(defaults.name)
@@ -476,7 +478,12 @@ export function ListEditorPage() {
           <input
             value={clientName}
             onFocus={(event) => selectDefaultInputValue(event.currentTarget, defaults.clientName)}
-            onClick={(event) => selectDefaultInputValue(event.currentTarget, defaults.clientName)}
+            onPointerDown={(event) => {
+              if (event.currentTarget.value !== defaults.clientName) return
+              event.preventDefault()
+              event.currentTarget.focus()
+              event.currentTarget.select()
+            }}
             onBlur={(event) => {
               if (event.currentTarget.value.trim()) return
               setClientName(defaults.clientName)
@@ -491,7 +498,12 @@ export function ListEditorPage() {
           <input
             value={venue}
             onFocus={(event) => selectDefaultInputValue(event.currentTarget, defaults.venue)}
-            onClick={(event) => selectDefaultInputValue(event.currentTarget, defaults.venue)}
+            onPointerDown={(event) => {
+              if (event.currentTarget.value !== defaults.venue) return
+              event.preventDefault()
+              event.currentTarget.focus()
+              event.currentTarget.select()
+            }}
             onBlur={(event) => {
               if (event.currentTarget.value.trim()) return
               setVenue(defaults.venue)
