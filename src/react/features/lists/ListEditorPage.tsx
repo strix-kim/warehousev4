@@ -27,7 +27,18 @@ import { useLanguage } from '../../lib/i18n'
 import { useModalLayer } from '../../lib/useModalLayer'
 import { fetchAllEquipment, readCachedAllEquipment } from '../equipment/api'
 import type { Equipment } from '../equipment/types'
-import { createEquipmentList, fetchEquipmentList, readCachedEquipmentList, updateEquipmentList, type EquipmentList, type EquipmentListItem } from './api'
+import {
+  clearListDraft,
+  createEquipmentList,
+  fetchEquipmentList,
+  readCachedEquipmentList,
+  readListDraft,
+  saveListDraft,
+  updateEquipmentList,
+  type EquipmentList,
+  type EquipmentListItem,
+  type ListDraft,
+} from './api'
 import { listDocumentDefaults } from './documentDefaults'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
@@ -61,6 +72,24 @@ function selectDefaultInputValue(input: HTMLInputElement, defaultValue: string) 
   if (input.value === defaultValue) input.select()
 }
 
+// Реквизит считается нетронутым, если он пуст или совпадает с дефолтом ЛЮБОГО из
+// языков: пользователь мог переключить язык, не притронувшись к полю.
+function isDefaultDocumentValue(value: string, field: 'name' | 'clientName' | 'venue') {
+  const trimmed = value.trim()
+  return !trimmed || Object.values(listDocumentDefaults).some((item) => item[field] === trimmed)
+}
+
+// «Пустой» черновик не хранится и стирает уже записанный: иначе один заход на
+// /lists/new без единого действия подсовывал бы плашку «черновик восстановлен».
+// Дата и формат Excel в проверку не входят — у них дефолт есть всегда.
+function isDraftEmpty(draft: ListDraft) {
+  return draft.items.length === 0
+    && !draft.description.trim()
+    && isDefaultDocumentValue(draft.name, 'name')
+    && isDefaultDocumentValue(draft.clientName, 'clientName')
+    && isDefaultDocumentValue(draft.venue, 'venue')
+}
+
 function groupKey(item: Pick<Equipment, 'brand' | 'model' | 'type' | 'subtype'>) {
   return [item.brand, item.model, item.type, item.subtype].map((value) => value.trim().toLocaleLowerCase('ru')).join('::')
 }
@@ -76,12 +105,16 @@ export function ListEditorPage() {
   const { listId } = useParams<{ listId: string }>()
   const { tr, language, locale } = useLanguage()
   const defaults = listDocumentDefaults[language]
-  const [name, setName] = useState<string>(() => listDocumentDefaults[language].name)
-  const [clientName, setClientName] = useState<string>(() => listDocumentDefaults[language].clientName)
-  const [venue, setVenue] = useState<string>(() => listDocumentDefaults[language].venue)
-  const [description, setDescription] = useState('')
-  const [documentMode, setDocumentMode] = useState<'working' | 'approval'>('working')
-  const [eventDate, setEventDate] = useState(todayDateValue)
+  // Черновик восстанавливается ТОЛЬКО в режиме создания: у открытого списка
+  // источник правды — строка в базе. Шапка документа поднимается прямо в
+  // начальном стейте, поэтому эффект языковых дефолтов её уже не перетирает.
+  const [restoredDraft] = useState(() => listId ? null : readListDraft())
+  const [name, setName] = useState<string>(() => restoredDraft?.name ?? listDocumentDefaults[language].name)
+  const [clientName, setClientName] = useState<string>(() => restoredDraft?.clientName ?? listDocumentDefaults[language].clientName)
+  const [venue, setVenue] = useState<string>(() => restoredDraft?.venue ?? listDocumentDefaults[language].venue)
+  const [description, setDescription] = useState(() => restoredDraft?.description ?? '')
+  const [documentMode, setDocumentMode] = useState<'working' | 'approval'>(() => restoredDraft?.documentMode ?? 'working')
+  const [eventDate, setEventDate] = useState(() => restoredDraft?.eventDate ?? todayDateValue())
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
   const [subcategory, setSubcategory] = useState('')
@@ -104,10 +137,16 @@ export function ListEditorPage() {
   const [catalogLimit, setCatalogLimit] = useState(60)
   const catalogRef = useRef<HTMLElement>(null)
   const selectionRef = useRef<HTMLElement>(null)
+  // Сколько позиций черновика не нашлось в живом каталоге. null — плашки нет.
+  const [draftNotice, setDraftNotice] = useState<{ missingGroups: number } | null>(null)
   // Гидратация разведена на две: шапка документа заполняется сразу из строки
   // списка, состав — только когда приехал каталог.
   const hydratedMetaRef = useRef('')
   const hydratedSelectionRef = useRef('')
+  // Автосейв заблокирован, пока восстановление не закончилось: стартовый пустой
+  // стейт затёр бы сохранённый черновик раньше, чем тот успеет подняться.
+  // Восстанавливать нечего — снят сразу.
+  const draftRestoredRef = useRef(!restoredDraft)
 
   useEffect(() => {
     let current = true
@@ -255,6 +294,63 @@ export function ListEditorPage() {
     hydratedSelectionRef.current = listToEdit.id
   }, [equipment, groups, listToEdit])
 
+  // Выборка черновика поднимается только по живому каталогу: позицию ищем по
+  // ключу группы, серийники оставляем те, что ещё существуют. Пока каталог
+  // грузится или не загрузился вовсе, восстановление не запускается — иначе
+  // «ничего не нашлось» стёрло бы черновик вместо того, чтобы его вернуть.
+  useEffect(() => {
+    if (!restoredDraft || draftRestoredRef.current || isLoading || hasLoadError) return
+    const groupsByKey = new Map(groups.map((group) => [group.key, group]))
+    const restored: SelectedGroup[] = []
+    let missingGroups = 0
+
+    for (const item of restoredDraft.items) {
+      const group = groupsByKey.get(item.key)
+      if (!group) {
+        missingGroups += 1
+        continue
+      }
+      const serialIds = item.serialIds.filter((id) => group.serializedItems.some((unit) => unit.id === id))
+      restored.push({ group, count: Math.max(1, item.count), serialIds, serialPickerOpen: false })
+    }
+
+    setSelected(restored)
+    setDraftNotice({ missingGroups })
+    draftRestoredRef.current = true
+  }, [groups, hasLoadError, isLoading, restoredDraft])
+
+  const draftItems = useMemo(() => selected.map((item) => ({
+    key: item.group.key,
+    count: item.count,
+    serialIds: item.serialIds,
+  })), [selected])
+
+  // Автосейв черновика: пауза 1 с после последнего изменения. Режим
+  // редактирования сюда не заходит — там «сохранить» пишет в базу.
+  useEffect(() => {
+    if (listId || !draftRestoredRef.current) return
+    const timer = window.setTimeout(() => {
+      const draft: ListDraft = { name, clientName, venue, description, eventDate, documentMode, items: draftItems }
+      if (isDraftEmpty(draft)) clearListDraft()
+      else saveListDraft(draft)
+    }, 1000)
+    return () => window.clearTimeout(timer)
+  }, [clientName, description, documentMode, draftItems, eventDate, listId, name, venue])
+
+  // «Начать заново»: черновик стирается, форма возвращается к дефолтам.
+  function discardDraft() {
+    clearListDraft()
+    setDraftNotice(null)
+    setSelected([])
+    setName(defaults.name)
+    setClientName(defaults.clientName)
+    setVenue(defaults.venue)
+    setDescription('')
+    setEventDate(todayDateValue())
+    setDocumentMode('working')
+    setSuccessMessage('')
+  }
+
   useEffect(() => { setSubcategory(''); setCatalogLimit(60) }, [category])
   useEffect(() => setCatalogLimit(60), [search, subcategory])
 
@@ -377,7 +473,12 @@ export function ListEditorPage() {
       const id = await persistList()
       setSuccessMessage(isCreating ? tr('Список сохранён в системе.', 'Ro‘yxat tizimda saqlandi.') : tr('Изменения сохранены.', 'O‘zgarishlar saqlandi.'))
       // После создания источник правды — listId из URL: следующее «Сохранить» обновит эту же запись, а не заведёт вторую.
-      if (isCreating) navigate(`/lists/${id}/edit`, { replace: true })
+      if (isCreating) {
+        // Черновик своё отработал: дальше запись живёт в базе.
+        clearListDraft()
+        setDraftNotice(null)
+        navigate(`/lists/${id}/edit`, { replace: true })
+      }
     } catch {
       setSaveError(tr('Не удалось сохранить список. Файл всё ещё можно скачать.', 'Ro‘yxatni saqlab bo‘lmadi. Faylni baribir yuklab olish mumkin.'))
     } finally {
@@ -442,6 +543,20 @@ export function ListEditorPage() {
       {openError && <div className="state-block state-block--error editor-open-error"><CircleAlert size={23} /><strong>{tr('Список не открыт', 'Ro‘yxat ochilmadi')}</strong><span>{openError === 'not-draft'
         ? tr('Изменять можно только черновики. Подтверждённый или выданный список доступен в режиме просмотра.', 'Faqat qoralamalarni o‘zgartirish mumkin. Tasdiqlangan yoki berilgan ro‘yxat faqat ko‘rish rejimida mavjud.')
         : tr('Не удалось открыть сохранённый список.', 'Saqlangan ro‘yxatni ochib bo‘lmadi.')}</span><button className="button button--secondary" onClick={() => navigate('/lists')}>{tr('Вернуться к спискам', 'Ro‘yxatlarga qaytish')}</button></div>}
+
+      {draftNotice && (
+        <div className="editor-draft-notice">
+          <Info size={18} />
+          <span>
+            <strong>{tr('Черновик восстановлен', 'Qoralama tiklandi')}</strong>
+            {draftNotice.missingGroups > 0 && <small>{tr(
+              `позиций больше нет в каталоге: ${draftNotice.missingGroups}`,
+              `katalogda qolmagan pozitsiyalar: ${draftNotice.missingGroups}`,
+            )}</small>}
+          </span>
+          <button className="button button--secondary" type="button" onClick={discardDraft}>{tr('Начать заново', 'Yangidan boshlash')}</button>
+        </div>
+      )}
 
       <section className="quick-list-meta data-panel">
         <label className="field quick-list-meta__name">

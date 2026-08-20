@@ -496,6 +496,11 @@ h2 { letter-spacing: -0.025em; }
 .tracking-details__body { padding: 14px; }
 .tracking-details__body .optional-tracking-note { margin-top: 0; }
 .editor-open-error { margin-bottom: 18px; border: 1px solid #efc6c6; border-radius: var(--radius-md); }
+.editor-draft-notice { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-soft); }
+.editor-draft-notice > svg { flex: 0 0 auto; color: var(--accent); }
+.editor-draft-notice > span { display: flex; flex: 1 1 auto; flex-direction: column; gap: 3px; min-width: 0; }
+.editor-draft-notice strong { font-size: 13px; }
+.editor-draft-notice small { color: var(--ink-faint); font-size: 12px; line-height: 1.45; }
 .shortage-panel { margin-bottom: 14px; border: 1px solid #f0d99d; border-radius: 10px; background: #fffaf0; overflow: hidden; }
 .shortage-panel > div { display: flex; gap: 10px; padding: 13px; color: var(--warning); }
 .shortage-panel > div svg { flex: 0 0 auto; }

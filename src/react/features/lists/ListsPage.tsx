@@ -16,7 +16,7 @@ import {
   TriangleAlert,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
@@ -101,38 +101,32 @@ export function ListsPage() {
   const navigate = useNavigate()
   const { tr, locale, language } = useLanguage()
   const statusView = getStatusView(tr)
-  const [initialResult] = useState(readCachedEquipmentLists)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(preferredListsPageSize)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState<'all' | ReservationStatus>('all')
+  const [initialResult] = useState(() => readCachedEquipmentLists({ page: 1, search: '', status: 'all', pageSize }))
   const [rows, setRows] = useState<EquipmentList[]>(() => initialResult?.rows ?? [])
   const [total, setTotal] = useState(() => initialResult?.total ?? 0)
   const [isLoading, setIsLoading] = useState(() => !initialResult)
-  const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState<'all' | ReservationStatus>('all')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(preferredListsPageSize)
+  // Только флаг: текст ошибки собирается на рендере. Строка в стейте потянула бы
+  // tr в зависимости эффекта загрузки, и смена языка перезапрашивала бы списки.
+  const [hasLoadError, setHasLoadError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [selected, setSelected] = useState<EquipmentList | null>(null)
   const [exporting, setExporting] = useState<{ id: string; mode: 'working' | 'approval' } | null>(null)
   const [exportError, setExportError] = useState('')
 
-  async function loadLists(bypassCache = false) {
-    const cached = readCachedEquipmentLists()
-    if (cached && !bypassCache) {
-      setRows(cached.rows)
-      setTotal(cached.total)
-    }
-    setIsLoading(!cached && rows.length === 0)
-    setError('')
-    try {
-      const result = await fetchEquipmentLists({ bypassCache: bypassCache || Boolean(cached) })
-      setRows(result.rows)
-      setTotal(result.total)
-      if (selected) setSelected(result.rows.find((item) => item.id === selected.id) ?? null)
-    } catch {
-      if (!cached && rows.length === 0) setError(tr('Не удалось загрузить сохранённые списки.', 'Saqlangan ro‘yxatlarni yuklab bo‘lmadi.'))
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  // Поиск и фильтр теперь считает база, поэтому total — это счётчик ТЕКУЩЕЙ
+  // выборки: без фильтров «всего», с фильтрами «найдено».
+  const isFiltered = Boolean(search) || status !== 'all'
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  // Номер страницы зажимается на рендере: удалили единственный список второй
+  // страницы — pageCount стал 1, а page остался 2, и панель показывала
+  // «Страница 2 из 1» без единой карточки. Зажатое значение и рисуется, и грузится.
+  const currentPage = Math.min(page, pageCount)
+  const visibleListIds = rows.map((list) => list.id).join(':')
 
   useEffect(() => {
     const media = window.matchMedia(MOBILE_MEDIA_QUERY)
@@ -144,28 +138,49 @@ export function ListsPage() {
     return () => media.removeEventListener('change', handleChange)
   }, [])
 
-  useEffect(() => { void loadLists() }, [])
+  // Запрос уходит не на каждую букву: пауза 300 мс, и любая смена запроса
+  // возвращает на первую страницу — иначе «страница 3» осталась бы за пределами
+  // новой выборки.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      // Тримим здесь же: api всё равно обрежет строку перед ключом кэша, а
+      // пробел, набранный в поле, иначе включал бы подпись «Найдено списков».
+      setSearch(searchInput.trim())
+      setPage(1)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [searchInput])
 
-  const filteredRows = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase('ru')
-    return rows.filter((list) => {
-      const matchesSearch = !query || `${list.name} ${list.description ?? ''}`.toLocaleLowerCase('ru').includes(query)
-      return matchesSearch && (status === 'all' || list.reservation_status === status)
-    })
-  }, [rows, search, status])
-  const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize))
-  // Номер страницы зажимается на рендере: удалили единственный список второй
-  // страницы — pageCount стал 1, а page остался 2, и панель показывала
-  // «Страница 2 из 1» без единой карточки.
-  const currentPage = Math.min(page, pageCount)
-  const visibleRows = filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-  const visibleListIds = visibleRows.map((list) => list.id).join(':')
+  useEffect(() => setPage(1), [status])
 
-  useEffect(() => setPage(1), [search, status])
+  useEffect(() => {
+    let isCurrent = true
+    const cached = readCachedEquipmentLists({ page: currentPage, search, status, pageSize })
+    if (cached) {
+      setRows(cached.rows)
+      setTotal(cached.total)
+    }
+    setIsLoading(!cached)
+    setHasLoadError(false)
+
+    fetchEquipmentLists({ page: currentPage, search, status, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
+      .then((result) => {
+        if (!isCurrent) return
+        setRows(result.rows)
+        setTotal(result.total)
+        // Открытые детали переезжают на свежую строку: смена этапа и удаление
+        // возвращаются сюда через reloadKey.
+        setSelected((current) => current ? result.rows.find((item) => item.id === current.id) ?? null : null)
+      })
+      .catch(() => { if (isCurrent && !cached) setHasLoadError(true) })
+      .finally(() => { if (isCurrent) setIsLoading(false) })
+
+    return () => { isCurrent = false }
+  }, [currentPage, pageSize, reloadKey, search, status])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      visibleRows.slice(0, 6).forEach((list) => { void prefetchSavedListDetails(list) })
+      rows.slice(0, 6).forEach((list) => { void prefetchSavedListDetails(list) })
     }, 500)
     return () => window.clearTimeout(timer)
   }, [visibleListIds])
@@ -207,20 +222,20 @@ export function ListsPage() {
       </header>
 
       <section className="metric-strip">
-        <div className="metric"><span className="metric__label">{tr('Всего списков', 'Jami ro‘yxatlar')}</span><strong>{total}</strong></div>
+        <div className="metric"><span className="metric__label">{isFiltered ? tr('Найдено списков', 'Topilgan ro‘yxatlar') : tr('Всего списков', 'Jami ro‘yxatlar')}</span><strong>{total}</strong></div>
         <div className="metric metric--notice"><CircleAlert size={17} /><span>{tr('Excel скачивается без сохранения; нехватка остаётся предупреждением и не блокирует работу', 'Excel saqlamasdan yuklanadi; yetishmovchilik ogohlantirish bo‘lib qoladi va ishni to‘xtatmaydi')}</span></div>
       </section>
 
       <section className="data-panel">
         <div className="panel-heading">
-          <div><h2>{tr('Сохранённые списки', 'Saqlangan ro‘yxatlar')}</h2><p>{tr('Необязательный архив: до 50 последних списков из базы.', 'Ixtiyoriy arxiv: bazadagi so‘nggi 50 tagacha ro‘yxat.')}</p></div>
+          <div><h2>{tr('Сохранённые списки', 'Saqlangan ro‘yxatlar')}</h2><p>{tr('Необязательный архив: поиск, фильтр и страницы считает база — по всему архиву.', 'Ixtiyoriy arxiv: qidiruv, filtr va sahifalarni baza hisoblaydi — butun arxiv bo‘yicha.')}</p></div>
           <span className="read-only-label">{tr('Расширенный учёт', 'Kengaytirilgan hisob')}</span>
         </div>
 
         <div className="toolbar">
           <label className="search-field">
             <Search size={18} />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tr('Название или описание…', 'Nomi yoki tavsifi…')} aria-label={tr('Поиск списков', 'Ro‘yxatlarni qidirish')} />
+            <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder={tr('Название списка…', 'Ro‘yxat nomi…')} aria-label={tr('Поиск списков', 'Ro‘yxatlarni qidirish')} />
           </label>
           <AppSelect
             value={status}
@@ -239,13 +254,13 @@ export function ListsPage() {
 
         {exportError && <p className="form-error list-export-error"><CircleAlert size={14} /> {exportError}</p>}
 
-        {error ? (
-          <div className="state-block state-block--error"><CircleAlert size={25} /><strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong><span>{error}</span><button className="button button--secondary" onClick={() => void loadLists(true)}>{tr('Повторить', 'Qayta urinish')}</button></div>
+        {hasLoadError ? (
+          <div className="state-block state-block--error"><CircleAlert size={25} /><strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong><span>{tr('Не удалось загрузить сохранённые списки.', 'Saqlangan ro‘yxatlarni yuklab bo‘lmadi.')}</span><button className="button button--secondary" onClick={() => setReloadKey((current) => current + 1)}>{tr('Повторить', 'Qayta urinish')}</button></div>
         ) : (
           <div className="list-grid">
             {isLoading && rows.length === 0
               ? Array.from({ length: 6 }, (_, index) => <div className="list-card list-card--loading" key={index} />)
-              : visibleRows.map((list, index) => {
+              : rows.map((list, index) => {
                   const lifecycle = list.advanced_features ? statusView[list.reservation_status] : { label: tr('Сохранён', 'Saqlangan'), tone: 'neutral' }
                   const isExporting = exporting?.id === list.id
                   const listNumber = (currentPage - 1) * pageSize + index + 1
@@ -281,8 +296,8 @@ export function ListsPage() {
                 })}
           </div>
         )}
-        {!isLoading && !error && filteredRows.length === 0 && (
-          total === 0 && !search && status === 'all' ? (
+        {!isLoading && !hasLoadError && rows.length === 0 && (
+          total === 0 && !isFiltered ? (
             <div className="state-block state-block--illustrated state-block--roomy">
               <img src="/illustrations/equipment-kit.webp" alt="" aria-hidden="true" />
               <strong>{tr('Сохранённых списков пока нет', 'Saqlangan ro‘yxatlar hozircha yo‘q')}</strong>
@@ -293,9 +308,9 @@ export function ListsPage() {
             <div className="state-block"><Search size={25} /><strong>{tr('Списки не найдены', 'Ro‘yxatlar topilmadi')}</strong><span>{tr('Измените запрос или фильтр.', 'So‘rov yoki filtrni o‘zgartiring.')}</span></div>
           )
         )}
-        {!isLoading && !error && filteredRows.length > 0 && (
+        {!isLoading && !hasLoadError && rows.length > 0 && (
           <footer className="pagination">
-            <span>{tr('Показано', 'Ko‘rsatildi')} {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredRows.length)} {tr('из', 'dan')} {filteredRows.length}</span>
+            <span>{tr('Показано', 'Ko‘rsatildi')} {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, total)} {tr('из', 'dan')} {total}</span>
             <div className="pagination__controls">
               <button className="icon-button icon-button--bordered" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)} aria-label={tr('Предыдущая страница списков', 'Ro‘yxatlarning oldingi sahifasi')}><ChevronLeft size={18} /></button>
               <span>{tr('Страница', 'Sahifa')} <strong>{currentPage}</strong> {tr('из', 'dan')} {pageCount}</span>
@@ -305,12 +320,12 @@ export function ListsPage() {
         )}
       </section>
 
-      {selected && <ReservationDrawer list={selected} onClose={() => setSelected(null)} onChanged={() => loadLists(true)} />}
+      {selected && <ReservationDrawer list={selected} onClose={() => setSelected(null)} onChanged={() => setReloadKey((current) => current + 1)} />}
     </>
   )
 }
 
-function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; onClose: () => void; onChanged: () => Promise<void> }) {
+function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; onClose: () => void; onChanged: () => void }) {
   const navigate = useNavigate()
   const { tr, locale, language } = useLanguage()
   useModalLayer(onClose)
@@ -386,7 +401,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
     setError('')
     try {
       await transitionEquipmentList(list.id, action.target, note)
-      await onChanged()
+      onChanged()
     } catch (transitionError) {
       const message = transitionError instanceof Error ? transitionError.message : ''
       setError(message.includes('physically available') || message.includes('shortage') ? 'issue-shortage' : 'transition')
@@ -400,7 +415,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
     setError('')
     try {
       await deleteEquipmentList(list.id)
-      await onChanged()
+      onChanged()
       onClose()
     } catch {
       setError('delete')

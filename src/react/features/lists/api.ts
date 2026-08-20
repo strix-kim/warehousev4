@@ -2,9 +2,10 @@ import { supabase } from '../../lib/supabase'
 import { cachedQuery, invalidateCachePrefix, primeCachedQuery, readCachedQuery } from '../../lib/persistentCache'
 import type { Json, Tables } from '../../lib/database.types'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
+import { escapeLikePattern } from '../../lib/postgrest'
 import { fetchEquipmentByIds } from '../equipment/api'
 import type { Equipment } from '../equipment/types'
-import { listCompositionCacheKey } from './cacheKeys'
+import { LIST_DRAFT_CACHE_KEY, LIST_DRAFT_TTL_MS, listCompositionCacheKey } from './cacheKeys'
 import type { ExportListRow } from './xlsxExport'
 
 export type ReservationStatus = 'draft' | 'confirmed' | 'issued' | 'returned'
@@ -105,10 +106,14 @@ async function withLegacySchemaFallback<Result>(run: (schema: 'modern' | 'legacy
   }
 }
 
-// Сохранённые списки пагинируются на клиенте, но размер страницы — тоже контракт
-// фичи: он один и там, где список рисуется, и там, где его прогревают.
+export const LISTS_PAGE_SIZE = 12
+export const MOBILE_LISTS_PAGE_SIZE = 6
+
+// Размер страницы входит в ключ кэша, поэтому его выбирает сама фича: и страница,
+// и прогрев в App.tsx обязаны спросить одно и то же число, иначе прогрев ляжет
+// мимо ключа, который потом читает список.
 export function preferredListsPageSize() {
-  return window.matchMedia(MOBILE_MEDIA_QUERY).matches ? 6 : 12
+  return window.matchMedia(MOBILE_MEDIA_QUERY).matches ? MOBILE_LISTS_PAGE_SIZE : LISTS_PAGE_SIZE
 }
 
 // list_mode и reservation_status держит CHECK в базе, но в схеме это обычный text —
@@ -168,20 +173,63 @@ function normalizeLegacyList(row: LegacyEquipmentListRow): EquipmentList {
   }
 }
 
-export function readCachedEquipmentLists() {
-  return readCachedQuery<{ rows: EquipmentList[]; total: number }>('equipment-lists:recent')
+export type EquipmentListsQuery = {
+  page?: number
+  search?: string
+  status?: 'all' | ReservationStatus
+  pageSize?: number
+  bypassCache?: boolean
 }
 
-export async function fetchEquipmentLists({ bypassCache = false } = {}) {
+export type EquipmentListsPage = {
+  rows: EquipmentList[]
+  // Счётчик ТЕКУЩЕЙ выборки: с фильтрами это «найдено», без них — «всего».
+  // Второй ходки за общим числом нет намеренно.
+  total: number
+}
+
+type NormalizedListsQuery = Required<Omit<EquipmentListsQuery, 'bypassCache'>>
+
+function normalizeListsQuery({ page = 1, search = '', status = 'all', pageSize = LISTS_PAGE_SIZE }: EquipmentListsQuery): NormalizedListsQuery {
+  return { page, search: search.trim(), status, pageSize }
+}
+
+// Ключ остаётся под префиксом `equipment-lists:` — его целиком сбрасывает любая
+// запись (создание, правка, удаление, смена этапа), и страницы обязаны уехать
+// вместе с ней.
+function equipmentListsCacheKey(query: NormalizedListsQuery) {
+  return `equipment-lists:page:${JSON.stringify(query)}`
+}
+
+export function readCachedEquipmentLists(query: Omit<EquipmentListsQuery, 'bypassCache'> = {}) {
+  return readCachedQuery<EquipmentListsPage>(equipmentListsCacheKey(normalizeListsQuery(query)))
+}
+
+export async function fetchEquipmentLists(query: EquipmentListsQuery = {}): Promise<EquipmentListsPage> {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
-  return cachedQuery('equipment-lists:recent', 10 * 60 * 1000, () => withLegacySchemaFallback(async (schema) => {
+  const normalized = normalizeListsQuery(query)
+  const { page, search, status, pageSize } = normalized
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+  const namePattern = search ? `%${escapeLikePattern(search)}%` : ''
+
+  return cachedQuery(equipmentListsCacheKey(normalized), 10 * 60 * 1000, () => withLegacySchemaFallback(async (schema) => {
     if (schema === 'legacy') {
-      const { data, error, count } = await client
+      // В старой схеме нет reservation_status: поиск по названию всё равно
+      // серверный, а фильтр этапа разбираем здесь. normalizeLegacyList помечает
+      // ВСЕ такие строки черновиком, поэтому «все этапы» и «черновики» пропускают
+      // выборку как есть, а любой другой этап заведомо пуст — и страница, и
+      // счётчик. Фильтровать после .range() нельзя: страницы разъехались бы.
+      if (status !== 'all' && status !== 'draft') return { rows: [], total: 0 }
+      let legacyQuery = client
         .from('equipment_lists')
         .select(legacyListColumns, { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(50)
+        .order('id', { ascending: false })
+        .range(from, to)
+      if (namePattern) legacyQuery = legacyQuery.ilike('name', namePattern)
+      const { data, error, count } = await legacyQuery
       if (error) throw error
       return {
         rows: (data ?? []).map((item) => normalizeLegacyList(item)),
@@ -189,17 +237,24 @@ export async function fetchEquipmentLists({ bypassCache = false } = {}) {
       }
     }
 
-    const { data, error, count } = await client
+    // Сортировка created_at desc, id desc: created_at не уникален (импорт кладёт
+    // пачку одной секундой), и без второго ключа строка могла попасть на две
+    // соседние страницы сразу либо не попасть ни на одну.
+    let listsQuery = client
       .from('equipment_lists')
       .select(listColumns, { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(50)
+      .order('id', { ascending: false })
+      .range(from, to)
+    if (namePattern) listsQuery = listsQuery.ilike('name', namePattern)
+    if (status !== 'all') listsQuery = listsQuery.eq('reservation_status', status)
+    const { data, error, count } = await listsQuery
     if (error) throw error
     return {
       rows: (data ?? []).map((item) => normalizeList(item)),
       total: count ?? 0,
     }
-  }), { bypass: bypassCache })
+  }), { bypass: query.bypassCache ?? false })
 }
 
 function equipmentListCacheKey(listId: string) {
@@ -337,6 +392,42 @@ export function buildSavedListComposition(list: EquipmentList, { bypassCache = f
 export function prefetchSavedListDetails(list: EquipmentList) {
   primeCachedQuery(equipmentListCacheKey(list.id), 10 * 60 * 1000, list)
   return buildSavedListComposition(list).catch(() => undefined)
+}
+
+// Черновик редактора нового списка. Позиция хранится КЛЮЧОМ ГРУППЫ, а не снимком
+// бренда и модели: восстановление всё равно пересобирает выборку по живому
+// каталогу, и снимок разошёлся бы с ним после переименования модели.
+export type ListDraftItem = {
+  key: string
+  count: number
+  serialIds: string[]
+}
+
+export type ListDraft = {
+  name: string
+  clientName: string
+  venue: string
+  description: string
+  eventDate: string
+  documentMode: 'working' | 'approval'
+  items: ListDraftItem[]
+}
+
+export function readListDraft() {
+  return readCachedQuery<ListDraft>(LIST_DRAFT_CACHE_KEY)
+}
+
+export function saveListDraft(draft: ListDraft) {
+  primeCachedQuery(LIST_DRAFT_CACHE_KEY, LIST_DRAFT_TTL_MS, draft)
+}
+
+// Точечного удаления одного ключа у persistentCache нет, поэтому стираем
+// префиксом. Пустой вызов гасим сразу: invalidateCachePrefix поднимает поколение
+// кэша, а это отменяет запись ВСЕХ ответов, летящих прямо сейчас, — и обычный
+// заход на /lists/new без черновика выбрасывал бы прогрев каталога.
+export function clearListDraft() {
+  if (readListDraft() === null) return
+  invalidateCachePrefix(LIST_DRAFT_CACHE_KEY)
 }
 
 export type EquipmentListDocumentInput = {

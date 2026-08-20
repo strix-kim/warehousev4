@@ -19,3 +19,11 @@ export function listCompositionCacheKey(listId: string) {
 export function invalidateListCompositionCache() {
   invalidateCachePrefix(listCompositionCachePrefix)
 }
+
+// Черновик несохранённого списка (/lists/new). Ключ НАМЕРЕННО живёт вне префикса
+// `equipment-lists:`: тот целиком сбрасывается на каждом создании, правке,
+// удалении и смене этапа — и унёс бы с собой работу, которую пользователь ещё не
+// сохранял. Сутки — верхняя граница «вернусь к этому завтра»; дальше запись
+// протухает сама.
+export const LIST_DRAFT_CACHE_KEY = 'list-draft:new'
+export const LIST_DRAFT_TTL_MS = 24 * 60 * 60 * 1000
