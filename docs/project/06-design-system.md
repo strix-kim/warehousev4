@@ -150,11 +150,13 @@ inline-теней `rgba(...)` уникальных под конкретный �
 **Зоны касания 44px** — объявлены точечно, не единой утилитой:
 `styles.css:64` (`.sidebar__nav a`, `min-height`), `:334` (`.home-destination__arrow`),
 `:618` (`.login-icon`), `:696` (`.button` внутри `@media 820px`), `:702`
-(`.search-field, .select-field`), `:768` (`.mode-switch button`), `:779`
+(`.search-field`), `:779`
 (`.quantity-stepper`), `:807` (`.button`, readability-pass — дублирует `:696`),
 `:871/873/874/876/877/878/880` (readability-pass, второй `@media 820px`:
 `.language-switch--compact button`, `.icon-button`, `.editor-header`,
 `.mobile-editor-tabs button`, `.picker-item`, `.app-select`).
+`.mode-switch button` из этого перечня удалён: класса `.mode-switch` нет в разметке,
+его правила снесены как мёртвый CSS (заодно с `.select-field`).
 
 **`prefers-reduced-motion: reduce`** — два блока, идентичных по содержанию,
 не объединены:
