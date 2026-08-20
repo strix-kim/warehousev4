@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase'
-import { cachedQuery, invalidateCachePrefix, readCachedQuery } from '../../lib/persistentCache'
+import { cachedQuery, invalidateCachePrefix, primeCachedQuery, readCachedQuery } from '../../lib/persistentCache'
 import type { Json, Tables } from '../../lib/database.types'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { fetchEquipmentByIds } from '../equipment/api'
@@ -76,7 +76,34 @@ export type ReservationHistory = Omit<
 
 const listColumns = 'id,name,description,client_name,venue,type,list_mode,equipment_ids,equipment_items,created_at,is_archived,reservation_status,reservation_start,reservation_end,shortage_snapshot'
 
+const legacyListColumns = 'id,name,description,type,list_mode,equipment_ids,equipment_items,created_at,is_archived'
+
 const reservationStatuses: ReservationStatus[] = ['draft', 'confirmed', 'issued', 'returned']
+
+// Коды, которые означают ровно одно: в базе НЕТ того, что мы просим, — таблицы
+// (PGRST205, 42P01) или колонки (PGRST204, 42703). Только они разрешают повтор
+// запроса в старой схеме. Сетевой сбой, 401 и отказ RLS сюда не попадают: раньше
+// они уводили в legacy-ветку, где статус жёстко проставлялся черновиком, и этот
+// вымысел кэшировался на 10 минут.
+const missingSchemaCodes = new Set(['PGRST205', '42P01', 'PGRST204', '42703'])
+
+function isMissingSchemaError(error: unknown) {
+  if (!error || typeof error !== 'object') return false
+  const code = (error as { code?: unknown }).code
+  return typeof code === 'string' && missingSchemaCodes.has(code)
+}
+
+// Единственная ветка фолбэка на старую схему: сначала запрос в современной схеме,
+// и только код «нет колонки/таблицы» разрешает второй заход. Ошибка второго захода
+// уходит наружу как есть.
+async function withLegacySchemaFallback<Result>(run: (schema: 'modern' | 'legacy') => Promise<Result>): Promise<Result> {
+  try {
+    return await run('modern')
+  } catch (error) {
+    if (!isMissingSchemaError(error)) throw error
+    return run('legacy')
+  }
+}
 
 // Сохранённые списки пагинируются на клиенте, но размер страницы — тоже контракт
 // фичи: он один и там, где список рисуется, и там, где его прогревают.
@@ -148,29 +175,31 @@ export function readCachedEquipmentLists() {
 export async function fetchEquipmentLists({ bypassCache = false } = {}) {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
-  return cachedQuery('equipment-lists:recent', 10 * 60 * 1000, async () => {
+  return cachedQuery('equipment-lists:recent', 10 * 60 * 1000, () => withLegacySchemaFallback(async (schema) => {
+    if (schema === 'legacy') {
+      const { data, error, count } = await client
+        .from('equipment_lists')
+        .select(legacyListColumns, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .limit(50)
+      if (error) throw error
+      return {
+        rows: (data ?? []).map((item) => normalizeLegacyList(item)),
+        total: count ?? 0,
+      }
+    }
+
     const { data, error, count } = await client
       .from('equipment_lists')
       .select(listColumns, { count: 'exact' })
       .order('created_at', { ascending: false })
       .limit(50)
-
-    if (!error) return {
+    if (error) throw error
+    return {
       rows: (data ?? []).map((item) => normalizeList(item)),
       total: count ?? 0,
     }
-
-    const legacy = await client
-      .from('equipment_lists')
-      .select('id,name,description,type,list_mode,equipment_ids,equipment_items,created_at,is_archived', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .limit(50)
-    if (legacy.error) throw error
-    return {
-      rows: (legacy.data ?? []).map((item) => normalizeLegacyList(item)),
-      total: legacy.count ?? 0,
-    }
-  }, { bypass: bypassCache })
+  }), { bypass: bypassCache })
 }
 
 function equipmentListCacheKey(listId: string) {
@@ -200,24 +229,25 @@ export function readCachedReservationHistory(listId: string) {
 export async function fetchEquipmentList(listId: string, { bypassCache = false } = {}) {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
-  return cachedQuery(equipmentListCacheKey(listId), 10 * 60 * 1000, async () => {
-    const modern = await client
+  return cachedQuery(equipmentListCacheKey(listId), 10 * 60 * 1000, () => withLegacySchemaFallback(async (schema) => {
+    if (schema === 'legacy') {
+      const { data, error } = await client
+        .from('equipment_lists')
+        .select(legacyListColumns)
+        .eq('id', listId)
+        .single()
+      if (error) throw error
+      return normalizeLegacyList(data)
+    }
+
+    const { data, error } = await client
       .from('equipment_lists')
       .select(listColumns)
       .eq('id', listId)
       .single()
-
-    if (!modern.error) return normalizeList(modern.data)
-
-    const legacy = await client
-      .from('equipment_lists')
-      .select('id,name,description,type,list_mode,equipment_ids,equipment_items,created_at,is_archived')
-      .eq('id', listId)
-      .single()
-
-    if (legacy.error) throw modern.error
-    return normalizeLegacyList(legacy.data)
-  }, { bypass: bypassCache })
+    if (error) throw error
+    return normalizeList(data)
+  }), { bypass: bypassCache })
 }
 
 // Состав сохранённого списка — строки для деталей и для Excel. Ключ кэша
@@ -262,13 +292,14 @@ export function buildSavedListRows(list: EquipmentList, { bypassCache = false } 
   return cachedQuery(listCompositionCacheKey(list.id), 10 * 60 * 1000, () => loadSavedListRows(list), { bypass: bypassCache })
 }
 
+// Прогрев карточки списка стоит РОВНО один запрос — состав. Деталь списка мы уже
+// держим в руках: строка из equipment-lists:recent собрана тем же селектом, что и
+// одиночная выборка, поэтому кладём её в кэш детали напрямую. История и дефицит
+// грузятся при открытии деталей: reservation_shortages — полная агрегация склада,
+// звать её вслепую на шесть карточек нечем оправдать.
 export function prefetchSavedListDetails(list: EquipmentList) {
-  return Promise.allSettled([
-    buildSavedListRows(list),
-    fetchEquipmentList(list.id),
-    list.advanced_features ? fetchReservationHistory(list.id) : Promise.resolve([]),
-    list.advanced_features && list.reservation_start && list.reservation_end ? fetchReservationShortages(list.id) : Promise.resolve([]),
-  ])
+  primeCachedQuery(equipmentListCacheKey(list.id), 10 * 60 * 1000, list)
+  return buildSavedListRows(list).catch(() => undefined)
 }
 
 export type EquipmentListDocumentInput = {

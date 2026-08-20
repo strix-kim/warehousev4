@@ -117,6 +117,10 @@ export async function fetchEquipment({ page, search, availability, pageSize = EQ
   }, { bypass: bypassCache })
 }
 
+// Полная выгрузка каталога — это ~1.4 МБ JSON, поэтому она живёт ТОЛЬКО в памяти
+// сессии (persist: false): в localStorage она одна съедала треть квоты Safari,
+// а с сервера батчами приезжает за секунды. Цена — после перезагрузки страницы
+// редактор списка ждёт сеть вместо первого кадра из кэша.
 export async function fetchAllEquipment({ bypassCache = false } = {}): Promise<Equipment[]> {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
@@ -138,7 +142,7 @@ export async function fetchAllEquipment({ bypassCache = false } = {}): Promise<E
       if (batch.length < batchSize) break
     }
     return rows
-  }, { bypass: bypassCache })
+  }, { bypass: bypassCache, persist: false })
 }
 
 export async function fetchEquipmentByIds(ids: string[]): Promise<Equipment[]> {
