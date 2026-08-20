@@ -7,6 +7,10 @@
 READY, `warehouse.argomedia.uz` отвечает 200. Отставание с1–с2 закрыто.
 **Последний doc-audit:** не проводился; `03-data-model` сведён с живой базой в с2.
 Следующий рубеж — ≈с6.
+**Аудит архитектуры:** проведён в с4 —
+`docs/project/audits/2026-08-20-architecture.md`. 66 находок пережили адверсариальную
+проверку (1 HIGH, 7 medium), 5 отклонено. Вердикт: **проект собран правильно**;
+системная проблема одна — у контрактов нет владельцев.
 **Мост:** **подключён полностью.** Supabase — `warehousev4` (`umbqiktyqlfqqgupxqdm`),
 Vercel — `warehousev4` (`prj_2Xh9KlIRla8fZaF4n8ZcSWDQ14MY`, команда
 `team_VVVqjT57YkCiqVBzOXs0OBfs`).
