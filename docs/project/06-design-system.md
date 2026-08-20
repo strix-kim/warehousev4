@@ -6,7 +6,7 @@
 
 Источники: `src/react/styles.css` (889 строк, прочитан целиком), `index.html`,
 `src/react/components/AppSelect.tsx`, `src/react/components/AppDatePicker.tsx`,
-`src/react/features/equipment/EquipmentVisual.tsx`, `public/`, `AUDIT-2026-08-19.md`.
+`src/react/features/equipment/EquipmentVisual.tsx`, `public/`, `docs/handoffs/2026-08-19-0-audit.md`.
 
 ## 1. Токены (`:root`, `styles.css:1-27`; сами переменные — `:7-26`)
 
@@ -246,7 +246,7 @@ category icon is safer than an arbitrary product photo"` (22 записи — ф
 
 ## 9. Правило иллюстраций
 
-Из `AUDIT-2026-08-19.md:42-43`:
+Из `docs/handoffs/2026-08-19-0-audit.md:58-59`:
 > Использовать иллюстрации на входе, главной и в пустых/обучающих состояниях.
 > Использовать реальные фото в превью конкретной модели.
 
@@ -279,7 +279,7 @@ CSS-in-JS; классы — плоские BEM-подобные имена (`.bl
 - Контраст цветов (WCAG AA/AAA) не проверялся ни для одной пары фон/текст.
 - Реальный визуальный результат (скриншоты) не снимался — вся страница написана
   по чтению кода, без раннера/браузера.
-- `AUDIT-2026-08-19.md` целиком построчно не проверялся — использован только
+- `docs/handoffs/2026-08-19-0-audit.md` целиком построчно не проверялся — использован только
   фрагмент про правило иллюстраций (:8-10, :42-43); остальные заявления файла
   вне зоны этой страницы.
 - `manifest.json` в `public/equipment-images/` не открывался напрямую — использован
