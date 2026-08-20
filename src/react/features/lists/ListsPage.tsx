@@ -19,19 +19,21 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
+import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
-import { cachedQuery, readCachedQuery } from '../../lib/persistentCache'
 import { useModalLayer } from '../../lib/useModalLayer'
-import { fetchEquipmentByIds } from '../equipment/api'
 import {
+  buildSavedListRows,
   deleteEquipmentList,
-  fetchEquipmentList,
   fetchEquipmentLists,
   fetchReservationHistory,
   fetchReservationShortages,
+  prefetchSavedListDetails,
+  preferredListsPageSize,
   readCachedReservationHistory,
   readCachedReservationShortages,
   readCachedEquipmentLists,
+  readCachedSavedListRows,
   transitionEquipmentList,
   type EquipmentList,
   type ReservationHistory,
@@ -60,10 +62,6 @@ function getTransitionCopy(tr: Tr): Partial<Record<ReservationStatus, { target: 
   }
 }
 
-function preferredPageSize() {
-  return window.matchMedia('(max-width: 820px)').matches ? 6 : 12
-}
-
 // equipment_ids и equipment_items не пересекаются: RPC кладёт серийные позиции в первый
 // массив, все остальные — во второй. Поэтому размер списка — их сумма при любом list_mode.
 function listSize(list: EquipmentList) {
@@ -73,55 +71,6 @@ function listSize(list: EquipmentList) {
 
 function formatDate(value: string | null, locale: string, tr: Tr) {
   return value ? new Intl.DateTimeFormat(locale).format(new Date(`${value}T12:00:00`)) : tr('дата не указана', 'sana ko‘rsatilmagan')
-}
-
-function savedListRowsCacheKey(listId: string) {
-  return `equipment-lists:composition:${listId}`
-}
-
-function readCachedSavedListRows(listId: string) {
-  return readCachedQuery<ExportListRow[]>(savedListRowsCacheKey(listId))
-}
-
-async function loadSavedListRows(list: EquipmentList) {
-  const serialized = await fetchEquipmentByIds(list.equipment_ids ?? [])
-  const grouped = new Map<string, ExportListRow>()
-  const addRow = (row: ExportListRow) => {
-    const key = `${row.category}::${row.equipment}::${row.subtype}`.toLocaleLowerCase('ru')
-    const current = grouped.get(key)
-    if (current) {
-      current.count += row.count
-      current.serialNumbers.push(...row.serialNumbers)
-    } else grouped.set(key, { ...row, serialNumbers: [...row.serialNumbers] })
-  }
-  for (const item of serialized) addRow({
-    category: item.type,
-    equipment: `${item.brand} ${item.model}`.trim(),
-    subtype: item.subtype,
-    count: 1,
-    serialNumbers: item.serialnumber ? [item.serialnumber] : [],
-  })
-  for (const item of list.equipment_items ?? []) addRow({
-    category: item.type,
-    equipment: `${item.brand} ${item.model}`.trim(),
-    subtype: item.subtype,
-    count: item.count,
-    serialNumbers: [],
-  })
-  return [...grouped.values()]
-}
-
-function buildSavedListRows(list: EquipmentList, { bypassCache = false } = {}) {
-  return cachedQuery(savedListRowsCacheKey(list.id), 10 * 60 * 1000, () => loadSavedListRows(list), { bypass: bypassCache })
-}
-
-function prefetchSavedListDetails(list: EquipmentList) {
-  return Promise.allSettled([
-    buildSavedListRows(list),
-    fetchEquipmentList(list.id),
-    list.advanced_features ? fetchReservationHistory(list.id) : Promise.resolve([]),
-    list.advanced_features && list.reservation_start && list.reservation_end ? fetchReservationShortages(list.id) : Promise.resolve([]),
-  ])
 }
 
 export function ListsPage() {
@@ -136,7 +85,7 @@ export function ListsPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<'all' | ReservationStatus>('all')
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(preferredPageSize)
+  const [pageSize, setPageSize] = useState(preferredListsPageSize)
   const [selected, setSelected] = useState<EquipmentList | null>(null)
   const [exporting, setExporting] = useState<{ id: string; mode: 'working' | 'approval' } | null>(null)
   const [exportError, setExportError] = useState('')
@@ -162,9 +111,9 @@ export function ListsPage() {
   }
 
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 820px)')
+    const media = window.matchMedia(MOBILE_MEDIA_QUERY)
     const handleChange = () => {
-      setPageSize(preferredPageSize())
+      setPageSize(preferredListsPageSize())
       setPage(1)
     }
     media.addEventListener('change', handleChange)

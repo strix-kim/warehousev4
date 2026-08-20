@@ -1,7 +1,11 @@
 import { supabase } from '../../lib/supabase'
 import { cachedQuery, invalidateCachePrefix, readCachedQuery } from '../../lib/persistentCache'
 import type { Json, Tables } from '../../lib/database.types'
+import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
+import { fetchEquipmentByIds } from '../equipment/api'
 import type { Equipment } from '../equipment/types'
+import { listCompositionCacheKey } from './cacheKeys'
+import type { ExportListRow } from './xlsxExport'
 
 export type ReservationStatus = 'draft' | 'confirmed' | 'issued' | 'returned'
 
@@ -41,8 +45,6 @@ export type EquipmentList = Omit<
   advanced_features: boolean
 }
 
-export type AbstractListItem = EquipmentListItem
-
 export type ReservationShortage = {
   brand: string
   model: string
@@ -75,6 +77,12 @@ export type ReservationHistory = Omit<
 const listColumns = 'id,name,description,client_name,venue,type,list_mode,equipment_ids,equipment_items,created_at,is_archived,reservation_status,reservation_start,reservation_end,shortage_snapshot'
 
 const reservationStatuses: ReservationStatus[] = ['draft', 'confirmed', 'issued', 'returned']
+
+// Сохранённые списки пагинируются на клиенте, но размер страницы — тоже контракт
+// фичи: он один и там, где список рисуется, и там, где его прогревают.
+export function preferredListsPageSize() {
+  return window.matchMedia(MOBILE_MEDIA_QUERY).matches ? 6 : 12
+}
 
 // list_mode и reservation_status держит CHECK в базе, но в схеме это обычный text —
 // сужаем на входе, чтобы дальше по коду ходил доменный тип.
@@ -210,6 +218,57 @@ export async function fetchEquipmentList(listId: string, { bypassCache = false }
     if (legacy.error) throw modern.error
     return normalizeLegacyList(legacy.data)
   }, { bypass: bypassCache })
+}
+
+// Состав сохранённого списка — строки для деталей и для Excel. Ключ кэша
+// принадлежит этой фиче, но лежит в листовом cacheKeys.ts: сбрасывать его
+// нужно и из equipment/api, а зависимость equipment → lists/api замкнула бы
+// граф фич в цикл.
+export { invalidateListCompositionCache } from './cacheKeys'
+
+export function readCachedSavedListRows(listId: string) {
+  return readCachedQuery<ExportListRow[]>(listCompositionCacheKey(listId))
+}
+
+async function loadSavedListRows(list: EquipmentList) {
+  const serialized = await fetchEquipmentByIds(list.equipment_ids ?? [])
+  const grouped = new Map<string, ExportListRow>()
+  const addRow = (row: ExportListRow) => {
+    const key = `${row.category}::${row.equipment}::${row.subtype}`.toLocaleLowerCase('ru')
+    const current = grouped.get(key)
+    if (current) {
+      current.count += row.count
+      current.serialNumbers.push(...row.serialNumbers)
+    } else grouped.set(key, { ...row, serialNumbers: [...row.serialNumbers] })
+  }
+  for (const item of serialized) addRow({
+    category: item.type,
+    equipment: `${item.brand} ${item.model}`.trim(),
+    subtype: item.subtype,
+    count: 1,
+    serialNumbers: item.serialnumber ? [item.serialnumber] : [],
+  })
+  for (const item of list.equipment_items ?? []) addRow({
+    category: item.type,
+    equipment: `${item.brand} ${item.model}`.trim(),
+    subtype: item.subtype,
+    count: item.count,
+    serialNumbers: [],
+  })
+  return [...grouped.values()]
+}
+
+export function buildSavedListRows(list: EquipmentList, { bypassCache = false } = {}) {
+  return cachedQuery(listCompositionCacheKey(list.id), 10 * 60 * 1000, () => loadSavedListRows(list), { bypass: bypassCache })
+}
+
+export function prefetchSavedListDetails(list: EquipmentList) {
+  return Promise.allSettled([
+    buildSavedListRows(list),
+    fetchEquipmentList(list.id),
+    list.advanced_features ? fetchReservationHistory(list.id) : Promise.resolve([]),
+    list.advanced_features && list.reservation_start && list.reservation_end ? fetchReservationShortages(list.id) : Promise.resolve([]),
+  ])
 }
 
 export type EquipmentListDocumentInput = {

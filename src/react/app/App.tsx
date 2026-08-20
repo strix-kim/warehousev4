@@ -66,7 +66,9 @@ function AppShell() {
           page: 1,
           search: '',
           availability: '',
-          pageSize: window.matchMedia('(max-width: 820px)').matches ? 8 : equipmentApi.EQUIPMENT_PAGE_SIZE,
+          // Размер страницы входит в ключ кэша: прогрев обязан спросить его у самой фичи,
+          // иначе страница промахнётся мимо прогретой записи.
+          pageSize: equipmentApi.preferredEquipmentPageSize(),
         }),
         listsApi.fetchEquipmentLists(),
       ])).catch(() => undefined)
@@ -74,7 +76,7 @@ function AppShell() {
     const editorDataTimer = window.setTimeout(() => {
       void Promise.all([
         import('../features/equipment/api'),
-        import('../features/equipment/EquipmentVisual'),
+        import('../components/EquipmentVisual'),
       ]).then(async ([equipmentApi, visuals]) => {
         const [equipment] = await Promise.all([
           equipmentApi.fetchAllEquipment(),

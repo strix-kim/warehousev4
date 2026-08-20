@@ -1,10 +1,21 @@
 import { supabase } from '../../lib/supabase'
 import { cachedQuery, invalidateCachePrefix, readCachedQuery } from '../../lib/persistentCache'
 import type { Json } from '../../lib/database.types'
+import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
+// Только листовой cacheKeys, не lists/api: обратное ребро замкнуло бы цикл фич.
+import { invalidateListCompositionCache } from '../lists/cacheKeys'
+import type { EquipmentAvailability } from './availability'
 import type { EquipmentPageResult } from './types'
 import type { Equipment, EquipmentRow } from './types'
 
 export const EQUIPMENT_PAGE_SIZE = 50
+export const MOBILE_EQUIPMENT_PAGE_SIZE = 8
+
+// Размер страницы каталога входит в ключ кэша, поэтому его выбирает эта фича:
+// прогрев в App.tsx и сама страница обязаны спрашивать одно и то же число.
+export function preferredEquipmentPageSize() {
+  return window.matchMedia(MOBILE_MEDIA_QUERY).matches ? MOBILE_EQUIPMENT_PAGE_SIZE : EQUIPMENT_PAGE_SIZE
+}
 
 const quantityPlaceholders = new Set(['', 'n/a', 'na', 'нет', 'без номера', 'б/н', 'none', 'null', '-'])
 
@@ -173,7 +184,10 @@ export type CreateEquipmentInput = {
   type: string
   subtype: string
   count: number
-  availability: string
+  // Новая запись заводится только с кодом из словаря; правка существующей
+  // единицы (UpdateEquipmentInput) остаётся строкой — там в поле может лежать
+  // историческое значение, которое интерфейс не сужает.
+  availability: EquipmentAvailability
   location: string
   technicalspecification?: string
   lengthinmeters?: string
@@ -313,7 +327,8 @@ export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput): 
 
   invalidateCachePrefix('equipment:')
   invalidateCachePrefix('equipment-taxonomy')
-  invalidateCachePrefix('equipment-lists:composition:')
+  // Состав сохранённых списков подписан данными модели — ключ принадлежит фиче списков.
+  invalidateListCompositionCache()
   return { item: normalizeEquipment(data), updatedModelUnits }
 }
 

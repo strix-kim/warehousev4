@@ -1,7 +1,8 @@
 import { Check, ChevronDown } from 'lucide-react'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { usePopoverLayer } from '../lib/usePopoverLayer'
 
 export type AppSelectOption<T extends string> = {
   value: T
@@ -41,25 +42,7 @@ export function AppSelect<T extends string>({
     setPosition({ top, left: Math.max(12, left), width })
   }, [open, options.length])
 
-  useEffect(() => {
-    if (!open) return
-    const closeOnOutside = (event: PointerEvent) => {
-      const target = event.target as Node
-      if (!rootRef.current?.contains(target) && !popoverRef.current?.contains(target)) setOpen(false)
-    }
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
-    const closeOnViewportChange = () => setOpen(false)
-    document.addEventListener('pointerdown', closeOnOutside)
-    window.addEventListener('keydown', closeOnEscape)
-    window.addEventListener('resize', closeOnViewportChange)
-    window.addEventListener('scroll', closeOnViewportChange)
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutside)
-      window.removeEventListener('keydown', closeOnEscape)
-      window.removeEventListener('resize', closeOnViewportChange)
-      window.removeEventListener('scroll', closeOnViewportChange)
-    }
-  }, [open])
+  usePopoverLayer(open, () => setOpen(false), [rootRef, popoverRef])
 
   return (
     <div className={`app-select ${className}`} ref={rootRef}>

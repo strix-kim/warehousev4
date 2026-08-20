@@ -1,21 +1,11 @@
 import { CalendarDays, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { parseDateValue, toDateValue } from '../lib/date'
+import { usePopoverLayer } from '../lib/usePopoverLayer'
 
 const uzbekMonths = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr']
 const uzbekWeekdays = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya']
-
-function parseDate(value: string) {
-  const [year, month, day] = value.split('-').map(Number)
-  return year && month && day ? new Date(year, month - 1, day) : null
-}
-
-function toDateValue(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 function sameDay(first: Date, second: Date) {
   return first.getFullYear() === second.getFullYear()
@@ -54,7 +44,7 @@ export function AppDatePicker({
   previousMonthLabel: string
   nextMonthLabel: string
 }) {
-  const selectedDate = useMemo(() => parseDate(value), [value])
+  const selectedDate = useMemo(() => parseDateValue(value), [value])
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
@@ -79,25 +69,7 @@ export function AppDatePicker({
     setPosition({ top, left, width })
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const closeOnOutside = (event: PointerEvent) => {
-      const target = event.target as Node
-      if (!triggerRef.current?.contains(target) && !popoverRef.current?.contains(target)) setOpen(false)
-    }
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
-    const closeOnViewportChange = () => setOpen(false)
-    document.addEventListener('pointerdown', closeOnOutside)
-    window.addEventListener('keydown', closeOnEscape)
-    window.addEventListener('resize', closeOnViewportChange)
-    window.addEventListener('scroll', closeOnViewportChange)
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutside)
-      window.removeEventListener('keydown', closeOnEscape)
-      window.removeEventListener('resize', closeOnViewportChange)
-      window.removeEventListener('scroll', closeOnViewportChange)
-    }
-  }, [open])
+  usePopoverLayer(open, () => setOpen(false), [triggerRef, popoverRef])
 
   const firstWeekday = (new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1).getDay() + 6) % 7
   const daysInMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0).getDate()

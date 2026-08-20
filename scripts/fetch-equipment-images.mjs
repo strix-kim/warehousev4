@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { createClient } from '@supabase/supabase-js'
 
@@ -38,7 +39,11 @@ function parseEnv(source) {
     }))
 }
 
-function normalize(value) {
+// Контракт ключа картинки. Эти две функции — единственный источник: скрипт
+// именует ими записи манифеста и он же эмитит их ИСХОДНИКОМ в generated-модуль
+// (см. renderEquipmentImagesModule), откуда их берёт клиент. Копии по разные
+// стороны tsconfig больше нет, разъехаться нечему.
+export function normalize(value) {
   return value
     .toLocaleLowerCase('ru')
     .normalize('NFKD')
@@ -47,8 +52,22 @@ function normalize(value) {
     .replace(/\s+/g, ' ')
 }
 
-function equipmentKey(brand, model) {
+export function equipmentKey(brand, model) {
   return `${normalize(brand)}::${normalize(model)}`
+}
+
+// Текст generated/equipmentImages.ts. Функции уезжают своим же исходником,
+// типы навешиваются контекстно — параметры получают тип из аннотации const.
+export function renderEquipmentImagesModule(clientManifest) {
+  return `// Generated from scripts/image-cache/manifest.json. Keep the client bundle limited to local paths.
+// Функции ключа генератор эмитит исходником из scripts/fetch-equipment-images.mjs:
+// правка normalize там приезжает сюда сама, руками этот файл не трогают.
+export const normalize: (value: string) => string = ${normalize.toString()}
+
+export const equipmentImageKey: (brand: string, model: string) => string = ${equipmentKey.toString()}
+
+export const equipmentImages: Record<string, string> = ${JSON.stringify(clientManifest, null, 2)}
+`
 }
 
 function isGenericEquipment(item) {
@@ -207,7 +226,7 @@ async function saveArtifacts(manifest, failures, equipment) {
   await writeFile(manifestUrl, `${JSON.stringify(orderedManifest, null, 2)}\n`)
   await writeFile(reportUrl, `${JSON.stringify({ generatedAt: new Date().toISOString(), total, downloaded: Object.keys(manifest).length, missing: missingItems.length, missingItems }, null, 2)}\n`)
   const clientManifest = Object.fromEntries(Object.entries(orderedManifest).map(([key, entry]) => [key, entry.src]))
-  await writeFile(generatedUrl, `// Generated from scripts/image-cache/manifest.json. Keep the client bundle limited to local paths.\nexport const equipmentImages: Record<string, string> = ${JSON.stringify(clientManifest, null, 2)}\n`)
+  await writeFile(generatedUrl, renderEquipmentImagesModule(clientManifest))
 
   const referencedFiles = new Set(Object.values(manifest).map((entry) => entry.src.split('/').at(-1)))
   const orphanedFiles = (await readdir(outputDirectory))
@@ -277,4 +296,6 @@ async function main() {
   console.log(`Done. Images: ${Object.keys(manifest).length}/${equipment.length}; fallback icons: ${equipment.length - Object.keys(manifest).length}`)
 }
 
-await main()
+// Скрапинг запускается только при прямом вызове (`npm run images:equipment`):
+// импорт модуля должен отдавать функции ключа, а не ходить в сеть.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main()

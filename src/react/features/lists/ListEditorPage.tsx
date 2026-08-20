@@ -20,13 +20,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AppDatePicker } from '../../components/AppDatePicker'
 import { AppSelect } from '../../components/AppSelect'
+import { EquipmentVisual, preloadEquipmentImages } from '../../components/EquipmentVisual'
+import { todayDateValue } from '../../lib/date'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
 import { useModalLayer } from '../../lib/useModalLayer'
 import { fetchAllEquipment, readCachedAllEquipment } from '../equipment/api'
-import { EquipmentVisual, preloadEquipmentImages } from '../equipment/EquipmentVisual'
 import type { Equipment } from '../equipment/types'
 import { createEquipmentList, fetchEquipmentList, readCachedEquipmentList, updateEquipmentList, type EquipmentList, type EquipmentListItem } from './api'
+import { listDocumentDefaults } from './documentDefaults'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
 type CatalogGroup = {
@@ -50,27 +52,6 @@ type SelectedGroup = {
   serialPickerOpen: boolean
 }
 
-const listDefaults = {
-  ru: {
-    name: 'Техническое обеспечение мероприятия',
-    clientName: 'Заказчик не указан',
-    venue: 'Площадка мероприятия',
-  },
-  uz: {
-    name: 'Tadbirni texnik ta’minlash',
-    clientName: 'Buyurtmachi ko‘rsatilmagan',
-    venue: 'Tadbir maydoni',
-  },
-} as const
-
-function todayDateValue() {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 function selectDefaultInputValue(input: HTMLInputElement, defaultValue: string) {
   if (input.value === defaultValue) input.select()
 }
@@ -89,10 +70,10 @@ export function ListEditorPage() {
   const navigate = useNavigate()
   const { listId } = useParams<{ listId: string }>()
   const { tr, language, locale } = useLanguage()
-  const defaults = listDefaults[language]
-  const [name, setName] = useState<string>(() => listDefaults[language].name)
-  const [clientName, setClientName] = useState<string>(() => listDefaults[language].clientName)
-  const [venue, setVenue] = useState<string>(() => listDefaults[language].venue)
+  const defaults = listDocumentDefaults[language]
+  const [name, setName] = useState<string>(() => listDocumentDefaults[language].name)
+  const [clientName, setClientName] = useState<string>(() => listDocumentDefaults[language].clientName)
+  const [venue, setVenue] = useState<string>(() => listDocumentDefaults[language].venue)
   const [description, setDescription] = useState('')
   const [documentMode, setDocumentMode] = useState<'working' | 'approval'>('working')
   const [eventDate, setEventDate] = useState(todayDateValue)
@@ -169,7 +150,7 @@ export function ListEditorPage() {
   }, [listId, tr])
 
   useEffect(() => {
-    const allDefaults = Object.values(listDefaults)
+    const allDefaults = Object.values(listDocumentDefaults)
     setName((current) => allDefaults.some((item) => item.name === current) ? defaults.name : current)
     setClientName((current) => allDefaults.some((item) => item.clientName === current) ? defaults.clientName : current)
     setVenue((current) => allDefaults.some((item) => item.venue === current) ? defaults.venue : current)

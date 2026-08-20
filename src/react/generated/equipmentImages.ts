@@ -1,4 +1,19 @@
 // Generated from scripts/image-cache/manifest.json. Keep the client bundle limited to local paths.
+// Функции ключа генератор эмитит исходником из scripts/fetch-equipment-images.mjs:
+// правка normalize там приезжает сюда сама, руками этот файл не трогают.
+export const normalize: (value: string) => string = function normalize(value) {
+  return value
+    .toLocaleLowerCase('ru')
+    .normalize('NFKD')
+    .replace(/[^a-zа-яё0-9]+/gi, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+export const equipmentImageKey: (brand: string, model: string) => string = function equipmentKey(brand, model) {
+  return `${normalize(brand)}::${normalize(model)}`
+}
+
 export const equipmentImages: Record<string, string> = {
   "acer::vg240y": "/equipment-images/acer-vg240y-dc5d3751.webp",
   "agl::agl 3512 ip 4k": "/equipment-images/agl-agl-3512-ip-4k-4007b057.webp",

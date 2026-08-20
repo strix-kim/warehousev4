@@ -1,3 +1,5 @@
+import { companyDetails, companyLegalName, listDocumentDefaults } from './documentDefaults'
+
 export type ExportListRow = {
   category: string
   equipment: string
@@ -18,9 +20,6 @@ export type ExportListInput = {
   language: 'ru' | 'uz'
   documentMode?: 'working' | 'approval'
 }
-
-const companyName = 'ООО «ARGO-MEDIA»'
-const companyDetails = 'Адрес: г. Ташкент, Яшнабадский район, ул. Алимкент, пр. 1, д. 33/1, телефон: (+99890) 175-55-89\nр/с 2020 8000 8055 5124 2001 в ЧАКБ «ORIENT FINANS», МФО: 01071, ИНН: 309 737 673, ОКЭД: 62090'
 
 const encoder = new TextEncoder()
 
@@ -53,9 +52,10 @@ function getSheetMetrics(input: ExportListInput) {
 }
 
 function buildSheet(input: ExportListInput) {
+  const defaults = listDocumentDefaults[input.language]
   const t = input.language === 'uz'
-    ? { title: 'USKUNALAR RO‘YXATI', project: 'Loyiha / tadbir', client: 'Buyurtmachi / tashkilotchi', venue: 'Maydon / joylashuv', date: 'Tadbir sanasi', description: 'Hujjatga izoh', generated: 'Tuzilgan', number: '№', equipment: 'Uskuna', count: 'Miqdor', serials: 'Seriya raqamlari', note: 'Eslatma', total: 'Jami birliklar', noSerials: '—', defaultProject: 'Tadbirni texnik ta’minlash', defaultClient: 'Buyurtmachi ko‘rsatilmagan', defaultVenue: 'Tadbir maydoni', contents: 'JAMLAMA TARKIBI', positions: 'Pozitsiyalar', units: 'Birliklar' }
-    : { title: 'СПИСОК ОБОРУДОВАНИЯ', project: 'Проект / мероприятие', client: 'Заказчик / организатор', venue: 'Площадка / локация', date: 'Дата мероприятия', description: 'Комментарий к документу', generated: 'Сформирован', number: '№', equipment: 'Оборудование', count: 'Кол-во', serials: 'Серийные номера', note: 'Примечание', total: 'Всего единиц', noSerials: '—', defaultProject: 'Техническое обеспечение мероприятия', defaultClient: 'Заказчик не указан', defaultVenue: 'Площадка мероприятия', contents: 'СОСТАВ КОМПЛЕКТА', positions: 'Позиций', units: 'Единиц' }
+    ? { title: 'USKUNALAR RO‘YXATI', project: 'Loyiha / tadbir', client: 'Buyurtmachi / tashkilotchi', venue: 'Maydon / joylashuv', date: 'Tadbir sanasi', description: 'Hujjatga izoh', generated: 'Tuzilgan', number: '№', equipment: 'Uskuna', count: 'Miqdor', serials: 'Seriya raqamlari', note: 'Eslatma', total: 'Jami birliklar', noSerials: '—', contents: 'JAMLAMA TARKIBI', positions: 'Pozitsiyalar', units: 'Birliklar' }
+    : { title: 'СПИСОК ОБОРУДОВАНИЯ', project: 'Проект / мероприятие', client: 'Заказчик / организатор', venue: 'Площадка / локация', date: 'Дата мероприятия', description: 'Комментарий к документу', generated: 'Сформирован', number: '№', equipment: 'Оборудование', count: 'Кол-во', serials: 'Серийные номера', note: 'Примечание', total: 'Всего единиц', noSerials: '—', contents: 'СОСТАВ КОМПЛЕКТА', positions: 'Позиций', units: 'Единиц' }
   const date = input.eventDate
     ? new Intl.DateTimeFormat(input.locale).format(new Date(`${input.eventDate}T12:00:00`))
     : '—'
@@ -69,10 +69,11 @@ function buildSheet(input: ExportListInput) {
   if (approvalMode) {
     const year = new Date().getFullYear()
     const approvalText = input.language === 'uz'
-      ? `TASDIQLAYMAN\n“ARGO MEDIA” MChJ direktori\n_____________Sharapova S.Sh.\n“___” _________ ${year}-y.`
-      : `УТВЕРЖДАЮ\nДиректор ООО «ARGO MEDIA»\n_____________ Шарапова С.Ш.\n«___» __________ ${year} г.`
+      ? `TASDIQLAYMAN\n${companyLegalName.uz} direktori\n_____________Sharapova S.Sh.\n“___” _________ ${year}-y.`
+      : `УТВЕРЖДАЮ\nДиректор ${companyLegalName.ru}\n_____________ Шарапова С.Ш.\n«___» __________ ${year} г.`
     rows.push(
-      `<row r="1" ht="42" customHeight="1">${textCell('A1', 'A', 12)}${textCell('B1', companyName, 13)}${textCell('D1', approvalText, 11)}</row>`,
+      // Шапка бланка остаётся русской при любом языке документа — как и было.
+      `<row r="1" ht="42" customHeight="1">${textCell('A1', 'A', 12)}${textCell('B1', companyLegalName.ru, 13)}${textCell('D1', approvalText, 11)}</row>`,
       `<row r="2" ht="25" customHeight="1">${textCell('A2', companyDetails, 19)}</row>`,
       '<row r="3" ht="25" customHeight="1"/>',
       '<row r="4" ht="8" customHeight="1"/>',
@@ -90,9 +91,9 @@ function buildSheet(input: ExportListInput) {
 
   // Пары «подпись → значение»: тип кортежем, иначе деструктуризация даёт string | undefined
   const metadata: [string, string][] = [
-    [t.project, input.name || t.defaultProject],
-    [t.client, input.clientName || t.defaultClient],
-    [t.venue, input.venue || t.defaultVenue],
+    [t.project, input.name || defaults.name],
+    [t.client, input.clientName || defaults.clientName],
+    [t.venue, input.venue || defaults.venue],
     [t.date, date],
     [t.description, input.description || '—'],
     [t.generated, generatedAt],
@@ -133,7 +134,7 @@ function buildSheet(input: ExportListInput) {
   <printOptions horizontalCentered="1"/>
   <pageMargins left="0.35" right="0.35" top="0.55" bottom="0.55" header="0.25" footer="0.25"/>
   <pageSetup orientation="portrait" fitToWidth="1" fitToHeight="0" paperSize="9" pageOrder="downThenOver"/>
-  <headerFooter differentOddEven="1"><oddHeader>&amp;LARGO MEDIA&amp;R${xml(input.name || t.defaultProject)}</oddHeader><evenHeader>&amp;LARGO MEDIA&amp;R${xml(input.name || t.defaultProject)}</evenHeader><oddFooter>&amp;LARGO MEDIA&amp;C${input.language === 'uz' ? 'Sahifa' : 'Страница'} &amp;P / &amp;N&amp;R${date}</oddFooter><evenFooter>&amp;LARGO MEDIA&amp;C${input.language === 'uz' ? 'Sahifa' : 'Страница'} &amp;P / &amp;N&amp;R${date}</evenFooter></headerFooter>
+  <headerFooter differentOddEven="1"><oddHeader>&amp;LARGO MEDIA&amp;R${xml(input.name || defaults.name)}</oddHeader><evenHeader>&amp;LARGO MEDIA&amp;R${xml(input.name || defaults.name)}</evenHeader><oddFooter>&amp;LARGO MEDIA&amp;C${input.language === 'uz' ? 'Sahifa' : 'Страница'} &amp;P / &amp;N&amp;R${date}</oddFooter><evenFooter>&amp;LARGO MEDIA&amp;C${input.language === 'uz' ? 'Sahifa' : 'Страница'} &amp;P / &amp;N&amp;R${date}</evenFooter></headerFooter>
 </worksheet>`
 }
 
@@ -238,7 +239,7 @@ function safeFileName(value: string) {
   return value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').slice(0, 80) || 'equipment-list'
 }
 
-export function createEquipmentListXlsxBlob(input: ExportListInput) {
+function createEquipmentListXlsxBlob(input: ExportListInput) {
   const sheetName = input.language === 'uz' ? 'Uskunalar' : 'Оборудование'
   const { headerRow, totalRow } = getSheetMetrics(input)
   const files = [

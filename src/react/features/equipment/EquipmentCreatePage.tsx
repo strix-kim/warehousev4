@@ -2,19 +2,28 @@ import { ArrowLeft, Boxes, CheckCircle2, CircleAlert, PackagePlus, Save, ShieldC
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
+import { EquipmentVisual } from '../../components/EquipmentVisual'
 import {
   createEquipment,
   fetchEquipmentTaxonomy,
   serialNumberExists,
   type EquipmentTaxonomy,
 } from './api'
-import { EquipmentVisual } from './EquipmentVisual'
+import {
+  equipmentAvailabilityLabel,
+  equipmentAvailabilityOptions,
+  type EquipmentAvailability,
+} from './availability'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
 
 type RecordKind = 'serialized' | 'quantity'
 
 const initialTaxonomy: EquipmentTaxonomy = { types: [], subtypes: [] }
+
+// Статус «выдано» проставляет только выдача списка, руками новую запись
+// в него не заводят — в форме создания этот код не предлагается.
+const newEquipmentAvailabilityCodes: EquipmentAvailability[] = ['available', 'unavailable', 'diagnostics']
 
 export function EquipmentCreatePage() {
   const navigate = useNavigate()
@@ -27,12 +36,13 @@ export function EquipmentCreatePage() {
   const [type, setType] = useState('')
   const [subtype, setSubtype] = useState('')
   const [count, setCount] = useState(1)
-  const [availability, setAvailability] = useState('available')
+  const [availability, setAvailability] = useState<EquipmentAvailability>('available')
   const [location, setLocation] = useState(() => tr('Офис', 'Ofis'))
   const [length, setLength] = useState('')
   const [specification, setSpecification] = useState('')
   const [description, setDescription] = useState('')
   const [taxonomy, setTaxonomy] = useState(initialTaxonomy)
+  const newEquipmentAvailabilityOptions = equipmentAvailabilityOptions(tr, newEquipmentAvailabilityCodes)
   const [serialDuplicate, setSerialDuplicate] = useState(false)
   const [isCheckingSerial, setIsCheckingSerial] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -206,11 +216,7 @@ export function EquipmentCreatePage() {
               <span>03</span><div><h2>{tr('Состояние и детали', 'Holat va tafsilotlar')}</h2><p>{tr('Помогают быстрее находить и проверять оборудование.', 'Uskunani tezroq topish va tekshirishga yordam beradi.')}</p></div>
             </div>
             <div className="form-grid">
-              <div className="field"><span>{tr('Статус', 'Holat')}</span><AppSelect value={availability} onChange={setAvailability} ariaLabel={tr('Статус оборудования', 'Uskuna holati')} options={[
-                { value: 'available', label: tr('В наличии', 'Mavjud') },
-                { value: 'unavailable', label: tr('Нет на складе', 'Omborda yo‘q') },
-                { value: 'diagnostics', label: tr('Диагностика', 'Diagnostika') },
-              ]} /></div>
+              <div className="field"><span>{tr('Статус', 'Holat')}</span><AppSelect value={availability} onChange={setAvailability} ariaLabel={tr('Статус оборудования', 'Uskuna holati')} options={newEquipmentAvailabilityOptions} /></div>
               <label className="field"><span>{tr('Локация', 'Joylashuv')} *</span><input value={location} onChange={(event) => setLocation(event.target.value)} required /></label>
               <label className="field"><span>{tr('Длина, м', 'Uzunlik, m')}</span><input value={length} onChange={(event) => setLength(event.target.value)} placeholder={tr('Только для кабелей', 'Faqat kabellar uchun')} inputMode="decimal" /></label>
               <label className="field form-grid__wide"><span>{tr('Технические характеристики', 'Texnik xususiyatlar')}</span><textarea value={specification} onChange={(event) => setSpecification(event.target.value)} rows={3} placeholder={tr('Мощность, разъёмы, диапазон частот…', 'Quvvat, ulagichlar, chastota diapazoni…')} /></label>
@@ -230,7 +236,7 @@ export function EquipmentCreatePage() {
             <div><dt>{tr('Тип учёта', 'Hisob turi')}</dt><dd>{kind === 'serialized' ? tr('По серийному номеру', 'Seriya raqami bo‘yicha') : tr('По количеству', 'Miqdor bo‘yicha')}</dd></div>
             <div><dt>{kind === 'serialized' ? tr('Серийный номер', 'Seriya raqami') : tr('Внутренний код', 'Ichki kod')}</dt><dd className="mono">{kind === 'serialized' ? serialNumber || '—' : inventoryCode || tr('Без кода', 'Kodsiz')}</dd></div>
             <div><dt>{tr('Количество', 'Miqdor')}</dt><dd>{kind === 'serialized' ? 1 : count} {tr('шт.', 'dona')}</dd></div>
-            <div><dt>{tr('Статус', 'Holat')}</dt><dd>{availability === 'available' ? tr('В наличии', 'Mavjud') : availability === 'diagnostics' ? tr('Диагностика', 'Diagnostika') : tr('Нет на складе', 'Omborda yo‘q')}</dd></div>
+            <div><dt>{tr('Статус', 'Holat')}</dt><dd>{equipmentAvailabilityLabel(availability, tr)}</dd></div>
             <div><dt>{tr('Локация', 'Joylashuv')}</dt><dd>{location || '—'}</dd></div>
           </dl>
           <div className="drawer__notice equipment-preview__notice"><ShieldCheck size={18} /><p>{kind === 'serialized' ? tr('Перед сохранением серийный номер автоматически проверяется на дубли.', 'Saqlashdan oldin seriya raqami takrorlanishga avtomatik tekshiriladi.') : tr('Эта позиция будет добавляться в фактические списки с выбором количества.', 'Bu pozitsiya haqiqiy ro‘yxatlarga miqdor tanlash bilan qo‘shiladi.')}</p></div>

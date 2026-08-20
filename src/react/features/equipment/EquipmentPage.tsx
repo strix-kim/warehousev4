@@ -13,40 +13,24 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
+import { EquipmentVisual, preloadEquipmentImages } from '../../components/EquipmentVisual'
 import {
   countEquipmentModelUnits,
-  EQUIPMENT_PAGE_SIZE,
   fetchEquipment,
   fetchEquipmentMovements,
+  MOBILE_EQUIPMENT_PAGE_SIZE,
+  preferredEquipmentPageSize,
   readCachedEquipment,
   readCachedEquipmentMovements,
   updateEquipmentModelAndUnit,
   type EquipmentMovement,
 } from './api'
-import { EquipmentVisual, preloadEquipmentImages } from './EquipmentVisual'
+import { equipmentAvailabilityOptions, equipmentAvailabilityView } from './availability'
 import type { Equipment } from './types'
+import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
 import { useModalLayer } from '../../lib/useModalLayer'
-
-const MOBILE_EQUIPMENT_PAGE_SIZE = 8
-
-function preferredPageSize() {
-  return window.matchMedia('(max-width: 820px)').matches
-    ? MOBILE_EQUIPMENT_PAGE_SIZE
-    : EQUIPMENT_PAGE_SIZE
-}
-
-function availabilityView(value: string, tr: (ru: string, uz: string) => string) {
-  const normalized = value.toLowerCase()
-  if (normalized === 'available' || normalized.includes('налич')) {
-    return { label: tr('В наличии', 'Mavjud'), tone: 'success' }
-  }
-  if (normalized === 'diagnostics' || normalized.includes('диагност')) return { label: tr('Диагностика', 'Diagnostika'), tone: 'warning' }
-  if (normalized === 'issued') return { label: tr('Выдано', 'Berilgan'), tone: 'danger' }
-  if (normalized === 'unavailable' || normalized.includes('не на складе')) return { label: tr('Нет на складе', 'Omborda yo‘q'), tone: 'neutral' }
-  return { label: value || tr('Не указано', 'Ko‘rsatilmagan'), tone: 'neutral' }
-}
 
 function equipmentCode(id: string) {
   return `EQ-${id.slice(0, 6).toUpperCase()}`
@@ -57,18 +41,46 @@ function equipmentIdentifier(item: Equipment, tr: (ru: string, uz: string) => st
   return item.serialnumber || tr('Без серийного номера', 'Seriya raqamisiz')
 }
 
+// Черновик формы в drawer'е: одним объектом, чтобы сброс к записи был одной
+// операцией, а не десятью setState в двух местах.
+type EquipmentEditDraft = {
+  brand: string
+  model: string
+  type: string
+  subtype: string
+  specification: string
+  length: string
+  description: string
+  availability: string
+  location: string
+  count: number
+}
+
+function toEditDraft(item: Equipment): EquipmentEditDraft {
+  return {
+    brand: item.brand,
+    model: item.model,
+    type: item.type,
+    subtype: item.subtype,
+    specification: item.technicalspecification ?? '',
+    // 'N/A' — способ базы сказать «длина не применима»; в поле это пусто.
+    length: item.lengthinmeters === 'N/A' ? '' : item.lengthinmeters ?? '',
+    description: item.description ?? '',
+    availability: item.availability,
+    location: item.location,
+    count: item.count,
+  }
+}
+
 export function EquipmentPage() {
   const navigate = useNavigate()
   const { tr, locale, language } = useLanguage()
   const availabilityOptions = [
     { value: '', label: tr('Все статусы', 'Barcha holatlar') },
-    { value: 'available', label: tr('В наличии', 'Mavjud') },
-    { value: 'unavailable', label: tr('Нет на складе', 'Omborda yo‘q') },
-    { value: 'diagnostics', label: tr('Диагностика', 'Diagnostika') },
-    { value: 'issued', label: tr('Выдано', 'Berilgan') },
+    ...equipmentAvailabilityOptions(tr),
   ]
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(preferredPageSize)
+  const [pageSize, setPageSize] = useState(preferredEquipmentPageSize)
   const [initialResult] = useState(() => readCachedEquipment({ page: 1, search: '', availability: '', pageSize }))
   const [rows, setRows] = useState<Equipment[]>(() => initialResult?.rows ?? [])
   const [total, setTotal] = useState(() => initialResult?.total ?? 0)
@@ -81,9 +93,9 @@ export function EquipmentPage() {
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 820px)')
+    const media = window.matchMedia(MOBILE_MEDIA_QUERY)
     const handleChange = () => {
-      setPageSize(preferredPageSize())
+      setPageSize(preferredEquipmentPageSize())
       setPage(1)
     }
     media.addEventListener('change', handleChange)
@@ -226,7 +238,7 @@ export function EquipmentPage() {
                       </tr>
                     ))
                   : rows.map((item) => {
-                      const status = availabilityView(item.availability, tr)
+                      const status = equipmentAvailabilityView(item.availability, tr)
                       return (
                         <tr
                           key={item.id}
@@ -301,7 +313,7 @@ export function EquipmentPage() {
 function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClose: () => void; onUpdated: (item: Equipment) => void }) {
   const { tr, locale, language } = useLanguage()
   useModalLayer(onClose)
-  const status = availabilityView(item.availability, tr)
+  const status = equipmentAvailabilityView(item.availability, tr)
   const [movements, setMovements] = useState<EquipmentMovement[]>(() => readCachedEquipmentMovements(item.id) ?? [])
   const [historyError, setHistoryError] = useState('')
   const [isEditing, setIsEditing] = useState(false)
@@ -309,29 +321,16 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
   const [editError, setEditError] = useState('')
   const [editSuccess, setEditSuccess] = useState('')
   const [modelUnitCount, setModelUnitCount] = useState(1)
-  const [brand, setBrand] = useState(item.brand)
-  const [model, setModel] = useState(item.model)
-  const [type, setType] = useState(item.type)
-  const [subtype, setSubtype] = useState(item.subtype)
-  const [specification, setSpecification] = useState(item.technicalspecification ?? '')
-  const [length, setLength] = useState(item.lengthinmeters === 'N/A' ? '' : item.lengthinmeters ?? '')
-  const [description, setDescription] = useState(item.description ?? '')
-  const [availability, setAvailability] = useState(item.availability)
-  const [location, setLocation] = useState(item.location)
-  const [count, setCount] = useState(item.count)
+  const [draft, setDraft] = useState(() => toEditDraft(item))
+  const { brand, model, type, subtype, specification, length, description, availability, location, count } = draft
   const canSave = Boolean(brand.trim() && model.trim() && type.trim() && subtype.trim() && count >= 0)
 
+  function changeDraft<K extends keyof EquipmentEditDraft>(field: K, value: EquipmentEditDraft[K]) {
+    setDraft((current) => ({ ...current, [field]: value }))
+  }
+
   useEffect(() => {
-    setBrand(item.brand)
-    setModel(item.model)
-    setType(item.type)
-    setSubtype(item.subtype)
-    setSpecification(item.technicalspecification ?? '')
-    setLength(item.lengthinmeters === 'N/A' ? '' : item.lengthinmeters ?? '')
-    setDescription(item.description ?? '')
-    setAvailability(item.availability)
-    setLocation(item.location)
-    setCount(item.count)
+    setDraft(toEditDraft(item))
   }, [item])
 
   useEffect(() => {
@@ -364,16 +363,7 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
   }, [item.id, tr])
 
   function cancelEditing() {
-    setBrand(item.brand)
-    setModel(item.model)
-    setType(item.type)
-    setSubtype(item.subtype)
-    setSpecification(item.technicalspecification ?? '')
-    setLength(item.lengthinmeters === 'N/A' ? '' : item.lengthinmeters ?? '')
-    setDescription(item.description ?? '')
-    setAvailability(item.availability)
-    setLocation(item.location)
-    setCount(item.count)
+    setDraft(toEditDraft(item))
     setEditError('')
     setIsEditing(false)
   }
@@ -441,13 +431,13 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
                 <span className="read-only-label">{modelUnitCount} {tr('единиц', 'birlik')}</span>
               </div>
               <div className="equipment-edit-grid">
-                <label className="field"><span>{tr('Бренд', 'Brend')} *</span><input value={brand} onChange={(event) => setBrand(event.target.value)} /></label>
-                <label className="field"><span>{tr('Модель', 'Model')} *</span><input value={model} onChange={(event) => setModel(event.target.value)} /></label>
-                <label className="field"><span>{tr('Категория', 'Toifa')} *</span><input value={type} onChange={(event) => setType(event.target.value)} /></label>
-                <label className="field"><span>{tr('Подкатегория', 'Quyi toifa')} *</span><input value={subtype} onChange={(event) => setSubtype(event.target.value)} /></label>
-                <label className="field"><span>{tr('Длина, м', 'Uzunlik, m')}</span><input value={length} onChange={(event) => setLength(event.target.value)} placeholder={tr('Только если применимо', 'Faqat tegishli bo‘lsa')} /></label>
-                <label className="field field--wide"><span>{tr('Технические характеристики', 'Texnik xususiyatlar')}</span><textarea value={specification} onChange={(event) => setSpecification(event.target.value)} rows={3} /></label>
-                <label className="field field--wide"><span>{tr('Описание', 'Tavsif')}</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} /></label>
+                <label className="field"><span>{tr('Бренд', 'Brend')} *</span><input value={brand} onChange={(event) => changeDraft('brand', event.target.value)} /></label>
+                <label className="field"><span>{tr('Модель', 'Model')} *</span><input value={model} onChange={(event) => changeDraft('model', event.target.value)} /></label>
+                <label className="field"><span>{tr('Категория', 'Toifa')} *</span><input value={type} onChange={(event) => changeDraft('type', event.target.value)} /></label>
+                <label className="field"><span>{tr('Подкатегория', 'Quyi toifa')} *</span><input value={subtype} onChange={(event) => changeDraft('subtype', event.target.value)} /></label>
+                <label className="field"><span>{tr('Длина, м', 'Uzunlik, m')}</span><input value={length} onChange={(event) => changeDraft('length', event.target.value)} placeholder={tr('Только если применимо', 'Faqat tegishli bo‘lsa')} /></label>
+                <label className="field field--wide"><span>{tr('Технические характеристики', 'Texnik xususiyatlar')}</span><textarea value={specification} onChange={(event) => changeDraft('specification', event.target.value)} rows={3} /></label>
+                <label className="field field--wide"><span>{tr('Описание', 'Tavsif')}</span><textarea value={description} onChange={(event) => changeDraft('description', event.target.value)} rows={3} /></label>
               </div>
             </section>
             <section className="equipment-edit-section">
@@ -455,15 +445,10 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
                 <div><h3>{tr('Конкретная единица', 'Muayyan birlik')}</h3><p>{tr('Статус и локация изменятся только у этой записи. Серийный номер останется прежним.', 'Holat va joylashuv faqat shu yozuvda o‘zgaradi. Seriya raqami o‘zgarmaydi.')}</p></div>
               </div>
               <div className="equipment-edit-grid">
-                <div className="field"><span>{tr('Статус', 'Holat')}</span><AppSelect value={availability} onChange={setAvailability} ariaLabel={tr('Статус оборудования', 'Uskuna holati')} options={[
-                  { value: 'available', label: tr('В наличии', 'Mavjud') },
-                  { value: 'unavailable', label: tr('Нет на складе', 'Omborda yo‘q') },
-                  { value: 'diagnostics', label: tr('Диагностика', 'Diagnostika') },
-                  { value: 'issued', label: tr('Выдано', 'Berilgan') },
-                ]} /></div>
-                <label className="field"><span>{tr('Локация', 'Joylashuv')} *</span><input value={location} onChange={(event) => setLocation(event.target.value)} required /></label>
+                <div className="field"><span>{tr('Статус', 'Holat')}</span><AppSelect value={availability} onChange={(value) => changeDraft('availability', value)} ariaLabel={tr('Статус оборудования', 'Uskuna holati')} options={equipmentAvailabilityOptions(tr)} /></div>
+                <label className="field"><span>{tr('Локация', 'Joylashuv')} *</span><input value={location} onChange={(event) => changeDraft('location', event.target.value)} required /></label>
                 <label className="field"><span>{item.tracking_mode === 'quantity' ? tr('Внутренний код', 'Ichki kod') : tr('Серийный номер', 'Seriya raqami')}</span><input value={equipmentIdentifier(item, tr)} readOnly /></label>
-                <label className="field"><span>{tr('Количество', 'Miqdor')}</span><input type="number" min="0" max="9999" value={item.tracking_mode === 'serialized' ? 1 : count} onChange={(event) => setCount(Number(event.target.value))} disabled={item.tracking_mode === 'serialized'} /></label>
+                <label className="field"><span>{tr('Количество', 'Miqdor')}</span><input type="number" min="0" max="9999" value={item.tracking_mode === 'serialized' ? 1 : count} onChange={(event) => changeDraft('count', Number(event.target.value))} disabled={item.tracking_mode === 'serialized'} /></label>
               </div>
             </section>
             {editError && <p className="form-error"><CircleAlert size={15} /> {editError}</p>}
