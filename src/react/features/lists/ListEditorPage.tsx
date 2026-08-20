@@ -12,19 +12,16 @@ import {
   Minus,
   Plus,
   Save,
-  Search,
   Trash2,
-  X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AppDatePicker } from '../../components/AppDatePicker'
 import { AppSelect } from '../../components/AppSelect'
-import { EquipmentVisual, preloadEquipmentImages } from '../../components/EquipmentVisual'
+import { preloadEquipmentImages } from '../../components/EquipmentVisual'
 import { todayDateValue } from '../../lib/date'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
-import { useModalLayer } from '../../lib/useModalLayer'
 import { fetchAllEquipment, readCachedAllEquipment } from '../equipment/api'
 import type { Equipment } from '../equipment/types'
 import {
@@ -33,28 +30,15 @@ import {
   fetchEquipmentList,
   readCachedEquipmentList,
   readListDraft,
-  saveListDraft,
   updateEquipmentList,
   type EquipmentList,
   type EquipmentListItem,
-  type ListDraft,
 } from './api'
+import { buildCatalogGroups, groupKey, type CatalogGroup } from './catalogGroups'
 import { listDocumentDefaults } from './documentDefaults'
+import { CatalogPanel, CatalogPreviewDrawer } from './ListEditorCatalog'
+import { useListDraftAutosave } from './useListDraftAutosave'
 import { downloadEquipmentListXlsx } from './xlsxExport'
-
-type CatalogGroup = {
-  key: string
-  brand: string
-  model: string
-  type: string
-  subtype: string
-  allItems: Equipment[]
-  serializedItems: Equipment[]
-  quantityItems: Equipment[]
-  quantityAvailable: number
-  availableCount: number
-  totalCount: number
-}
 
 // Подпись позиции — минимальный снимок группы. Нужен ровно в одном случае:
 // группы больше нет в свежем каталоге, и строку нечем было бы нарисовать.
@@ -80,36 +64,8 @@ function selectDefaultInputValue(input: HTMLInputElement, defaultValue: string) 
   if (input.value === defaultValue) input.select()
 }
 
-// Реквизит считается нетронутым, если он пуст или совпадает с дефолтом ЛЮБОГО из
-// языков: пользователь мог переключить язык, не притронувшись к полю.
-function isDefaultDocumentValue(value: string, field: 'name' | 'clientName' | 'venue') {
-  const trimmed = value.trim()
-  return !trimmed || Object.values(listDocumentDefaults).some((item) => item[field] === trimmed)
-}
-
-// «Пустой» черновик не хранится и стирает уже записанный: иначе один заход на
-// /lists/new без единого действия подсовывал бы плашку «черновик восстановлен».
-// Дата и формат Excel в проверку не входят — у них дефолт есть всегда.
-function isDraftEmpty(draft: ListDraft) {
-  return draft.items.length === 0
-    && !draft.description.trim()
-    && isDefaultDocumentValue(draft.name, 'name')
-    && isDefaultDocumentValue(draft.clientName, 'clientName')
-    && isDefaultDocumentValue(draft.venue, 'venue')
-}
-
-function groupKey(item: Pick<Equipment, 'brand' | 'model' | 'type' | 'subtype'>) {
-  return [item.brand, item.model, item.type, item.subtype].map((value) => value.trim().toLocaleLowerCase('ru')).join('::')
-}
-
 function selectionLabel(group: CatalogGroup): SelectionLabel {
   return { brand: group.brand, model: group.model, type: group.type, subtype: group.subtype }
-}
-
-function isAvailable(item: Equipment) {
-  const status = item.availability.toLocaleLowerCase('ru')
-  if (status.startsWith('не ') || status.includes('диагност') || status === 'issued' || status === 'unavailable') return false
-  return status === 'available' || status.startsWith('в н')
 }
 
 export function ListEditorPage() {
@@ -127,9 +83,6 @@ export function ListEditorPage() {
   const [description, setDescription] = useState(() => restoredDraft?.description ?? '')
   const [documentMode, setDocumentMode] = useState<'working' | 'approval'>(() => restoredDraft?.documentMode ?? 'working')
   const [eventDate, setEventDate] = useState(() => restoredDraft?.eventDate ?? todayDateValue())
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('')
-  const [subcategory, setSubcategory] = useState('')
   const [cachedEquipment] = useState(readCachedAllEquipment)
   const [cachedList] = useState(() => listId ? readCachedEquipmentList(listId) : null)
   const [equipment, setEquipment] = useState<Equipment[]>(() => cachedEquipment ?? [])
@@ -146,7 +99,6 @@ export function ListEditorPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [previewGroup, setPreviewGroup] = useState<CatalogGroup | null>(null)
   const [mobilePanel, setMobilePanel] = useState<'catalog' | 'selection'>('catalog')
-  const [catalogLimit, setCatalogLimit] = useState(60)
   const catalogRef = useRef<HTMLElement>(null)
   const selectionRef = useRef<HTMLElement>(null)
   // Сколько позиций черновика не нашлось в живом каталоге. null — плашки нет.
@@ -228,61 +180,11 @@ export function ListEditorPage() {
     setVenue((current) => allDefaults.some((item) => item.venue === current) ? defaults.venue : current)
   }, [defaults])
 
-  const groups = useMemo(() => {
-    const map = new Map<string, CatalogGroup>()
-    for (const item of equipment) {
-      const key = groupKey(item)
-      const group = map.get(key) ?? {
-        key,
-        brand: item.brand,
-        model: item.model,
-        type: item.type,
-        subtype: item.subtype,
-        allItems: [],
-        serializedItems: [],
-        quantityItems: [],
-        quantityAvailable: 0,
-        availableCount: 0,
-        totalCount: 0,
-      }
-      const units = item.tracking_mode === 'serialized' ? 1 : Math.max(0, item.count)
-      group.allItems.push(item)
-      group.totalCount += units
-      if (isAvailable(item)) {
-        if (item.tracking_mode === 'serialized') group.serializedItems.push(item)
-        else {
-          group.quantityItems.push(item)
-          group.quantityAvailable += units
-        }
-        group.availableCount += units
-      }
-      map.set(key, group)
-    }
-    return [...map.values()]
-      .map((group) => ({ ...group, serializedItems: group.serializedItems.sort((a, b) => (a.serialnumber ?? '').localeCompare(b.serialnumber ?? '')) }))
-      .sort((a, b) => `${a.type} ${a.brand} ${a.model}`.localeCompare(`${b.type} ${b.brand} ${b.model}`, 'ru'))
-  }, [equipment])
+  const groups = useMemo(() => buildCatalogGroups(equipment), [equipment])
 
   // Единственный источник группы по ключу: и восстановление, и рендер выборки,
   // и payload читают каталог отсюда, а не из снимков в стейте.
   const groupsByKey = useMemo(() => new Map(groups.map((group) => [group.key, group])), [groups])
-
-  const categories = useMemo(() => [...new Set(groups.map((group) => group.type))]
-    .sort((a, b) => translateEquipmentTaxonomy(a, language).localeCompare(translateEquipmentTaxonomy(b, language), locale)), [groups, language, locale])
-  const subcategories = useMemo(() => category
-    ? [...new Set(groups.filter((group) => group.type === category).map((group) => group.subtype))]
-      .sort((a, b) => translateEquipmentTaxonomy(a, language).localeCompare(translateEquipmentTaxonomy(b, language), locale))
-    : [], [category, groups, language, locale])
-  const filteredGroups = useMemo(() => {
-    const terms = search.trim().toLocaleLowerCase(locale).split(/\s+/).filter(Boolean)
-    return groups.filter((group) => {
-      if (category && group.type !== category) return false
-      if (subcategory && group.subtype !== subcategory) return false
-      const haystack = `${group.brand} ${group.model} ${group.type} ${group.subtype} ${translateEquipmentTaxonomy(group.type, language)} ${translateEquipmentTaxonomy(group.subtype, language)}`.toLocaleLowerCase(locale)
-      return terms.every((term) => haystack.includes(term))
-    })
-  }, [category, groups, language, locale, search, subcategory])
-  const visibleGroups = filteredGroups.slice(0, catalogLimit)
 
   useEffect(() => {
     if (!listToEdit || groups.length === 0 || hydratedSelectionRef.current === listToEdit.id) return
@@ -339,17 +241,7 @@ export function ListEditorPage() {
     serialIds: item.serialIds,
   })), [selected])
 
-  // Автосейв черновика: пауза 1 с после последнего изменения. Режим
-  // редактирования сюда не заходит — там «сохранить» пишет в базу.
-  useEffect(() => {
-    if (listId || !draftRestoredRef.current) return
-    const timer = window.setTimeout(() => {
-      const draft: ListDraft = { name, clientName, venue, description, eventDate, documentMode, items: draftItems }
-      if (isDraftEmpty(draft)) clearListDraft()
-      else saveListDraft(draft)
-    }, 1000)
-    return () => window.clearTimeout(timer)
-  }, [clientName, description, documentMode, draftItems, eventDate, listId, name, venue])
+  useListDraftAutosave({ listId, restoredRef: draftRestoredRef, name, clientName, venue, description, eventDate, documentMode, items: draftItems })
 
   // «Начать заново»: черновик стирается, форма возвращается к дефолтам.
   function discardDraft() {
@@ -364,9 +256,6 @@ export function ListEditorPage() {
     setDocumentMode('working')
     setSuccessMessage('')
   }
-
-  useEffect(() => { setSubcategory(''); setCatalogLimit(60) }, [category])
-  useEffect(() => setCatalogLimit(60), [search, subcategory])
 
   const selectedCount = selected.reduce((sum, item) => sum + item.count, 0)
   const selectedKeys = useMemo(() => new Set(selected.map((item) => item.key)), [selected])
@@ -684,68 +573,18 @@ export function ListEditorPage() {
       </div>
 
       <div className="editor-grid editor-grid--quick">
-        <section ref={catalogRef} className={`data-panel catalog-picker ${mobilePanel === 'catalog' ? 'mobile-active' : ''}`}>
-          <div className="panel-heading">
-            <div><h2>{tr('Каталог по моделям', 'Modellar katalogi')}</h2><p>{tr('Одна модель — одна строка, независимо от количества серийных единиц.', 'Seriyali birliklar sonidan qat’i nazar, bir model — bir qator.')}</p></div>
-            <span className="read-only-label">{isLoading && groups.length === 0 ? tr('Загружаем каталог…', 'Katalog yuklanmoqda…') : `${groups.length} ${tr('моделей', 'model')}`}</span>
-          </div>
-          <div className="quick-catalog-toolbar">
-            <label className="search-field">
-              <Search size={18} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tr('Модель, бренд или категория…', 'Model, brend yoki toifa…')} aria-label={tr('Поиск оборудования', 'Uskunalarni qidirish')} />
-            </label>
-            <AppSelect
-              value={category}
-              options={[{ value: '', label: tr('Все категории', 'Barcha toifalar') }, ...categories.map((value) => ({ value, label: translateEquipmentTaxonomy(value, language) }))]}
-              onChange={setCategory}
-              ariaLabel={tr('Категория', 'Toifa')}
-            />
-            {category && subcategories.length > 1 && (
-              <AppSelect
-                value={subcategory}
-                options={[{ value: '', label: tr('Все подкатегории', 'Barcha quyi toifalar') }, ...subcategories.map((value) => ({ value, label: translateEquipmentTaxonomy(value, language) }))]}
-                onChange={setSubcategory}
-                ariaLabel={tr('Подкатегория', 'Quyi toifa')}
-              />
-            )}
-          </div>
-          <div className="picker-results">
-            {hasLoadError && <div className="state-block state-block--error"><CircleAlert size={23} /><span>{tr('Не удалось загрузить каталог.', 'Katalogni yuklab bo‘lmadi.')}</span></div>}
-            {isLoading && equipment.length === 0 && Array.from({ length: 8 }, (_, index) => <div className="picker-skeleton" key={index} />)}
-            {!hasLoadError && visibleGroups.map((group) => {
-              const selectedAlready = selectedKeys.has(group.key)
-              const selectedItem = selectedByKey.get(group.key)
-              const serialCount = group.serializedItems.length
-              const tracking = serialCount && group.quantityAvailable
-                ? tr('смешанный учёт', 'aralash hisob')
-                : serialCount ? tr('есть S/N', 'S/N mavjud') : tr('без S/N', 'S/N siz')
-              return (
-                <div className={`picker-item picker-item--grouped ${selectedAlready ? 'picker-item--selected' : ''}`} key={group.key}>
-                  <button className="picker-item__preview" type="button" onClick={() => setPreviewGroup(group)} aria-label={tr(`Открыть описание ${group.brand} ${group.model}`, `${group.brand} ${group.model} tavsifini ochish`)}>
-                    <EquipmentVisual item={group} />
-                    <span className="picker-item__copy">
-                      <strong>{group.brand} {group.model}</strong>
-                      <small>{translateEquipmentTaxonomy(group.subtype, language)} · {tracking}</small>
-                    </span>
-                    <span className={`picker-item__count ${group.availableCount === 0 ? 'picker-item__count--empty' : ''}`}>{group.availableCount > 0 ? `${tr('доступно', 'mavjud')} ${group.availableCount}` : tr('нет на складе', 'omborda yo‘q')}</span>
-                  </button>
-                  <button className="picker-item__action" type="button" onClick={() => addGroup(group)} aria-label={tr(`Добавить ещё ${group.brand} ${group.model}`, `${group.brand} ${group.model} yana qo‘shish`)}>
-                    <Plus size={17} />
-                    {selectedItem && <span>{selectedItem.count}</span>}
-                  </button>
-                </div>
-              )
-            })}
-            {!hasLoadError && filteredGroups.length > visibleGroups.length && (
-              <div className="picker-load-more">
-                <button className="button button--secondary" type="button" onClick={() => setCatalogLimit((current) => current + 60)}>
-                  {tr('Показать ещё', 'Yana ko‘rsatish')} · {filteredGroups.length - visibleGroups.length}
-                </button>
-              </div>
-            )}
-            {!isLoading && !hasLoadError && filteredGroups.length === 0 && <div className="state-block"><Search size={25} /><strong>{tr('Ничего не найдено', 'Hech narsa topilmadi')}</strong><span>{tr('Измените поиск или категорию.', 'Qidiruv yoki toifani o‘zgartiring.')}</span></div>}
-          </div>
-        </section>
+        <CatalogPanel
+          panelRef={catalogRef}
+          isMobileActive={mobilePanel === 'catalog'}
+          groups={groups}
+          equipmentCount={equipment.length}
+          isLoading={isLoading}
+          hasLoadError={hasLoadError}
+          selectedKeys={selectedKeys}
+          selectedByKey={selectedByKey}
+          onPreview={setPreviewGroup}
+          onAdd={addGroup}
+        />
 
         <section ref={selectionRef} className={`data-panel selection-panel ${mobilePanel === 'selection' ? 'mobile-active' : ''}`}>
           <div className="panel-heading">
@@ -825,39 +664,5 @@ export function ListEditorPage() {
 
       {previewGroup && <CatalogPreviewDrawer group={previewGroup} onClose={() => setPreviewGroup(null)} onAdd={() => { addGroup(previewGroup); setPreviewGroup(null) }} />}
     </>
-  )
-}
-
-function CatalogPreviewDrawer({ group, onClose, onAdd }: { group: CatalogGroup; onClose: () => void; onAdd: () => void }) {
-  const { tr, language } = useLanguage()
-  useModalLayer(onClose)
-  const representative = group.allItems[0]
-  const hasSerialized = group.allItems.some((item) => item.tracking_mode === 'serialized')
-  const hasQuantity = group.allItems.some((item) => item.tracking_mode === 'quantity')
-  const tracking = hasSerialized && hasQuantity
-    ? tr('Смешанный учёт', 'Aralash hisob')
-    : hasSerialized ? tr('По серийным номерам', 'Seriya raqamlari bo‘yicha') : tr('По количеству', 'Miqdor bo‘yicha')
-
-  return (
-    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Описание модели', 'Model tavsifi')} onMouseDown={onClose}>
-      <aside className="drawer catalog-preview-drawer" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="drawer__header">
-          <div><p className="eyebrow">{translateEquipmentTaxonomy(group.type, language)}</p><h2>{group.brand} {group.model}</h2></div>
-          <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
-        </div>
-        <span className={`badge badge--${group.availableCount > 0 ? 'success' : 'neutral'}`}><i />{group.availableCount > 0 ? tr(`На складе: ${group.availableCount}`, `Omborda: ${group.availableCount}`) : tr('Сейчас нет на складе', 'Hozir omborda yo‘q')}</span>
-        <EquipmentVisual item={group} size="large" alt={`${group.brand} ${group.model}`} />
-        <dl className="detail-list">
-          <div><dt>{tr('Категория', 'Toifa')}</dt><dd>{translateEquipmentTaxonomy(group.type, language)}</dd></div>
-          <div><dt>{tr('Подкатегория', 'Quyi toifa')}</dt><dd>{translateEquipmentTaxonomy(group.subtype, language)}</dd></div>
-          <div><dt>{tr('Способ учёта', 'Hisob turi')}</dt><dd>{tracking}</dd></div>
-          <div><dt>{tr('Всего заведено', 'Jami kiritilgan')}</dt><dd>{group.totalCount} {tr('шт.', 'dona')}</dd></div>
-          <div className="detail-list__wide"><dt>{tr('Характеристики', 'Xususiyatlar')}</dt><dd>{representative?.technicalspecification || tr('Не указаны', 'Ko‘rsatilmagan')}</dd></div>
-          <div className="detail-list__wide"><dt>{tr('Описание', 'Tavsif')}</dt><dd>{representative?.description || tr('Описание пока не заполнено', 'Tavsif hali kiritilmagan')}</dd></div>
-        </dl>
-        {group.availableCount === 0 && <p className="availability-warning"><Info size={15} />{tr('Модель можно добавить в документ: нехватка будет отмечена предупреждением.', 'Modelni hujjatga qo‘shish mumkin: yetishmovchilik ogohlantirish bilan ko‘rsatiladi.')}</p>}
-        <button className="button button--primary catalog-preview-drawer__add" onClick={onAdd}><Plus size={17} /> {tr('Добавить в список', 'Ro‘yxatga qo‘shish')}</button>
-      </aside>
-    </div>
   )
 }
