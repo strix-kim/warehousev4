@@ -56,8 +56,16 @@ type CatalogGroup = {
   totalCount: number
 }
 
+// Подпись позиции — минимальный снимок группы. Нужен ровно в одном случае:
+// группы больше нет в свежем каталоге, и строку нечем было бы нарисовать.
+type SelectionLabel = Pick<CatalogGroup, 'brand' | 'model' | 'type' | 'subtype'>
+
+// Выборка хранит КЛЮЧ группы, а не саму группу: сам объект берётся из актуальной
+// Map на рендере. Иначе остатки, серийники и payload считались бы по каталогу
+// на момент клика — обновление склада до выборки не доезжало.
 type SelectedGroup = {
-  group: CatalogGroup
+  key: string
+  label: SelectionLabel
   count: number
   serialIds: string[]
   serialPickerOpen: boolean
@@ -92,6 +100,10 @@ function isDraftEmpty(draft: ListDraft) {
 
 function groupKey(item: Pick<Equipment, 'brand' | 'model' | 'type' | 'subtype'>) {
   return [item.brand, item.model, item.type, item.subtype].map((value) => value.trim().toLocaleLowerCase('ru')).join('::')
+}
+
+function selectionLabel(group: CatalogGroup): SelectionLabel {
+  return { brand: group.brand, model: group.model, type: group.type, subtype: group.subtype }
 }
 
 function isAvailable(item: Equipment) {
@@ -251,6 +263,10 @@ export function ListEditorPage() {
       .sort((a, b) => `${a.type} ${a.brand} ${a.model}`.localeCompare(`${b.type} ${b.brand} ${b.model}`, 'ru'))
   }, [equipment])
 
+  // Единственный источник группы по ключу: и восстановление, и рендер выборки,
+  // и payload читают каталог отсюда, а не из снимков в стейте.
+  const groupsByKey = useMemo(() => new Map(groups.map((group) => [group.key, group])), [groups])
+
   const categories = useMemo(() => [...new Set(groups.map((group) => group.type))]
     .sort((a, b) => translateEquipmentTaxonomy(a, language).localeCompare(translateEquipmentTaxonomy(b, language), locale)), [groups, language, locale])
   const subcategories = useMemo(() => category
@@ -270,11 +286,10 @@ export function ListEditorPage() {
 
   useEffect(() => {
     if (!listToEdit || groups.length === 0 || hydratedSelectionRef.current === listToEdit.id) return
-    const groupsByKey = new Map(groups.map((group) => [group.key, group]))
     const equipmentById = new Map(equipment.map((item) => [item.id, item]))
     const restored = new Map<string, SelectedGroup>()
     const addRestored = (group: CatalogGroup, count: number, serialId?: string) => {
-      const current = restored.get(group.key) ?? { group, count: 0, serialIds: [], serialPickerOpen: false }
+      const current = restored.get(group.key) ?? { key: group.key, label: selectionLabel(group), count: 0, serialIds: [], serialPickerOpen: false }
       current.count += count
       if (serialId && group.serializedItems.some((item) => item.id === serialId)) current.serialIds.push(serialId)
       restored.set(group.key, current)
@@ -292,7 +307,7 @@ export function ListEditorPage() {
 
     setSelected([...restored.values()])
     hydratedSelectionRef.current = listToEdit.id
-  }, [equipment, groups, listToEdit])
+  }, [equipment, groups, groupsByKey, listToEdit])
 
   // Выборка черновика поднимается только по живому каталогу: позицию ищем по
   // ключу группы, серийники оставляем те, что ещё существуют. Пока каталог
@@ -300,7 +315,6 @@ export function ListEditorPage() {
   // «ничего не нашлось» стёрло бы черновик вместо того, чтобы его вернуть.
   useEffect(() => {
     if (!restoredDraft || draftRestoredRef.current || isLoading || hasLoadError) return
-    const groupsByKey = new Map(groups.map((group) => [group.key, group]))
     const restored: SelectedGroup[] = []
     let missingGroups = 0
 
@@ -311,16 +325,16 @@ export function ListEditorPage() {
         continue
       }
       const serialIds = item.serialIds.filter((id) => group.serializedItems.some((unit) => unit.id === id))
-      restored.push({ group, count: Math.max(1, item.count), serialIds, serialPickerOpen: false })
+      restored.push({ key: group.key, label: selectionLabel(group), count: Math.max(1, item.count), serialIds, serialPickerOpen: false })
     }
 
     setSelected(restored)
     setDraftNotice({ missingGroups })
     draftRestoredRef.current = true
-  }, [groups, hasLoadError, isLoading, restoredDraft])
+  }, [groupsByKey, hasLoadError, isLoading, restoredDraft])
 
   const draftItems = useMemo(() => selected.map((item) => ({
-    key: item.group.key,
+    key: item.key,
     count: item.count,
     serialIds: item.serialIds,
   })), [selected])
@@ -355,8 +369,15 @@ export function ListEditorPage() {
   useEffect(() => setCatalogLimit(60), [search, subcategory])
 
   const selectedCount = selected.reduce((sum, item) => sum + item.count, 0)
-  const selectedKeys = useMemo(() => new Set(selected.map((item) => item.group.key)), [selected])
-  const selectedByKey = useMemo(() => new Map(selected.map((item) => [item.group.key, item])), [selected])
+  const selectedKeys = useMemo(() => new Set(selected.map((item) => item.key)), [selected])
+  const selectedByKey = useMemo(() => new Map(selected.map((item) => [item.key, item])), [selected])
+  // Выборка, склеенная со свежим каталогом. group === null означает, что модели
+  // в каталоге больше нет: позицию не выбрасываем, рисуем по снимку подписи.
+  const resolvedSelection = useMemo(() => selected.map((item) => ({
+    item,
+    group: groupsByKey.get(item.key) ?? null,
+    label: groupsByKey.get(item.key) ?? item.label,
+  })), [groupsByKey, selected])
   const canSubmit = selectedCount > 0 && !isOpening && !openError
 
   function moveToMobilePanel(panel: 'catalog' | 'selection') {
@@ -370,16 +391,16 @@ export function ListEditorPage() {
   function addGroup(group: CatalogGroup) {
     setSuccessMessage('')
     setSelected((current) => {
-      const existing = current.find((item) => item.group.key === group.key)
-      if (existing) return current.map((item) => item.group.key === group.key ? { ...item, count: item.count + 1 } : item)
-      return [...current, { group, count: 1, serialIds: [], serialPickerOpen: false }]
+      const existing = current.find((item) => item.key === group.key)
+      if (existing) return current.map((item) => item.key === group.key ? { ...item, count: item.count + 1 } : item)
+      return [...current, { key: group.key, label: selectionLabel(group), count: 1, serialIds: [], serialPickerOpen: false }]
     })
   }
 
   function changeCount(key: string, delta: number) {
     setSelected((current) => current
       .map((item) => {
-        if (item.group.key !== key) return item
+        if (item.key !== key) return item
         const count = Math.max(0, item.count + delta)
         return { ...item, count, serialIds: item.serialIds.slice(0, count) }
       })
@@ -387,12 +408,12 @@ export function ListEditorPage() {
   }
 
   function toggleSerialPicker(key: string) {
-    setSelected((current) => current.map((item) => item.group.key === key ? { ...item, serialPickerOpen: !item.serialPickerOpen } : item))
+    setSelected((current) => current.map((item) => item.key === key ? { ...item, serialPickerOpen: !item.serialPickerOpen } : item))
   }
 
   function toggleSerial(key: string, equipmentId: string) {
     setSelected((current) => current.map((item) => {
-      if (item.group.key !== key) return item
+      if (item.key !== key) return item
       const exists = item.serialIds.includes(equipmentId)
       const serialIds = exists ? item.serialIds.filter((id) => id !== equipmentId) : [...item.serialIds, equipmentId]
       return { ...item, serialIds, count: Math.max(item.count, serialIds.length) }
@@ -404,10 +425,13 @@ export function ListEditorPage() {
     setSelected([])
   }
 
+  // Состав документа собирается по АКТУАЛЬНОМУ каталогу: конкретные единицы
+  // берутся только из живой группы. Группы уже нет — вся позиция уходит
+  // планируемой строкой по снимку подписи, как и раньше.
   function buildItems(): EquipmentListItem[] {
-    return selected.flatMap((selectedItem) => {
+    return resolvedSelection.flatMap(({ item: selectedItem, group, label }) => {
       const concrete = selectedItem.serialIds.flatMap((id) => {
-        const item = selectedItem.group.serializedItems.find((candidate) => candidate.id === id)
+        const item = group?.serializedItems.find((candidate) => candidate.id === id)
         return item ? [{
           equipment_id: item.id,
           brand: item.brand,
@@ -420,7 +444,7 @@ export function ListEditorPage() {
       })
       let remaining = selectedItem.count - concrete.length
       const quantityItems: EquipmentListItem[] = []
-      for (const item of selectedItem.group.quantityItems) {
+      for (const item of group?.quantityItems ?? []) {
         if (remaining <= 0) break
         const allocated = Math.min(remaining, Math.max(0, item.count))
         if (allocated <= 0) continue
@@ -436,10 +460,10 @@ export function ListEditorPage() {
         remaining -= allocated
       }
       const planned: EquipmentListItem[] = remaining > 0 ? [{
-        brand: selectedItem.group.brand,
-        model: selectedItem.group.model,
-        type: selectedItem.group.type,
-        subtype: selectedItem.group.subtype,
+        brand: label.brand,
+        model: label.model,
+        type: label.type,
+        subtype: label.subtype,
         count: remaining,
         tracking_mode: 'planned',
       }] : []
@@ -501,13 +525,13 @@ export function ListEditorPage() {
         locale,
         language,
         documentMode,
-        rows: selected.map((item) => ({
-          category: item.group.type,
-          equipment: `${item.group.brand} ${item.group.model}`.trim(),
-          subtype: item.group.subtype,
+        rows: resolvedSelection.map(({ item, group, label }) => ({
+          category: label.type,
+          equipment: `${label.brand} ${label.model}`.trim(),
+          subtype: label.subtype,
           count: item.count,
           serialNumbers: item.serialIds.flatMap((id) => {
-            const equipmentItem = item.group.serializedItems.find((candidate) => candidate.id === id)
+            const equipmentItem = group?.serializedItems.find((candidate) => candidate.id === id)
             return equipmentItem?.serialnumber ? [equipmentItem.serialnumber] : []
           }),
         })),
@@ -737,25 +761,28 @@ export function ListEditorPage() {
                 <span>{tr('Нажмите на нужную модель в каталоге.', 'Katalogdagi kerakli modelni bosing.')}</span>
               </div>
             )}
-            {selected.map((item, index) => (
-              <article className="quick-selection-item" key={item.group.key}>
+            {resolvedSelection.map(({ item, group, label }, index) => (
+              <article className="quick-selection-item" key={item.key}>
                 <div className="quick-selection-item__main">
                   <span className="equipment-row-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                   <div className="quick-selection-item__copy">
-                    <strong>{item.group.brand} {item.group.model}</strong>
-                    <small>{translateEquipmentTaxonomy(item.group.subtype, language)} · {tr('на складе', 'omborda')} {item.group.availableCount}</small>
+                    <strong>{label.brand} {label.model}</strong>
+                    <small>{translateEquipmentTaxonomy(label.subtype, language)} · {group
+                      ? `${tr('на складе', 'omborda')} ${group.availableCount}`
+                      : tr('нет в каталоге', 'katalogda yo‘q')}</small>
                   </div>
                   <div className="quantity-stepper">
-                    <button onClick={() => changeCount(item.group.key, -1)} aria-label={tr('Уменьшить', 'Kamaytirish')}><Minus size={14} /></button>
+                    <button onClick={() => changeCount(item.key, -1)} aria-label={tr('Уменьшить', 'Kamaytirish')}><Minus size={14} /></button>
                     <strong>{item.count}</strong>
-                    <button onClick={() => changeCount(item.group.key, 1)} aria-label={tr('Увеличить', 'Ko‘paytirish')}><Plus size={14} /></button>
+                    <button onClick={() => changeCount(item.key, 1)} aria-label={tr('Увеличить', 'Ko‘paytirish')}><Plus size={14} /></button>
                   </div>
-                  <button className="icon-button" onClick={() => changeCount(item.group.key, -item.count)} aria-label={tr('Удалить модель', 'Modelni o‘chirish')}><Trash2 size={16} /></button>
+                  <button className="icon-button" onClick={() => changeCount(item.key, -item.count)} aria-label={tr('Удалить модель', 'Modelni o‘chirish')}><Trash2 size={16} /></button>
                 </div>
-                {item.count > item.group.availableCount && <p className="quick-inline-warning"><CircleAlert size={13} /> {tr('Больше текущего остатка — в Excel попадёт указанное количество.', 'Joriy qoldiqdan ko‘p — Excelga ko‘rsatilgan miqdor tushadi.')}</p>}
-                {item.group.serializedItems.length > 0 && (
+                {group && item.count > group.availableCount && <p className="quick-inline-warning"><CircleAlert size={13} /> {tr('Больше текущего остатка — в Excel попадёт указанное количество.', 'Joriy qoldiqdan ko‘p — Excelga ko‘rsatilgan miqdor tushadi.')}</p>}
+                {!group && <p className="quick-inline-warning"><CircleAlert size={13} /> {tr('Модели больше нет в каталоге — позиция уйдёт в документ как планируемая.', 'Model katalogda yo‘q — pozitsiya hujjatga rejalashtirilgan sifatida tushadi.')}</p>}
+                {group && group.serializedItems.length > 0 && (
                   <>
-                    <button className="serial-toggle" onClick={() => toggleSerialPicker(item.group.key)} type="button">
+                    <button className="serial-toggle" onClick={() => toggleSerialPicker(item.key)} type="button">
                       <span>{item.serialIds.length
                         ? tr(`Выбрано S/N: ${item.serialIds.length} из ${item.count}`, `S/N tanlandi: ${item.serialIds.length} / ${item.count}`)
                         : tr('Серийные номера не указывать', 'Seriya raqamlarini ko‘rsatmaslik')}</span>
@@ -764,9 +791,9 @@ export function ListEditorPage() {
                     {item.serialPickerOpen && (
                       <div className="serial-picker">
                         <p>{tr('Отметьте только те номера, которые точно поедут на мероприятие.', 'Tadbirga aniq olib boriladigan raqamlarni belgilang.')}</p>
-                        <div>{item.group.serializedItems.map((equipmentItem) => {
+                        <div>{group.serializedItems.map((equipmentItem) => {
                           const active = item.serialIds.includes(equipmentItem.id)
-                          return <button className={active ? 'active' : ''} onClick={() => toggleSerial(item.group.key, equipmentItem.id)} key={equipmentItem.id} type="button"><span>{active && <Check size={13} />}</span>{equipmentItem.serialnumber || tr('Без номера', 'Raqamsiz')}</button>
+                          return <button className={active ? 'active' : ''} onClick={() => toggleSerial(item.key, equipmentItem.id)} key={equipmentItem.id} type="button"><span>{active && <Check size={13} />}</span>{equipmentItem.serialnumber || tr('Без номера', 'Raqamsiz')}</button>
                         })}</div>
                       </div>
                     )}
