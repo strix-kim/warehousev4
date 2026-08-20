@@ -181,7 +181,7 @@ markdown-файлы по этому списку — читай нужный ц�
 | Скилл | Когда запускать |
 |---|---|
 | `.claude/skills/session-start/SKILL.md` | начало каждой сессии/чата и аварийное восстановление |
-| `.claude/skills/checkpoint/SKILL.md` | прораб подтвердил чекпоинт — гейты и коммит в ветку |
+| `.claude/skills/checkpoint/SKILL.md` | прораб подтвердил чекпоинт — гейты, коммит в ветку, слияние принятого |
 | `.claude/skills/session-close/SKILL.md` | «закрываем сессию» — handoff, current-state, решения |
 | `.claude/skills/doc-audit/SKILL.md` | ~5+ кодовых сессий с последнего аудита или перед вехой |
 | `.claude/skills/rls-verify/SKILL.md` | затронуты права, роли, RLS, чужие записи |
