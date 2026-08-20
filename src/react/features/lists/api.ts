@@ -256,40 +256,77 @@ export async function fetchEquipmentList(listId: string, { bypassCache = false }
 // граф фич в цикл.
 export { invalidateListCompositionCache } from './cacheKeys'
 
-export function readCachedSavedListRows(listId: string) {
-  return readCachedQuery<ExportListRow[]>(listCompositionCacheKey(listId))
+export type SavedListComposition = {
+  rows: ExportListRow[]
+  // Серийные единицы, чьи id остались в equipment_ids, а строк на складе уже нет
+  // (позицию удалили). Счётчик в шапке списка считает по equipment_ids, состав —
+  // по пришедшим строкам, и без этого числа расхождение ничем не объяснено.
+  missingUnits: number
 }
 
-async function loadSavedListRows(list: EquipmentList) {
-  const serialized = await fetchEquipmentByIds(list.equipment_ids ?? [])
+export function readCachedSavedListComposition(listId: string) {
+  return readCachedQuery<SavedListComposition>(listCompositionCacheKey(listId))
+}
+
+// Ключ группировки позиции. Модель определяет нормализованная пара
+// lower(trim(brand)) + lower(trim(model)) — ровно то правило, по которому модель
+// правит серверная RPC. Сырой текст давал две строки на одну модель там, где в
+// базе у одной единицы «Sony » с пробелом, а у другой «sony».
+function modelGroupKey(brand: string, model: string) {
+  return `${brand.trim().toLocaleLowerCase('ru')}::${model.trim().toLocaleLowerCase('ru')}`
+}
+
+async function loadSavedListComposition(list: EquipmentList): Promise<SavedListComposition> {
+  const serializedIds = [...new Set(list.equipment_ids ?? [])]
+  const quantityItems = list.equipment_items ?? []
+  // Живые строки склада тянем и для количественных позиций: в jsonb у них лежит
+  // СНИМОК бренда и модели на момент сохранения, а у серийной части подпись
+  // читается из equipment. После переименования модели два источника расходились,
+  // и одна позиция показывалась двумя строками. equipment_id авторитетнее текста,
+  // поэтому подпись берём по нему; снимок остаётся фолбэком для позиций без id.
+  const referencedIds = [...new Set([
+    ...serializedIds,
+    ...quantityItems.flatMap((item) => item.equipment_id ? [item.equipment_id] : []),
+  ])]
+  const units = await fetchEquipmentByIds(referencedIds)
+  const unitById = new Map(units.map((unit) => [unit.id, unit]))
+
   const grouped = new Map<string, ExportListRow>()
-  const addRow = (row: ExportListRow) => {
-    const key = `${row.category}::${row.equipment}::${row.subtype}`.toLocaleLowerCase('ru')
+  const addRow = (source: Pick<Equipment, 'brand' | 'model' | 'type' | 'subtype'>, count: number, serialNumber?: string | null) => {
+    const key = modelGroupKey(source.brand, source.model)
     const current = grouped.get(key)
     if (current) {
-      current.count += row.count
-      current.serialNumbers.push(...row.serialNumbers)
-    } else grouped.set(key, { ...row, serialNumbers: [...row.serialNumbers] })
+      current.count += count
+      if (serialNumber) current.serialNumbers.push(serialNumber)
+      return
+    }
+    grouped.set(key, {
+      category: source.type,
+      equipment: `${source.brand} ${source.model}`.trim(),
+      subtype: source.subtype,
+      count,
+      serialNumbers: serialNumber ? [serialNumber] : [],
+    })
   }
-  for (const item of serialized) addRow({
-    category: item.type,
-    equipment: `${item.brand} ${item.model}`.trim(),
-    subtype: item.subtype,
-    count: 1,
-    serialNumbers: item.serialnumber ? [item.serialnumber] : [],
-  })
-  for (const item of list.equipment_items ?? []) addRow({
-    category: item.type,
-    equipment: `${item.brand} ${item.model}`.trim(),
-    subtype: item.subtype,
-    count: item.count,
-    serialNumbers: [],
-  })
-  return [...grouped.values()]
+
+  for (const equipmentId of serializedIds) {
+    const unit = unitById.get(equipmentId)
+    if (!unit) continue
+    addRow(unit, 1, unit.serialnumber)
+  }
+  for (const item of quantityItems) {
+    const unit = item.equipment_id ? unitById.get(item.equipment_id) : undefined
+    addRow(unit ?? item, item.count)
+  }
+
+  return {
+    rows: [...grouped.values()],
+    missingUnits: serializedIds.filter((equipmentId) => !unitById.has(equipmentId)).length,
+  }
 }
 
-export function buildSavedListRows(list: EquipmentList, { bypassCache = false } = {}) {
-  return cachedQuery(listCompositionCacheKey(list.id), 10 * 60 * 1000, () => loadSavedListRows(list), { bypass: bypassCache })
+export function buildSavedListComposition(list: EquipmentList, { bypassCache = false } = {}) {
+  return cachedQuery(listCompositionCacheKey(list.id), 10 * 60 * 1000, () => loadSavedListComposition(list), { bypass: bypassCache })
 }
 
 // Прогрев карточки списка стоит РОВНО один запрос — состав. Деталь списка мы уже
@@ -299,7 +336,7 @@ export function buildSavedListRows(list: EquipmentList, { bypassCache = false } 
 // звать её вслепую на шесть карточек нечем оправдать.
 export function prefetchSavedListDetails(list: EquipmentList) {
   primeCachedQuery(equipmentListCacheKey(list.id), 10 * 60 * 1000, list)
-  return buildSavedListRows(list).catch(() => undefined)
+  return buildSavedListComposition(list).catch(() => undefined)
 }
 
 export type EquipmentListDocumentInput = {

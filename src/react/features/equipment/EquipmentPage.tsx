@@ -89,8 +89,16 @@ export function EquipmentPage() {
   const [availability, setAvailability] = useState('')
   const [selected, setSelected] = useState<Equipment | null>(null)
   const [isLoading, setIsLoading] = useState(() => !initialResult)
-  const [error, setError] = useState('')
+  // Только флаг: текст ошибки собирается на рендере. Строка в стейте потянула бы
+  // tr в зависимости эффекта загрузки, и смена языка перезагружала бы каталог.
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  // Номер страницы зажимается на рендере: каталог мог сократиться (удалили
+  // позиции, сузился фильтр), и page остался за пределами — без зажима выходила
+  // «Страница 3 из 1» с пустой таблицей. Зажатое значение и рисуется, и грузится.
+  const currentPage = Math.min(page, pageCount)
 
   useEffect(() => {
     const media = window.matchMedia(MOBILE_MEDIA_QUERY)
@@ -112,22 +120,22 @@ export function EquipmentPage() {
 
   useEffect(() => {
     let isCurrent = true
-    const cached = readCachedEquipment({ page, search, availability, pageSize })
+    const cached = readCachedEquipment({ page: currentPage, search, availability, pageSize })
     if (cached) {
       setRows(cached.rows)
       setTotal(cached.total)
       preloadEquipmentImages(cached.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 24)
     }
     setIsLoading(!cached)
-    setError('')
+    setHasLoadError(false)
 
-    fetchEquipment({ page, search, availability, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
+    fetchEquipment({ page: currentPage, search, availability, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
       .then((result) => {
         if (!isCurrent) return
         setRows(result.rows)
         setTotal(result.total)
         preloadEquipmentImages(result.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 24)
-        const nextPage = page + 1
+        const nextPage = currentPage + 1
         if (nextPage <= Math.ceil(result.total / pageSize)) {
           void fetchEquipment({ page: nextPage, search, availability, pageSize })
             .then((nextResult) => preloadEquipmentImages(nextResult.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 16))
@@ -135,7 +143,7 @@ export function EquipmentPage() {
         }
       })
       .catch(() => {
-        if (isCurrent && !cached) setError(tr('Не удалось загрузить оборудование. Повторите попытку.', 'Uskunalarni yuklab bo‘lmadi. Qayta urinib ko‘ring.'))
+        if (isCurrent && !cached) setHasLoadError(true)
       })
       .finally(() => {
         if (isCurrent) setIsLoading(false)
@@ -144,15 +152,14 @@ export function EquipmentPage() {
     return () => {
       isCurrent = false
     }
-  }, [availability, page, pageSize, reloadKey, search, tr])
+  }, [availability, currentPage, pageSize, reloadKey, search])
 
-  const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const range = useMemo(() => {
     if (!total) return '0'
-    const from = (page - 1) * pageSize + 1
-    const to = Math.min(page * pageSize, total)
+    const from = (currentPage - 1) * pageSize + 1
+    const to = Math.min(currentPage * pageSize, total)
     return `${from}–${to}`
-  }, [page, pageSize, total])
+  }, [currentPage, pageSize, total])
 
   return (
     <>
@@ -210,11 +217,11 @@ export function EquipmentPage() {
           />
         </div>
 
-        {error ? (
+        {hasLoadError ? (
           <div className="state-block state-block--error">
             <CircleAlert size={24} />
             <strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong>
-            <span>{error}</span>
+            <span>{tr('Не удалось загрузить оборудование. Повторите попытку.', 'Uskunalarni yuklab bo‘lmadi. Qayta urinib ko‘ring.')}</span>
             <button className="button button--secondary" onClick={() => setReloadKey((value) => value + 1)}>{tr('Повторить', 'Qayta urinish')}</button>
           </div>
         ) : (
@@ -284,11 +291,11 @@ export function EquipmentPage() {
         <footer className="pagination">
           <span>{tr('Показано', 'Ko‘rsatildi')} {range} {tr('из', 'dan')} {total.toLocaleString(locale)}</span>
           <div className="pagination__controls">
-            <button className="icon-button icon-button--bordered" disabled={page <= 1 || isLoading} onClick={() => setPage((value) => value - 1)} aria-label={tr('Предыдущая страница', 'Oldingi sahifa')}>
+            <button className="icon-button icon-button--bordered" disabled={currentPage <= 1 || isLoading} onClick={() => setPage(currentPage - 1)} aria-label={tr('Предыдущая страница', 'Oldingi sahifa')}>
               <ChevronLeft size={18} />
             </button>
-            <span>{tr('Страница', 'Sahifa')} <strong>{page}</strong> {tr('из', 'dan')} {pageCount}</span>
-            <button className="icon-button icon-button--bordered" disabled={page >= pageCount || isLoading} onClick={() => setPage((value) => value + 1)} aria-label={tr('Следующая страница', 'Keyingi sahifa')}>
+            <span>{tr('Страница', 'Sahifa')} <strong>{currentPage}</strong> {tr('из', 'dan')} {pageCount}</span>
+            <button className="icon-button icon-button--bordered" disabled={currentPage >= pageCount || isLoading} onClick={() => setPage(currentPage + 1)} aria-label={tr('Следующая страница', 'Keyingi sahifa')}>
               <ChevronRight size={18} />
             </button>
           </div>
@@ -315,7 +322,9 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
   useModalLayer(onClose)
   const status = equipmentAvailabilityView(item.availability, tr)
   const [movements, setMovements] = useState<EquipmentMovement[]>(() => readCachedEquipmentMovements(item.id) ?? [])
-  const [historyError, setHistoryError] = useState('')
+  // Флаг вместо текста: иначе tr попадает в зависимости эффекта и смена языка
+  // перезапрашивает историю движения.
+  const [hasHistoryError, setHasHistoryError] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [editError, setEditError] = useState('')
@@ -346,7 +355,7 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
     const cached = readCachedEquipmentMovements(item.id)
     if (cached) {
       setMovements(cached)
-      setHistoryError('')
+      setHasHistoryError(false)
     } else {
       setMovements([])
     }
@@ -354,13 +363,13 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
       .then((data) => {
         if (!current) return
         setMovements(data)
-        setHistoryError('')
+        setHasHistoryError(false)
       })
       .catch(() => {
-        if (current && !cached) setHistoryError(tr('История временно недоступна.', 'Tarix vaqtincha mavjud emas.'))
+        if (current && !cached) setHasHistoryError(true)
       })
     return () => { current = false }
-  }, [item.id, tr])
+  }, [item.id])
 
   function cancelEditing() {
     setDraft(toEditDraft(item))
@@ -482,8 +491,8 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
                 </div>
               </div>
             ))}
-            {!historyError && movements.length === 0 && <p className="muted">{tr('История пока пуста. После подключения журнала здесь появятся изменения количества, выдачи и возвраты.', 'Tarix hozircha bo‘sh. Jurnal ulangach, bu yerda miqdor o‘zgarishi, berish va qaytarishlar ko‘rinadi.')}</p>}
-            {historyError && <p className="form-error">{historyError}</p>}
+            {!hasHistoryError && movements.length === 0 && <p className="muted">{tr('История пока пуста. После подключения журнала здесь появятся изменения количества, выдачи и возвраты.', 'Tarix hozircha bo‘sh. Jurnal ulangach, bu yerda miqdor o‘zgarishi, berish va qaytarishlar ko‘rinadi.')}</p>}
+            {hasHistoryError && <p className="form-error">{tr('История временно недоступна.', 'Tarix vaqtincha mavjud emas.')}</p>}
           </div>
         </section></>}
       </aside>

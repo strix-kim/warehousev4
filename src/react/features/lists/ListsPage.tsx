@@ -23,7 +23,7 @@ import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useModalLayer } from '../../lib/useModalLayer'
 import {
-  buildSavedListRows,
+  buildSavedListComposition,
   deleteEquipmentList,
   fetchEquipmentLists,
   fetchReservationHistory,
@@ -33,17 +33,41 @@ import {
   readCachedReservationHistory,
   readCachedReservationShortages,
   readCachedEquipmentLists,
-  readCachedSavedListRows,
+  readCachedSavedListComposition,
   transitionEquipmentList,
   type EquipmentList,
   type ReservationHistory,
   type ReservationShortage,
   type ReservationStatus,
+  type SavedListComposition,
 } from './api'
 import { useLanguage } from '../../lib/i18n'
-import { downloadEquipmentListXlsx, type ExportListRow } from './xlsxExport'
+import { downloadEquipmentListXlsx } from './xlsxExport'
 
 type Tr = (ru: string, uz: string) => string
+
+// Причина отказа в деталях списка. Код, а не готовая строка: строка потянула бы
+// tr в зависимости эффекта загрузки, и смена языка перезапрашивала бы состав,
+// историю и дефицит.
+type DrawerErrorCode = '' | 'composition' | 'issue-shortage' | 'transition' | 'delete'
+
+const emptyComposition: SavedListComposition = { rows: [], missingUnits: 0 }
+
+function getDrawerErrorMessage(code: DrawerErrorCode, tr: Tr) {
+  switch (code) {
+    case 'composition': return tr(
+      'Не удалось загрузить состав списка. Закройте детали и попробуйте открыть их ещё раз.',
+      'Ro‘yxat tarkibini yuklab bo‘lmadi. Tafsilotlarni yoping va yana ochib ko‘ring.',
+    )
+    case 'issue-shortage': return tr(
+      'Фактического оборудования уже недостаточно для выдачи. Резерв сохранён — скорректируйте комплект или остаток.',
+      'Berish uchun haqiqiy uskuna yetarli emas. Bandlov saqlandi — jamlanma yoki qoldiqni tuzating.',
+    )
+    case 'transition': return tr('Не удалось изменить этап. Данные не были изменены.', 'Bosqichni o‘zgartirib bo‘lmadi. Ma’lumotlar o‘zgartirilmadi.')
+    case 'delete': return tr('Не удалось удалить список. Попробуйте ещё раз.', 'Ro‘yxatni o‘chirib bo‘lmadi. Qayta urinib ko‘ring.')
+    default: return ''
+  }
+}
 
 function getStatusView(tr: Tr): Record<ReservationStatus, { label: string; tone: string }> {
   return {
@@ -130,7 +154,11 @@ export function ListsPage() {
     })
   }, [rows, search, status])
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize))
-  const visibleRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
+  // Номер страницы зажимается на рендере: удалили единственный список второй
+  // страницы — pageCount стал 1, а page остался 2, и панель показывала
+  // «Страница 2 из 1» без единой карточки.
+  const currentPage = Math.min(page, pageCount)
+  const visibleRows = filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const visibleListIds = visibleRows.map((list) => list.id).join(':')
 
   useEffect(() => setPage(1), [search, status])
@@ -146,7 +174,7 @@ export function ListsPage() {
     setExporting({ id: list.id, mode: documentMode })
     setExportError('')
     try {
-      const rows = await buildSavedListRows(list)
+      const composition = await buildSavedListComposition(list)
       downloadEquipmentListXlsx({
         name: list.name,
         clientName: list.client_name ?? '',
@@ -156,7 +184,7 @@ export function ListsPage() {
         locale,
         language,
         documentMode,
-        rows,
+        rows: composition.rows,
       })
     } catch {
       setExportError(tr('Не удалось подготовить Excel для сохранённого списка.', 'Saqlangan ro‘yxat uchun Excelni tayyorlab bo‘lmadi.'))
@@ -220,7 +248,7 @@ export function ListsPage() {
               : visibleRows.map((list, index) => {
                   const lifecycle = list.advanced_features ? statusView[list.reservation_status] : { label: tr('Сохранён', 'Saqlangan'), tone: 'neutral' }
                   const isExporting = exporting?.id === list.id
-                  const listNumber = (page - 1) * pageSize + index + 1
+                  const listNumber = (currentPage - 1) * pageSize + index + 1
                   return (
                     <article
                       className="list-card"
@@ -267,11 +295,11 @@ export function ListsPage() {
         )}
         {!isLoading && !error && filteredRows.length > 0 && (
           <footer className="pagination">
-            <span>{tr('Показано', 'Ko‘rsatildi')} {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredRows.length)} {tr('из', 'dan')} {filteredRows.length}</span>
+            <span>{tr('Показано', 'Ko‘rsatildi')} {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredRows.length)} {tr('из', 'dan')} {filteredRows.length}</span>
             <div className="pagination__controls">
-              <button className="icon-button icon-button--bordered" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} aria-label={tr('Предыдущая страница списков', 'Ro‘yxatlarning oldingi sahifasi')}><ChevronLeft size={18} /></button>
-              <span>{tr('Страница', 'Sahifa')} <strong>{page}</strong> {tr('из', 'dan')} {pageCount}</span>
-              <button className="icon-button icon-button--bordered" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)} aria-label={tr('Следующая страница списков', 'Ro‘yxatlarning keyingi sahifasi')}><ChevronRight size={18} /></button>
+              <button className="icon-button icon-button--bordered" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)} aria-label={tr('Предыдущая страница списков', 'Ro‘yxatlarning oldingi sahifasi')}><ChevronLeft size={18} /></button>
+              <span>{tr('Страница', 'Sahifa')} <strong>{currentPage}</strong> {tr('из', 'dan')} {pageCount}</span>
+              <button className="icon-button icon-button--bordered" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)} aria-label={tr('Следующая страница списков', 'Ro‘yxatlarning keyingi sahifasi')}><ChevronRight size={18} /></button>
             </div>
           </footer>
         )}
@@ -290,9 +318,9 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   const transitionCopy = getTransitionCopy(tr)
   const [shortages, setShortages] = useState<ReservationShortage[]>(() => readCachedReservationShortages(list.id) ?? [])
   const [history, setHistory] = useState<ReservationHistory[]>(() => readCachedReservationHistory(list.id) ?? [])
-  const [composition, setComposition] = useState<ExportListRow[]>(() => readCachedSavedListRows(list.id) ?? [])
+  const [composition, setComposition] = useState<SavedListComposition>(() => readCachedSavedListComposition(list.id) ?? emptyComposition)
   const [note, setNote] = useState('')
-  const [isLoading, setIsLoading] = useState(() => readCachedSavedListRows(list.id) === null)
+  const [isLoading, setIsLoading] = useState(() => readCachedSavedListComposition(list.id) === null)
   const [isTrackingLoading, setIsTrackingLoading] = useState(() => {
     if (!list.advanced_features) return false
     const hasHistory = readCachedReservationHistory(list.id) !== null
@@ -302,15 +330,15 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [error, setError] = useState('')
-  const [trackingWarning, setTrackingWarning] = useState('')
+  const [error, setError] = useState<DrawerErrorCode>('')
+  const [hasTrackingWarning, setHasTrackingWarning] = useState(false)
   const action = list.advanced_features ? transitionCopy[list.reservation_status] : undefined
   const lifecycle = statusView[list.reservation_status]
   const cannotIssuePlan = list.reservation_status === 'confirmed' && list.list_mode === 'abstract'
   const missingLegacyDates = list.reservation_status === 'draft' && (!list.reservation_start || !list.reservation_end)
 
   async function loadDetails() {
-    const cachedComposition = readCachedSavedListRows(list.id)
+    const cachedComposition = readCachedSavedListComposition(list.id)
     const cachedHistory = list.advanced_features ? readCachedReservationHistory(list.id) : []
     const needsShortages = Boolean(list.advanced_features && list.reservation_start && list.reservation_end)
     const cachedShortages = needsShortages ? readCachedReservationShortages(list.id) : []
@@ -320,20 +348,17 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
     setIsLoading(cachedComposition === null)
     setIsTrackingLoading(cachedHistory === null || cachedShortages === null)
     setError('')
-    setTrackingWarning('')
+    setHasTrackingWarning(false)
     const trackingRequest = Promise.allSettled([
       list.advanced_features ? fetchReservationHistory(list.id, { bypassCache: cachedHistory !== null }) : Promise.resolve([]),
       needsShortages ? fetchReservationShortages(list.id, { bypassCache: cachedShortages !== null }) : Promise.resolve([]),
     ])
 
     try {
-      setComposition(await buildSavedListRows(list, { bypassCache: cachedComposition !== null }))
+      setComposition(await buildSavedListComposition(list, { bypassCache: cachedComposition !== null }))
     } catch {
-      if (cachedComposition === null) setComposition([])
-      setError(tr(
-        'Не удалось загрузить состав списка. Закройте детали и попробуйте открыть их ещё раз.',
-        'Ro‘yxat tarkibini yuklab bo‘lmadi. Tafsilotlarni yoping va yana ochib ko‘ring.',
-      ))
+      if (cachedComposition === null) setComposition(emptyComposition)
+      setError('composition')
     } finally {
       setIsLoading(false)
     }
@@ -347,16 +372,13 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
     else setShortages([])
 
     if (historyResult.status === 'rejected' || shortagesResult.status === 'rejected') {
-      setTrackingWarning(tr(
-        'Дополнительный складской учёт временно не обновился. Состав списка и Excel доступны как обычно.',
-        'Qo‘shimcha ombor hisobi vaqtincha yangilanmadi. Ro‘yxat tarkibi va Excel odatdagidek mavjud.',
-      ))
+      setHasTrackingWarning(true)
     }
 
     setIsTrackingLoading(false)
   }
 
-  useEffect(() => { void loadDetails() }, [list.id, list.reservation_status, tr])
+  useEffect(() => { void loadDetails() }, [list.id, list.reservation_status])
 
   async function runTransition() {
     if (!action || cannotIssuePlan || missingLegacyDates) return
@@ -367,9 +389,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
       await onChanged()
     } catch (transitionError) {
       const message = transitionError instanceof Error ? transitionError.message : ''
-      setError(message.includes('physically available') || message.includes('shortage')
-        ? tr('Фактического оборудования уже недостаточно для выдачи. Резерв сохранён — скорректируйте комплект или остаток.', 'Berish uchun haqiqiy uskuna yetarli emas. Bandlov saqlandi — jamlanma yoki qoldiqni tuzating.')
-        : tr('Не удалось изменить этап. Данные не были изменены.', 'Bosqichni o‘zgartirib bo‘lmadi. Ma’lumotlar o‘zgartirilmadi.'))
+      setError(message.includes('physically available') || message.includes('shortage') ? 'issue-shortage' : 'transition')
     } finally {
       setIsTransitioning(false)
     }
@@ -383,10 +403,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
       await onChanged()
       onClose()
     } catch {
-      setError(tr(
-        'Не удалось удалить список. Попробуйте ещё раз.',
-        'Ro‘yxatni o‘chirib bo‘lmadi. Qayta urinib ko‘ring.',
-      ))
+      setError('delete')
     } finally {
       setIsDeleting(false)
     }
@@ -410,8 +427,17 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
         <div className="reservation-drawer__body">
           <section className="saved-list-contents">
             <div className="saved-list-contents__heading"><div><h3>{tr('Оборудование в списке', 'Ro‘yxatdagi uskunalar')}</h3><p>{tr('Полный сохранённый состав документа', 'Hujjatning to‘liq saqlangan tarkibi')}</p></div><strong>{listSize(list)}</strong></div>
-            {isLoading ? <div className="detail-skeleton" /> : composition.length > 0 ? (
-              <div className="saved-list-items">{composition.map((item, index) => (
+            {/* Счётчик в шапке считает по equipment_ids, состав — по строкам склада.
+                Расхождение объясняем прямо здесь, иначе «12 единиц» над 11 строками
+                выглядит ошибкой интерфейса. */}
+            {composition.missingUnits > 0 && (
+              <p className="availability-warning"><CircleAlert size={16} />{tr(
+                `${composition.missingUnits} единиц из состава не найдены на складе — возможно, удалены`,
+                `Tarkibdagi ${composition.missingUnits} birlik omborda topilmadi — o‘chirilgan bo‘lishi mumkin`,
+              )}</p>
+            )}
+            {isLoading ? <div className="detail-skeleton" /> : composition.rows.length > 0 ? (
+              <div className="saved-list-items">{composition.rows.map((item, index) => (
                 <div className="saved-list-item" key={`${item.category}-${item.equipment}-${item.subtype}`}>
                   <span className="equipment-row-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                   <span className="saved-list-item__copy"><strong>{item.equipment}</strong><small>{translateEquipmentTaxonomy(item.category, language)} · {translateEquipmentTaxonomy(item.subtype, language)}{item.serialNumbers.length > 0 ? ` · S/N ${item.serialNumbers.join(', ')}` : ''}</small></span>
@@ -420,7 +446,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
               ))}</div>
             ) : <p className="muted">{tr('В этом списке нет оборудования.', 'Bu ro‘yxatda uskuna yo‘q.')}</p>}
           </section>
-          {error && <p className="form-error"><CircleAlert size={15} /> {error}</p>}
+          {error && <p className="form-error"><CircleAlert size={15} /> {getDrawerErrorMessage(error, tr)}</p>}
         </div>
 
         <div className="reservation-drawer__footer">
@@ -436,7 +462,10 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
             <div className="tracking-details__body">
               <div className="optional-tracking-note"><CircleAlert size={18} /><span><strong>{tr('Что это такое', 'Bu nima')}</strong><small>{tr('Здесь можно подтвердить комплект, отметить его выдачу и возврат. Для обычного списка и скачивания Excel этот раздел не нужен.', 'Bu yerda jamlanmani tasdiqlash, berish va qaytarishni belgilash mumkin. Oddiy ro‘yxat va Excel yuklash uchun bu bo‘lim kerak emas.')}</small></span></div>
 
-              {trackingWarning && <p className="availability-warning"><CircleAlert size={16} />{trackingWarning}</p>}
+              {hasTrackingWarning && <p className="availability-warning"><CircleAlert size={16} />{tr(
+                'Дополнительный складской учёт временно не обновился. Состав списка и Excel доступны как обычно.',
+                'Qo‘shimcha ombor hisobi vaqtincha yangilanmadi. Ro‘yxat tarkibi va Excel odatdagidek mavjud.',
+              )}</p>}
 
               {isTrackingLoading ? <div className="detail-skeleton" /> : shortages.length > 0 ? (
                 <section className="shortage-panel">

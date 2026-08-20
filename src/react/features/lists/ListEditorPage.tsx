@@ -52,6 +52,11 @@ type SelectedGroup = {
   serialPickerOpen: boolean
 }
 
+// Причина отказа при открытии сохранённого списка. Держим кодом, а не готовой
+// строкой: строка потянула бы tr в зависимости эффекта, и смена языка
+// перезапрашивала бы список из базы.
+type OpenErrorCode = '' | 'not-draft' | 'failed'
+
 function selectDefaultInputValue(input: HTMLInputElement, defaultValue: string) {
   if (input.value === defaultValue) input.select()
 }
@@ -87,8 +92,9 @@ export function ListEditorPage() {
   const [isLoading, setIsLoading] = useState(() => !cachedEquipment)
   const [isSaving, setIsSaving] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
-  const [loadError, setLoadError] = useState('')
-  const [openError, setOpenError] = useState('')
+  // Каталог: тоже только флаг — текст ошибки собирается на рендере.
+  const [hasLoadError, setHasLoadError] = useState(false)
+  const [openError, setOpenError] = useState<OpenErrorCode>('')
   const [isOpening, setIsOpening] = useState(Boolean(listId && !cachedList))
   const [listToEdit, setListToEdit] = useState<EquipmentList | null>(() => cachedList?.reservation_status === 'draft' ? cachedList : null)
   const [saveError, setSaveError] = useState('')
@@ -98,22 +104,25 @@ export function ListEditorPage() {
   const [catalogLimit, setCatalogLimit] = useState(60)
   const catalogRef = useRef<HTMLElement>(null)
   const selectionRef = useRef<HTMLElement>(null)
-  const hydratedListRef = useRef('')
+  // Гидратация разведена на две: шапка документа заполняется сразу из строки
+  // списка, состав — только когда приехал каталог.
+  const hydratedMetaRef = useRef('')
+  const hydratedSelectionRef = useRef('')
 
   useEffect(() => {
     let current = true
     setIsLoading(!cachedEquipment)
-    setLoadError('')
+    setHasLoadError(false)
     fetchAllEquipment({ bypassCache: Boolean(cachedEquipment) })
       .then((result) => {
         if (!current) return
         setEquipment(result)
         preloadEquipmentImages(result, 32)
       })
-      .catch(() => { if (current && !cachedEquipment) setLoadError(tr('Не удалось загрузить каталог.', 'Katalogni yuklab bo‘lmadi.')) })
+      .catch(() => { if (current && !cachedEquipment) setHasLoadError(true) })
       .finally(() => { if (current) setIsLoading(false) })
     return () => { current = false }
-  }, [tr])
+  }, [])
 
   useEffect(() => {
     if (!listId) {
@@ -137,17 +146,29 @@ export function ListEditorPage() {
         if (!current) return
         if (error instanceof Error && error.message === 'not-draft') {
           setListToEdit(null)
-          setOpenError(tr('Изменять можно только черновики. Подтверждённый или выданный список доступен в режиме просмотра.', 'Faqat qoralamalarni o‘zgartirish mumkin. Tasdiqlangan yoki berilgan ro‘yxat faqat ko‘rish rejimida mavjud.'))
+          setOpenError('not-draft')
           return
         }
         if (cached?.reservation_status === 'draft') return
-        setOpenError(error instanceof Error && error.message === 'not-draft'
-          ? tr('Изменять можно только черновики. Подтверждённый или выданный список доступен в режиме просмотра.', 'Faqat qoralamalarni o‘zgartirish mumkin. Tasdiqlangan yoki berilgan ro‘yxat faqat ko‘rish rejimida mavjud.')
-          : tr('Не удалось открыть сохранённый список.', 'Saqlangan ro‘yxatni ochib bo‘lmadi.'))
+        setOpenError('failed')
       })
       .finally(() => { if (current) setIsOpening(false) })
     return () => { current = false }
-  }, [listId, tr])
+  }, [listId])
+
+  // Шапка документа заполняется, как только приехала САМА строка списка, и не
+  // ждёт каталог. Раньше и шапка, и состав гидратировались одним эффектом по
+  // приходу каталога — на холодном старте с медленной сетью приехавшие данные
+  // затирали название, которое пользователь успел набрать за эти секунды.
+  useEffect(() => {
+    if (!listToEdit || hydratedMetaRef.current === listToEdit.id) return
+    setName(listToEdit.name)
+    setClientName(listToEdit.client_name ?? defaults.clientName)
+    setVenue(listToEdit.venue ?? defaults.venue)
+    setDescription(listToEdit.description ?? '')
+    setEventDate(listToEdit.reservation_start ?? todayDateValue())
+    hydratedMetaRef.current = listToEdit.id
+  }, [defaults.clientName, defaults.venue, listToEdit])
 
   useEffect(() => {
     const allDefaults = Object.values(listDocumentDefaults)
@@ -209,7 +230,7 @@ export function ListEditorPage() {
   const visibleGroups = filteredGroups.slice(0, catalogLimit)
 
   useEffect(() => {
-    if (!listToEdit || groups.length === 0 || hydratedListRef.current === listToEdit.id) return
+    if (!listToEdit || groups.length === 0 || hydratedSelectionRef.current === listToEdit.id) return
     const groupsByKey = new Map(groups.map((group) => [group.key, group]))
     const equipmentById = new Map(equipment.map((item) => [item.id, item]))
     const restored = new Map<string, SelectedGroup>()
@@ -230,14 +251,9 @@ export function ListEditorPage() {
       if (group) addRestored(group, Math.max(1, Number(item.count) || 1), item.tracking_mode === 'serialized' ? item.equipment_id : undefined)
     }
 
-    setName(listToEdit.name)
-    setClientName(listToEdit.client_name ?? defaults.clientName)
-    setVenue(listToEdit.venue ?? defaults.venue)
-    setDescription(listToEdit.description ?? '')
-    setEventDate(listToEdit.reservation_start ?? todayDateValue())
     setSelected([...restored.values()])
-    hydratedListRef.current = listToEdit.id
-  }, [defaults.clientName, defaults.venue, equipment, groups, listToEdit])
+    hydratedSelectionRef.current = listToEdit.id
+  }, [equipment, groups, listToEdit])
 
   useEffect(() => { setSubcategory(''); setCatalogLimit(60) }, [category])
   useEffect(() => setCatalogLimit(60), [search, subcategory])
@@ -423,7 +439,9 @@ export function ListEditorPage() {
         </div>
       </header>
 
-      {openError && <div className="state-block state-block--error editor-open-error"><CircleAlert size={23} /><strong>{tr('Список не открыт', 'Ro‘yxat ochilmadi')}</strong><span>{openError}</span><button className="button button--secondary" onClick={() => navigate('/lists')}>{tr('Вернуться к спискам', 'Ro‘yxatlarga qaytish')}</button></div>}
+      {openError && <div className="state-block state-block--error editor-open-error"><CircleAlert size={23} /><strong>{tr('Список не открыт', 'Ro‘yxat ochilmadi')}</strong><span>{openError === 'not-draft'
+        ? tr('Изменять можно только черновики. Подтверждённый или выданный список доступен в режиме просмотра.', 'Faqat qoralamalarni o‘zgartirish mumkin. Tasdiqlangan yoki berilgan ro‘yxat faqat ko‘rish rejimida mavjud.')
+        : tr('Не удалось открыть сохранённый список.', 'Saqlangan ro‘yxatni ochib bo‘lmadi.')}</span><button className="button button--secondary" onClick={() => navigate('/lists')}>{tr('Вернуться к спискам', 'Ro‘yxatlarga qaytish')}</button></div>}
 
       <section className="quick-list-meta data-panel">
         <label className="field quick-list-meta__name">
@@ -553,9 +571,9 @@ export function ListEditorPage() {
             )}
           </div>
           <div className="picker-results">
-            {loadError && <div className="state-block state-block--error"><CircleAlert size={23} /><span>{loadError}</span></div>}
+            {hasLoadError && <div className="state-block state-block--error"><CircleAlert size={23} /><span>{tr('Не удалось загрузить каталог.', 'Katalogni yuklab bo‘lmadi.')}</span></div>}
             {isLoading && equipment.length === 0 && Array.from({ length: 8 }, (_, index) => <div className="picker-skeleton" key={index} />)}
-            {!loadError && visibleGroups.map((group) => {
+            {!hasLoadError && visibleGroups.map((group) => {
               const selectedAlready = selectedKeys.has(group.key)
               const selectedItem = selectedByKey.get(group.key)
               const serialCount = group.serializedItems.length
@@ -579,14 +597,14 @@ export function ListEditorPage() {
                 </div>
               )
             })}
-            {!loadError && filteredGroups.length > visibleGroups.length && (
+            {!hasLoadError && filteredGroups.length > visibleGroups.length && (
               <div className="picker-load-more">
                 <button className="button button--secondary" type="button" onClick={() => setCatalogLimit((current) => current + 60)}>
                   {tr('Показать ещё', 'Yana ko‘rsatish')} · {filteredGroups.length - visibleGroups.length}
                 </button>
               </div>
             )}
-            {!isLoading && !loadError && filteredGroups.length === 0 && <div className="state-block"><Search size={25} /><strong>{tr('Ничего не найдено', 'Hech narsa topilmadi')}</strong><span>{tr('Измените поиск или категорию.', 'Qidiruv yoki toifani o‘zgartiring.')}</span></div>}
+            {!isLoading && !hasLoadError && filteredGroups.length === 0 && <div className="state-block"><Search size={25} /><strong>{tr('Ничего не найдено', 'Hech narsa topilmadi')}</strong><span>{tr('Измените поиск или категорию.', 'Qidiruv yoki toifani o‘zgartiring.')}</span></div>}
           </div>
         </section>
 

@@ -1,5 +1,5 @@
 import { ArrowLeft, Boxes, CheckCircle2, CircleAlert, PackagePlus, Save, ShieldCheck } from 'lucide-react'
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
@@ -19,7 +19,16 @@ import { useLanguage } from '../../lib/i18n'
 
 type RecordKind = 'serialized' | 'quantity'
 
+// Результат проверки серийника на дубли. 'failed' — проверка НЕ прошла: это не
+// «дубля нет», а «мы не знаем», и сохранять по нему нельзя (gotchas §11).
+type SerialCheck = 'idle' | 'unique' | 'duplicate' | 'failed'
+
 const initialTaxonomy: EquipmentTaxonomy = { types: [], subtypes: [] }
+
+// Локация — ДАННЫЕ, а не текст интерфейса: в базе лежит один словарь значений
+// на всех. Через tr() при языке uz в базу уезжало 'Ofis' и заводило вторую
+// локацию рядом с 'Офис', под которым сейчас весь каталог.
+const DEFAULT_LOCATION = 'Офис'
 
 // Статус «выдано» проставляет только выдача списка, руками новую запись
 // в него не заводят — в форме создания этот код не предлагается.
@@ -37,17 +46,18 @@ export function EquipmentCreatePage() {
   const [subtype, setSubtype] = useState('')
   const [count, setCount] = useState(1)
   const [availability, setAvailability] = useState<EquipmentAvailability>('available')
-  const [location, setLocation] = useState(() => tr('Офис', 'Ofis'))
+  const [location, setLocation] = useState(DEFAULT_LOCATION)
   const [length, setLength] = useState('')
   const [specification, setSpecification] = useState('')
   const [description, setDescription] = useState('')
   const [taxonomy, setTaxonomy] = useState(initialTaxonomy)
   const newEquipmentAvailabilityOptions = equipmentAvailabilityOptions(tr, newEquipmentAvailabilityCodes)
-  const [serialDuplicate, setSerialDuplicate] = useState(false)
+  const [serialCheck, setSerialCheck] = useState<SerialCheck>('idle')
   const [isCheckingSerial, setIsCheckingSerial] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [createdId, setCreatedId] = useState('')
+  const brandInputRef = useRef<HTMLInputElement>(null)
   const canSave = Boolean(
     brand.trim()
     && model.trim()
@@ -56,7 +66,9 @@ export function EquipmentCreatePage() {
     && subtype.trim()
     && location.trim()
     && count >= 1
-    && !serialDuplicate,
+    // 'failed' кнопку не блокирует: отправка сама перепроверит номер и остановится,
+    // если проверка снова не прошла. Иначе один сетевой сбой запирал бы форму.
+    && serialCheck !== 'duplicate',
   )
 
   useEffect(() => {
@@ -65,26 +77,50 @@ export function EquipmentCreatePage() {
 
   function changeKind(nextKind: RecordKind) {
     setKind(nextKind)
-    setSerialDuplicate(false)
+    setSerialCheck('idle')
     if (nextKind === 'serialized') setCount(1)
   }
 
-  async function checkSerial() {
-    if (kind !== 'serialized') {
-      setSerialDuplicate(false)
-      return false
-    }
-    if (!serialNumber.trim()) {
-      setSerialDuplicate(false)
-      return false
+  // Сброс формы к пустому бланку — вместо перезагрузки страницы: партию заводят
+  // позициями подряд, а полный перезапуск SPA на каждой из них при плохой сети
+  // рискует не подняться обратно.
+  function resetForm() {
+    setKind('serialized')
+    setBrand('')
+    setModel('')
+    setSerialNumber('')
+    setInventoryCode('')
+    setType('')
+    setSubtype('')
+    setCount(1)
+    setAvailability('available')
+    setLocation(DEFAULT_LOCATION)
+    setLength('')
+    setSpecification('')
+    setDescription('')
+    setSerialCheck('idle')
+    setError('')
+    setCreatedId('')
+    // Форма монтируется тем же кадром, что и сброс, — фокус ставим после него.
+    window.requestAnimationFrame(() => brandInputRef.current?.focus())
+  }
+
+  async function checkSerial(): Promise<SerialCheck> {
+    if (kind !== 'serialized' || !serialNumber.trim()) {
+      setSerialCheck('idle')
+      return 'idle'
     }
     setIsCheckingSerial(true)
     try {
       const exists = await serialNumberExists(serialNumber)
-      setSerialDuplicate(exists)
-      return exists
+      const result: SerialCheck = exists ? 'duplicate' : 'unique'
+      setSerialCheck(result)
+      return result
     } catch {
-      return false
+      // Отказ проверки НЕ означает «дубля нет»: разрешает только база, а
+      // уникального индекса на serialnumber в проде нет (gotchas §11).
+      setSerialCheck('failed')
+      return 'failed'
     } finally {
       setIsCheckingSerial(false)
     }
@@ -93,9 +129,16 @@ export function EquipmentCreatePage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
-    const hasDuplicate = await checkSerial()
-    if (hasDuplicate) {
+    const result = await checkSerial()
+    if (result === 'duplicate') {
       setError(tr('Такой серийный номер уже есть в каталоге.', 'Bu seriya raqami katalogda allaqachon mavjud.'))
+      return
+    }
+    if (result === 'failed') {
+      setError(tr(
+        'Не удалось проверить серийный номер на дубли. Запись не сохранена — повторите попытку.',
+        'Seriya raqamini takrorlanishga tekshirib bo‘lmadi. Yozuv saqlanmadi — qayta urinib ko‘ring.',
+      ))
       return
     }
 
@@ -133,7 +176,7 @@ export function EquipmentCreatePage() {
         <p>{brand} {model} {tr('сохранено в каталоге. Другие записи не изменялись.', 'katalogga saqlandi. Boshqa yozuvlar o‘zgartirilmadi.')}</p>
         <div>
           <button className="button button--primary" onClick={() => navigate('/equipment')}>{tr('Открыть каталог', 'Katalogni ochish')}</button>
-          <button className="button button--secondary" onClick={() => window.location.reload()}>{tr('Добавить ещё', 'Yana qo‘shish')}</button>
+          <button className="button button--secondary" onClick={resetForm}>{tr('Добавить ещё', 'Yana qo‘shish')}</button>
         </div>
       </section>
     )
@@ -179,21 +222,27 @@ export function EquipmentCreatePage() {
               <span>02</span><div><h2>{tr('Основная информация', 'Asosiy ma’lumot')}</h2><p>{tr('Поля со звёздочкой обязательны.', 'Yulduzchali maydonlar majburiy.')}</p></div>
             </div>
             <div className="form-grid">
-              <label className="field"><span>{tr('Бренд', 'Brend')} *</span><input value={brand} onChange={(event) => setBrand(event.target.value)} placeholder={tr('Например, Shure', 'Masalan, Shure')} required /></label>
+              <label className="field"><span>{tr('Бренд', 'Brend')} *</span><input ref={brandInputRef} value={brand} onChange={(event) => setBrand(event.target.value)} placeholder={tr('Например, Shure', 'Masalan, Shure')} required /></label>
               <label className="field"><span>{tr('Модель', 'Model')} *</span><input value={model} onChange={(event) => setModel(event.target.value)} placeholder={tr('Например, ULXD4Q', 'Masalan, ULXD4Q')} required /></label>
               {kind === 'serialized' ? (
                 <label className="field">
                   <span>{tr('Серийный номер', 'Seriya raqami')} *</span>
                   <input
                     value={serialNumber}
-                    onChange={(event) => { setSerialNumber(event.target.value); setSerialDuplicate(false) }}
+                    onChange={(event) => { setSerialNumber(event.target.value); setSerialCheck('idle') }}
                     onBlur={() => void checkSerial()}
-                    className={serialDuplicate ? 'input-error' : ''}
+                    className={serialCheck === 'duplicate' ? 'input-error' : ''}
                     placeholder={tr('С корпуса устройства', 'Qurilma korpusidan')}
                     required
                   />
-                  <small className={serialDuplicate ? 'field-hint field-hint--error' : 'field-hint'}>
-                    {isCheckingSerial ? tr('Проверяем номер…', 'Raqam tekshirilmoqda…') : serialDuplicate ? tr('Этот номер уже используется.', 'Bu raqam allaqachon ishlatilmoqda.') : tr('Номер проверяется на дубли перед сохранением.', 'Saqlashdan oldin raqam takrorlanishi tekshiriladi.')}
+                  <small className={serialCheck === 'duplicate' || serialCheck === 'failed' ? 'field-hint field-hint--error' : 'field-hint'}>
+                    {isCheckingSerial
+                      ? tr('Проверяем номер…', 'Raqam tekshirilmoqda…')
+                      : serialCheck === 'duplicate'
+                        ? tr('Этот номер уже используется.', 'Bu raqam allaqachon ishlatilmoqda.')
+                        : serialCheck === 'failed'
+                          ? tr('Проверить номер не удалось. Сохранение попробует ещё раз.', 'Raqamni tekshirib bo‘lmadi. Saqlash yana urinib ko‘radi.')
+                          : tr('Номер проверяется на дубли перед сохранением.', 'Saqlashdan oldin raqam takrorlanishi tekshiriladi.')}
                   </small>
                 </label>
               ) : (

@@ -232,12 +232,20 @@ export async function createEquipment(input: CreateEquipmentInput) {
   return data.id as string
 }
 
+// В шаблоне LIKE/ILIKE `%` и `_` — подстановочные знаки, а `\` — знак
+// экранирования. Без экранирования серийник `AB_1234` совпадал с `AB-1234`
+// и давал ложный дубль. Обратная косая идёт первой, иначе она экранировала бы
+// уже добавленные косые.
+function escapeLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`)
+}
+
 export async function serialNumberExists(serialNumber: string) {
   if (!supabase) throw new Error('Supabase не настроен')
   const { count, error } = await supabase
     .from('equipment')
     .select('id', { count: 'exact', head: true })
-    .ilike('serialnumber', serialNumber.trim())
+    .ilike('serialnumber', escapeLikePattern(serialNumber.trim()))
 
   if (error) throw error
   return (count ?? 0) > 0

@@ -3,6 +3,7 @@ import { FormEvent, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from './AuthProvider'
 import { LanguageSwitcher, useLanguage } from '../../lib/i18n'
+import { isSupabaseConfigured } from '../../lib/supabase'
 
 export function LoginPage() {
   const { session, signIn } = useAuth()
@@ -18,6 +19,18 @@ export function LoginPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
+
+    // Провал конфигурации — не «неверный пароль»: без переменных окружения
+    // клиента Supabase просто нет, и signIn упал бы в общий catch, обвинив
+    // пользователя. Гейт сборки ловит пустые переменные, но не протухший ключ.
+    if (!isSupabaseConfigured) {
+      setError(tr(
+        'Приложение не настроено: нет связи с сервером данных. Сообщите администратору.',
+        'Ilova sozlanmagan: ma’lumotlar serveri bilan aloqa yo‘q. Administratorga xabar bering.',
+      ))
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
