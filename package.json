@@ -7,7 +7,8 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 5180 --strictPort",
+    "check": "tsc -b",
     "build": "tsc -b && vite build",
     "build:vercel": "tsc -b && vite build --mode production",
     "images:equipment": "node scripts/fetch-equipment-images.mjs",
