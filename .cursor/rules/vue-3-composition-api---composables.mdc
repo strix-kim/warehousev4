@@ -1,5 +1,0 @@
----
-alwaysApply: true
----
-- Use setup() function for component logic
-- Utilize ref and reactive for reactive state
