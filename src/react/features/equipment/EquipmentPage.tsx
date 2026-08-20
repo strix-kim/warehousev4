@@ -10,13 +10,14 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
 import { EquipmentVisual, preloadEquipmentImages } from '../../components/EquipmentVisual'
 import {
   countEquipmentModelUnits,
   fetchEquipment,
+  fetchEquipmentById,
   fetchEquipmentMovements,
   MOBILE_EQUIPMENT_PAGE_SIZE,
   preferredEquipmentPageSize,
@@ -34,6 +35,13 @@ import { useModalLayer } from '../../lib/useModalLayer'
 
 function equipmentCode(id: string) {
   return `EQ-${id.slice(0, 6).toUpperCase()}`
+}
+
+// 40001 (serialization_failure) серверная RPC поднимает, когда карточку изменили
+// после того, как её открыли: правка не применена ни в одном поле.
+function isStaleCardError(error: unknown) {
+  return typeof error === 'object' && error !== null && 'code' in error
+    && (error as { code?: unknown }).code === '40001'
 }
 
 function equipmentIdentifier(item: Equipment, tr: (ru: string, uz: string) => string) {
@@ -306,6 +314,12 @@ export function EquipmentPage() {
         <EquipmentDrawer
           item={selected}
           onClose={() => setSelected(null)}
+          onRefreshed={(fresh) => {
+            // Перечитанная карточка обновляет только саму запись и её строку в
+            // таблице: гонять весь каталог заново из-за открытия drawer'а незачем.
+            setSelected(fresh)
+            setRows((current) => current.map((row) => row.id === fresh.id ? fresh : row))
+          }}
           onUpdated={(updated) => {
             setSelected(updated)
             setRows((current) => current.map((row) => row.id === updated.id ? updated : row))
@@ -317,7 +331,7 @@ export function EquipmentPage() {
   )
 }
 
-function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClose: () => void; onUpdated: (item: Equipment) => void }) {
+function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { item: Equipment; onClose: () => void; onRefreshed: (item: Equipment) => void; onUpdated: (item: Equipment) => void }) {
   const { tr, locale, language } = useLanguage()
   useModalLayer(onClose)
   const status = equipmentAvailabilityView(item.availability, tr)
@@ -331,6 +345,12 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
   const [editSuccess, setEditSuccess] = useState('')
   const [modelUnitCount, setModelUnitCount] = useState(1)
   const [draft, setDraft] = useState(() => toEditDraft(item))
+  // 'stale' — перечитать карточку не удалось, на экране данные из каталога;
+  // 'missing' — записи в базе больше нет.
+  const [refreshState, setRefreshState] = useState<'fresh' | 'stale' | 'missing'>('fresh')
+  // Ответ, пришедший после закрытия, игнорируем: onRefreshed поднимает запись
+  // наверх и заново открыл бы уже закрытый drawer.
+  const isOpenRef = useRef(true)
   const { brand, model, type, subtype, specification, length, description, availability, location, count } = draft
   const canSave = Boolean(brand.trim() && model.trim() && type.trim() && subtype.trim() && count >= 0)
 
@@ -338,9 +358,42 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
     setDraft((current) => ({ ...current, [field]: value }))
   }
 
+  useEffect(() => () => { isOpenRef.current = false }, [])
+
   useEffect(() => {
+    // Пока идёт правка, черновик не пересобираем: перечитывание карточки — в том
+    // числе после конфликта версий — не имеет права стереть введённое.
+    if (isEditing) return
     setDraft(toEditDraft(item))
-  }, [item])
+  }, [isEditing, item])
+
+  // Перечитывание карточки с сервера: общее для открытия drawer'а и для отказа
+  // 40001 — в обоих случаях нужна свежая строка вместе с её updated_at.
+  async function reloadCard() {
+    try {
+      const fresh = await fetchEquipmentById(item.id)
+      if (!isOpenRef.current) return
+      if (!fresh) {
+        setRefreshState('missing')
+        return
+      }
+      setRefreshState('fresh')
+      onRefreshed(fresh)
+    } catch {
+      // Отказ не выдаём за «данных нет»: карточка остаётся на данных каталога,
+      // но пользователь видит, что они могут быть устаревшими.
+      if (isOpenRef.current) setRefreshState('stale')
+    }
+  }
+
+  // Карточку открывают на данных каталога, а им до десяти минут. Свежая строка
+  // сжимает окно, в котором устаревшая вкладка перезапишет чужую правку, и даёт
+  // актуальный updated_at для сверки версии на сервере.
+  useEffect(() => {
+    void reloadCard()
+    // Зависимость только от id: reloadCard замыкает onRefreshed, которую родитель
+    // пересоздаёт на каждом рендере, и эффект зациклился бы на своём же обновлении.
+  }, [item.id])
 
   useEffect(() => {
     let current = true
@@ -399,7 +452,11 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
         description,
         availability,
         location,
-        count: item.tracking_mode === 'serialized' ? 1 : count,
+        // Серийная карточка количеством не управляет: параметр не уезжает вовсе,
+        // и база оставляет count прежним. Принудительная единица раньше писала
+        // фантомную строку в журнал движения при правке одного описания.
+        count: item.tracking_mode === 'quantity' ? count : undefined,
+        updatedAt: item.updated_at,
       })
       onUpdated(updated)
       setIsEditing(false)
@@ -409,8 +466,18 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
           `Изменения сохранены. Данные модели обновлены у ${updatedModelUnits} единиц.`,
           `O‘zgarishlar saqlandi. Model ma’lumotlari ${updatedModelUnits} ta birlikda yangilandi.`,
         ))
-    } catch {
-      setEditError(tr('Не удалось сохранить изменения. Данные не изменены.', 'O‘zgarishlarni saqlab bo‘lmadi. Ma’lumotlar o‘zgarmadi.'))
+    } catch (error) {
+      if (isStaleCardError(error)) {
+        setEditError(tr(
+          'Карточку уже изменили в другой вкладке или другим сотрудником. Данные обновлены — проверьте и сохраните ещё раз.',
+          'Karta boshqa oynada yoki boshqa xodim tomonidan o‘zgartirilgan. Ma’lumotlar yangilandi — tekshiring va yana saqlang.',
+        ))
+        // Введённые значения остаются на экране: пользователь предупреждён и решает
+        // сам, а повторное сохранение уйдёт уже с новым updated_at.
+        await reloadCard()
+      } else {
+        setEditError(tr('Не удалось сохранить изменения. Данные не изменены.', 'O‘zgarishlarni saqlab bo‘lmadi. Ma’lumotlar o‘zgarmadi.'))
+      }
     } finally {
       setIsSaving(false)
     }
@@ -430,6 +497,11 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
           </div>
         </div>
         <span className={`badge badge--${status.tone}`}><i />{status.label}</span>
+        {refreshState !== 'fresh' && (
+          <p className="form-error"><CircleAlert size={15} /> {refreshState === 'missing'
+            ? tr('Записи больше нет в базе — возможно, её удалили.', 'Yozuv bazada yo‘q — ehtimol, u o‘chirilgan.')
+            : tr('Не удалось обновить карточку с сервера — показаны данные из каталога.', 'Kartani serverdan yangilab bo‘lmadi — katalogdagi ma’lumotlar ko‘rsatilmoqda.')}</p>
+        )}
         <EquipmentVisual item={isEditing ? { brand, model, type, subtype } : item} size="large" alt={`${brand} ${model}`} />
         {editSuccess && <p className="form-success"><Save size={15} /> {editSuccess}</p>}
         {isEditing ? (

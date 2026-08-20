@@ -573,9 +573,13 @@ export type Database = {
         Args: {
           p_availability: string
           p_brand: string
-          p_count: number
+          // ПРАВКА РУКАМИ: p_count стал необязательным (не прислали — count
+          // остаётся прежним), p_expected_updated_at — версия карточки для
+          // оптимистической блокировки; null означает «не сверять».
+          p_count?: number
           p_description: string
           p_equipment_id: string
+          p_expected_updated_at?: string | null
           p_lengthinmeters: string
           p_location: string
           p_model: string

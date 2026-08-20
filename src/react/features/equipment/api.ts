@@ -157,6 +157,21 @@ export async function fetchEquipmentByIds(ids: string[]): Promise<Equipment[]> {
   return (data ?? []).map((row) => normalizeEquipment(row))
 }
 
+// Одна карточка прямо с сервера, в обход кэша каталога: drawer перечитывает ею
+// запись при открытии и после конфликта версий. null — строки в базе больше нет,
+// это НЕ отказ запроса (отказ прилетает исключением).
+export async function fetchEquipmentById(id: string): Promise<Equipment | null> {
+  if (!supabase) throw new Error('Supabase не настроен')
+  const { data, error } = await supabase
+    .from('equipment')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) throw error
+  return data ? normalizeEquipment(data) : null
+}
+
 export type EquipmentTaxonomy = {
   types: string[]
   subtypes: string[]
@@ -293,7 +308,12 @@ export type UpdateEquipmentInput = {
   description: string
   availability: string
   location: string
-  count: number
+  // Количество принадлежит количественному учёту: для серийной карточки поле не
+  // заполняется, и параметр не уезжает в базу вовсе.
+  count?: number
+  // Версия записи, на которой открыли карточку. Разошлась с базой — RPC отказывает
+  // кодом 40001. null (у записи нет updated_at) значит «сверить нечем».
+  updatedAt: string | null
 }
 
 export type UpdateEquipmentResult = {
@@ -313,7 +333,7 @@ function readUpdatedModelUnits(value: Json): number | null {
 export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput): Promise<UpdateEquipmentResult> {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
-  const { data: rpcResult, error } = await client.rpc('update_equipment_model_and_unit', {
+  const args = {
     p_equipment_id: input.id,
     p_brand: input.brand.trim(),
     p_model: input.model.trim(),
@@ -324,8 +344,15 @@ export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput): 
     p_description: input.description.trim(),
     p_availability: input.availability,
     p_location: input.location.trim(),
-    p_count: input.count,
-  })
+    p_expected_updated_at: input.updatedAt,
+  }
+  // Без count база оставляет его как есть. Раньше серийная карточка всегда
+  // отправляла 1 и на записи с другим количеством плодила фантомную строку
+  // «Изменено количество» в журнале движения при правке одного описания.
+  const { data: rpcResult, error } = await client.rpc(
+    'update_equipment_model_and_unit',
+    input.count === undefined ? args : { ...args, p_count: input.count },
+  )
   if (error) throw error
 
   const updatedModelUnits = readUpdatedModelUnits(rpcResult)
