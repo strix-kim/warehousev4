@@ -112,7 +112,6 @@ export function ListEditorPage() {
   const [listToEdit, setListToEdit] = useState<EquipmentList | null>(() => cachedList?.reservation_status === 'draft' ? cachedList : null)
   const [saveError, setSaveError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
-  const [savedId, setSavedId] = useState('')
   const [previewGroup, setPreviewGroup] = useState<CatalogGroup | null>(null)
   const [mobilePanel, setMobilePanel] = useState<'catalog' | 'selection'>('catalog')
   const [catalogLimit, setCatalogLimit] = useState(60)
@@ -256,7 +255,6 @@ export function ListEditorPage() {
     setDescription(listToEdit.description ?? '')
     setEventDate(listToEdit.reservation_start ?? todayDateValue())
     setSelected([...restored.values()])
-    setSavedId(listToEdit.id)
     hydratedListRef.current = listToEdit.id
   }, [defaults.clientName, defaults.venue, equipment, groups, listToEdit])
 
@@ -277,7 +275,6 @@ export function ListEditorPage() {
   }
 
   function addGroup(group: CatalogGroup) {
-    setSavedId('')
     setSuccessMessage('')
     setSelected((current) => {
       const existing = current.find((item) => item.group.key === group.key)
@@ -287,7 +284,6 @@ export function ListEditorPage() {
   }
 
   function changeCount(key: string, delta: number) {
-    setSavedId('')
     setSelected((current) => current
       .map((item) => {
         if (item.group.key !== key) return item
@@ -302,7 +298,6 @@ export function ListEditorPage() {
   }
 
   function toggleSerial(key: string, equipmentId: string) {
-    setSavedId('')
     setSelected((current) => current.map((item) => {
       if (item.group.key !== key) return item
       const exists = item.serialIds.includes(equipmentId)
@@ -312,7 +307,6 @@ export function ListEditorPage() {
   }
 
   function clearSelection() {
-    setSavedId('')
     setSuccessMessage('')
     setSelected([])
   }
@@ -361,7 +355,6 @@ export function ListEditorPage() {
   }
 
   async function persistList() {
-    if (savedId) return savedId
     const items = buildItems()
     const listMode: 'specific' | 'abstract' = items.every((item) => item.tracking_mode !== 'planned') ? 'specific' : 'abstract'
     const input = {
@@ -374,19 +367,20 @@ export function ListEditorPage() {
       reservationEnd: eventDate || null,
       equipmentItems: items,
     }
-    const id = listId ? await updateEquipmentList(listId, input) : await createEquipmentList(input)
-    setSavedId(id)
-    return id
+    return listId ? await updateEquipmentList(listId, input) : await createEquipmentList(input)
   }
 
   async function saveList() {
     if (!canSubmit) return
+    const isCreating = !listId
     setIsSaving(true)
     setSaveError('')
     setSuccessMessage('')
     try {
-      await persistList()
-      setSuccessMessage(listId ? tr('Изменения сохранены.', 'O‘zgarishlar saqlandi.') : tr('Список сохранён в системе.', 'Ro‘yxat tizimda saqlandi.'))
+      const id = await persistList()
+      setSuccessMessage(isCreating ? tr('Список сохранён в системе.', 'Ro‘yxat tizimda saqlandi.') : tr('Изменения сохранены.', 'O‘zgarishlar saqlandi.'))
+      // После создания источник правды — listId из URL: следующее «Сохранить» обновит эту же запись, а не заведёт вторую.
+      if (isCreating) navigate(`/lists/${id}/edit`, { replace: true })
     } catch {
       setSaveError(tr('Не удалось сохранить список. Файл всё ещё можно скачать.', 'Ro‘yxatni saqlab bo‘lmadi. Faylni baribir yuklab olish mumkin.'))
     } finally {
@@ -440,7 +434,7 @@ export function ListEditorPage() {
         </div>
         <div className="editor-header__actions">
           <button className="button button--secondary" onClick={() => void saveList()} disabled={!canSubmit || isSaving || isExporting}>
-            <Save size={17} /> {savedId ? tr('Сохранено', 'Saqlandi') : isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить', 'Saqlash')}
+            <Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить', 'Saqlash')}
           </button>
           <button className="button button--primary" onClick={() => void exportList()} disabled={!canSubmit || isSaving || isExporting}>
             <FileSpreadsheet size={18} /> {isExporting ? tr('Готовим Excel…', 'Excel tayyorlanmoqda…') : tr('Скачать Excel', 'Excel yuklash')}
@@ -465,9 +459,8 @@ export function ListEditorPage() {
             onBlur={(event) => {
               if (event.currentTarget.value.trim()) return
               setName(defaults.name)
-              setSavedId('')
             }}
-            onChange={(event) => { setName(event.target.value); setSavedId('') }}
+            onChange={(event) => setName(event.target.value)}
             placeholder={tr('Например, Форум в Hyatt', 'Masalan, Hyatt forumi')}
           />
         </label>
@@ -475,7 +468,7 @@ export function ListEditorPage() {
           <span><CalendarDays size={13} /> {tr('Дата', 'Sana')} <small>{tr('сегодня по умолчанию', 'standart — bugun')}</small></span>
           <AppDatePicker
             value={eventDate}
-            onChange={(value) => { setEventDate(value); setSavedId('') }}
+            onChange={setEventDate}
             locale={locale}
             placeholder={tr('Выберите дату', 'Sanani tanlang')}
             ariaLabel={tr('Дата мероприятия', 'Tadbir sanasi')}
@@ -499,9 +492,8 @@ export function ListEditorPage() {
             onBlur={(event) => {
               if (event.currentTarget.value.trim()) return
               setClientName(defaults.clientName)
-              setSavedId('')
             }}
-            onChange={(event) => { setClientName(event.target.value); setSavedId('') }}
+            onChange={(event) => setClientName(event.target.value)}
             placeholder={tr('Например, ARGO Media', 'Masalan, ARGO Media')}
           />
         </label>
@@ -519,15 +511,14 @@ export function ListEditorPage() {
             onBlur={(event) => {
               if (event.currentTarget.value.trim()) return
               setVenue(defaults.venue)
-              setSavedId('')
             }}
-            onChange={(event) => { setVenue(event.target.value); setSavedId('') }}
+            onChange={(event) => setVenue(event.target.value)}
             placeholder={tr('Например, Hyatt Regency', 'Masalan, Hyatt Regency')}
           />
         </label>
         <label className="field quick-list-meta__notes">
           <span>{tr('Комментарий к документу', 'Hujjatga izoh')}</span>
-          <input value={description} onChange={(event) => { setDescription(event.target.value); setSavedId('') }} placeholder={tr('Необязательно: зал, время, особенности комплекта', 'Ixtiyoriy: zal, vaqt, jamlanma xususiyatlari')} />
+          <input value={description} onChange={(event) => setDescription(event.target.value)} placeholder={tr('Необязательно: зал, время, особенности комплекта', 'Ixtiyoriy: zal, vaqt, jamlanma xususiyatlari')} />
         </label>
         <div className="field quick-list-meta__document">
           <span>{tr('Формат Excel', 'Excel formati')}</span>
@@ -675,7 +666,7 @@ export function ListEditorPage() {
             <div><span>{tr('Всего единиц', 'Jami birliklar')}</span><strong>{selectedCount}</strong></div>
             {selected.length > 0 && <button className="clear-selection" onClick={clearSelection} type="button"><Trash2 size={14} /> {tr('Очистить список', 'Ro‘yxatni tozalash')}</button>}
             <div className="quick-list-actions">
-              <button className="button button--secondary" onClick={() => void saveList()} disabled={!canSubmit || isSaving || isExporting}><Save size={16} /> {savedId ? tr('Сохранено', 'Saqlandi') : tr('Сохранить', 'Saqlash')}</button>
+              <button className="button button--secondary" onClick={() => void saveList()} disabled={!canSubmit || isSaving || isExporting}><Save size={16} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить', 'Saqlash')}</button>
               <button className="button button--primary" onClick={() => void exportList()} disabled={!canSubmit || isSaving || isExporting}><FileSpreadsheet size={17} /> {isExporting ? tr('Готовим…', 'Tayyorlanmoqda…') : tr('Скачать Excel', 'Excel yuklash')}</button>
             </div>
             {successMessage && <p className="form-success"><Check size={14} /> {successMessage}</p>}

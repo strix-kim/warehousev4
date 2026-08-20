@@ -64,11 +64,11 @@ function preferredPageSize() {
   return window.matchMedia('(max-width: 820px)').matches ? 6 : 12
 }
 
+// equipment_ids и equipment_items не пересекаются: RPC кладёт серийные позиции в первый
+// массив, все остальные — во второй. Поэтому размер списка — их сумма при любом list_mode.
 function listSize(list: EquipmentList) {
   const quantity = list.equipment_items?.reduce((sum, item) => sum + (Number(item.count) || 0), 0) ?? 0
-  return list.list_mode === 'abstract'
-    ? quantity
-    : (list.equipment_ids?.length ?? 0) + quantity
+  return (list.equipment_ids?.length ?? 0) + quantity
 }
 
 function formatDate(value: string | null, locale: string, tr: Tr) {

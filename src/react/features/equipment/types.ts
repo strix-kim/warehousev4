@@ -12,7 +12,7 @@ export type Equipment = {
   count: number
   availability: string
   description: string | null
-  location: string | null
+  location: string
   created_at: string
   updated_at: string
 }

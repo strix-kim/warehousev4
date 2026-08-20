@@ -246,10 +246,16 @@ export type UpdateEquipmentInput = {
   count: number
 }
 
-export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput) {
+export type UpdateEquipmentResult = {
+  item: Equipment
+  // Сколько строк реально задел серверный update. null — ответ без счётчика, число называть нельзя.
+  updatedModelUnits: number | null
+}
+
+export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput): Promise<UpdateEquipmentResult> {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
-  const { error } = await client.rpc('update_equipment_model_and_unit', {
+  const { data: rpcResult, error } = await client.rpc('update_equipment_model_and_unit', {
     p_equipment_id: input.id,
     p_brand: input.brand.trim(),
     p_model: input.model.trim(),
@@ -264,6 +270,9 @@ export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput) {
   })
   if (error) throw error
 
+  const reportedUnits = (rpcResult as { updated_model_units?: unknown } | null)?.updated_model_units
+  const updatedModelUnits = typeof reportedUnits === 'number' && Number.isFinite(reportedUnits) ? reportedUnits : null
+
   const { data, error: fetchError } = await client
     .from('equipment')
     .select('*')
@@ -274,7 +283,7 @@ export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput) {
   invalidateCachePrefix('equipment:')
   invalidateCachePrefix('equipment-taxonomy')
   invalidateCachePrefix('equipment-lists:composition:')
-  return normalizeEquipment(data)
+  return { item: normalizeEquipment(data), updatedModelUnits }
 }
 
 export type EquipmentMovement = {

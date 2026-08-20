@@ -317,7 +317,7 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
   const [length, setLength] = useState(item.lengthinmeters === 'N/A' ? '' : item.lengthinmeters ?? '')
   const [description, setDescription] = useState(item.description ?? '')
   const [availability, setAvailability] = useState(item.availability)
-  const [location, setLocation] = useState(item.location ?? '')
+  const [location, setLocation] = useState(item.location)
   const [count, setCount] = useState(item.count)
   const canSave = Boolean(brand.trim() && model.trim() && type.trim() && subtype.trim() && count >= 0)
 
@@ -330,7 +330,7 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
     setLength(item.lengthinmeters === 'N/A' ? '' : item.lengthinmeters ?? '')
     setDescription(item.description ?? '')
     setAvailability(item.availability)
-    setLocation(item.location ?? '')
+    setLocation(item.location)
     setCount(item.count)
   }, [item])
 
@@ -372,7 +372,7 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
     setLength(item.lengthinmeters === 'N/A' ? '' : item.lengthinmeters ?? '')
     setDescription(item.description ?? '')
     setAvailability(item.availability)
-    setLocation(item.location ?? '')
+    setLocation(item.location)
     setCount(item.count)
     setEditError('')
     setIsEditing(false)
@@ -380,11 +380,16 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
 
   async function saveChanges() {
     if (!canSave) return
+    // Локация в базе NOT NULL: пустое поле называем сами, иначе пользователь получит безымянный отказ RPC.
+    if (!location.trim()) {
+      setEditError(tr('Укажите локацию — без неё сохранить нельзя.', 'Joylashuvni ko‘rsating — usiz saqlab bo‘lmaydi.'))
+      return
+    }
     setIsSaving(true)
     setEditError('')
     setEditSuccess('')
     try {
-      const updated = await updateEquipmentModelAndUnit({
+      const { item: updated, updatedModelUnits } = await updateEquipmentModelAndUnit({
         id: item.id,
         brand,
         model,
@@ -399,10 +404,12 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
       })
       onUpdated(updated)
       setIsEditing(false)
-      setEditSuccess(tr(
-        `Изменения сохранены. Данные модели обновлены у ${modelUnitCount} единиц.`,
-        `O‘zgarishlar saqlandi. Model ma’lumotlari ${modelUnitCount} ta birlikda yangilandi.`,
-      ))
+      setEditSuccess(updatedModelUnits === null
+        ? tr('Изменения сохранены.', 'O‘zgarishlar saqlandi.')
+        : tr(
+          `Изменения сохранены. Данные модели обновлены у ${updatedModelUnits} единиц.`,
+          `O‘zgarishlar saqlandi. Model ma’lumotlari ${updatedModelUnits} ta birlikda yangilandi.`,
+        ))
     } catch {
       setEditError(tr('Не удалось сохранить изменения. Данные не изменены.', 'O‘zgarishlarni saqlab bo‘lmadi. Ma’lumotlar o‘zgarmadi.'))
     } finally {
@@ -454,7 +461,7 @@ function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClos
                   { value: 'diagnostics', label: tr('Диагностика', 'Diagnostika') },
                   { value: 'issued', label: tr('Выдано', 'Berilgan') },
                 ]} /></div>
-                <label className="field"><span>{tr('Локация', 'Joylashuv')}</span><input value={location} onChange={(event) => setLocation(event.target.value)} /></label>
+                <label className="field"><span>{tr('Локация', 'Joylashuv')} *</span><input value={location} onChange={(event) => setLocation(event.target.value)} required /></label>
                 <label className="field"><span>{item.tracking_mode === 'quantity' ? tr('Внутренний код', 'Ichki kod') : tr('Серийный номер', 'Seriya raqami')}</span><input value={equipmentIdentifier(item, tr)} readOnly /></label>
                 <label className="field"><span>{tr('Количество', 'Miqdor')}</span><input type="number" min="0" max="9999" value={item.tracking_mode === 'serialized' ? 1 : count} onChange={(event) => setCount(Number(event.target.value))} disabled={item.tracking_mode === 'serialized'} /></label>
               </div>
