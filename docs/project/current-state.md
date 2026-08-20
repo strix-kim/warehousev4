@@ -3,7 +3,7 @@
 **Сессия:** 3 (2026-08-20) — закрыта
 **Актуальный handoff:** `docs/handoffs/2026-08-20-3-workspace.md`
 **Ветка:** `session-3-workspace` — **влита в `main` и выкачена.**
-**Прод совпадает с репозиторием:** `676f67b`, деплой `dpl_6LMTz6uXJbFr1LUmwb8M4YeieHbq`
+**Прод совпадает с репозиторием:** `8396aad`, деплой `dpl_5VxcAkGp1RPjQz4Bq9KVkU2vGLdF`
 READY, `warehouse.argomedia.uz` отвечает 200. Отставание с1–с2 закрыто.
 **Последний doc-audit:** не проводился; `03-data-model` сведён с живой базой в с2.
 Следующий рубеж — ≈с6.
