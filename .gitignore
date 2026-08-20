@@ -28,3 +28,6 @@ outputs
 *.sln
 *.sw?
 .vercel
+
+# Служебные worktree харнесса (создаются агентами Claude Code)
+.claude/worktrees/

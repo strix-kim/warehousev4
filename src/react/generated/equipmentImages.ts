@@ -1,4 +1,4 @@
-// Generated from public/equipment-images/manifest.json. Keep the client bundle limited to local paths.
+// Generated from scripts/image-cache/manifest.json. Keep the client bundle limited to local paths.
 export const equipmentImages: Record<string, string> = {
   "acer::vg240y": "/equipment-images/acer-vg240y-dc5d3751.webp",
   "agl::agl 3512 ip 4k": "/equipment-images/agl-agl-3512-ip-4k-4007b057.webp",

@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#0c1116" />
     <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon.png" />
-    <link rel="preload" href="/brand/video-engineer-avatar.png" as="image" />
+    <!-- Единственная картинка первого экрана: иллюстрация страницы входа (она же арт «Оборудования» на главной).
+         Остальное грузят сами компоненты — у них loading="eager" и fetchPriority="high". -->
     <link rel="preload" href="/illustrations/av-warehouse.webp" as="image" type="image/webp" />
-    <link rel="preload" href="/illustrations/equipment-kit.webp" as="image" type="image/webp" />
     <title>ARGO · Учёт оборудования</title>
   </head>
   <body>

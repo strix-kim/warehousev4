@@ -10,7 +10,6 @@
     "dev": "vite --port 5180 --strictPort",
     "check": "tsc -b",
     "build": "tsc -b && vite build",
-    "build:vercel": "tsc -b && vite build --mode production",
     "images:equipment": "node scripts/fetch-equipment-images.mjs",
     "preview": "vite preview"
   },
@@ -22,6 +21,7 @@
     "react-router-dom": "7.18.2"
   },
   "devDependencies": {
+    "@types/node": "24.0.10",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "@vitejs/plugin-react": "5.2.0",
