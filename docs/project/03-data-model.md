@@ -2,35 +2,43 @@
 
 Что лежит в базе, кто имеет к этому доступ и как это менять.
 
+**Сверено с живой базой 2026-08-20 (сессия 2).** Утверждения о колонках, типах,
+ограничениях, политиках, индексах, грантах и триггерах — выписка из прода через
+Supabase MCP, а не реконструкция по TypeScript-типам, как было в сессии 1.
+Утверждения о клиентском коде по-прежнему опираются на якоря `файл:N`.
+
 Все якоря вида `файл:N` проверены чтением файла. Пути даны от корня репозитория
 `warehouse.argomedia.uz`.
 
 ---
 
-## 0. Главное предупреждение: схемы в репозитории нет
+## 0. Схема в репозитории есть — это выписка, а не реконструкция
 
-**DDL базовых таблиц `users`, `equipment`, `equipment_lists`, `events`, `mount_points`,
-`reports` в репозитории ОТСУТСТВУЕТ.** Ни `create table`, ни дампа. Есть только
-`alter table … add column if not exists` поверх уже существующих таблиц.
+**Снята 2026-08-20 (сессия 2) через Supabase MCP по системному каталогу Postgres
+и лежит в `supabase/migrations/00000000000000_baseline_remote_schema.sql`** (далее
+`baseline.sql`). До этого DDL базовых таблиц в git отсутствовал вовсе, и вся страница
+была реконструкцией по TypeScript-типам; теперь каждое утверждение о колонке, типе,
+ограничении, политике, индексе и гранте — **выписка из живой базы**.
 
-Следствия, которые обязан учитывать любой агент:
+Что это меняет для агента:
 
-- Прод-схема из git **не восстанавливается**. Развернуть проект с нуля по репозиторию нельзя.
-- Любое утверждение «в таблице `equipment` есть колонка X» ниже — это утверждение про
-  **TypeScript-тип** `src/react/features/equipment/types.ts:1-18` или про **колонку,
-  упомянутую в SQL-запросе**, а не выписка из базы. Типы и реальность могут расходиться:
-  `Equipment.tracking_mode` и `Equipment.inventory_code` (`types.ts:6-7`) колонками
-  **не являются** вообще (см. §9).
-- Механизма применения SQL в репозитории нет: нет `supabase/config.toml`
-  (в `supabase/` только каталог `migrations/`), нет пакета `supabase` в `package.json`
-  (там из супабейсного только `@supabase/supabase-js` — `package.json:17`), нет `.github/`.
-  Всё, что описано ниже, кто-то прогонял руками в SQL Editor. Что именно прогнали и в
-  каком порядке — **не установлено**.
+- **Прод-схема из git восстанавливается.** `baseline.sql` содержит 134 объекта —
+  ровно столько же, сколько нашлось в проде: 9 таблиц, 30 политик, 10 триггеров,
+  15 функций, 31 индекс, ключи и проверки. Полнота проверена механической сверкой
+  имён (134 из 134), а не чтением глазами.
+- **Файл идемпотентен и к проду не применялся** — он снят С прода. Версия
+  `00000000000000` выбрана так, чтобы он всегда шёл первым, до миграций `20260819*`.
+- Типы и реальность разошлись ровно в одном месте, и оно осталось: `Equipment.tracking_mode`
+  и `Equipment.inventory_code` (`types.ts:6-7`) колонками **не являются** (см. §9).
+- Инструмента применения SQL в репозитории по-прежнему нет: ни `supabase/config.toml`,
+  ни пакета `supabase` в `package.json` (`@supabase/supabase-js` — `package.json:17`),
+  ни `.github/`. Миграции применяются вручную — через дашборд или Supabase MCP.
 
-**Чем закрывается:** `supabase db pull` (после `supabase link`) или `pg_dump --schema-only`.
-До тех пор — все разделы ниже читать как реконструкцию, а не как выписку.
+**Чего в `baseline.sql` нет** (и восстанавливается отдельно): данные, настройки Auth и
+Storage, служебные схемы Supabase (`auth`, `storage`, `realtime`) — их ведёт платформа.
 
-**Как проверить фактическое состояние прода** (три запроса, без них спорить о схеме бессмысленно):
+**Как пересверить факты прода** (три запроса; после любой правки схемы мимо `baseline.sql`
+он устаревает):
 
 ```sql
 select table_name, column_name, data_type, is_nullable, column_default
@@ -44,6 +52,14 @@ from information_schema.role_table_grants
 where table_schema = 'public' and grantee in ('anon','authenticated') order by 1,2;
 ```
 
+**Состояние данных на момент снятия** (2026-08-20): `equipment` — 1481 строка,
+`equipment_movements` — 1391, `events` — 4, `mount_points` — 9, `public.users` — **1**,
+`auth.users` — **1**. `equipment_lists`, `equipment_reservation_items`,
+`reservation_status_history`, `reports` — **пусто**. То есть ни одного сохранённого
+списка в проде ещё нет, а аккаунт в системе ровно один — это прямо касается
+`/rls-verify`: второго аккаунта для прогона под двумя пользователями **не существует**,
+его нужно завести.
+
 ---
 
 **Конвенция сокращений в ссылках.** Имена SQL-файлов длинные, поэтому в тексте они
@@ -56,6 +72,7 @@ where table_schema = 'public' and grantee in ('anon','authenticated') order by 1
 | `…equipment_model_editing.sql` | `scripts/2026-08-19_equipment_model_editing.sql` |
 | `…list_document_fields.sql` | `scripts/2026-08-19_list_document_fields.sql` |
 | `migrations/20260819131611` | `supabase/migrations/20260819131611_edit_saved_equipment_lists.sql` |
+| `baseline.sql` | `supabase/migrations/00000000000000_baseline_remote_schema.sql` — снимок прод-схемы, снят в с2 |
 
 Голый `api.ts` без префикса разрешается по контексту абзаца: в разделах про каталог
 и оборудование это `src/react/features/equipment/api.ts`, в разделах про списки —
@@ -64,9 +81,10 @@ where table_schema = 'public' and grantee in ('anon','authenticated') order by 1
 
 ## 1. Таблицы
 
-Столбец «Откуда факт»: `DDL` — таблица реально создана файлом в репозитории;
-`alter` — файл только добавляет колонку к таблице неизвестного происхождения;
-`TS` — колонка известна лишь по TypeScript-типу или по тексту запроса.
+Всё ниже — выписка из прода через `baseline.sql` (§0). Столбец «Откуда факт» теперь
+показывает не источник знания, а **историю объекта**: `baseline` — существовал до
+первой миграции, происхождение неизвестно; `скрипт`/`миграция` — заведён конкретным
+файлом репозитория, который можно прочитать.
 
 ### 1.1 Живые таблицы
 
@@ -82,7 +100,7 @@ where table_schema = 'public' and grantee in ('anon','authenticated') order by 1
 | `public.equipment_movements` | прямой `.from('equipment_movements')` — `equipment/api.ts:306`, только чтение (грант тоже только `select`, `…rls.sql:1061`) | **DDL есть**: `…rls.sql:135-154` |
 | `public.reservation_status_history` | прямой `.from('reservation_status_history')` — `lists/api.ts:250`, только чтение (грант только `select`, `…rls.sql:1060`) | **DDL есть**: `…rls.sql:120-133` |
 | `public.equipment_reservation_items` | **клиент не обращается ни разу**, хотя мог бы: полный CRUD-грант (`…rls.sql:1059`) и четыре RLS-политики (`…rls.sql:941-978`) на месте. Состав списка пишется только внутри RPC (`…rls.sql:684-699`, `migrations/20260819131611:98-116`), а обратно приходит агрегатом из `reservation_shortages` (`lists/api.ts:225`) | **DDL есть**: `scripts/2026-08-19_reservations_history_rls.sql:96-118` |
-| `public.users` | **клиент не обращается ни разу и не может**: права `authenticated` отозваны (`…hardening.sql:6`). Таблицу читают только `security definer`-функции `private.*` — см. §4.1 | только политики и гранты; DDL нет |
+| `public.users` | **клиент не обращается ни разу и не может**: у `authenticated` НЕТ НИ ОДНОГО гранта — проверено в проде. Таблицу читают только `security definer`-функции `private.*` — см. §4.1 | baseline; DDL: `baseline.sql`, §1 |
 
 Практический вывод: поверхность прямых обращений браузера — ровно **четыре таблицы**
 (`equipment`, `equipment_lists`, `equipment_movements`, `reservation_status_history`)
@@ -106,38 +124,48 @@ where table_schema = 'public' and grantee in ('anon','authenticated') order by 1
 Ни `users`, ни `events`, ни `mount_points`, ни `reports`, ни
 `equipment_reservation_items` не упомянуты ни разу — что и зафиксировано в §1.1.
 
-### 1.3 Таблица-призрак
+### 1.3 Таблица-призрак: её нет (закрыто в с2)
 
-`scripts/2026-08-19_security_performance_hardening.sql:12` вызывает
-`alter function public.validate_technical_duties_status() set search_path = ''`.
-Функция с таким именем подразумевает таблицу вроде `technical_duties`, которой нет
-нигде больше в репозитории. Сколько ещё таких таблиц в проде — **не установлено**
-(закрывается запросом из §0).
+В сессии 1 предполагалось, что `public.validate_technical_duties_status()`
+(`scripts/2026-08-19_security_performance_hardening.sql:12`) обслуживает таблицу вроде
+`technical_duties`. **Это опровергнуто выпиской из прода:** функция — триггер
+`trg_validate_technical_duties_status` `before insert or update on public.mount_points`,
+и проверяет она **jsonb-колонку** `mount_points.technical_duties`, перебирая её
+элементы и требуя `status in ('в работе','выполнено','проблема')`.
+
+Таблицы `technical_duties` в проде нет. Таблиц в `public` ровно девять, все перечислены
+в §1.1–1.2 — незнакомых объектов не осталось.
 
 ### 1.4 `public.equipment` — колонки
 
-Базового DDL нет. Колонки, подтверждённые SQL-запросами и TS-типом:
+Выписка из прода (`baseline.sql`, §1). 14 колонок, все `not null` отмечены явно:
 
-| Колонка | Откуда факт |
-|---|---|
-| `id` uuid | `…rls.sql:242`, `types.ts:2` |
-| `brand`, `model`, `type`, `subtype` | `…rls.sql:243-246`, `types.ts:3-4,8-9` |
-| `serialnumber` | `…rls.sql:249-252`, `types.ts:5` (nullable по TS) |
-| `count` integer | `…rls.sql:248`, `types.ts:12` |
-| `availability` text | `…rls.sql:184`, `types.ts:13` |
-| `location` | `2026-08-19_equipment_model_editing.sql:72`, `types.ts:15` |
-| `technicalspecification`, `lengthinmeters`, `description` | `…equipment_model_editing.sql:60-62`, `types.ts:10-11,14` |
-| `created_at`, `updated_at` | `…equipment_model_editing.sql:63`, `types.ts:16-17` |
+| Колонка | Тип | Обязательность и умолчание |
+|---|---|---|
+| `id` | uuid | not null, default `gen_random_uuid()` |
+| `model`, `brand` | text | **not null** |
+| `serialnumber` | text | **not null** — расходится с TS-типом, где поле nullable (`types.ts:5`) |
+| `type`, `subtype` | text | **not null** |
+| `location` | text | **not null** |
+| `technicalspecification`, `description` | text | nullable |
+| `lengthinmeters` | text | default `'N/A'` |
+| `count` | integer | default `1` |
+| `availability` | text | default `'available'` |
+| `created_at`, `updated_at` | timestamptz | default `now()` |
 
-Ограничения, заведённые репозиторием (`scripts/2026-08-19_reservations_history_rls.sql`):
+Ограничения:
 
-- `:211` — `alter column availability set default 'available'`;
-- `:220-222` — `equipment_availability_check`: `availability in ('available','unavailable','diagnostics','issued')`;
-- `:230-231` — `equipment_count_nonnegative_check`: `count >= 0`.
+- `equipment_availability_check`: `availability in ('available','unavailable','diagnostics','issued')`;
+- `equipment_count_nonnegative_check`: `count >= 0`.
 
-**`UNIQUE` на `serialnumber` в репозитории отсутствует.** Уникальность держится
-только клиентской проверкой — это дыра, разбор в разделе «Расхождения документации
+**`UNIQUE` на `serialnumber` в проде НЕТ — проверено.** Есть только обычный btree
+`idx_equipment_serialnumber`. Уникальность держится единственной клиентской проверкой:
+это не гонка, а отсутствие ограничения — разбор в разделе «Расхождения документации
 с кодом» в конце страницы.
+
+**`serialnumber` объявлен `not null`, а TS-тип считает его необязательным.** Значит
+попытка создать позицию без серийного номера отобьётся не валидацией формы, а ошибкой
+Postgres. Расхождение реальное, в backlog занесено.
 
 ### 1.5 `public.equipment_lists` — колонки
 
@@ -154,12 +182,16 @@ where table_schema = 'public' and grantee in ('anon','authenticated') order by 1
 | `confirmed_at`, `issued_at`, `returned_at` timestamptz | `…rls.sql:49-51` |
 | `status_changed_at` not null default now(), `status_changed_by` uuid | `…rls.sql:52-53` |
 | `shortage_snapshot` jsonb not null default `'[]'` | `…rls.sql:54` |
-| `mount_point_id` | только по индексу `…hardening.sql:38-40` — колонка есть, тип **не установлен** |
+| `mount_point_id` | uuid, FK → `mount_points(id)` **on delete set null** — тип и внешний ключ установлены выпиской из прода; в репозитории FK не заводился ни одним файлом |
 
-Ограничения (`…rls.sql:56-94`, все через `do $$ … if not exists`):
-`equipment_lists_reservation_status_check` (4 значения, `:65`),
-`equipment_lists_reservation_dates_check` (обе даты пусты либо start ≤ end, `:75-82`),
-`equipment_lists_status_changed_by_fkey` → `auth.users(id) on delete set null` (`:92`).
+Ограничения (все подтверждены в проде): `equipment_lists_reservation_status_check`
+(4 значения), `equipment_lists_reservation_dates_check` (обе даты пусты либо start ≤ end),
+`equipment_lists_list_mode_check` (`specific` / `abstract`),
+`equipment_lists_status_changed_by_fkey` → `auth.users(id) on delete set null`,
+`equipment_lists_created_by_fkey` → `auth.users(id)` **без `on delete`** — то есть
+удалить автора списка из `auth.users` нельзя, пока список существует (поведение по
+умолчанию `no action`). Плюс `event_id` → `events` on delete cascade и
+`mount_point_id` → `mount_points` on delete set null.
 
 **Два представления состава списка живут одновременно** и синхронизируются вручную
 внутри RPC: legacy-пара `equipment_ids` / `equipment_items` (`…rls.sql:655-671`,
@@ -215,18 +247,45 @@ Check-ограничения на оба статуса — `:129-132`. Пише
 
 ---
 
-## 2. Два механизма SQL и их конфликт
+## 2. Два механизма SQL: порядок установлен (с2)
 
 В репозитории **два независимых набора SQL**, и они пересекаются по объектам.
 
 | Набор | Файлы | Даты |
 |---|---|---|
-| `supabase/migrations/` | 4 | `20260819131611`, `20260819141650`, `20260819142617`, `20260819142846` — все 2026-08-19, 13:16–14:28 |
+| `supabase/migrations/` | 4 + baseline | `20260819131611`, `20260819141650`, `20260819142617`, `20260819142846` — все 2026-08-19, 13:16–14:28 |
 | `scripts/*.sql` | 6 | `2025-01-10`, `2025-08-06`, четыре от `2026-08-19` (без времени) |
 
-Порядок применения **нигде не зафиксирован**, инструмента применения нет (§0).
-Внутри `scripts/` порядок вообще определяется только тем, как человек кликал в
-SQL Editor: имена файлов лексически сортируются, но никто не обязывался их так гонять.
+**Порядок больше не гипотеза.** `supabase_migrations.schema_migrations` в проде
+содержит восемь записей, и они разрешают все споры сессии 1:
+
+| # | Версия в проде | Имя в проде | Файл репозитория |
+|---|---|---|---|
+| 1 | `20260819100935` | `reservations_history_rls_20260819` | `scripts/2026-08-19_reservations_history_rls.sql` |
+| 2 | `20260819102946` | `security_performance_hardening_20260819` | `scripts/2026-08-19_security_performance_hardening.sql` |
+| 3 | `20260819110118` | `list_document_fields_20260819` | `scripts/2026-08-19_list_document_fields.sql` |
+| 4 | `20260819111900` | `equipment_model_editing_20260819` | `scripts/2026-08-19_equipment_model_editing.sql` |
+| 5 | `20260819132044` | `edit_saved_equipment_lists` | `migrations/20260819131611_…` |
+| 6 | `20260819141934` | `allow_list_owners_to_delete_drafts` | `migrations/20260819141650_…` |
+| 7 | `20260819142805` | `allow_default_account_to_delete_any_list` | `migrations/20260819142617_allow_app_members_to_delete_any_list.sql` |
+| 8 | `20260819142903` | `optimize_default_account_delete_policy` | `migrations/20260819142846_…` |
+
+Три вывода:
+
+1. **Порядок — `scripts/` → `migrations/`.** Четыре скрипта от 19.08 применены первыми
+   (10:09–11:19), четыре миграции следом (13:20–14:29). Значит везде ниже, где сессия 1
+   писала «зависит от порядка», действует ветка «`scripts/` → `migrations/`».
+2. **`scripts/*.sql` от 19.08 — НЕ архив.** Они применены к проду и зарегистрированы как
+   миграции, просто под другими версиями и именами. Утверждение «`scripts/` — архив без
+   гарантий применения» верно только для двух старых файлов.
+3. **Два старых скрипта (`2025-01-10`, `2025-08-06`) в истории миграций отсутствуют.**
+   Их эффект в базе есть (колонки `equipment_items`, `list_mode`, индексы,
+   `update_mount_points_count`), но записи о применении нет — их прогоняли до перехода
+   на миграции. Имена в проде и в репозитории также разошлись у пункта 7: файл называется
+   `allow_app_members_to_delete_any_list`, применённая миграция —
+   `allow_default_account_to_delete_any_list`. Правит она именно default-account.
+
+Инструмента применения в репозитории по-прежнему нет (§0) — миграции гоняют вручную.
 
 ### 2.1 Конфликт первый: права на `public.users`
 
@@ -237,15 +296,26 @@ SQL Editor: имена файлов лексически сортируются,
 | `scripts/2026-08-19_security_performance_hardening.sql:6` | `revoke all on table public.users from authenticated` |
 
 Это прямое противоречие: `…rls.sql:1056` выдаёт полный набор прав, `…hardening.sql:6`
-забирает всё. Кто побеждает — определяется **исключительно порядком прогона**,
-которого в репозитории нет. Лексически `reservations_history_rls` < `security_performance_hardening`
-(`r` < `s`), и `AUDIT-2026-08-19.md:57` («Убраны слишком широкие прямые права … на
-таблицу пользователей») говорит в пользу того, что `hardening` был последним, — но
-это косвенный довод, а не факт. **Фактическое состояние — не установлено**, закрывается
-третьим запросом из §0.
+забирает всё. **Спор закрыт выпиской из прода (с2): победил `revoke`.**
 
-Тот же конфликт по legacy-таблицам: `…rls.sql:1062-1064` даёт `events`, `mount_points`,
-`reports` полный CRUD `authenticated`, `…hardening.sql:5` всё отзывает.
+Фактические гранты `authenticated` в проде — ровно такие:
+
+| Таблица | Права `authenticated` |
+|---|---|
+| `equipment`, `equipment_lists`, `equipment_reservation_items` | select, insert, update, delete |
+| `equipment_movements`, `reservation_status_history` | **только select** |
+| `users`, `events`, `mount_points`, `reports` | **ни одного гранта** |
+
+У роли `anon` нет прав ни на одну таблицу `public`. Тот же результат по legacy-таблицам:
+`…rls.sql:1062-1064` давал `events`, `mount_points`, `reports` полный CRUD,
+`…hardening.sql:5` всё отозвал — и, поскольку `hardening` шёл вторым (§2), отзыв и
+действует.
+
+**Практическое следствие, которое надо помнить при чтении §3:** политики `users_*`,
+`events_*`, `mount_points_*`, `reports_*` в проде существуют, но **недостижимы**.
+RLS фильтрует строки только после того, как роль получила право на таблицу; нет
+гранта — запрос падает на правах, до политики дело не доходит. Любой код вида
+`supabase.from('users').select(...)` получит отказ, а не пустой список.
 
 **Не читай этот раздел в отрыве от §4.1.** «Права то дают, то забирают» — не признак
 недоделки, которую надо привести к одному виду. Отзыв прав на `public.users` работает
@@ -267,14 +337,24 @@ SQL Editor: имена файлов лексически сортируются,
 | `20260819142617_allow_app_members_to_delete_any_list.sql:9-22` | предыдущие дропнуты; остаётся только `…_delete_for_default_account`: член приложения **и** `auth.jwt()->>'email' = 'argo@argomedia.uz'` |
 | `20260819142846_optimize_default_account_delete_policy.sql:3-13` | та же политика пересоздана дословно (`:11-12` идентичны `142617:20-21`); зачем — из диффа не следует |
 
-Итог зависит от порядка:
+**Итог установлен (с2): действует ветка «`scripts/` → `migrations/`».** В проде на
+`equipment_lists` ровно одна политика удаления:
 
-- **`scripts/` → `migrations/`**: удалять списки может только аккаунт `argo@argomedia.uz`.
-  Роль admin права удаления **не даёт**.
-- **`migrations/` → `scripts/`**: цикл `…rls.sql:864-880` сносит
-  `equipment_lists_delete_for_default_account` вместе со всеми, и остаётся
-  `equipment_lists_delete_for_admins` (`:937`) — то есть кнопка удаления у
-  `argo@argomedia.uz` перестаёт работать, если у аккаунта нет роли `admin`.
+```sql
+equipment_lists_delete_for_default_account  DELETE  to authenticated
+using (
+  (select private.is_app_member())
+  and ((select auth.jwt()) ->> 'email') = 'argo@argomedia.uz'
+)
+```
+
+Политики `equipment_lists_delete_for_admins` в проде **нет**. Значит:
+
+- **удалять списки может ровно один почтовый адрес** — `argo@argomedia.uz`;
+- **роль `admin` права удаления не даёт вообще**;
+- право привязано не к роли и не к членству, а к строке в JWT. Смена почты у владельца
+  аккаунта молча отберёт возможность удалять списки, и в интерфейсе это будет выглядеть
+  как поломка приложения (см. абзац ниже про `lists/api.ts`). Долг записан в backlog.
 
 Клиент (`lists/api.ts:205-219`) делает обычный `delete … .select('id').maybeSingle()`
 и при пустом ответе кидает `Equipment list cannot be deleted` (`:216`) — то есть
@@ -340,16 +420,18 @@ RLS включён на девяти таблицах: `…rls.sql:882-890`.
    от чьего имени идёт запрос, а RLS не отключает. Политики обходятся потому, что
    владелец функции при `security definer` оказывается владельцем таблицы, а владелец
    таблицы от RLS освобождён — пока на таблице не выставлено `force row level security`.
-   **Владелец объектов в репозитории не зафиксирован** (ни одного `alter table … owner to`),
-   `force row level security` тоже не встречается ни в `scripts/`, ни в
-   `supabase/migrations/` — значит вся конструкция держится на владельце по умолчанию,
-   назначенном тем, кто прогонял SQL. Пока это не проверено — **не установлено**.
-   Закрывается запросом:
+   **Проверено в с2: конструкция цела.** Все девять таблиц `public` и все пять функций
+   `private.*` принадлежат роли `postgres`, `relforcerowsecurity = false` у всех девяти.
+   Владелец функции и владелец таблицы совпадают, принудительный RLS не включён —
+   значит вставка из триггера политики обходит, и журналы неподделываемы ровно так, как
+   задумано (`…rls.sql:450-451`).
+
+   **Что это ломает при неаккуратной правке:** включите `force row level security` на
+   `equipment_movements` или `reservation_status_history` — и триггерная вставка начнёт
+   падать на RLS, а история молча перестанет писаться (политик на insert там нет). То же
+   произойдёт, если сменить владельца таблицы, не сменив владельца функции. Перепроверка:
    `select relname, relowner::regrole, relforcerowsecurity from pg_class where relname in ('reservation_status_history','equipment_movements')`
    плюс `select proname, proowner::regrole from pg_proc where pronamespace = 'private'::regnamespace`.
-   Владельцы функции и таблицы совпали и `relforcerowsecurity = false` — журналы
-   неподделываемы, как задумано (`…rls.sql:450-451`). Разошлись — вставка из триггера
-   упадёт на RLS, и история просто перестанет писаться.
 3. Политики `mount_points` и `reports` проверяют лишь **существование** события, а не
    право на него. Само по себе это дыра (любой authenticated читает чужие точки монтажа
    через `exists`), но нейтрализована грантами: `…hardening.sql:5` отзывает права на
@@ -361,14 +443,24 @@ RLS включён на девяти таблицах: `…rls.sql:882-890`.
 
 ### 3.1 Гранты (нужны в дополнение к RLS)
 
-`…rls.sql:1046-1054` — тотальный `revoke all` с `anon` и `authenticated` на девять таблиц.
-`…rls.sql:1056-1064` — обратные гранты `authenticated`:
+**Фактическое состояние прода** (проверено в с2, таблица целиком — в §2.1): полный CRUD
+у `authenticated` есть на `equipment`, `equipment_lists`, `equipment_reservation_items`;
+только `select` — на `equipment_movements` и `reservation_status_history`; на `users`,
+`events`, `mount_points`, `reports` — **ни одного гранта**. У `anon` — ничего.
 
-- полный CRUD: `users`, `equipment`, `equipment_lists`, `equipment_reservation_items`,
-  `events`, `mount_points`, `reports`;
-- только `select`: `reservation_status_history` (`:1060`), `equipment_movements` (`:1061`).
+История: `…rls.sql:1046-1054` отзывал всё, `…rls.sql:1056-1064` возвращал широкие права,
+`…hardening.sql:5-6` снова снял `users` и три legacy-таблицы. Поскольку `hardening`
+применялся вторым (§2), в проде осталось состояние после него.
 
-Далее `…hardening.sql:5-6` снимает `users`, `events`, `mount_points`, `reports` — см. §2.1.
+**EXECUTE на RPC** выдан `authenticated` для шести функций: `reservation_shortages`,
+`create_equipment_list_with_items`, `create_equipment_list_document`,
+`update_equipment_list_document`, `transition_equipment_list_status`,
+`update_equipment_model_and_unit`. У `anon` нет ни одной. Схема `private` открыта
+(`usage`) для `postgres` и `authenticated`, но её функции недоступны через PostgREST,
+потому что схема не выставлена в Data API.
+
+**Realtime:** ни одна рабочая таблица не входит в публикацию `supabase_realtime` —
+подписок на изменения в проде нет.
 
 `…rls.sql:1066` — `notify pgrst, 'reload schema'`. Без него PostgREST не увидит новые RPC.
 Клиентские фолбэки на коды `PGRST202/42883` (`lists/api.ts:226`) и `PGRST205/42P01`
@@ -385,7 +477,7 @@ public, anon`; `grant usage … to authenticated`. Схема **не выста�
 | Функция | Строка | Свойства |
 |---|---|---|
 | `private.is_app_member()` → boolean | `…rls.sql:9-21` | `language sql stable` **`security definer`** `set search_path = ''`; тело: `exists (select 1 from public.users u where u.id = auth.uid())` |
-| `private.has_any_role(allowed_roles text[])` → boolean | `…rls.sql:23-36` | те же свойства; `u.role::text = any(allowed_roles)` — `role` приводится к тексту, значит колонка, вероятно, enum; фактический тип **не установлен** |
+| `private.has_any_role(allowed_roles text[])` → boolean | `…rls.sql:23-36` | те же свойства; `u.role::text = any(allowed_roles)`. **Тип установлен (с2): `role` — не enum, а `character varying(32)`** с check-ограничением `users_role_check` на четыре значения: `video_engineer`, `technician`, `manager`, `admin`. Приведение `::text` здесь — просто согласование типов с `text[]` |
 
 Права: `revoke all … from public, anon` (`:38-39`), `grant execute … to authenticated`
 (`:40-41`).
@@ -436,12 +528,30 @@ public, anon`; `grant usage … to authenticated`. Схема **не выста�
 с `revoke all … from public, anon, authenticated` (`…rls.sql:586-588`). Комментарий
 `:450-451` формулирует замысел: клиент не должен уметь подделать или стереть историю.
 
+В проде триггеров **десять**, не четыре — полный список снят выпиской (`baseline.sql`, §6):
+
 | Триггер | Таблица | Когда | Функция |
 |---|---|---|---|
 | `trg_equipment_movement_history` | `public.equipment` | `after insert or update of count, availability` | `private.log_equipment_change()` — `…rls.sql:452-508`, создан `:591-593` |
+| `update_equipment_updated_at` | `public.equipment` | `before update` | `public.update_updated_at_column()` |
 | `trg_guard_reservation_list_update` | `public.equipment_lists` | `before update` | `private.guard_reservation_list_update()` — `…rls.sql:510-549`, создан `:596-598` |
 | `trg_reservation_status_history` | `public.equipment_lists` | `after insert or update` | `private.log_reservation_status_change()` — `…rls.sql:551-584`, создан `:601-603` |
+| `trigger_update_equipment_lists_updated_at` | `public.equipment_lists` | `before update` | `public.update_equipment_lists_updated_at()` |
 | `trg_mount_points_count` | `public.mount_points` | `after insert or delete or update` | `update_mount_points_count()` — создан `scripts/2025-08-06_mount_points_fk.sql:31-33`, тело переписано `…hardening.sql:14-30` |
+| `mount_point_insert` | `public.mount_points` | `after insert` | то же `update_mount_points_count()` |
+| `mount_point_update` | `public.mount_points` | `after update of event_id` | то же |
+| `mount_point_delete` | `public.mount_points` | `after delete` | то же |
+| `trg_validate_technical_duties_status` | `public.mount_points` | `before insert or update` | `public.validate_technical_duties_status()` |
+
+**Находка с2: на `mount_points` висят четыре триггера пересчёта вместо одного.**
+`trg_mount_points_count` покрывает `insert or delete or update` целиком, а
+`mount_point_insert` / `mount_point_update` / `mount_point_delete` дублируют его
+поштучно. На каждую вставку `update_mount_points_count()` выполняется дважды.
+
+Порчи данных это не даёт — функция не инкрементирует счётчик, а **пересчитывает его
+заново** (`select count(*) … where event_id = …`), поэтому двойной прогон даёт тот же
+результат. Цена — лишняя работа, а не расхождение. Таблица `mount_points` — наследие
+Vue-версии, продукт её не трогает, так что долг записан в backlog без срочности.
 
 **`guard_reservation_list_update` — единственная защита жизненного цикла на уровне
 записи** (RLS её не даёт, см. §3, замечание 1):
@@ -478,7 +588,13 @@ public, anon`; `grant usage … to authenticated`. Схема **не выста�
 - Четырём унаследованным функциям `search_path` прикручен задним числом:
   `…hardening.sql:10-12` — `update_updated_at_column()`, `update_equipment_lists_updated_at()`,
   `validate_technical_duties_status()`; плюс переписанная `update_mount_points_count()`.
-  **Тел этих трёх функций в репозитории нет** — что они делают, не установлено.
+  **Тела выписаны в с2** (`baseline.sql`, §5) — сюрпризов нет:
+  `update_updated_at_column()` и `update_equipment_lists_updated_at()` идентичны и
+  делают `NEW.updated_at = NOW()`; `validate_technical_duties_status()` перебирает
+  jsonb-массив `mount_points.technical_duties` и требует
+  `status in ('в работе','выполнено','проблема')` — это и есть источник легенды о
+  «таблице-призраке» (§1.3). Все три написаны с CRLF-переносами, в отличие от остальных
+  функций схемы, — то есть заводились вставкой из другого редактора.
 - Прямой вызов всех четырёх запрещён: `…hardening.sql:32-35`.
 - Единственное исключение из правила — оригинальная `update_mount_points_count()` в
   `scripts/2025-08-06_mount_points_fk.sql:19-28`: без `search_path`, `security invoker`
@@ -636,9 +752,30 @@ technicalspecification, lengthinmeters, description) обновляются **у
 Шесть последних — закрытие предупреждения Supabase `unindexed_foreign_keys`
 (`…hardening.sql:37`, подтверждено `AUDIT-2026-08-19.md:59`).
 
-**Индексов на `equipment` в репозитории нет ни одного** — включая тот, что нужен
-`reservation_shortages` для группировки по `lower(btrim(brand/model/type/subtype))`
-(`…rls.sql:361-372`). Есть ли они в проде — не установлено.
+**В репозитории индексов на `equipment` не было ни одного — но в проде их восемь**
+(выписка с2, `baseline.sql`, §3):
+
+| Индекс | Выражение |
+|---|---|
+| `idx_equipment_availability` | `(availability)` |
+| `idx_equipment_brand` | `(brand)` |
+| `idx_equipment_location` | `(location)` |
+| `idx_equipment_model` | `(model)` |
+| `idx_equipment_serialnumber` | `(serialnumber)` — **btree, НЕ unique** |
+| `idx_equipment_subtype` | `(subtype)` |
+| `idx_equipment_type` | `(type)` |
+| `idx_equipment_search` | **GIN** по `to_tsvector('russian', model \|\| ' ' \|\| brand \|\| ' ' \|\| serialnumber \|\| ' ' \|\| coalesce(description,''))` |
+
+Два замечания, которые стоит держать в голове:
+
+- **Полнотекстовый GIN-индекс существует, но продукт его не использует.** Поиск в
+  каталоге идёт через `ilike`-фильтры, а не через `to_tsvector/@@`, — значит этот индекс
+  сейчас не работает ни на один запрос и только удорожает запись. Либо переводить поиск
+  на него, либо убирать; занесено в backlog.
+- **Индекса под группировку `reservation_shortages` по `lower(btrim(...))` на `equipment`
+  так и нет** — на `equipment_reservation_items` он есть
+  (`equipment_reservation_items_model_idx`), а на складе нет. При 1481 строке это
+  незаметно, при кратном росте станет заметно.
 
 ---
 
@@ -757,9 +894,22 @@ U+FFFD REPLACEMENT CHARACTER. Файл пережил round-trip через ко
 
 Отдельно: клиентская эвристика `isAvailable` в `ListEditorPage.tsx:82-86` до сих пор
 понимает **русские** статусы (`status.startsWith('в н')`, `status.includes('диагност')`,
-`status.startsWith('не ')`) наравне с `'available'`/`'unavailable'`/`'issued'`. То есть
-клиент готов к тому, что нормализация не везде прошла — а CHECK `…rls.sql:220-222`
-утверждает, что русских значений быть не может. Одно из двух неверно; какое — не установлено.
+`status.startsWith('не ')`) наравне с `'available'`/`'unavailable'`/`'issued'`.
+
+**Спор закрыт выпиской с2: прав CHECK, эвристика — мёртвый код.** В проде на 1481 строку
+встречаются ровно три значения `availability`, все английские:
+
+| Значение | Строк |
+|---|---|
+| `available` | 1475 |
+| `unavailable` | 5 |
+| `diagnostics` | 1 |
+| `issued` | 0 |
+
+Русских статусов не осталось ни одного — нормализация прошла полностью. Разбор русских
+строк в `ListEditorPage.tsx` можно удалять: он не срабатывает и при этом маскирует
+опечатку в английском значении (незнакомая строка молча считается недоступной).
+Занесено в backlog.
 
 ---
 
@@ -801,9 +951,13 @@ U+FFFD REPLACEMENT CHARACTER. Файл пережил round-trip через ко
    Не трогать `private.is_app_member()` / `private.has_any_role()` без прочтения §4.1.
 6. **После добавления/изменения RPC** — `notify pgrst, 'reload schema'` в конце миграции
    (образец: `…rls.sql:1066`), иначе PostgREST вернёт `PGRST202`.
-7. **До любого изменения схемы** сначала сделать `supabase db pull` и закоммитить
-   полученный baseline (§0). Писать миграцию поверх неизвестного состояния —
-   это то, как проект пришёл в текущее положение.
+7. **Baseline снят (с2) — держать его в актуальном состоянии.**
+   `supabase/migrations/00000000000000_baseline_remote_schema.sql` описывает прод на
+   2026-08-20. Он НЕ обновляется сам: правка схемы мимо миграции делает его враньём,
+   а врущая дока опаснее отсутствующей. Порядок такой — изменение оформляется обычной
+   миграцией `YYYYMMDDHHMMSS_*.sql`, а baseline пересниматься не обязан: он описывает
+   стартовую точку, поверх которой миграции накатываются по порядку. Переснимать его
+   имеет смысл только после большой ручной правки в дашборде.
 8. **Правки RLS-политик**: помнить про цикл `…rls.sql:864-880`, который дропает всё на
    девяти таблицах. Пока этот файл кто-то может прогнать повторно, любая политика,
    заведённая миграцией, — временная.
@@ -812,41 +966,54 @@ U+FFFD REPLACEMENT CHARACTER. Файл пережил round-trip через ко
 
 ## Не покрыто
 
-1. **Реальная схема прода** — главное. Ни одной колонки не подтверждено выпиской из базы.
-   Закрывается `supabase db pull` / `pg_dump --schema-only` / тремя запросами из §0.
-2. **Порядок, в котором `scripts/` и `supabase/migrations/` были применены к проду.**
-   Из-за этого не установлено: есть ли у `authenticated` прямые права на `public.users`,
-   `events`, `mount_points`, `reports` (§2.1) и какая политика удаления списков
-   действует — «только `argo@argomedia.uz`» или «только admin» (§2.2). Закрывается
-   запросами к `pg_policies` и `information_schema.role_table_grants`.
-3. **Тела трёх унаследованных функций** — `public.update_updated_at_column()`,
-   `public.update_equipment_lists_updated_at()`, `public.validate_technical_duties_status()`.
-   В репозитории только `alter … set search_path` и `revoke` (`…hardening.sql:10-12, 32-34`).
-   Какие триггеры на них навешены и какие таблицы затрагивают — не установлено
-   (`select … from pg_trigger` / `pg_get_functiondef`).
-4. **Таблица `technical_duties`** (или как она называется) и любые другие таблицы прода,
-   не упомянутые в репозитории — §1.3.
-5. **Тип колонки `public.users.role`.** Из `u.role::text` (`…rls.sql:34`) следует, что
-   это, вероятно, enum, но какой и с какими значениями — не установлено. Известные из
-   политик значения: `admin`, `manager`, `technician`.
-6. **Тип и назначение `equipment_lists.mount_point_id`** — колонка видна только по
-   индексу `…hardening.sql:38-40`; FK на `mount_points` в репозитории не заводится.
-7. **`equipment_lists.type`** — колонка заполняется литералом `'custom'` (`…rls.sql:678`)
-   и читается клиентом (`lists/api.ts:19,56`), но нигде не используется в логике.
-   Какие ещё значения там встречаются в проде — не установлено.
-8. **Наличие индексов на `public.equipment`** — в репозитории ни одного (§7).
-9. **Утверждения `AUDIT-2026-08-19.md` о данных прода** (`:53` — 1481 позиция и 0 старых
-   списков; `:65` — 11 дублирующихся серийников; `:70` — старые таблицы пусты) —
-   репозиторием не проверяются. `AUDIT-2026-08-19.md` построчно целиком не сверялся.
-10. **Реальное поведение при конкурентных транзакциях** — блокировки `for update`
-    расставлены (`…rls.sql:726`, `:764-769`, `:810-815`; `migrations/20260819131611:32`),
-    но нагрузочно/интеграционно не проверялись. `AUDIT-2026-08-19.md:68` подтверждает:
-    автотестов и CI нет.
-11. **Владельцы таблиц и функций `private.*`** — от них зависит, обходят ли
-    `security definer`-функции RLS (§3 замечание 2, §4.1). В репозитории нет ни одного
-    `alter … owner to` и ни одного `force row level security`. Закрывается
-    `select relname, relowner::regrole, relforcerowsecurity from pg_class where relnamespace = 'public'::regnamespace`
-    и `select proname, prosecdef, proowner::regrole from pg_proc where pronamespace = 'private'::regnamespace`.
+**Закрыто в сессии 2** (было пунктами 1–8 списка сессии 1): реальная схема прода,
+порядок применения `scripts/` и `migrations/`, права `authenticated` на `users` и
+legacy-таблицы, действующая политика удаления списков, тела трёх унаследованных функций
+и навешенные на них триггеры, «таблица-призрак» `technical_duties`, тип `users.role`,
+тип и внешний ключ `equipment_lists.mount_point_id`, наличие индексов на `equipment`.
+Всё перечисленное теперь выписка из базы, а не догадка.
+
+Остаётся не покрытым:
+
+1. **`equipment_lists.type`** — колонка заполняется литералом `'custom'` (`…rls.sql:678`)
+   и читается клиентом (`lists/api.ts:19,56`), но нигде не используется в логике. Какие
+   ещё значения там встречаются, по данным сказать нельзя: таблица в проде пуста.
+2. **Реальное поведение при конкурентных транзакциях** — блокировки `for update`
+   расставлены (`…rls.sql:726`, `:764-769`, `:810-815`; `migrations/20260819131611:32`),
+   но нагрузочно/интеграционно не проверялись. Автотестов и CI нет.
+3. **Владельцы таблиц и функций `private.*`.** Известно, что все пять функций `private.*`
+   объявлены `security definer` с `search_path = ''`, а `force row level security` не
+   включён ни на одной таблице. Но конкретный владелец (а значит — обходит ли `definer`
+   политики полностью) выпиской с2 не снимался. Закрывается
+   `select relname, relowner::regrole, relforcerowsecurity from pg_class where relnamespace = 'public'::regnamespace`
+   и `select proname, proowner::regrole from pg_proc where pronamespace = 'private'::regnamespace`.
+4. **Утверждение `AUDIT-2026-08-19.md:65` про 11 дублирующихся нормализованных
+   серийников** — в с2 не перепроверялось запросом; остальные его утверждения о данных
+   подтвердились (1481 позиция, старые списки отсутствуют, legacy-таблицы почти пусты:
+   `events` — 4 строки, `mount_points` — 9, `reports` — 0).
+5. **Данные не в схеме `public`** — настройки Auth (политика паролей, MFA), содержимое
+   `storage`, конфигурация Realtime. Выписка с2 покрывала только `public` и `private`.
+
+### Расхождения схемы с репозиторием (найдены выпиской с2)
+
+- **`public.users.id` не связан с `auth.users`.** Колонка объявлена
+  `uuid not null default gen_random_uuid()` и внешнего ключа на `auth.users(id)` не
+  имеет — при том что вся авторизация построена на совпадении этих идентификаторов
+  (`private.is_app_member()` сверяет `u.id = auth.uid()`). Совпадение держится
+  соглашением, а не базой: профиль с «неправильным» `id` вставится молча, а его
+  владелец просто никогда не пройдёт проверку членства. Соседние таблицы ссылаются на
+  `auth.users(id)` напрямую (`equipment_lists.created_by`,
+  `equipment_reservation_items.created_by`, `*.changed_by`) — то есть в схеме
+  сосуществуют две разные привязки к пользователю.
+- **Дубль внешнего ключа на `mount_points`.** `mount_points_event_id_fkey` и
+  `mount_points_event_fk` — одна и та же пара колонок, одно и то же
+  `on delete cascade`. Второй заведён `scripts/2025-08-06_mount_points_fk.sql`, первый
+  существовал раньше. Вреда нет, кроме двойной проверки на каждой вставке.
+- **Четыре триггера пересчёта вместо одного** на `mount_points` — разбор в §5.
+- **`equipment.serialnumber` объявлен `not null`,** а TypeScript-тип считает поле
+  необязательным (`types.ts:5`) — §1.4.
+- **GIN-индекс полнотекстового поиска `idx_equipment_search` существует, но не
+  используется** ни одним запросом продукта — §7.
 
 ### Расхождения документации с кодом (обнаруженные)
 
