@@ -88,7 +88,8 @@ function buildSheet(input: ExportListInput) {
     merges.push('B1:E1')
   }
 
-  const metadata = [
+  // Пары «подпись → значение»: тип кортежем, иначе деструктуризация даёт string | undefined
+  const metadata: [string, string][] = [
     [t.project, input.name || t.defaultProject],
     [t.client, input.clientName || t.defaultClient],
     [t.venue, input.venue || t.defaultVenue],

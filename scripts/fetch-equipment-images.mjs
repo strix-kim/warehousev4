@@ -10,8 +10,11 @@ const execFileAsync = promisify(execFile)
 const root = new URL('../', import.meta.url)
 const outputDirectory = new URL('../public/equipment-images/', import.meta.url)
 const generatedDirectory = new URL('../src/react/generated/', import.meta.url)
-const manifestUrl = new URL('../public/equipment-images/manifest.json', import.meta.url)
-const reportUrl = new URL('../public/equipment-images/report.json', import.meta.url)
+// Служебные артефакты прогона лежат вне public/: веб раздаёт public/ целиком,
+// а манифест — инкрементальный кэш скрапера, а не ассет приложения
+const cacheDirectory = new URL('./image-cache/', import.meta.url)
+const manifestUrl = new URL('manifest.json', cacheDirectory)
+const reportUrl = new URL('report.json', cacheDirectory)
 const generatedUrl = new URL('../src/react/generated/equipmentImages.ts', import.meta.url)
 const catalogUrl = new URL('./equipment-catalog.json', import.meta.url)
 const userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/131 Safari/537.36'
@@ -204,7 +207,7 @@ async function saveArtifacts(manifest, failures, equipment) {
   await writeFile(manifestUrl, `${JSON.stringify(orderedManifest, null, 2)}\n`)
   await writeFile(reportUrl, `${JSON.stringify({ generatedAt: new Date().toISOString(), total, downloaded: Object.keys(manifest).length, missing: missingItems.length, missingItems }, null, 2)}\n`)
   const clientManifest = Object.fromEntries(Object.entries(orderedManifest).map(([key, entry]) => [key, entry.src]))
-  await writeFile(generatedUrl, `// Generated from public/equipment-images/manifest.json. Keep the client bundle limited to local paths.\nexport const equipmentImages: Record<string, string> = ${JSON.stringify(clientManifest, null, 2)}\n`)
+  await writeFile(generatedUrl, `// Generated from scripts/image-cache/manifest.json. Keep the client bundle limited to local paths.\nexport const equipmentImages: Record<string, string> = ${JSON.stringify(clientManifest, null, 2)}\n`)
 
   const referencedFiles = new Set(Object.values(manifest).map((entry) => entry.src.split('/').at(-1)))
   const orphanedFiles = (await readdir(outputDirectory))
@@ -215,6 +218,7 @@ async function saveArtifacts(manifest, failures, equipment) {
 async function main() {
   await mkdir(outputDirectory, { recursive: true })
   await mkdir(generatedDirectory, { recursive: true })
+  await mkdir(cacheDirectory, { recursive: true })
   const equipment = await loadEquipment()
   const manifest = await readManifest()
   const genericItems = equipment.filter(isGenericEquipment)
