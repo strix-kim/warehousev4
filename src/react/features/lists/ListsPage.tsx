@@ -291,7 +291,8 @@ export function ListsPage() {
                       <div className="reservation-window"><CalendarRange size={15} /><span>{formatDate(list.reservation_start, locale, tr)} — {formatDate(list.reservation_end, locale, tr)}</span></div>
                       <div className="list-card__meta">
                         <span><strong>{listSize(list)}</strong> {tr('единиц', 'birlik')}</span>
-                        <span>{new Intl.DateTimeFormat(locale).format(new Date(list.created_at))}</span>
+                        {/* created_at в схеме nullable; поведение прежнее: пустое значение даёт эпоху */}
+                        <span>{new Intl.DateTimeFormat(locale).format(new Date(list.created_at ?? 0))}</span>
                       </div>
                       <div className="list-card__actions">
                         <button className="button button--secondary list-card__details" onClick={() => setSelected(list)}><Clock3 size={16} /> {tr('Открыть детали списка', 'Ro‘yxat tafsilotlarini ochish')}</button>

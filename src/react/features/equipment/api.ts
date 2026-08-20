@@ -1,17 +1,18 @@
 import { supabase } from '../../lib/supabase'
 import { cachedQuery, invalidateCachePrefix, readCachedQuery } from '../../lib/persistentCache'
+import type { Json } from '../../lib/database.types'
 import type { EquipmentPageResult } from './types'
-import type { Equipment } from './types'
+import type { Equipment, EquipmentRow } from './types'
 
 export const EQUIPMENT_PAGE_SIZE = 50
 
 const quantityPlaceholders = new Set(['', 'n/a', 'na', 'нет', 'без номера', 'б/н', 'none', 'null', '-'])
 
-function normalizeEquipment(row: Omit<Equipment, 'tracking_mode' | 'inventory_code'>): Equipment {
-  const storedIdentifier = row.serialnumber?.trim() ?? ''
+function normalizeEquipment(row: EquipmentRow): Equipment {
+  const storedIdentifier = row.serialnumber.trim()
   const normalizedIdentifier = storedIdentifier.toLowerCase()
   const generatedQuantityCode = storedIdentifier.startsWith('QTY::')
-  const isQuantity = row.count > 1
+  const isQuantity = (row.count ?? 0) > 1
     || storedIdentifier.startsWith('AUTO-')
     || generatedQuantityCode
     || quantityPlaceholders.has(normalizedIdentifier)
@@ -25,6 +26,8 @@ function normalizeEquipment(row: Omit<Equipment, 'tracking_mode' | 'inventory_co
 
   return {
     ...row,
+    availability: row.availability ?? '',
+    count: row.count ?? 0,
     serialnumber: isQuantity ? null : storedIdentifier,
     tracking_mode: isQuantity ? 'quantity' : 'serialized',
     inventory_code: inventoryCode,
@@ -179,14 +182,20 @@ export type CreateEquipmentInput = {
 
 export async function createEquipment(input: CreateEquipmentInput) {
   if (!supabase) throw new Error('Supabase не настроен')
+  // serialnumber в базе NOT NULL: для серийного учёта номер обязателен, для
+  // количественного его заменяет служебный идентификатор. Раньше пустое значение
+  // уезжало в базу и падало там же на NOT NULL — теперь отказ виден на месте.
+  const serialnumber = input.trackingMode === 'serialized'
+    ? input.serialnumber?.trim()
+    : storedQuantityIdentifier(input.inventoryCode)
+  if (!serialnumber) throw new Error('Серийный номер обязателен')
+
   const { data, error } = await supabase
     .from('equipment')
     .insert({
       brand: input.brand.trim(),
       model: input.model.trim(),
-      serialnumber: input.trackingMode === 'serialized'
-        ? input.serialnumber?.trim()
-        : storedQuantityIdentifier(input.inventoryCode),
+      serialnumber,
       type: input.type.trim(),
       subtype: input.subtype.trim(),
       count: input.count,
@@ -221,14 +230,29 @@ export async function countEquipmentModelUnits(brand: string, model: string) {
   const client = supabase
   const cacheKey = `equipment:model-count:${brand.trim().toLocaleLowerCase('ru')}::${model.trim().toLocaleLowerCase('ru')}`
   return cachedQuery(cacheKey, 10 * 60 * 1000, async () => {
-    const { count, error } = await client
-      .from('equipment')
-      .select('id', { count: 'exact', head: true })
-      .eq('brand', brand)
-      .eq('model', model)
+    // Считает база по тому же правилу, по которому правит модель серверная RPC:
+    // lower(btrim(brand/model)). Клиентский .eq по сырым строкам расходился с ней
+    // на записях с ведущими пробелами.
+    const { data, error } = await client.rpc('count_equipment_model_units', {
+      p_brand: brand,
+      p_model: model,
+    })
 
+    // ВРЕМЕННЫЙ фолбэк: пока миграция с count_equipment_model_units не применена,
+    // база отвечает «функции нет» — считаем по-старому, .eq по сырым строкам.
+    // Гейт строго по коду отсутствия функции. После применения миграции ветка
+    // мертва — удалить вместе с этим комментарием.
+    if (error && (error.code === 'PGRST202' || error.code === '42883')) {
+      const legacy = await client
+        .from('equipment')
+        .select('id', { count: 'exact', head: true })
+        .eq('brand', brand)
+        .eq('model', model)
+      if (legacy.error) throw legacy.error
+      return legacy.count ?? 0
+    }
     if (error) throw error
-    return count ?? 0
+    return data ?? 0
   })
 }
 
@@ -252,6 +276,14 @@ export type UpdateEquipmentResult = {
   updatedModelUnits: number | null
 }
 
+// Счётчик задетых строк из ответа update_equipment_model_and_unit. RPC возвращает
+// jsonb, то есть Json, — число подтверждаем проверками, а не приведением типа.
+function readUpdatedModelUnits(value: Json): number | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null
+  const reported = value.updated_model_units
+  return typeof reported === 'number' && Number.isFinite(reported) ? reported : null
+}
+
 export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput): Promise<UpdateEquipmentResult> {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
@@ -270,8 +302,7 @@ export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput): 
   })
   if (error) throw error
 
-  const reportedUnits = (rpcResult as { updated_model_units?: unknown } | null)?.updated_model_units
-  const updatedModelUnits = typeof reportedUnits === 'number' && Number.isFinite(reportedUnits) ? reportedUnits : null
+  const updatedModelUnits = readUpdatedModelUnits(rpcResult)
 
   const { data, error: fetchError } = await client
     .from('equipment')
