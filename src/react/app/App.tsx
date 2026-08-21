@@ -1,6 +1,7 @@
 import { ArrowUpRight, Boxes, ChevronDown, ClipboardList, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, RadioTower, Warehouse } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
+import { AppErrorBoundary } from '../components/AppErrorBoundary'
 import { useAuth } from '../features/auth/AuthProvider'
 import { LanguageSwitcher, useLanguage } from '../lib/i18n'
 import { reportAppError } from '../lib/reportAppError'
@@ -22,10 +23,17 @@ const HomePage = lazy(loadHomePage)
 export function App() {
   const { isLoading, session } = useAuth()
 
+  // Dev-триггер корневой границы: бросок здесь выше любой постраничной границы, но
+  // ниже корневой. window.location вместо useLocation — чтобы не подписывать App на
+  // каждую навигацию ради ветки, которой в проде нет.
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('__crash') === 'app') {
+    throw new Error('проверка границы: корень')
+  }
+
   if (isLoading) return <AppLoader />
 
   return <Routes>
-      <Route path="/login" element={<Suspense fallback={<AppLoader />}><LoginPage /></Suspense>} />
+      <Route path="/login" element={<RouteBoundary variant="app"><LoginPage /></RouteBoundary>} />
       <Route element={session ? <AppShell /> : <LoginRedirect />}>
         <Route index element={<RouteBoundary><HomePage /></RouteBoundary>} />
         <Route path="/equipment" element={<RouteBoundary><EquipmentPage /></RouteBoundary>} />
@@ -178,8 +186,29 @@ function AppShell() {
   )
 }
 
-function RouteBoundary({ children }: { children: ReactNode }) {
-  return <Suspense fallback={<RouteLoader />}>{children}</Suspense>
+function RouteBoundary({ children, variant = 'page' }: { children: ReactNode; variant?: 'app' | 'page' }) {
+  const location = useLocation()
+  const { tr } = useLanguage()
+
+  return (
+    // resetKey — путь: экран ошибки гаснет при уходе на другой раздел. Экземпляр
+    // границы переживает смену маршрута (useRoutes сверяет элементы по позиции),
+    // поэтому без явного сброса ошибка залипла бы на всём приложении.
+    <AppErrorBoundary variant={variant} resetKey={location.pathname} tr={tr}>
+      <Suspense fallback={variant === 'app' ? <AppLoader /> : <RouteLoader />}>
+        {import.meta.env.DEV && <CrashTrigger search={location.search} />}
+        {children}
+      </Suspense>
+    </AppErrorBoundary>
+  )
+}
+
+// Dev-триггер постраничной границы. Отдельный компонент, а не проверка в теле
+// RouteBoundary: бросок обязан случиться ВНУТРИ границы, иначе его поймает
+// вышестоящая корневая и унесёт сайдбар.
+function CrashTrigger({ search }: { search: string }) {
+  if (new URLSearchParams(search).get('__crash') === '1') throw new Error('проверка границы')
+  return null
 }
 
 function RouteLoader() {
