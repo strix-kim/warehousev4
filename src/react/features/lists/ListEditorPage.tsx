@@ -1,12 +1,10 @@
 import {
   ArrowDown,
   ArrowLeft,
-  CalendarDays,
   Check,
   CircleAlert,
   FileCheck2,
   FileSpreadsheet,
-  Hash,
   Info,
   ListChecks,
   Minus,
@@ -17,7 +15,6 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { AppDatePicker } from '../../components/AppDatePicker'
 import { preloadEquipmentImages } from '../../components/EquipmentVisual'
 import { formatDateTime, formatTime, parseDateValue, todayDateValue } from '../../lib/date'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
@@ -37,6 +34,7 @@ import {
 } from './api'
 import { buildCatalogGroups, groupKey, type CatalogGroup } from './catalogGroups'
 import { CatalogPanel, CatalogPreviewDrawer } from './ListEditorCatalog'
+import { ListEditorMeta, type ListMetaField, type RequisiteField } from './ListEditorMeta'
 import { useListDraftAutosave } from './useListDraftAutosave'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
@@ -59,11 +57,6 @@ type SelectedGroup = {
 // строкой: строка потянула бы tr в зависимости эффекта, и смена языка
 // перезапрашивала бы список из базы.
 type OpenErrorCode = '' | 'not-draft' | 'failed'
-
-// Реквизиты, без которых не собирается документ на согласование. Проверка
-// клиентская и это UX: документ формируется здесь же, в браузере, пары в базе
-// у неё быть не может.
-type RequisiteField = 'name' | 'clientName' | 'venue'
 
 // Высота липкой полосы табов на телефоне (8 сверху + кнопка 44 + 4 снизу + рамка 1).
 // Держится в паре с .mobile-editor-tabs и .quick-catalog-toolbar в styles.css:
@@ -337,6 +330,18 @@ export function ListEditorPage() {
       next.delete(field)
       return next
     })
+  }
+
+  // Правка реквизита снимает с поля подсветку «обязательно для согласования»:
+  // пользователь уже отвечает на подсказку, держать её дальше незачем.
+  function changeMeta(field: ListMetaField, value: string) {
+    switch (field) {
+      case 'name': setName(value); clearRequisiteError(field); break
+      case 'clientName': setClientName(value); clearRequisiteError(field); break
+      case 'venue': setVenue(value); clearRequisiteError(field); break
+      case 'description': setDescription(value); break
+      case 'eventDate': setEventDate(value); break
+    }
   }
 
   const selectedCount = selected.reduce((sum, item) => sum + item.count, 0)
@@ -642,65 +647,13 @@ export function ListEditorPage() {
         </div>
       )}
 
-      <section ref={metaRef} className="quick-list-meta data-panel">
-        <label className="field quick-list-meta__name">
-          <span>{tr('Проект или мероприятие', 'Loyiha yoki tadbir')} <small>{tr('необязательно: подставится дата', 'ixtiyoriy: sana qo‘yiladi')}</small></span>
-          <input
-            id="quick-list-name"
-            className={requisiteErrors.has('name') ? 'input-error' : ''}
-            value={name}
-            onChange={(event) => { setName(event.target.value); clearRequisiteError('name') }}
-            placeholder={tr('Например, Форум в Hyatt', 'Masalan, Hyatt forumi')}
-          />
-          {requisiteErrors.has('name') && <small className="field-hint field-hint--error">{tr('Обязательно для согласования', 'Kelishuv uchun majburiy')}</small>}
-        </label>
-        <div className="field">
-          <span><CalendarDays size={13} /> {tr('Дата', 'Sana')} <small>{tr('сегодня по умолчанию', 'standart — bugun')}</small></span>
-          <AppDatePicker
-            value={eventDate}
-            onChange={setEventDate}
-            locale={locale}
-            placeholder={tr('Выберите дату', 'Sanani tanlang')}
-            ariaLabel={tr('Дата мероприятия', 'Tadbir sanasi')}
-            todayLabel={tr('Сегодня', 'Bugun')}
-            clearLabel={tr('Очистить', 'Tozalash')}
-            previousMonthLabel={tr('Предыдущий месяц', 'Oldingi oy')}
-            nextMonthLabel={tr('Следующий месяц', 'Keyingi oy')}
-          />
-        </div>
-        <label className="field quick-list-meta__client">
-          <span>{tr('Заказчик / организатор', 'Buyurtmachi / tashkilotchi')} <small>{tr('нужно для документа на согласование', 'kelishuv hujjati uchun kerak')}</small></span>
-          <input
-            id="quick-list-clientName"
-            className={requisiteErrors.has('clientName') ? 'input-error' : ''}
-            value={clientName}
-            onChange={(event) => { setClientName(event.target.value); clearRequisiteError('clientName') }}
-            placeholder={tr('Например, ARGO Media', 'Masalan, ARGO Media')}
-          />
-          {requisiteErrors.has('clientName') && <small className="field-hint field-hint--error">{tr('Обязательно для согласования', 'Kelishuv uchun majburiy')}</small>}
-        </label>
-        <label className="field quick-list-meta__venue">
-          <span>{tr('Площадка / локация', 'Maydon / joylashuv')} <small>{tr('нужно для документа на согласование', 'kelishuv hujjati uchun kerak')}</small></span>
-          <input
-            id="quick-list-venue"
-            className={requisiteErrors.has('venue') ? 'input-error' : ''}
-            value={venue}
-            onChange={(event) => { setVenue(event.target.value); clearRequisiteError('venue') }}
-            placeholder={tr('Например, Hyatt Regency', 'Masalan, Hyatt Regency')}
-          />
-          {requisiteErrors.has('venue') && <small className="field-hint field-hint--error">{tr('Обязательно для согласования', 'Kelishuv uchun majburiy')}</small>}
-        </label>
-        <label className="field quick-list-meta__notes">
-          <span>{tr('Комментарий к документу', 'Hujjatga izoh')}</span>
-          <input value={description} onChange={(event) => setDescription(event.target.value)} placeholder={tr('Необязательно: зал, время, особенности комплекта', 'Ixtiyoriy: zal, vaqt, jamlanma xususiyatlari')} />
-        </label>
-        <div className="quick-list-hint"><Hash size={17} /><span>{tr('Добавляйте модели и количество. Серийные номера можно указать позже только там, где это нужно.', 'Modellar va miqdorni qo‘shing. Seriya raqamlarini keyin faqat kerak bo‘lgan joyda ko‘rsatish mumkin.')}</span></div>
-        <div className="quick-list-next">
-          <button className="button button--primary" type="button" onClick={() => moveToMobilePanel('catalog')}>
-            {tr('Перейти к оборудованию', 'Uskunalarga o‘tish')} <ArrowDown size={17} />
-          </button>
-        </div>
-      </section>
+      <ListEditorMeta
+        panelRef={metaRef}
+        values={{ name, clientName, venue, description, eventDate }}
+        requisiteErrors={requisiteErrors}
+        onChange={changeMeta}
+        onGoToCatalog={() => moveToMobilePanel('catalog')}
+      />
 
       <div className="mobile-editor-tabs" role="tablist" aria-label={tr('Раздел редактора', 'Tahrirchi bo‘limi')}>
         <button className={mobilePanel === 'catalog' ? 'active' : ''} onClick={() => moveToMobilePanel('catalog')} role="tab" aria-selected={mobilePanel === 'catalog'}>{tr('Каталог', 'Katalog')}</button>
