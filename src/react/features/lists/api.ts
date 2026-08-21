@@ -415,7 +415,6 @@ export type ListDraft = {
   venue: string
   description: string
   eventDate: string
-  documentMode: 'working' | 'approval'
   items: ListDraftItem[]
 }
 

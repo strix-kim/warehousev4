@@ -3,8 +3,8 @@ import {
   ArrowLeft,
   CalendarDays,
   Check,
-  ChevronDown,
   CircleAlert,
+  FileCheck2,
   FileSpreadsheet,
   Hash,
   Info,
@@ -12,16 +12,17 @@ import {
   Minus,
   Plus,
   Save,
+  ScanBarcode,
   Trash2,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AppDatePicker } from '../../components/AppDatePicker'
-import { AppSelect } from '../../components/AppSelect'
 import { preloadEquipmentImages } from '../../components/EquipmentVisual'
-import { todayDateValue } from '../../lib/date'
+import { formatDateTime, todayDateValue } from '../../lib/date'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
+import { useArmedAction } from '../../lib/useArmedAction'
 import { fetchAllEquipment, readCachedAllEquipment } from '../equipment/api'
 import type { Equipment } from '../equipment/types'
 import {
@@ -60,6 +61,15 @@ type SelectedGroup = {
 // перезапрашивала бы список из базы.
 type OpenErrorCode = '' | 'not-draft' | 'failed'
 
+// Высота липкой полосы табов на телефоне (8 сверху + кнопка 44 + 4 снизу + рамка 1).
+// Держится в паре с .mobile-editor-tabs и .quick-catalog-toolbar в styles.css:
+// разъедется — таб «В списке» снова приземлится под срезанным заголовком.
+const MOBILE_TABS_HEIGHT = 57
+
+// Потолок количества в позиции. Ограничение чисто интерфейсное — база принимает
+// любое число, но в рабочем списке четырёхзначное количество означает опечатку.
+const MAX_ITEM_COUNT = 999
+
 function selectDefaultInputValue(input: HTMLInputElement, defaultValue: string) {
   if (input.value === defaultValue) input.select()
 }
@@ -81,7 +91,6 @@ export function ListEditorPage() {
   const [clientName, setClientName] = useState<string>(() => restoredDraft?.clientName ?? listDocumentDefaults[language].clientName)
   const [venue, setVenue] = useState<string>(() => restoredDraft?.venue ?? listDocumentDefaults[language].venue)
   const [description, setDescription] = useState(() => restoredDraft?.description ?? '')
-  const [documentMode, setDocumentMode] = useState<'working' | 'approval'>(() => restoredDraft?.documentMode ?? 'working')
   const [eventDate, setEventDate] = useState(() => restoredDraft?.eventDate ?? todayDateValue())
   const [cachedEquipment] = useState(readCachedAllEquipment)
   const [cachedList] = useState(() => listId ? readCachedEquipmentList(listId) : null)
@@ -89,7 +98,8 @@ export function ListEditorPage() {
   const [selected, setSelected] = useState<SelectedGroup[]>([])
   const [isLoading, setIsLoading] = useState(() => !cachedEquipment)
   const [isSaving, setIsSaving] = useState(false)
-  const [isExporting, setIsExporting] = useState(false)
+  // Режим экспорта, а не флаг: «Готовим…» должна гореть на нажатой кнопке, а не на обеих.
+  const [isExporting, setIsExporting] = useState<'' | 'working' | 'approval'>('')
   // Каталог: тоже только флаг — текст ошибки собирается на рендере.
   const [hasLoadError, setHasLoadError] = useState(false)
   const [openError, setOpenError] = useState<OpenErrorCode>('')
@@ -97,6 +107,11 @@ export function ListEditorPage() {
   const [listToEdit, setListToEdit] = useState<EquipmentList | null>(() => cachedList?.reservation_status === 'draft' ? cachedList : null)
   const [saveError, setSaveError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  // Момент последней записи в базу. Нужен только строке состояния в шапке.
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
+  // Количество, которое пользователь СЕЙЧАС набирает. Держим отдельно от выборки:
+  // пустое поле — законное промежуточное состояние, а count = 0 выбросил бы позицию.
+  const [countDraft, setCountDraft] = useState<{ key: string; text: string } | null>(null)
   const [previewGroup, setPreviewGroup] = useState<CatalogGroup | null>(null)
   const [mobilePanel, setMobilePanel] = useState<'catalog' | 'selection'>('catalog')
   const catalogRef = useRef<HTMLElement>(null)
@@ -111,6 +126,11 @@ export function ListEditorPage() {
   // стейт затёр бы сохранённый черновик раньше, чем тот успеет подняться.
   // Восстанавливать нечего — снят сразу.
   const draftRestoredRef = useRef(!restoredDraft)
+  // Оба действия необратимы и стоят рядом с обычными кнопками, поэтому спрашивают
+  // подтверждение вторым нажатием. Экземпляры независимые: взведённая «Очистить»
+  // не должна взводить «Начать заново».
+  const clearArmed = useArmedAction()
+  const restartArmed = useArmedAction()
 
   useEffect(() => {
     let current = true
@@ -170,6 +190,8 @@ export function ListEditorPage() {
     setVenue(listToEdit.venue ?? defaults.venue)
     setDescription(listToEdit.description ?? '')
     setEventDate(listToEdit.reservation_start ?? todayDateValue())
+    const savedAt = Date.parse(listToEdit.created_at ?? '')
+    setLastSavedAt(Number.isNaN(savedAt) ? null : savedAt)
     hydratedMetaRef.current = listToEdit.id
   }, [defaults.clientName, defaults.venue, listToEdit])
 
@@ -241,7 +263,7 @@ export function ListEditorPage() {
     serialIds: item.serialIds,
   })), [selected])
 
-  useListDraftAutosave({ listId, restoredRef: draftRestoredRef, name, clientName, venue, description, eventDate, documentMode, items: draftItems })
+  useListDraftAutosave({ listId, restoredRef: draftRestoredRef, name, clientName, venue, description, eventDate, items: draftItems })
 
   // «Начать заново»: черновик стирается, форма возвращается к дефолтам.
   function discardDraft() {
@@ -253,7 +275,6 @@ export function ListEditorPage() {
     setVenue(defaults.venue)
     setDescription('')
     setEventDate(todayDateValue())
-    setDocumentMode('working')
     setSuccessMessage('')
   }
 
@@ -273,7 +294,10 @@ export function ListEditorPage() {
     setMobilePanel(panel)
     window.requestAnimationFrame(() => {
       const target = panel === 'catalog' ? catalogRef.current : selectionRef.current
-      target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      if (!target) return
+      // scrollIntoView прижимал панель к самому верху окна — липкие табы накрывали
+      // её заголовок. Скроллим руками, оставляя ровно высоту полосы табов.
+      window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - MOBILE_TABS_HEIGHT, behavior: 'smooth' })
     })
   }
 
@@ -294,6 +318,24 @@ export function ListEditorPage() {
         return { ...item, count, serialIds: item.serialIds.slice(0, count) }
       })
       .filter((item) => item.count > 0))
+  }
+
+  // Количество, набранное с клавиатуры. Ноль сюда не доходит: удаление позиции —
+  // это корзина и «−» с единицы, а не пустое поле.
+  function setCount(key: string, count: number) {
+    const next = Math.min(MAX_ITEM_COUNT, Math.max(1, count))
+    setSelected((current) => current.map((item) => item.key === key
+      ? { ...item, count: next, serialIds: item.serialIds.slice(0, next) }
+      : item))
+  }
+
+  // Набранное число применяется ОДИН раз — на blur или Enter, а не на каждый символ:
+  // иначе «12» поверх «5» проходило бы через count = 1 и резало бы выбранные S/N до
+  // одного, восстановить которые нечем. Клик по любой кнопке сначала снимает фокус,
+  // так что «Сохранить»/«Excel» всегда видят уже зафиксированное количество.
+  function commitCountDraft(key: string) {
+    if (countDraft?.key === key && Number(countDraft.text) >= 1) setCount(key, Number(countDraft.text))
+    setCountDraft(null)
   }
 
   function toggleSerialPicker(key: string) {
@@ -385,6 +427,7 @@ export function ListEditorPage() {
     try {
       const id = await persistList()
       setSuccessMessage(isCreating ? tr('Список сохранён в системе.', 'Ro‘yxat tizimda saqlandi.') : tr('Изменения сохранены.', 'O‘zgarishlar saqlandi.'))
+      setLastSavedAt(Date.now())
       // После создания источник правды — listId из URL: следующее «Сохранить» обновит эту же запись, а не заведёт вторую.
       if (isCreating) {
         // Черновик своё отработал: дальше запись живёт в базе.
@@ -399,9 +442,9 @@ export function ListEditorPage() {
     }
   }
 
-  function exportList() {
+  function exportList(documentMode: 'working' | 'approval') {
     if (!canSubmit) return
-    setIsExporting(true)
+    setIsExporting(documentMode)
     setSaveError('')
     setSuccessMessage('')
     try {
@@ -429,9 +472,41 @@ export function ListEditorPage() {
     } catch {
       setSaveError(tr('Не удалось подготовить Excel. Попробуйте ещё раз.', 'Excelni tayyorlab bo‘lmadi. Qayta urinib ko‘ring.'))
     } finally {
-      setIsExporting(false)
+      setIsExporting('')
     }
   }
+
+  const isBusy = isSaving || isExporting !== ''
+  // Один набор действий на две точки монтажа: шапка (десктоп) и футер выборки
+  // (телефон). Разные подписи в двух местах разошлись бы при первой же правке.
+  const actionButtons = (
+    <>
+      <button className="button button--secondary" onClick={() => void saveList()} disabled={!canSubmit || isBusy}>
+        <Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить', 'Saqlash')}
+      </button>
+      <button className="button button--secondary" onClick={() => exportList('working')} disabled={!canSubmit || isBusy} title={tr('Только список оборудования — для команды и работы', 'Faqat uskunalar ro‘yxati — jamoa va ish uchun')}>
+        <FileSpreadsheet size={17} />{isExporting === 'working' ? tr('Готовим…', 'Tayyorlanmoqda…') : tr('Рабочий Excel', 'Ishchi Excel')}
+      </button>
+      <button className="button button--primary" onClick={() => exportList('approval')} disabled={!canSubmit || isBusy} title={tr('Документ для заказчика: с реквизитами и подписями', 'Buyurtmachi uchun hujjat: rekvizitlar va imzolar bilan')}>
+        <FileCheck2 size={17} />{isExporting === 'approval' ? tr('Готовим…', 'Tayyorlanmoqda…') : tr('С реквизитами', 'Rekvizitlar bilan')}
+      </button>
+    </>
+  )
+
+  // Строка состояния занимает место eyebrow и имеет фиксированную высоту: результат
+  // действия сменяет нейтральный статус, не двигая раскладку и не заводя тостов.
+  const statusTone = saveError ? 'error' : successMessage ? 'success' : ''
+  const statusText = saveError || successMessage || (listId
+    ? (lastSavedAt
+      ? tr(`Черновик · сохранён ${formatDateTime(lastSavedAt, locale)}`, `Qoralama · saqlangan ${formatDateTime(lastSavedAt, locale)}`)
+      : tr('Черновик', 'Qoralama'))
+    : tr('Новый список — Excel скачивается без сохранения', 'Yangi ro‘yxat — Excel saqlamasdan yuklanadi'))
+  const statusBody = (
+    <>
+      {statusText}
+      {Boolean(successMessage) && listId && <> · <Link to="/lists">{tr('Открыть в реестре', 'Reestrda ochish')}</Link></>}
+    </>
+  )
 
   return (
     <>
@@ -440,17 +515,10 @@ export function ListEditorPage() {
           <ArrowLeft size={18} />
         </button>
         <div>
-          <p className="eyebrow">{listId ? tr('Редактирование черновика', 'Qoralamani tahrirlash') : tr('Быстрый рабочий документ', 'Tezkor ish hujjati')}</p>
-          <h1>{listId ? tr('Открытый список', 'Ochiq ro‘yxat') : tr('Список оборудования', 'Uskunalar ro‘yxati')}</h1>
+          <p className={`editor-status ${statusTone ? `editor-status--${statusTone}` : ''}`} role="status">{statusBody}</p>
+          <h1>{name.trim() || tr('Новый список', 'Yangi ro‘yxat')}</h1>
         </div>
-        <div className="editor-header__actions">
-          <button className="button button--secondary" onClick={() => void saveList()} disabled={!canSubmit || isSaving || isExporting}>
-            <Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить', 'Saqlash')}
-          </button>
-          <button className="button button--primary" onClick={() => void exportList()} disabled={!canSubmit || isSaving || isExporting}>
-            <FileSpreadsheet size={18} /> {isExporting ? tr('Готовим Excel…', 'Excel tayyorlanmoqda…') : tr('Скачать Excel', 'Excel yuklash')}
-          </button>
-        </div>
+        <div className="editor-header__actions">{actionButtons}</div>
       </header>
 
       {openError && <div className="state-block state-block--error editor-open-error"><CircleAlert size={23} /><strong>{tr('Список не открыт', 'Ro‘yxat ochilmadi')}</strong><span>{openError === 'not-draft'
@@ -467,7 +535,9 @@ export function ListEditorPage() {
               `katalogda qolmagan pozitsiyalar: ${draftNotice.missingGroups}`,
             )}</small>}
           </span>
-          <button className="button button--secondary" type="button" onClick={discardDraft}>{tr('Начать заново', 'Yangidan boshlash')}</button>
+          <button className="button button--secondary" type="button" onClick={() => restartArmed.fire(discardDraft)} onBlur={restartArmed.disarm}>
+            {restartArmed.armed ? tr('Да, начать заново', 'Ha, yangidan boshlansin') : tr('Начать заново', 'Yangidan boshlash')}
+          </button>
         </div>
       )}
 
@@ -547,18 +617,6 @@ export function ListEditorPage() {
           <span>{tr('Комментарий к документу', 'Hujjatga izoh')}</span>
           <input value={description} onChange={(event) => setDescription(event.target.value)} placeholder={tr('Необязательно: зал, время, особенности комплекта', 'Ixtiyoriy: zal, vaqt, jamlanma xususiyatlari')} />
         </label>
-        <div className="field quick-list-meta__document">
-          <span>{tr('Формат Excel', 'Excel formati')}</span>
-          <AppSelect
-            value={documentMode}
-            options={[
-              { value: 'working', label: tr('Рабочий список', 'Ish ro‘yxati') },
-              { value: 'approval', label: tr('На согласование + реквизиты', 'Tasdiqlash + rekvizitlar') },
-            ]}
-            onChange={setDocumentMode}
-            ariaLabel={tr('Формат Excel-документа', 'Excel hujjati formati')}
-          />
-        </div>
         <div className="quick-list-hint"><Hash size={17} /><span>{tr('Добавляйте модели и количество. Серийные номера можно указать позже только там, где это нужно.', 'Modellar va miqdorni qo‘shing. Seriya raqamlarini keyin faqat kerak bo‘lgan joyda ko‘rsatish mumkin.')}</span></div>
         <div className="quick-list-next">
           <button className="button button--primary" type="button" onClick={() => moveToMobilePanel('catalog')}>
@@ -608,49 +666,71 @@ export function ListEditorPage() {
                     <strong>{label.brand} {label.model}</strong>
                     <small>{translateEquipmentTaxonomy(label.subtype, language)} · {group
                       ? `${tr('на складе', 'omborda')} ${group.availableCount}`
-                      : tr('нет в каталоге', 'katalogda yo‘q')}</small>
+                      : tr('нет в каталоге', 'katalogda yo‘q')}{item.serialIds.length > 0
+                        ? tr(` · S/N ${item.serialIds.length} из ${item.count}`, ` · S/N ${item.serialIds.length} / ${item.count}`)
+                        : ''}</small>
                   </div>
                   <div className="quantity-stepper">
                     <button onClick={() => changeCount(item.key, -1)} aria-label={tr('Уменьшить', 'Kamaytirish')}><Minus size={14} /></button>
-                    <strong>{item.count}</strong>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      aria-label={tr('Количество', 'Miqdor')}
+                      value={countDraft?.key === item.key ? countDraft.text : String(item.count)}
+                      onFocus={(event) => event.currentTarget.select()}
+                      onChange={(event) => setCountDraft({ key: item.key, text: event.target.value.replace(/\D+/g, '').slice(0, 3) })}
+                      onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }}
+                      onBlur={() => commitCountDraft(item.key)}
+                    />
                     <button onClick={() => changeCount(item.key, 1)} aria-label={tr('Увеличить', 'Ko‘paytirish')}><Plus size={14} /></button>
                   </div>
+                  {group && group.serializedItems.length > 0 && (
+                    <button
+                      className={`icon-button serial-button ${item.serialPickerOpen ? 'is-open' : ''}`}
+                      type="button"
+                      onClick={() => toggleSerialPicker(item.key)}
+                      aria-label={tr('Уточнить серийные номера', 'Seriya raqamlarini aniqlash')}
+                      aria-expanded={item.serialPickerOpen}
+                    ><ScanBarcode size={16} /></button>
+                  )}
                   <button className="icon-button" onClick={() => changeCount(item.key, -item.count)} aria-label={tr('Удалить модель', 'Modelni o‘chirish')}><Trash2 size={16} /></button>
                 </div>
                 {group && item.count > group.availableCount && <p className="quick-inline-warning"><CircleAlert size={13} /> {tr('Больше текущего остатка — в Excel попадёт указанное количество.', 'Joriy qoldiqdan ko‘p — Excelga ko‘rsatilgan miqdor tushadi.')}</p>}
                 {!group && <p className="quick-inline-warning"><CircleAlert size={13} /> {tr('Модели больше нет в каталоге — позиция уйдёт в документ как планируемая.', 'Model katalogda yo‘q — pozitsiya hujjatga rejalashtirilgan sifatida tushadi.')}</p>}
-                {group && group.serializedItems.length > 0 && (
-                  <>
-                    <button className="serial-toggle" onClick={() => toggleSerialPicker(item.key)} type="button">
-                      <span>{item.serialIds.length
-                        ? tr(`Выбрано S/N: ${item.serialIds.length} из ${item.count}`, `S/N tanlandi: ${item.serialIds.length} / ${item.count}`)
-                        : tr('Серийные номера не указывать', 'Seriya raqamlarini ko‘rsatmaslik')}</span>
-                      <span>{item.serialPickerOpen ? tr('Скрыть', 'Yashirish') : tr('Уточнить S/N', 'S/N aniqlash')} <ChevronDown size={14} /></span>
-                    </button>
-                    {item.serialPickerOpen && (
-                      <div className="serial-picker">
-                        <p>{tr('Отметьте только те номера, которые точно поедут на мероприятие.', 'Tadbirga aniq olib boriladigan raqamlarni belgilang.')}</p>
-                        <div>{group.serializedItems.map((equipmentItem) => {
-                          const active = item.serialIds.includes(equipmentItem.id)
-                          return <button className={active ? 'active' : ''} onClick={() => toggleSerial(item.key, equipmentItem.id)} key={equipmentItem.id} type="button"><span>{active && <Check size={13} />}</span>{equipmentItem.serialnumber || tr('Без номера', 'Raqamsiz')}</button>
-                        })}</div>
-                      </div>
-                    )}
-                  </>
+                {group && group.serializedItems.length > 0 && item.serialPickerOpen && (
+                  <div className="serial-picker">
+                    <p>{tr('Отметьте только те номера, которые точно поедут на мероприятие.', 'Tadbirga aniq olib boriladigan raqamlarni belgilang.')}</p>
+                    <div>{group.serializedItems.map((equipmentItem) => {
+                      const active = item.serialIds.includes(equipmentItem.id)
+                      return <button className={active ? 'active' : ''} onClick={() => toggleSerial(item.key, equipmentItem.id)} key={equipmentItem.id} type="button"><span>{active && <Check size={13} />}</span>{equipmentItem.serialnumber || tr('Без номера', 'Raqamsiz')}</button>
+                    })}</div>
+                  </div>
                 )}
               </article>
             ))}
           </div>
 
           <footer className="selection-footer">
-            <div><span>{tr('Всего единиц', 'Jami birliklar')}</span><strong>{selectedCount}</strong></div>
-            {selected.length > 0 && <button className="clear-selection" onClick={clearSelection} type="button"><Trash2 size={14} /> {tr('Очистить список', 'Ro‘yxatni tozalash')}</button>}
-            <div className="quick-list-actions">
-              <button className="button button--secondary" onClick={() => void saveList()} disabled={!canSubmit || isSaving || isExporting}><Save size={16} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить', 'Saqlash')}</button>
-              <button className="button button--primary" onClick={() => void exportList()} disabled={!canSubmit || isSaving || isExporting}><FileSpreadsheet size={17} /> {isExporting ? tr('Готовим…', 'Tayyorlanmoqda…') : tr('Скачать Excel', 'Excel yuklash')}</button>
+            <div>
+              <span className="selection-footer__total">{tr('Всего единиц', 'Jami birliklar')} <strong>{selectedCount}</strong></span>
+              {selected.length > 0 && (
+                <button
+                  className={`clear-selection ${clearArmed.armed ? 'clear-selection--armed' : ''}`}
+                  onClick={() => clearArmed.fire(clearSelection)}
+                  onBlur={clearArmed.disarm}
+                  type="button"
+                ><Trash2 size={14} /> {clearArmed.armed
+                  ? tr(`Да, очистить ${selectedCount}`, `Ha, ${selectedCount} ta tozalansin`)
+                  : tr('Очистить список', 'Ro‘yxatni tozalash')}</button>
+              )}
             </div>
-            {successMessage && <p className="form-success"><Check size={14} /> {successMessage}</p>}
-            {saveError && <p className="form-error"><CircleAlert size={14} /> {saveError}</p>}
+            {/* Дубль действий для телефона: на десктопе он скрыт CSS, там кнопки живут в
+                липкой шапке. Сообщение о результате держим рядом с нажатой кнопкой. */}
+            <div className="selection-footer__mobile">
+              {actionButtons}
+              {statusTone !== '' && <p className={`editor-status editor-status--${statusTone} editor-status--inline`}>{statusBody}</p>}
+            </div>
           </footer>
         </section>
       </div>

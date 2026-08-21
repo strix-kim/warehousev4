@@ -135,7 +135,9 @@ export function CatalogPreviewDrawer({ group, onClose, onAdd }: { group: Catalog
       <aside className="drawer catalog-preview-drawer" onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
           <div><p className="eyebrow">{translateEquipmentTaxonomy(group.type, language)}</p><h2>{group.brand} {group.model}</h2></div>
-          <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+          <div className="drawer__header-actions">
+            <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+          </div>
         </div>
         <span className={`badge badge--${group.availableCount > 0 ? 'success' : 'neutral'}`}><i />{group.availableCount > 0 ? tr(`На складе: ${group.availableCount}`, `Omborda: ${group.availableCount}`) : tr('Сейчас нет на складе', 'Hozir omborda yo‘q')}</span>
         <EquipmentVisual item={group} size="large" alt={`${group.brand} ${group.model}`} />
@@ -148,7 +150,9 @@ export function CatalogPreviewDrawer({ group, onClose, onAdd }: { group: Catalog
           <div className="detail-list__wide"><dt>{tr('Описание', 'Tavsif')}</dt><dd>{representative?.description || tr('Описание пока не заполнено', 'Tavsif hali kiritilmagan')}</dd></div>
         </dl>
         {group.availableCount === 0 && <p className="availability-warning"><Info size={15} />{tr('Модель можно добавить в документ: нехватка будет отмечена предупреждением.', 'Modelni hujjatga qo‘shish mumkin: yetishmovchilik ogohlantirish bilan ko‘rsatiladi.')}</p>}
-        <button className="button button--primary catalog-preview-drawer__add" onClick={onAdd}><Plus size={17} /> {tr('Добавить в список', 'Ro‘yxatga qo‘shish')}</button>
+        <div className="catalog-preview-drawer__footer">
+          <button className="button button--primary catalog-preview-drawer__add" onClick={onAdd}><Plus size={17} /> {tr('Добавить в список', 'Ro‘yxatga qo‘shish')}</button>
+        </div>
       </aside>
     </div>
   )

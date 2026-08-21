@@ -18,6 +18,13 @@ export function parseDateValue(value: string) {
   return year && month && day ? new Date(year, month - 1, day) : null
 }
 
+// Момент времени короткой строкой («21.08, 14:32»). Год не показываем: строка
+// стоит рядом с открытым документом и отвечает на «когда сохранял», а не «в каком
+// году это было».
+export function formatDateTime(value: number, locale: string) {
+  return new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+}
+
 type Tr = (ru: string, uz: string) => string
 
 // Возраст данных словами. Числительные и склонения («2 минуты», «5 минут»,

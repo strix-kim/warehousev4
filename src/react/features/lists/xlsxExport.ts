@@ -1,3 +1,4 @@
+import { toDateValue } from '../../lib/date'
 import { companyDetails, companyLegalName, listDocumentDefaults } from './documentDefaults'
 
 export type ExportListRow = {
@@ -239,6 +240,16 @@ function safeFileName(value: string) {
   return value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').slice(0, 80) || 'equipment-list'
 }
 
+// Имя файла: дата мероприятия, название и режим документа. До этого оба режима
+// давали одно и то же имя — второй файл ложился в загрузки как «… (1)», и понять,
+// где рабочий список, а где документ с реквизитами, можно было только открыв оба.
+function exportFileName(input: ExportListInput) {
+  const suffix = input.documentMode === 'approval'
+    ? (input.language === 'uz' ? 'kelishuvga' : 'на-согласование')
+    : (input.language === 'uz' ? 'ishchi' : 'рабочий')
+  return `${input.eventDate ?? toDateValue(new Date())}_${safeFileName(input.name)}_${suffix}.xlsx`
+}
+
 function createEquipmentListXlsxBlob(input: ExportListInput) {
   const sheetName = input.language === 'uz' ? 'Uskunalar' : 'Оборудование'
   const { headerRow, totalRow } = getSheetMetrics(input)
@@ -260,7 +271,7 @@ export function downloadEquipmentListXlsx(input: ExportListInput) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `${safeFileName(input.name)}.xlsx`
+  anchor.download = exportFileName(input)
   document.body.append(anchor)
   anchor.click()
   anchor.remove()
