@@ -1,15 +1,8 @@
 {
+  "model": "opus",
   "permissions": {
     "allow": [
-      "Bash(awk *)",
-      "Bash(curl -s https://warehouse.argomedia.uz*)",
-      "Bash(curl -sI https://warehouse.argomedia.uz*)",
-      "Bash(mkdir -p *)",
-      "Bash(npm run check)",
-      "Bash(npm run build)",
-      "Bash(npm run dev)",
-      "Bash(npx tsc -b)",
-      "Bash(npx tsc -b --force)",
+      "Bash",
       "mcp__claude_ai_Supabase__list_projects",
       "mcp__claude_ai_Supabase__list_tables",
       "mcp__claude_ai_Supabase__list_migrations",

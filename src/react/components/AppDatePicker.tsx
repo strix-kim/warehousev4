@@ -1,26 +1,15 @@
 import { CalendarDays, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { parseDateValue, toDateValue } from '../lib/date'
+import { formatEventDate, formatMonthTitle, parseDateValue, toDateValue } from '../lib/date'
 import { usePopoverLayer } from '../lib/usePopoverLayer'
 
-const uzbekMonths = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr']
 const uzbekWeekdays = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya']
 
 function sameDay(first: Date, second: Date) {
   return first.getFullYear() === second.getFullYear()
     && first.getMonth() === second.getMonth()
     && first.getDate() === second.getDate()
-}
-
-function formatSelectedDate(date: Date, locale: string) {
-  if (locale.toLowerCase().startsWith('uz')) return `${date.getDate()}-${uzbekMonths[date.getMonth()]} ${date.getFullYear()}-yil`
-  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' }).format(date)
-}
-
-function formatMonth(date: Date, locale: string) {
-  if (locale.toLowerCase().startsWith('uz')) return `${uzbekMonths[date.getMonth()]} ${date.getFullYear()}`
-  return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(date)
 }
 
 export function AppDatePicker({
@@ -80,7 +69,7 @@ export function AppDatePicker({
     : Array.from({ length: 7 }, (_, index) => new Intl.DateTimeFormat(locale, { weekday: 'short' })
       .format(new Date(2024, 0, 1 + index)).replace('.', ''))
   const formattedValue = selectedDate
-    ? formatSelectedDate(selectedDate, locale)
+    ? formatEventDate(selectedDate, locale)
     : placeholder
 
   const chooseDate = (date: Date) => {
@@ -114,7 +103,7 @@ export function AppDatePicker({
         >
           <div className="app-date-picker__header">
             <button type="button" onClick={() => setVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1))} aria-label={previousMonthLabel}><ChevronLeft size={18} /></button>
-            <strong>{formatMonth(visibleMonth, locale)}</strong>
+            <strong>{formatMonthTitle(visibleMonth, locale)}</strong>
             <button type="button" onClick={() => setVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1))} aria-label={nextMonthLabel}><ChevronRight size={18} /></button>
           </div>
           <div className="app-date-picker__weekdays">{weekdays.map((day) => <span key={day}>{day}</span>)}</div>

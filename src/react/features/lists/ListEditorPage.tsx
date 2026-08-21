@@ -1,12 +1,10 @@
 import {
   ArrowDown,
   ArrowLeft,
-  CalendarDays,
   Check,
   CircleAlert,
   FileCheck2,
   FileSpreadsheet,
-  Hash,
   Info,
   ListChecks,
   Minus,
@@ -17,7 +15,6 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { AppDatePicker } from '../../components/AppDatePicker'
 import { preloadEquipmentImages } from '../../components/EquipmentVisual'
 import { formatDateTime, formatTime, parseDateValue, todayDateValue } from '../../lib/date'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
@@ -37,6 +34,8 @@ import {
 } from './api'
 import { buildCatalogGroups, groupKey, type CatalogGroup } from './catalogGroups'
 import { CatalogPanel, CatalogPreviewDrawer } from './ListEditorCatalog'
+import { ListEditorMeta, type ListMetaField, type RequisiteField } from './ListEditorMeta'
+import { useEditorChrome } from './useEditorChrome'
 import { useListDraftAutosave } from './useListDraftAutosave'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
@@ -59,11 +58,6 @@ type SelectedGroup = {
 // строкой: строка потянула бы tr в зависимости эффекта, и смена языка
 // перезапрашивала бы список из базы.
 type OpenErrorCode = '' | 'not-draft' | 'failed'
-
-// Реквизиты, без которых не собирается документ на согласование. Проверка
-// клиентская и это UX: документ формируется здесь же, в браузере, пары в базе
-// у неё быть не может.
-type RequisiteField = 'name' | 'clientName' | 'venue'
 
 // Высота липкой полосы табов на телефоне (8 сверху + кнопка 44 + 4 снизу + рамка 1).
 // Держится в паре с .mobile-editor-tabs и .quick-catalog-toolbar в styles.css:
@@ -137,9 +131,17 @@ export function ListEditorPage() {
   const [countDraft, setCountDraft] = useState<{ key: string; text: string } | null>(null)
   const [previewGroup, setPreviewGroup] = useState<CatalogGroup | null>(null)
   const [mobilePanel, setMobilePanel] = useState<'catalog' | 'selection'>('catalog')
+  // Панель реквизитов свёрнута по умолчанию: список собирают без неё, а документу
+  // на согласование страница раскроет её сама (см. exportList).
+  const [metaOpen, setMetaOpen] = useState(false)
   const catalogRef = useRef<HTMLElement>(null)
   const selectionRef = useRef<HTMLElement>(null)
   const metaRef = useRef<HTMLElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  // Прокрутка каждой вкладки телефона на момент ухода с неё: возврат в каталог
+  // приводит к той же модели, а не к первой.
+  const panelScrollRef = useRef<Partial<Record<'catalog' | 'selection', number>>>({})
+  useEditorChrome(gridRef)
   // Снимок документа на момент последней записи в базу. Пустая строка — снимка
   // ещё нет (список не открыт или не догрузился), и предупреждать не о чем.
   const savedSnapshotRef = useRef('')
@@ -339,6 +341,18 @@ export function ListEditorPage() {
     })
   }
 
+  // Правка реквизита снимает с поля подсветку «обязательно для согласования»:
+  // пользователь уже отвечает на подсказку, держать её дальше незачем.
+  function changeMeta(field: ListMetaField, value: string) {
+    switch (field) {
+      case 'name': setName(value); clearRequisiteError(field); break
+      case 'clientName': setClientName(value); clearRequisiteError(field); break
+      case 'venue': setVenue(value); clearRequisiteError(field); break
+      case 'description': setDescription(value); break
+      case 'eventDate': setEventDate(value); break
+    }
+  }
+
   const selectedCount = selected.reduce((sum, item) => sum + item.count, 0)
   const selectedKeys = useMemo(() => new Set(selected.map((item) => item.key)), [selected])
   const selectedByKey = useMemo(() => new Map(selected.map((item) => [item.key, item])), [selected])
@@ -352,8 +366,17 @@ export function ListEditorPage() {
   const canSubmit = selectedCount > 0 && !isOpening && !openError
 
   function moveToMobilePanel(panel: 'catalog' | 'selection') {
+    const switching = panel !== mobilePanel
+    if (switching) panelScrollRef.current[mobilePanel] = window.scrollY
     setMobilePanel(panel)
     window.requestAnimationFrame(() => {
+      // Вкладка уже открывалась — возвращаемся туда, где с неё ушли. Повторное
+      // нажатие на активную вкладку — к её заголовку, как и первое открытие.
+      const remembered = switching ? panelScrollRef.current[panel] : undefined
+      if (remembered !== undefined) {
+        window.scrollTo({ top: remembered })
+        return
+      }
       const target = panel === 'catalog' ? catalogRef.current : selectionRef.current
       if (!target) return
       // scrollIntoView прижимал панель к самому верху окна — липкие табы накрывали
@@ -537,10 +560,14 @@ export function ListEditorPage() {
           'Kelishuv hujjati uchun nom, buyurtmachi va maydonni to‘ldiring.',
         ))
         setSuccessMessage('')
-        metaRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-        // preventScroll обязателен: обычный фокус прыгает к полю мгновенно и
-        // обрывает плавную прокрутку к панели реквизитов.
-        document.getElementById(`quick-list-${missing[0]}`)?.focus({ preventScroll: true })
+        setMetaOpen(true)
+        // Поля свёрнутой панели появляются в DOM только после раскрытия, поэтому
+        // прокрутка и фокус — следующим кадром. preventScroll обязателен: обычный
+        // фокус прыгает к полю мгновенно и обрывает плавную прокрутку к панели.
+        window.requestAnimationFrame(() => {
+          metaRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+          document.getElementById(`quick-list-${missing[0]}`)?.focus({ preventScroll: true })
+        })
         return
       }
     }
@@ -642,72 +669,21 @@ export function ListEditorPage() {
         </div>
       )}
 
-      <section ref={metaRef} className="quick-list-meta data-panel">
-        <label className="field quick-list-meta__name">
-          <span>{tr('Проект или мероприятие', 'Loyiha yoki tadbir')} <small>{tr('необязательно: подставится дата', 'ixtiyoriy: sana qo‘yiladi')}</small></span>
-          <input
-            id="quick-list-name"
-            className={requisiteErrors.has('name') ? 'input-error' : ''}
-            value={name}
-            onChange={(event) => { setName(event.target.value); clearRequisiteError('name') }}
-            placeholder={tr('Например, Форум в Hyatt', 'Masalan, Hyatt forumi')}
-          />
-          {requisiteErrors.has('name') && <small className="field-hint field-hint--error">{tr('Обязательно для согласования', 'Kelishuv uchun majburiy')}</small>}
-        </label>
-        <div className="field">
-          <span><CalendarDays size={13} /> {tr('Дата', 'Sana')} <small>{tr('сегодня по умолчанию', 'standart — bugun')}</small></span>
-          <AppDatePicker
-            value={eventDate}
-            onChange={setEventDate}
-            locale={locale}
-            placeholder={tr('Выберите дату', 'Sanani tanlang')}
-            ariaLabel={tr('Дата мероприятия', 'Tadbir sanasi')}
-            todayLabel={tr('Сегодня', 'Bugun')}
-            clearLabel={tr('Очистить', 'Tozalash')}
-            previousMonthLabel={tr('Предыдущий месяц', 'Oldingi oy')}
-            nextMonthLabel={tr('Следующий месяц', 'Keyingi oy')}
-          />
-        </div>
-        <label className="field quick-list-meta__client">
-          <span>{tr('Заказчик / организатор', 'Buyurtmachi / tashkilotchi')} <small>{tr('нужно для документа на согласование', 'kelishuv hujjati uchun kerak')}</small></span>
-          <input
-            id="quick-list-clientName"
-            className={requisiteErrors.has('clientName') ? 'input-error' : ''}
-            value={clientName}
-            onChange={(event) => { setClientName(event.target.value); clearRequisiteError('clientName') }}
-            placeholder={tr('Например, ARGO Media', 'Masalan, ARGO Media')}
-          />
-          {requisiteErrors.has('clientName') && <small className="field-hint field-hint--error">{tr('Обязательно для согласования', 'Kelishuv uchun majburiy')}</small>}
-        </label>
-        <label className="field quick-list-meta__venue">
-          <span>{tr('Площадка / локация', 'Maydon / joylashuv')} <small>{tr('нужно для документа на согласование', 'kelishuv hujjati uchun kerak')}</small></span>
-          <input
-            id="quick-list-venue"
-            className={requisiteErrors.has('venue') ? 'input-error' : ''}
-            value={venue}
-            onChange={(event) => { setVenue(event.target.value); clearRequisiteError('venue') }}
-            placeholder={tr('Например, Hyatt Regency', 'Masalan, Hyatt Regency')}
-          />
-          {requisiteErrors.has('venue') && <small className="field-hint field-hint--error">{tr('Обязательно для согласования', 'Kelishuv uchun majburiy')}</small>}
-        </label>
-        <label className="field quick-list-meta__notes">
-          <span>{tr('Комментарий к документу', 'Hujjatga izoh')}</span>
-          <input value={description} onChange={(event) => setDescription(event.target.value)} placeholder={tr('Необязательно: зал, время, особенности комплекта', 'Ixtiyoriy: zal, vaqt, jamlanma xususiyatlari')} />
-        </label>
-        <div className="quick-list-hint"><Hash size={17} /><span>{tr('Добавляйте модели и количество. Серийные номера можно указать позже только там, где это нужно.', 'Modellar va miqdorni qo‘shing. Seriya raqamlarini keyin faqat kerak bo‘lgan joyda ko‘rsatish mumkin.')}</span></div>
-        <div className="quick-list-next">
-          <button className="button button--primary" type="button" onClick={() => moveToMobilePanel('catalog')}>
-            {tr('Перейти к оборудованию', 'Uskunalarga o‘tish')} <ArrowDown size={17} />
-          </button>
-        </div>
-      </section>
+      <ListEditorMeta
+        panelRef={metaRef}
+        values={{ name, clientName, venue, description, eventDate }}
+        requisiteErrors={requisiteErrors}
+        open={metaOpen}
+        onToggle={() => setMetaOpen((current) => !current)}
+        onChange={changeMeta}
+      />
 
       <div className="mobile-editor-tabs" role="tablist" aria-label={tr('Раздел редактора', 'Tahrirchi bo‘limi')}>
         <button className={mobilePanel === 'catalog' ? 'active' : ''} onClick={() => moveToMobilePanel('catalog')} role="tab" aria-selected={mobilePanel === 'catalog'}>{tr('Каталог', 'Katalog')}</button>
         <button className={mobilePanel === 'selection' ? 'active' : ''} onClick={() => moveToMobilePanel('selection')} role="tab" aria-selected={mobilePanel === 'selection'}>{tr('В списке', 'Ro‘yxatda')} <strong>{selectedCount}</strong></button>
       </div>
 
-      <div className="editor-grid editor-grid--quick">
+      <div ref={gridRef} className="editor-grid editor-grid--quick">
         <CatalogPanel
           panelRef={catalogRef}
           isMobileActive={mobilePanel === 'catalog'}
