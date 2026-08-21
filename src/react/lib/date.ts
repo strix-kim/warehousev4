@@ -70,3 +70,14 @@ export function formatAge(touchedAt: number, locale: string, tr: Tr) {
   if (hours < 24) return relative.format(-hours, 'hour')
   return relative.format(-Math.floor(hours / 24), 'day')
 }
+
+// Границы месяца со сдвигом от текущего (0 — этот, -1 — прошлый, +1 — следующий).
+// Считается от ЛОКАЛЬНОЙ даты пользователя, как и всё остальное здесь: фильтр
+// периода сравнивает календарные дни, а не моменты времени. День 0 следующего
+// месяца — последний день нужного, и переход через декабрь Date берёт на себя.
+export function monthRange(offset: number) {
+  const now = new Date()
+  const from = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+  const to = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)
+  return { from: toDateValue(from), to: toDateValue(to) }
+}

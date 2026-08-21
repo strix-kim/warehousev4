@@ -749,12 +749,19 @@ h2 { letter-spacing: -0.025em; }
   .button { min-height: 44px; }
   .icon-button { width: 44px; height: 44px; }
   .toolbar { align-items: stretch; flex-direction: column; }
+  /* Реестр: два фильтра делят одну строку. В столбик они стоили бы лишние 44 px
+     первого экрана — ровно то, что волна 2 отвоёвывает под первую карточку.
+     Каталог не трогаем: там селектов три, и половинная ширина разложит их 2 + 1. */
+  .toolbar:not(.toolbar--catalog) { flex-direction: row; flex-wrap: wrap; }
+  .toolbar:not(.toolbar--catalog) > *:not(.app-select) { flex: 1 0 100%; }
+  .toolbar:not(.toolbar--catalog) .app-select { flex: 1 1 calc(50% - 5px); min-width: 0; }
   .data-age { margin-left: 0; justify-content: space-between; }
   .data-age button { min-height: 44px; }
   .search-field { max-width: none; min-width: 0; height: 44px; }
   .search-field input { align-self: stretch; height: auto; }
   /* Тулбар в столбик — селекты на всю ширину, а не 200/260 px посреди экрана */
   .toolbar .app-select { width: 100%; }
+  .toolbar:not(.toolbar--catalog) .app-select { width: auto; }
   .pagination { align-items: flex-start; flex-direction: column; }
   .pagination__controls { width: 100%; justify-content: space-between; }
   .table-scroll { overflow: visible; }

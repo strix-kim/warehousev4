@@ -22,6 +22,7 @@ import { AppSelect } from '../../components/AppSelect'
 import { DataAge } from '../../components/DataAge'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
+import { monthRange } from '../../lib/date'
 import { useModalLayer } from '../../lib/useModalLayer'
 import {
   buildSavedListComposition,
@@ -103,6 +104,20 @@ function listSize(list: EquipmentList) {
   return (list.equipment_ids?.length ?? 0) + quantity
 }
 
+type ListsPeriod = 'all' | 'this-month' | 'last-month' | 'next-month'
+
+// Границы считаются на КАЖДЫЙ рендер, а не один раз при монтировании: вкладка
+// живёт на складе сутками, и «этот месяц», посчитанный первого числа в 23:59,
+// иначе остался бы прошлым до перезагрузки.
+function getPeriodRange(period: ListsPeriod) {
+  switch (period) {
+    case 'this-month': return monthRange(0)
+    case 'last-month': return monthRange(-1)
+    case 'next-month': return monthRange(1)
+    default: return { from: '', to: '' }
+  }
+}
+
 function formatDate(value: string | null, locale: string, tr: Tr) {
   return value ? new Intl.DateTimeFormat(locale).format(new Date(`${value}T12:00:00`)) : tr('дата не указана', 'sana ko‘rsatilmagan')
 }
@@ -123,6 +138,8 @@ export function ListsPage() {
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<'all' | ReservationStatus>('all')
+  const [period, setPeriod] = useState<ListsPeriod>('all')
+  const { from: periodFrom, to: periodTo } = getPeriodRange(period)
   const [initialResult] = useState(() => readCachedEquipmentLists({ page: 1, search: '', status: 'all', pageSize }))
   const [rows, setRows] = useState<EquipmentList[]>(() => initialResult?.rows ?? [])
   const [total, setTotal] = useState(() => initialResult?.total ?? 0)
@@ -148,7 +165,7 @@ export function ListsPage() {
 
   // Поиск и фильтр теперь считает база, поэтому total — это счётчик ТЕКУЩЕЙ
   // выборки: без фильтров «всего», с фильтрами «найдено».
-  const isFiltered = Boolean(search) || status !== 'all'
+  const isFiltered = Boolean(search) || status !== 'all' || period !== 'all'
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   // Номер страницы зажимается на рендере: удалили единственный список второй
   // страницы — pageCount стал 1, а page остался 2, и панель показывала
@@ -179,15 +196,15 @@ export function ListsPage() {
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
-  useEffect(() => setPage(1), [status])
+  useEffect(() => setPage(1), [status, period])
 
   useEffect(() => {
     let isCurrent = true
-    const cached = readCachedEquipmentLists({ page: currentPage, search, status, pageSize })
+    const cached = readCachedEquipmentLists({ page: currentPage, search, status, periodFrom, periodTo, pageSize })
     // Возраст спрашиваем у кэша, а не считаем от момента ответа: запись обновляется
     // только на УСПЕШНОМ ответе, поэтому после сбоя сети здесь остаётся старая метка —
     // ровно то, что бейдж и должен показать.
-    const readAge = () => readCachedEquipmentListsMeta({ page: currentPage, search, status, pageSize })?.touchedAt ?? null
+    const readAge = () => readCachedEquipmentListsMeta({ page: currentPage, search, status, periodFrom, periodTo, pageSize })?.touchedAt ?? null
     // Метка ДО запроса. Отказ сети не всегда доходит до .catch: при живой записи
     // в кэше cachedQuery подменяет провал последним значением и промис
     // РЕЗОЛВИТСЯ. Единственный честный признак «ответа с сервера не было» —
@@ -205,7 +222,7 @@ export function ListsPage() {
     // там, где исход запроса уже известен, — в .then и в .catch.
     setDataAt(null)
 
-    fetchEquipmentLists({ page: currentPage, search, status, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
+    fetchEquipmentLists({ page: currentPage, search, status, periodFrom, periodTo, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
       .then((result) => {
         if (!isCurrent) return
         setIsFetching(false)
@@ -231,7 +248,7 @@ export function ListsPage() {
       .finally(() => { if (isCurrent) setIsLoading(false) })
 
     return () => { isCurrent = false }
-  }, [currentPage, pageSize, reloadKey, search, status])
+  }, [currentPage, pageSize, periodFrom, periodTo, reloadKey, search, status])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -280,7 +297,7 @@ export function ListsPage() {
         <div className="toolbar">
           <label className="search-field">
             <Search size={18} />
-            <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder={tr('Название списка…', 'Ro‘yxat nomi…')} aria-label={tr('Поиск списков', 'Ro‘yxatlarni qidirish')} />
+            <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder={tr('Название, заказчик или площадка…', 'Nomi, buyurtmachi yoki maydon…')} aria-label={tr('Поиск списков по названию, заказчику и площадке', 'Ro‘yxatlarni nomi, buyurtmachisi va maydoni bo‘yicha qidirish')} />
           </label>
           <AppSelect
             value={status}
@@ -293,6 +310,18 @@ export function ListsPage() {
               { value: 'confirmed', label: tr('Подтверждённые', 'Tasdiqlanganlar') },
               { value: 'issued', label: tr('Выданные', 'Berilganlar') },
               { value: 'returned', label: tr('Возвращённые', 'Qaytarilganlar') },
+            ]}
+          />
+          <AppSelect
+            value={period}
+            onChange={setPeriod}
+            icon={<CalendarRange size={17} />}
+            ariaLabel={tr('Период мероприятия', 'Tadbir davri')}
+            options={[
+              { value: 'all', label: tr('Все даты', 'Barcha sanalar') },
+              { value: 'this-month', label: tr('Этот месяц', 'Shu oy') },
+              { value: 'last-month', label: tr('Прошлый месяц', 'O‘tgan oy') },
+              { value: 'next-month', label: tr('Следующий месяц', 'Keyingi oy') },
             ]}
           />
           <span className="toolbar__count">{isFiltered ? tr('Найдено', 'Topildi') : tr('Всего', 'Jami')}: {total}</span>

@@ -2,7 +2,7 @@ import { supabase } from '../../lib/supabase'
 import { cachedQuery, invalidateCachePrefix, primeCachedQuery, readCachedQuery, readCachedQueryMeta } from '../../lib/persistentCache'
 import type { Json, Tables } from '../../lib/database.types'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
-import { escapeLikePattern } from '../../lib/postgrest'
+import { escapeLikePattern, quoteFilterValue } from '../../lib/postgrest'
 import { reportAppError } from '../../lib/reportAppError'
 import { fetchEquipmentByIds } from '../equipment/api'
 import type { Equipment } from '../equipment/types'
@@ -178,6 +178,12 @@ export type EquipmentListsQuery = {
   page?: number
   search?: string
   status?: 'all' | ReservationStatus
+  // Период приходит готовыми границами (YYYY-MM-DD), а не названием («этот
+  // месяц»): название в ключе кэша означало бы, что первого числа страница
+  // покажет прошлый месяц под видом текущего — границы же меняются сами и
+  // уводят запрос на новый ключ.
+  periodFrom?: string
+  periodTo?: string
   pageSize?: number
   bypassCache?: boolean
 }
@@ -191,8 +197,8 @@ export type EquipmentListsPage = {
 
 type NormalizedListsQuery = Required<Omit<EquipmentListsQuery, 'bypassCache'>>
 
-function normalizeListsQuery({ page = 1, search = '', status = 'all', pageSize = LISTS_PAGE_SIZE }: EquipmentListsQuery): NormalizedListsQuery {
-  return { page, search: search.trim(), status, pageSize }
+function normalizeListsQuery({ page = 1, search = '', status = 'all', periodFrom = '', periodTo = '', pageSize = LISTS_PAGE_SIZE }: EquipmentListsQuery): NormalizedListsQuery {
+  return { page, search: search.trim(), status, periodFrom, periodTo, pageSize }
 }
 
 // Ключ остаётся под префиксом `equipment-lists:` — его целиком сбрасывает любая
@@ -215,19 +221,29 @@ export async function fetchEquipmentLists(query: EquipmentListsQuery = {}): Prom
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
   const normalized = normalizeListsQuery(query)
-  const { page, search, status, pageSize } = normalized
+  const { page, search, status, periodFrom, periodTo, pageSize } = normalized
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
   const namePattern = search ? `%${escapeLikePattern(search)}%` : ''
+  // Тот же шаблон, но закавыченный: внутри `.or(...)` сырое значение с запятой
+  // или скобкой разобралось бы как границы условий.
+  const searchExpression = namePattern
+    ? ['name', 'client_name', 'venue'].map((column) => `${column}.ilike.${quoteFilterValue(namePattern)}`).join(',')
+    : ''
 
   return cachedQuery(equipmentListsCacheKey(normalized), 10 * 60 * 1000, () => withLegacySchemaFallback(async (schema) => {
     if (schema === 'legacy') {
-      // В старой схеме нет reservation_status: поиск по названию всё равно
-      // серверный, а фильтр этапа разбираем здесь. normalizeLegacyList помечает
-      // ВСЕ такие строки черновиком, поэтому «все этапы» и «черновики» пропускают
-      // выборку как есть, а любой другой этап заведомо пуст — и страница, и
-      // счётчик. Фильтровать после .range() нельзя: страницы разъехались бы.
+      // В старой схеме нет ни reservation_status, ни client_name/venue, ни
+      // reservation_start: поиск остаётся по одному названию, а этап и период
+      // разбираем здесь. normalizeLegacyList помечает ВСЕ такие строки
+      // черновиком, поэтому «все этапы» и «черновики» пропускают выборку как
+      // есть, а любой другой этап заведомо пуст — и страница, и счётчик.
+      // Период пуст всегда: дата мероприятия там NULL, а NULL не попадает ни в
+      // один период — то же правило, что и в современной ветке. Отдать вместо
+      // этого невыбранную выборку было бы ложью: человек спросил месяц.
+      // Фильтровать после .range() нельзя: страницы разъехались бы.
       if (status !== 'all' && status !== 'draft') return { rows: [], total: 0 }
+      if (periodFrom || periodTo) return { rows: [], total: 0 }
       let legacyQuery = client
         .from('equipment_lists')
         .select(legacyListColumns, { count: 'exact' })
@@ -252,8 +268,13 @@ export async function fetchEquipmentLists(query: EquipmentListsQuery = {}): Prom
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
       .range(from, to)
-    if (namePattern) listsQuery = listsQuery.ilike('name', namePattern)
+    if (searchExpression) listsQuery = listsQuery.or(searchExpression)
     if (status !== 'all') listsQuery = listsQuery.eq('reservation_status', status)
+    // Период меряется по дате НАЧАЛА мероприятия: список без даты (колонка
+    // nullable) в любой период не попадает — сравнение с NULL ложно, и это
+    // честнее, чем показывать «этот месяц» вперемешку с недатированными.
+    if (periodFrom) listsQuery = listsQuery.gte('reservation_start', periodFrom)
+    if (periodTo) listsQuery = listsQuery.lte('reservation_start', periodTo)
     const { data, error, count } = await listsQuery
     if (error) throw error
     return {
