@@ -100,7 +100,16 @@ function AppShell() {
           // и прогрев обязан спросить его у самой фичи.
           pageSize: listsApi.preferredListsPageSize(),
         }),
-      ])).catch((error: unknown) => reportAppError(error, { scope: 'prefetch', detail: { batch: 'primary-data' } }))
+      ])).then((results) => {
+        // Promise.allSettled не отклоняется НИКОГДА: провал запроса виден только в
+        // статусе элемента, и внешний .catch про него не узнает. Отчёт собираем здесь,
+        // по каждому отказу отдельно.
+        results.forEach((result) => {
+          if (result.status === 'rejected') reportAppError(result.reason, { scope: 'prefetch', detail: { batch: 'primary-data' } })
+        })
+      // Внешний .catch остаётся: он ловит то, что случилось ДО allSettled — провал
+      // самого import() модулей api.
+      }).catch((error: unknown) => reportAppError(error, { scope: 'prefetch', detail: { batch: 'primary-data' } }))
     }, 120)
     const editorDataTimer = window.setTimeout(() => {
       void Promise.all([

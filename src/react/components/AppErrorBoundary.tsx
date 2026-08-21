@@ -28,7 +28,14 @@ export class AppErrorBoundary extends Component<Props, State> {
   static getDerivedStateFromError(error: unknown): State {
     // Бросить можно что угодно, а показать надо строку: нормализуем на входе, чтобы
     // отрисовка фолбэка не стала вторым источником ошибки.
-    return { error: error instanceof Error ? error : new Error(String(error)) }
+    if (error instanceof Error) return { error }
+    try {
+      return { error: new Error(String(error)) }
+    } catch {
+      // Приведение к строке само бросает (брошен объект с падающим toString). Для
+      // корневой границы это конец дерева — падать здесь нельзя ни при каких данных.
+      return { error: new Error('Unknown error') }
+    }
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {

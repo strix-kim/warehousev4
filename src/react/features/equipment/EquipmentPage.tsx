@@ -109,8 +109,10 @@ export function EquipmentPage() {
         }
       })
       .catch((error: unknown) => {
-        reportAppError(error, { scope: 'loader', route: '/equipment', detail: { servedFromCache: Boolean(cached) } })
+        // Отчёт — только для живого эффекта: отменённая загрузка (сменили фильтр,
+        // ушли со страницы) не отказ приложения, и шуметь ею в канал незачем.
         if (!isCurrent) return
+        reportAppError(error, { scope: 'loader', route: '/equipment', detail: { servedFromCache: Boolean(cached) } })
         setDataAt(readAge())
         if (!cached) setHasLoadError(true)
       })

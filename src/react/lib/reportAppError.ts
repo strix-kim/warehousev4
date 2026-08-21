@@ -30,8 +30,8 @@ export function setErrorSink(next: ((event: ReportedError) => void) | null): voi
   sink = next
 }
 
-// Окно дедупа: два прогревочных батча (App.tsx) при мёртвой сети дают пять-шесть
-// одинаковых строк подряд, за которыми не видно первой — настоящей.
+// Окно дедупа: при мёртвой сети один прогревочный батч (App.tsx) даёт по строке на
+// каждый запрос — несколько одинаковых подряд, за которыми не видно первой, настоящей.
 const DEDUP_WINDOW_MS = 5_000
 const lastReportedAt = new Map<string, number>()
 
@@ -39,12 +39,19 @@ function describeError(error: unknown): { message: string; code: string | null }
   if (typeof error === 'string') return { message: error, code: null }
   if (!error || typeof error !== 'object') return { message: String(error), code: null }
 
-  const candidate = error as { message?: unknown; code?: unknown; status?: unknown }
-  const message = typeof candidate.message === 'string' && candidate.message ? candidate.message : 'Unknown error'
-  const code = typeof candidate.code === 'string'
-    ? candidate.code
-    : typeof candidate.status === 'number' ? String(candidate.status) : null
-  return { message, code }
+  // Чтение свойств — под собственным try: геттер message или code может бросить, и
+  // без него отчёт целиком провалился бы в общий catch reportAppError, то есть исчез
+  // ровно тогда, когда ошибка была нестандартной.
+  try {
+    const candidate = error as { message?: unknown; code?: unknown; status?: unknown }
+    const message = typeof candidate.message === 'string' && candidate.message ? candidate.message : 'Unknown error'
+    const code = typeof candidate.code === 'string'
+      ? candidate.code
+      : typeof candidate.status === 'number' ? String(candidate.status) : null
+    return { message, code }
+  } catch {
+    return { message: 'Unreadable error', code: null }
+  }
 }
 
 export function reportAppError(error: unknown, context: ErrorContext): void {
@@ -59,8 +66,11 @@ export function reportAppError(error: unknown, context: ErrorContext): void {
     for (const [key, at] of lastReportedAt) {
       if (now - at > DEDUP_WINDOW_MS) lastReportedAt.delete(key)
     }
-    lastReportedAt.set(signature, now)
+    // Выход по окну — ДО отметки: иначе метка сдвигалась бы на каждой попытке, и
+    // ошибка, повторяющаяся чаще раза в 5 с, напечаталась бы ровно один раз за всю
+    // жизнь вкладки. Так это честный троттл «не чаще раза в 5 с».
     if (seenAt !== undefined && now - seenAt <= DEDUP_WINDOW_MS) return
+    lastReportedAt.set(signature, now)
 
     const event: ReportedError = {
       ...context,
@@ -72,13 +82,19 @@ export function reportAppError(error: unknown, context: ErrorContext): void {
       at: now,
     }
 
-    const label = `[argo] ${event.scope}${event.route ? ` ${event.route}` : ''}: ${message}`
-    if (import.meta.env.DEV) {
-      console[event.level === 'auth' ? 'warn' : 'error'](label, error, event)
-    } else {
-      // В прод-консоль уходят только message и code: у PostgrestError в details/hint
-      // лежит содержимое строк базы, и публиковать его нельзя (правило 3 CLAUDE.md).
-      console[event.level === 'auth' ? 'warn' : 'error'](label, { code: event.code })
+    // Печать — под своим try: консоль подменяема (расширения, инструменты), и её
+    // отказ не имеет права съесть доставку события в sink.
+    try {
+      const label = `[argo] ${event.scope}${event.route ? ` ${event.route}` : ''}: ${message}`
+      if (import.meta.env.DEV) {
+        console[event.level === 'auth' ? 'warn' : 'error'](label, error, event)
+      } else {
+        // В прод-консоль уходят только message и code: у PostgrestError в details/hint
+        // лежит содержимое строк базы, и публиковать его нельзя (правило 3 CLAUDE.md).
+        console[event.level === 'auth' ? 'warn' : 'error'](label, { code: event.code })
+      }
+    } catch {
+      // Консоль строку не приняла — событие всё равно уходит в sink ниже.
     }
 
     // Отказ авторизации в sink не идёт: сборщик считал бы истёкший JWT падением
@@ -93,15 +109,17 @@ export function reportAppError(error: unknown, context: ErrorContext): void {
 let globalListenersInstalled = false
 
 export function installGlobalErrorReporting(): void {
-  // Идемпотентно: повторный вызов (перезапуск рута, HMR) не вешает второй набор
-  // слушателей — иначе каждая ошибка печаталась бы столько раз, сколько было вызовов.
+  // Идемпотентно: повторный вызов не вешает второй набор слушателей — иначе каждая
+  // ошибка печаталась бы столько раз, сколько было вызовов.
   if (globalListenersInstalled || typeof window === 'undefined') return
   globalListenersInstalled = true
 
   window.addEventListener('error', (event) => {
     // Провал загрузки ресурса (<img>, <script>) всплывает тем же событием, но с
-    // error === null: отчёт по нему был бы строкой без содержимого.
-    if (!event.error) return
+    // error === null: отчёт по нему был бы строкой без содержимого. Проверяем именно
+    // null/undefined, а не ложность: throw 0, throw '' и throw false — настоящие
+    // ошибки, и глотать их нельзя.
+    if (event.error === null || event.error === undefined) return
     reportAppError(event.error, { scope: 'window', route: window.location.pathname })
   })
 

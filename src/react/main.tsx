@@ -16,7 +16,9 @@ createRoot(document.getElementById('root')!, {
   // Штатные обработчики React 19 переопределяем всегда, включая разработку: иначе
   // ошибка, которую React отдал границе или пережил сам, в канал не попадёт и в
   // консоли будет выглядеть как чужая. Сам объект Error канал печатает в dev-ветке.
-  onCaughtError: (error, errorInfo) => reportAppError(error, { scope: 'react', componentStack: errorInfo.componentStack, detail: { caught: true } }),
+  // onCaughtError не задаём: пойманное границей докладывает сама граница
+  // (componentDidCatch), и второй обработчик дал бы по два отчёта на одну ошибку —
+  // с разными scope, так что дедуп канала их не сольёт.
   onUncaughtError: (error, errorInfo) => reportAppError(error, { scope: 'react', componentStack: errorInfo.componentStack }),
   onRecoverableError: (error, errorInfo) => reportAppError(error, { scope: 'react', componentStack: errorInfo.componentStack, detail: { recoverable: true } }),
 }).render(
