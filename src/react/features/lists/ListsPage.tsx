@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   FileCheck2,
   FolderOpen,
+  MessageSquarePlus,
   PackageCheck,
   PencilLine,
   Plus,
@@ -211,6 +212,15 @@ export function ListsPage() {
 
   useEffect(() => setPage(1), [status, period])
 
+  // Открытый дровер держит СВОЮ копию строки, а смена этапа перезагружает список.
+  // Без пересадки на свежую строку человек, нажавший «Подтвердить комплект»,
+  // видел бы ту же кнопку и тот же бейдж — то есть решил бы, что не сработало.
+  // Зависимость только от rows: selected здесь пишется, и добавь мы его в
+  // зависимости, эффект гонялся бы сам за собой.
+  useEffect(() => {
+    setSelected((current) => (current ? rows.find((row) => row.id === current.id) ?? current : current))
+  }, [rows])
+
   useEffect(() => {
     let isCurrent = true
     const cached = readCachedEquipmentLists({ page: currentPage, search, status, periodFrom, periodTo, pageSize })
@@ -357,11 +367,12 @@ export function ListsPage() {
                   const isExporting = exporting?.id === list.id
                   // created_at в схеме nullable; поведение прежнее: пустое значение даёт эпоху
                   const createdAt = new Intl.DateTimeFormat(locale).format(new Date(list.created_at ?? 0))
-                  // Черновик продолжают собирать, а не разглядывают: он открывается
-                  // сразу в редакторе. Остальные этапы ведут в детали — там состав,
-                  // история и переход этапа.
+                  // Черновик продолжают собирать, а не разглядывают: первичная кнопка
+                  // ведёт его сразу в редактор. Детали при этом обязаны остаться
+                  // достижимыми и для него — только там живёт переход «Подтвердить
+                  // комплект», и без второй двери подтвердить список стало бы нечем.
                   const isDraft = list.reservation_status === 'draft'
-                  const open = () => { if (isDraft) navigate(`/lists/${list.id}/edit`); else setSelected(list) }
+                  const primaryAction = () => { if (isDraft) navigate(`/lists/${list.id}/edit`); else setSelected(list) }
                   const isEmpty = listSize(list) === 0
                   return (
                     <article
@@ -380,7 +391,10 @@ export function ListsPage() {
                         <span className={`badge badge--${lifecycle.tone}`}><i />{lifecycle.label}</span>
                       </div>
                       <div>
-                        <h3>{list.name}</h3>
+                        {/* Название — вторичная строка, и одновременно вход в детали:
+                            его псевдоэлемент растянут на карточку, поэтому «клик куда
+                            угодно» открывает состав, историю и этапы. */}
+                        <h3><button type="button" className="list-card__title" onClick={() => setSelected(list)}>{list.name}</button></h3>
                         {list.description && <p className="list-card__description">{list.description}</p>}
                       </div>
                       <div className="list-card__meta">
@@ -389,7 +403,7 @@ export function ListsPage() {
                         <span>{tr(`создан ${createdAt}`, `${createdAt} yaratilgan`)}</span>
                       </div>
                       <div className="list-card__actions">
-                        <button className="button button--primary list-card__open" onClick={open}>
+                        <button className="button button--primary list-card__open" onClick={primaryAction}>
                           {isDraft ? <><PencilLine size={16} /> {tr('Изменить', 'O‘zgartirish')}</> : <><FolderOpen size={16} /> {tr('Открыть', 'Ochish')}</>}
                         </button>
                         <ActionMenu
@@ -460,6 +474,10 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   const [history, setHistory] = useState<ReservationHistory[]>(() => readCachedReservationHistory(list.id) ?? [])
   const [composition, setComposition] = useState<SavedListComposition>(() => readCachedSavedListComposition(list.id) ?? emptyComposition)
   const [note, setNote] = useState('')
+  // Комментарий к переходу свёрнут: он необязателен, а развёрнутое поле на два
+  // ряда отодвигало бы саму кнопку этапа за сгиб — ровно то, из-за чего переход
+  // и был незаметен.
+  const [noteOpen, setNoteOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(() => readCachedSavedListComposition(list.id) === null)
   const [isTrackingLoading, setIsTrackingLoading] = useState(() => {
     if (!list.advanced_features) return false
@@ -527,6 +545,10 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
     setError('')
     try {
       await transitionEquipmentList(list.id, action.target, note)
+      // Комментарий описывал ПРОШЕДШИЙ шаг: оставить его в поле — значит
+      // приклеить к следующему переходу чужой текст.
+      setNote('')
+      setNoteOpen(false)
       onChanged()
     } catch (transitionError) {
       const message = transitionError instanceof Error ? transitionError.message : ''
@@ -598,15 +620,47 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
         </div>
 
         <div className="reservation-drawer__footer">
+          {/* Текущий шаг жизненного цикла — первым и всегда развёрнутым. До волны 2
+              он лежал внутри свёрнутого «Необязательно…» с собственной прокруткой:
+              тот, кто пришёл выдавать комплект, читал подпись как «не сюда». */}
+          {action && !missingLegacyDates && !cannotIssuePlan && (
+            <section className="transition-panel transition-panel--primary">
+              <div><strong>{action.label}</strong><p>{action.description}</p></div>
+              {/* Дефицит подробно разобран в «Подробностях учёта», но одной строкой
+                  он обязан быть здесь: иначе подтверждают вслепую. */}
+              {shortages.length > 0 && (
+                <p className="availability-warning"><TriangleAlert size={16} />{tr(
+                  `На дату мероприятия не хватает позиций: ${shortages.length}. Подробности — ниже.`,
+                  `Tadbir sanasida yetishmayotgan pozitsiyalar: ${shortages.length}. Tafsilotlar — quyida.`,
+                )}</p>
+              )}
+              {noteOpen ? (
+                <label className="field"><span>{tr('Комментарий к смене статуса (необязательно)', 'Holat o‘zgarishiga izoh (ixtiyoriy)')}</span><textarea autoFocus value={note} onChange={(event) => setNote(event.target.value)} rows={2} placeholder={tr('Например: выдал Алексей, комплект проверен', 'Masalan: Aleksey berdi, jamlanma tekshirildi')} /></label>
+              ) : (
+                <button type="button" className="transition-panel__note-toggle" onClick={() => setNoteOpen(true)}><MessageSquarePlus size={15} />{tr('Добавить комментарий', 'Izoh qo‘shish')}</button>
+              )}
+              <button className="button button--primary button--wide" onClick={() => void runTransition()} disabled={isTransitioning}>
+                {action.target === 'returned' ? <RotateCcw size={17} /> : <PackageCheck size={17} />}
+                {isTransitioning ? tr('Обновляем…', 'Yangilanmoqda…') : action.label}
+              </button>
+            </section>
+          )}
+
+          {/* Плашки «почему действия нет» — сразу под тем местом, где действие ожидали */}
+          {missingLegacyDates && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Список без даты мероприятия', 'Tadbir sanasisiz ro‘yxat')}</strong><br />{tr('Сохранён до появления учёта выдачи. Для выдачи и возврата соберите новый список с датой.', 'Berish hisobi paydo bo‘lgunga qadar saqlangan. Berish va qaytarish uchun sanasi bilan yangi ro‘yxat yig‘ing.')}</p></div>}
+          {/* Кнопки возврата в черновик нет намеренно: серверного перехода confirmed → draft
+              пока не существует, и плашка говорит только то, что человек может сделать сейчас */}
+          {cannotIssuePlan && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Выдать нельзя: в списке только модели, без серийных номеров', 'Berib bo‘lmaydi: ro‘yxatda faqat modellar, seriya raqamlarisiz')}</strong><br />{tr('Подтверждённый список изменить нельзя — соберите новый с серийными номерами.', 'Tasdiqlangan ro‘yxatni o‘zgartirib bo‘lmaydi — seriya raqamlari bilan yangisini yig‘ing.')}</p></div>}
+
           {list.reservation_status === 'draft' && (
-            <button className="button button--primary button--wide saved-list-edit" onClick={() => navigate(`/lists/${list.id}/edit`)}><PencilLine size={17} />{tr('Открыть и изменить список', 'Ro‘yxatni ochish va o‘zgartirish')}</button>
+            <button className="button button--secondary button--wide saved-list-edit" onClick={() => navigate(`/lists/${list.id}/edit`)}><PencilLine size={17} />{tr('Открыть и изменить список', 'Ro‘yxatni ochish va o‘zgartirish')}</button>
           )}
 
           {!list.advanced_features ? (
             <p className="availability-warning"><CircleAlert size={16} />{tr('Этот список сохранён как обычный документ. Учёт выдачи и возврата для него не включён.', 'Bu ro‘yxat oddiy hujjat sifatida saqlangan. Berish va qaytarish hisobi yoqilmagan.')}</p>
           ) : (
             <details className="tracking-details">
-            <summary><span><strong>{tr('Выдача и возврат', 'Berish va qaytarish')}</strong><small>{tr('Подтвердить → выдать → принять возврат', 'Tasdiqlash → berish → qaytarishni qabul qilish')}</small></span><ChevronRight size={18} /></summary>
+            <summary><span><strong>{tr('Подробности учёта', 'Hisob tafsilotlari')}</strong><small>{tr('Доступность на дату и история статусов', 'Sanadagi mavjudlik va holatlar tarixi')}</small></span><ChevronRight size={18} /></summary>
             <div className="tracking-details__body">
               {hasTrackingWarning && <p className="availability-warning"><CircleAlert size={16} />{tr(
                 'Дополнительный складской учёт временно не обновился. Состав списка и Excel доступны как обычно.',
@@ -620,22 +674,6 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
                 </section>
               ) : (
                 <div className="availability-ok"><PackageCheck size={18} /><span>{tr('По текущим данным комплект доступен на выбранные даты.', 'Joriy ma’lumotlarga ko‘ra jamlanma tanlangan sanalarda mavjud.')}</span></div>
-              )}
-
-              {missingLegacyDates && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Список без даты мероприятия', 'Tadbir sanasisiz ro‘yxat')}</strong><br />{tr('Сохранён до появления учёта выдачи. Для выдачи и возврата соберите новый список с датой.', 'Berish hisobi paydo bo‘lgunga qadar saqlangan. Berish va qaytarish uchun sanasi bilan yangi ro‘yxat yig‘ing.')}</p></div>}
-              {/* Кнопки возврата в черновик нет намеренно: серверного перехода confirmed → draft
-                  пока не существует, и плашка говорит только то, что человек может сделать сейчас */}
-              {cannotIssuePlan && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Выдать нельзя: в списке только модели, без серийных номеров', 'Berib bo‘lmaydi: ro‘yxatda faqat modellar, seriya raqamlarisiz')}</strong><br />{tr('Подтверждённый список изменить нельзя — соберите новый с серийными номерами.', 'Tasdiqlangan ro‘yxatni o‘zgartirib bo‘lmaydi — seriya raqamlari bilan yangisini yig‘ing.')}</p></div>}
-
-              {action && !missingLegacyDates && !cannotIssuePlan && (
-                <section className="transition-panel">
-                  <div><strong>{action.label}</strong><p>{action.description}</p></div>
-                  <label className="field"><span>{tr('Комментарий к смене статуса (необязательно)', 'Holat o‘zgarishiga izoh (ixtiyoriy)')}</span><textarea value={note} onChange={(event) => setNote(event.target.value)} rows={2} placeholder={tr('Например: выдал Алексей, комплект проверен', 'Masalan: Aleksey berdi, jamlanma tekshirildi')} /></label>
-                  <button className="button button--primary button--wide" onClick={() => void runTransition()} disabled={isTransitioning}>
-                    {action.target === 'returned' ? <RotateCcw size={17} /> : <PackageCheck size={17} />}
-                    {isTransitioning ? tr('Обновляем…', 'Yangilanmoqda…') : action.label}
-                  </button>
-                </section>
               )}
 
               <section className="history-section">

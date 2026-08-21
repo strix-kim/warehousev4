@@ -324,14 +324,15 @@ h2 { letter-spacing: -0.025em; }
 .list-card--loading { min-height: 250px; background: linear-gradient(90deg, #f7f8f6 25%, #fff 50%, #f7f8f6 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 .list-card__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .list-card__actions .button { min-width: 0; padding-inline: 10px; font-size: 12px; }
-/* Кликабельна вся карточка, но интерактивный элемент в разметке ОДИН: псевдоэлемент
-   первичной кнопки растянут на карточку. Обёртка-кнопка вокруг всего содержимого
-   дала бы вложенные кнопки, а onClick на article — область, недостижимую с
-   клавиатуры. Меню лежит выше по z-index и перехватывает свои клики само. */
-.list-card__open::after { content: ''; position: absolute; z-index: 0; inset: 0; border-radius: inherit; }
-.list-card__export { position: relative; z-index: 1; }
-.list-card:has(.list-card__open:hover) { border-color: var(--line-strong); }
-.list-card:has(.list-card__open:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* Клик по карточке открывает ДЕТАЛИ: псевдоэлемент названия растянут на всю
+   карточку. Обёртка-кнопка вокруг содержимого дала бы вложенные кнопки, а onClick
+   на article — область, недостижимую с клавиатуры. Кнопка этапа и меню лежат выше
+   по z-index и перехватывают свои клики сами. */
+.list-card__title { padding: 0; border: 0; color: inherit; background: none; font: inherit; text-align: left; }
+.list-card__title::after { content: ''; position: absolute; z-index: 0; inset: 0; }
+.list-card__open, .list-card__export { position: relative; z-index: 1; }
+.list-card:has(.list-card__title:hover) { border-color: var(--line-strong); }
+.list-card:has(.list-card__title:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 .home-page { min-height: calc(100dvh - 70px); display: flex; flex-direction: column; justify-content: center; }
 .home-page__header { max-width: 720px; margin-bottom: 32px; animation: rise-in .3s cubic-bezier(.2,.7,.2,1) both; }
@@ -601,6 +602,13 @@ h2 { letter-spacing: -0.025em; }
 .transition-panel > div > strong { font-size: 14px; }
 .transition-panel > div > p { margin: 5px 0 14px; color: var(--ink-soft); font-size: 12px; line-height: 1.55; }
 .transition-panel .field { margin-bottom: 12px; }
+/* Тот же блок, но в футере первым и всегда развёрнутым: это текущий шаг, а не
+   «необязательная» подробность, поэтому он выделен фоном и отбит от остального. */
+.transition-panel--primary { margin: 0 0 12px; border-color: var(--line-strong); background: var(--surface-soft); }
+.transition-panel--primary > div > p { margin-bottom: 12px; }
+.transition-panel--primary .availability-warning { margin-bottom: 12px; }
+.transition-panel__note-toggle { display: flex; align-items: center; gap: 7px; min-height: 34px; margin-bottom: 12px; padding: 0; border: 0; color: var(--ink-soft); background: none; font-size: 12px; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+.transition-panel__note-toggle svg { color: var(--ink-faint); }
 .history-section { margin-top: 22px; border-top: 1px solid var(--line); }
 .history-section .panel-heading { padding-inline: 0; }
 .history-section .panel-heading h3 { margin: 0 0 3px; font-size: 16px; }
