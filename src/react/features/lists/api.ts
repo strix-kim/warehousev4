@@ -3,6 +3,7 @@ import { cachedQuery, invalidateCachePrefix, primeCachedQuery, readCachedQuery }
 import type { Json, Tables } from '../../lib/database.types'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { escapeLikePattern } from '../../lib/postgrest'
+import { reportAppError } from '../../lib/reportAppError'
 import { fetchEquipmentByIds } from '../equipment/api'
 import type { Equipment } from '../equipment/types'
 import { LIST_DRAFT_CACHE_KEY, LIST_DRAFT_TTL_MS, listCompositionCacheKey } from './cacheKeys'
@@ -391,7 +392,7 @@ export function buildSavedListComposition(list: EquipmentList, { bypassCache = f
 // звать её вслепую на шесть карточек нечем оправдать.
 export function prefetchSavedListDetails(list: EquipmentList) {
   primeCachedQuery(equipmentListCacheKey(list.id), 10 * 60 * 1000, list)
-  return buildSavedListComposition(list).catch(() => undefined)
+  return buildSavedListComposition(list).catch((error: unknown) => reportAppError(error, { scope: 'prefetch', detail: { source: 'list-composition', listId: list.id } }))
 }
 
 // Черновик редактора нового списка. Позиция хранится КЛЮЧОМ ГРУППЫ, а не снимком

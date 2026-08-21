@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthProvider'
 import { LanguageSwitcher, useLanguage } from '../lib/i18n'
+import { reportAppError } from '../lib/reportAppError'
 
 const loadLoginPage = () => import('../features/auth/LoginPage').then((module) => ({ default: module.LoginPage }))
 const loadEquipmentPage = () => import('../features/equipment/EquipmentPage').then((module) => ({ default: module.EquipmentPage }))
@@ -90,7 +91,7 @@ function AppShell() {
           // и прогрев обязан спросить его у самой фичи.
           pageSize: listsApi.preferredListsPageSize(),
         }),
-      ])).catch(() => undefined)
+      ])).catch((error: unknown) => reportAppError(error, { scope: 'prefetch', detail: { batch: 'primary-data' } }))
     }, 120)
     const editorDataTimer = window.setTimeout(() => {
       void Promise.all([
@@ -102,7 +103,7 @@ function AppShell() {
           equipmentApi.fetchEquipmentTaxonomy(),
         ])
         visuals.preloadEquipmentImages(equipment, 32)
-      }).catch(() => undefined)
+      }).catch((error: unknown) => reportAppError(error, { scope: 'prefetch', detail: { batch: 'editor-data' } }))
     }, 700)
     return () => {
       window.clearTimeout(moduleTimer)

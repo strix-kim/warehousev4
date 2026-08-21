@@ -25,6 +25,7 @@ import type { Equipment } from './types'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
+import { reportAppError } from '../../lib/reportAppError'
 
 export function EquipmentPage() {
   const navigate = useNavigate()
@@ -93,10 +94,11 @@ export function EquipmentPage() {
         if (nextPage <= Math.ceil(result.total / pageSize)) {
           void fetchEquipment({ page: nextPage, search, availability, pageSize })
             .then((nextResult) => preloadEquipmentImages(nextResult.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 16))
-            .catch(() => undefined)
+            .catch((error: unknown) => reportAppError(error, { scope: 'prefetch', route: '/equipment', detail: { page: nextPage } }))
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        reportAppError(error, { scope: 'loader', route: '/equipment', detail: { servedFromCache: Boolean(cached) } })
         if (isCurrent && !cached) setHasLoadError(true)
       })
       .finally(() => {

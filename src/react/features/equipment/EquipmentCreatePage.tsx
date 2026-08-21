@@ -16,6 +16,7 @@ import {
 } from './availability'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
+import { reportAppError } from '../../lib/reportAppError'
 
 type RecordKind = 'serialized' | 'quantity'
 
@@ -72,7 +73,7 @@ export function EquipmentCreatePage() {
   )
 
   useEffect(() => {
-    fetchEquipmentTaxonomy().then(setTaxonomy).catch(() => undefined)
+    fetchEquipmentTaxonomy().then(setTaxonomy).catch((error: unknown) => reportAppError(error, { scope: 'prefetch', route: '/equipment/new', detail: { source: 'taxonomy' } }))
   }, [])
 
   function changeKind(nextKind: RecordKind) {

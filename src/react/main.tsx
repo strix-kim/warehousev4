@@ -4,9 +4,21 @@ import { BrowserRouter } from 'react-router-dom'
 import { App } from './app/App'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { LanguageProvider } from './lib/i18n'
+import { installGlobalErrorReporting, reportAppError } from './lib/reportAppError'
 import './styles.css'
 
-createRoot(document.getElementById('root')!).render(
+// Слушатели вешаются до createRoot: ошибка в самом рендере рута иначе осталась бы
+// без канала.
+installGlobalErrorReporting()
+
+createRoot(document.getElementById('root')!, {
+  // Штатные обработчики React 19 переопределяем всегда, включая разработку: иначе
+  // ошибка, которую React отдал границе или пережил сам, в канал не попадёт и в
+  // консоли будет выглядеть как чужая. Сам объект Error канал печатает в dev-ветке.
+  onCaughtError: (error, errorInfo) => reportAppError(error, { scope: 'react', componentStack: errorInfo.componentStack, detail: { caught: true } }),
+  onUncaughtError: (error, errorInfo) => reportAppError(error, { scope: 'react', componentStack: errorInfo.componentStack }),
+  onRecoverableError: (error, errorInfo) => reportAppError(error, { scope: 'react', componentStack: errorInfo.componentStack, detail: { recoverable: true } }),
+}).render(
   <StrictMode>
     <BrowserRouter>
       <LanguageProvider>
