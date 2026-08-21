@@ -68,7 +68,6 @@ export type Database = {
       equipment_lists: {
         Row: {
           client_name: string | null
-          confirmed_at: string | null
           created_at: string | null
           created_by: string | null
           description: string | null
@@ -77,25 +76,18 @@ export type Database = {
           event_id: string | null
           id: string
           is_archived: boolean | null
-          issued_at: string | null
           list_mode: string | null
           metadata: Json | null
           mount_point_id: string | null
           name: string
           reservation_end: string | null
           reservation_start: string | null
-          reservation_status: string
-          returned_at: string | null
-          shortage_snapshot: Json
-          status_changed_at: string
-          status_changed_by: string | null
           type: string
           updated_at: string | null
           venue: string | null
         }
         Insert: {
           client_name?: string | null
-          confirmed_at?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
@@ -104,25 +96,18 @@ export type Database = {
           event_id?: string | null
           id?: string
           is_archived?: boolean | null
-          issued_at?: string | null
           list_mode?: string | null
           metadata?: Json | null
           mount_point_id?: string | null
           name: string
           reservation_end?: string | null
           reservation_start?: string | null
-          reservation_status?: string
-          returned_at?: string | null
-          shortage_snapshot?: Json
-          status_changed_at?: string
-          status_changed_by?: string | null
           type: string
           updated_at?: string | null
           venue?: string | null
         }
         Update: {
           client_name?: string | null
-          confirmed_at?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
@@ -131,18 +116,12 @@ export type Database = {
           event_id?: string | null
           id?: string
           is_archived?: boolean | null
-          issued_at?: string | null
           list_mode?: string | null
           metadata?: Json | null
           mount_point_id?: string | null
           name?: string
           reservation_end?: string | null
           reservation_start?: string | null
-          reservation_status?: string
-          returned_at?: string | null
-          shortage_snapshot?: Json
-          status_changed_at?: string
-          status_changed_by?: string | null
           type?: string
           updated_at?: string | null
           venue?: string | null
@@ -220,66 +199,6 @@ export type Database = {
           },
           {
             foreignKeyName: "equipment_movements_list_id_fkey"
-            columns: ["list_id"]
-            isOneToOne: false
-            referencedRelation: "equipment_lists"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      equipment_reservation_items: {
-        Row: {
-          brand: string
-          created_at: string
-          created_by: string
-          equipment_id: string | null
-          id: string
-          list_id: string
-          model: string
-          requested_count: number
-          subtype: string
-          tracking_mode: string
-          type: string
-          updated_at: string
-        }
-        Insert: {
-          brand: string
-          created_at?: string
-          created_by?: string
-          equipment_id?: string | null
-          id?: string
-          list_id: string
-          model: string
-          requested_count?: number
-          subtype: string
-          tracking_mode: string
-          type: string
-          updated_at?: string
-        }
-        Update: {
-          brand?: string
-          created_at?: string
-          created_by?: string
-          equipment_id?: string | null
-          id?: string
-          list_id?: string
-          model?: string
-          requested_count?: number
-          subtype?: string
-          tracking_mode?: string
-          type?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "equipment_reservation_items_equipment_id_fkey"
-            columns: ["equipment_id"]
-            isOneToOne: false
-            referencedRelation: "equipment"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "equipment_reservation_items_list_id_fkey"
             columns: ["list_id"]
             isOneToOne: false
             referencedRelation: "equipment_lists"
@@ -430,47 +349,6 @@ export type Database = {
           },
         ]
       }
-      reservation_status_history: {
-        Row: {
-          changed_at: string
-          changed_by: string | null
-          from_status: string | null
-          id: string
-          list_id: string
-          note: string | null
-          shortage_snapshot: Json
-          to_status: string
-        }
-        Insert: {
-          changed_at?: string
-          changed_by?: string | null
-          from_status?: string | null
-          id?: string
-          list_id: string
-          note?: string | null
-          shortage_snapshot?: Json
-          to_status: string
-        }
-        Update: {
-          changed_at?: string
-          changed_by?: string | null
-          from_status?: string | null
-          id?: string
-          list_id?: string
-          note?: string | null
-          shortage_snapshot?: Json
-          to_status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "reservation_status_history_list_id_fkey"
-            columns: ["list_id"]
-            isOneToOne: false
-            referencedRelation: "equipment_lists"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       users: {
         Row: {
           email: string
@@ -500,9 +378,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      // ПРАВКА РУКАМИ: функции ещё нет в проде, она приезжает миграцией
-      // 20260820172928_count_equipment_model_units.sql. После её применения
-      // следующая генерация типов принесёт этот блок сама — тогда правку убрать.
       count_equipment_model_units: {
         Args: { p_brand: string; p_model: string }
         Returns: number
@@ -534,25 +409,6 @@ export type Database = {
           p_reservation_start: string | null
         }
         Returns: string
-      }
-      reservation_shortages: {
-        Args: { p_list_id: string }
-        Returns: {
-          available: number
-          brand: string
-          capacity: number
-          model: string
-          requested: number
-          reserved: number
-          shortage: number
-          specific_conflicts: number
-          subtype: string
-          type: string
-        }[]
-      }
-      transition_equipment_list_status: {
-        Args: { p_list_id: string; p_note?: string; p_target_status: string }
-        Returns: Json
       }
       update_equipment_list_document: {
         Args: {

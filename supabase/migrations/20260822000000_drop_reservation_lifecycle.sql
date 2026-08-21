@@ -227,7 +227,22 @@ grant execute on function public.update_equipment_list_document(uuid, text, text
 drop table if exists public.reservation_status_history;
 drop table if exists public.equipment_reservation_items;
 
--- 7. Колонки статусов. reservation_start/reservation_end НЕ ТРОГАЕМ.
+-- 7. INSERT-политика ссылается на reservation_status и три метки времени —
+--    колонки не удалить, пока она их сторожит. CASCADE здесь опасен: он снёс бы
+--    политику целиком, а таблица без INSERT-политики под RLS запрещает вставку
+--    ВСЕМ. Поэтому политика пересоздаётся явно, и проверка «created_by — это ты»
+--    в ней остаётся: к жизненному циклу она отношения не имеет.
+drop policy if exists equipment_lists_insert_for_members on public.equipment_lists;
+create policy equipment_lists_insert_for_members
+on public.equipment_lists
+for insert
+to authenticated
+with check (
+  (select private.is_app_member())
+  and created_by = (select auth.uid())
+);
+
+-- 8. Колонки статусов. reservation_start/reservation_end НЕ ТРОГАЕМ.
 alter table public.equipment_lists
   drop column if exists reservation_status,
   drop column if exists confirmed_at,
