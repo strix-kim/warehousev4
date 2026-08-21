@@ -485,6 +485,11 @@ export async function updateEquipmentList(listId: string, input: EquipmentListDo
   return data as string
 }
 
+// Отказ RLS на удалении: политика не возвращает ошибку — строка просто не попадает
+// под delete, и ответ приходит пустым. Код-строка, а не текст: сообщение собирает
+// интерфейс, здесь только причина.
+export const LIST_DELETE_FORBIDDEN = 'list-delete-forbidden'
+
 export async function deleteEquipmentList(listId: string) {
   if (!supabase) throw new Error('Supabase не настроен')
 
@@ -496,7 +501,7 @@ export async function deleteEquipmentList(listId: string) {
     .maybeSingle()
 
   if (error) throw error
-  if (!data) throw new Error('Equipment list cannot be deleted')
+  if (!data) throw new Error(LIST_DELETE_FORBIDDEN)
   invalidateCachePrefix('equipment-lists:')
   return data.id as string
 }

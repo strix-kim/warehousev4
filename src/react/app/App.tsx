@@ -190,6 +190,13 @@ function AppShell() {
       </aside>
 
       <main className="app-content">
+        {/* Минимум U5: на телефоне и планшете sidebar__footer скрыт, и выйти из аккаунта
+            негде. Полоса видна только до 820 px и уйдёт, когда в нижнюю навигацию
+            добавится пункт «Ещё». */}
+        <div className="mobile-account">
+          <span>{email}</span>
+          <button className="button button--secondary mobile-account__signout" onClick={() => void signOut()}><LogOut size={16} />{tr('Выйти', 'Chiqish')}</button>
+        </div>
         <Outlet />
       </main>
     </div>

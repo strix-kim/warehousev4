@@ -29,6 +29,7 @@ import {
   fetchEquipmentLists,
   fetchReservationHistory,
   fetchReservationShortages,
+  LIST_DELETE_FORBIDDEN,
   prefetchSavedListDetails,
   preferredListsPageSize,
   readCachedReservationHistory,
@@ -52,7 +53,7 @@ type Tr = (ru: string, uz: string) => string
 // Причина отказа в деталях списка. Код, а не готовая строка: строка потянула бы
 // tr в зависимости эффекта загрузки, и смена языка перезапрашивала бы состав,
 // историю и дефицит.
-type DrawerErrorCode = '' | 'composition' | 'issue-shortage' | 'transition' | 'delete'
+type DrawerErrorCode = '' | 'composition' | 'issue-shortage' | 'transition' | 'delete' | 'delete-forbidden'
 
 const emptyComposition: SavedListComposition = { rows: [], missingUnits: 0 }
 
@@ -67,6 +68,12 @@ function getDrawerErrorMessage(code: DrawerErrorCode, tr: Tr) {
       'Berish uchun haqiqiy uskuna yetarli emas. Bandlov saqlandi — jamlanma yoki qoldiqni tuzating.',
     )
     case 'transition': return tr('Не удалось изменить этап. Данные не были изменены.', 'Bosqichni o‘zgartirib bo‘lmadi. Ma’lumotlar o‘zgartirilmadi.')
+    // Отказ права и сбой сети разведены: «попробуйте ещё раз» на отказе RLS отправляет
+    // человека жать кнопку, которая не сработает ни разу.
+    case 'delete-forbidden': return tr(
+      'Удалять списки может только администратор склада — попросите его.',
+      'Ro‘yxatlarni faqat ombor administratori o‘chira oladi — undan so‘rang.',
+    )
     case 'delete': return tr('Не удалось удалить список. Попробуйте ещё раз.', 'Ro‘yxatni o‘chirib bo‘lmadi. Qayta urinib ko‘ring.')
     default: return ''
   }
@@ -83,9 +90,9 @@ function getStatusView(tr: Tr): Record<ReservationStatus, { label: string; tone:
 
 function getTransitionCopy(tr: Tr): Partial<Record<ReservationStatus, { target: ReservationStatus; label: string; description: string }>> {
   return {
-    draft: { target: 'confirmed', label: tr('Подтвердить комплект', 'Jamlanmani tasdiqlash'), description: tr('Оборудование будет учтено за этим списком на выбранную дату. Нехватка останется предупреждением.', 'Uskunalar tanlangan sana uchun shu ro‘yxatga biriktiriladi. Yetishmovchilik ogohlantirish bo‘lib qoladi.') },
-    confirmed: { target: 'issued', label: tr('Отметить выдачу', 'Berishni belgilash'), description: tr('Остаток на складе уменьшится, а серийные единицы будут отмечены как выданные.', 'Ombordagi qoldiq kamayadi, seriyali birliklar berilgan deb belgilanadi.') },
-    issued: { target: 'returned', label: tr('Принять возврат', 'Qaytarishni qabul qilish'), description: tr('Количество вернётся на склад, серийные единицы снова станут доступными.', 'Miqdor omborga qaytadi, seriyali birliklar yana mavjud bo‘ladi.') },
+    draft: { target: 'confirmed', label: tr('Подтвердить комплект', 'Jamlanmani tasdiqlash'), description: tr('Техника будет закреплена за списком на дату мероприятия. Если чего-то не хватает — покажем предупреждением, подтвердить это не помешает.', 'Uskunalar tadbir sanasida ro‘yxatga biriktiriladi. Nimadir yetishmasa — ogohlantirish ko‘rsatamiz, bu tasdiqlashga xalaqit bermaydi.') },
+    confirmed: { target: 'issued', label: tr('Отметить выдачу', 'Berishni belgilash'), description: tr('Техника уедет со склада: остаток уменьшится, серийные единицы получат статус «выдано».', 'Uskunalar ombordan chiqadi: qoldiq kamayadi, seriyali birliklar «berilgan» holatini oladi.') },
+    issued: { target: 'returned', label: tr('Принять возврат', 'Qaytarishni qabul qilish'), description: tr('Техника вернётся на склад и снова станет доступной для списков.', 'Uskunalar omborga qaytadi va yana ro‘yxatlar uchun mavjud bo‘ladi.') },
   }
 }
 
@@ -98,6 +105,13 @@ function listSize(list: EquipmentList) {
 
 function formatDate(value: string | null, locale: string, tr: Tr) {
   return value ? new Intl.DateTimeFormat(locale).format(new Date(`${value}T12:00:00`)) : tr('дата не указана', 'sana ko‘rsatilmagan')
+}
+
+// Однодневное мероприятие — одна дата: «21.08.2026 — 21.08.2026» читается как ошибка
+// интерфейса, а не как период в один день.
+function formatEventRange(start: string | null, end: string | null, locale: string, tr: Tr) {
+  if (start && start === end) return formatDate(start, locale, tr)
+  return `${formatDate(start, locale, tr)} — ${formatDate(end, locale, tr)}`
 }
 
 export function ListsPage() {
@@ -250,17 +264,7 @@ export function ListsPage() {
         </button>
       </header>
 
-      <section className="metric-strip">
-        <div className="metric"><span className="metric__label">{isFiltered ? tr('Найдено списков', 'Topilgan ro‘yxatlar') : tr('Всего списков', 'Jami ro‘yxatlar')}</span><strong>{total}</strong></div>
-        <div className="metric metric--notice"><CircleAlert size={17} /><span>{tr('Excel скачивается без сохранения; нехватка остаётся предупреждением и не блокирует работу', 'Excel saqlamasdan yuklanadi; yetishmovchilik ogohlantirish bo‘lib qoladi va ishni to‘xtatmaydi')}</span></div>
-      </section>
-
       <section className="data-panel">
-        <div className="panel-heading">
-          <div><h2>{tr('Сохранённые списки', 'Saqlangan ro‘yxatlar')}</h2><p>{tr('Необязательный архив: поиск, фильтр и страницы считает база — по всему архиву.', 'Ixtiyoriy arxiv: qidiruv, filtr va sahifalarni baza hisoblaydi — butun arxiv bo‘yicha.')}</p></div>
-          <span className="read-only-label">{tr('Расширенный учёт', 'Kengaytirilgan hisob')}</span>
-        </div>
-
         <div className="toolbar">
           <label className="search-field">
             <Search size={18} />
@@ -279,6 +283,7 @@ export function ListsPage() {
               { value: 'returned', label: tr('Возвращённые', 'Qaytarilganlar') },
             ]}
           />
+          <span className="toolbar__count">{isFiltered ? tr('Найдено', 'Topildi') : tr('Всего', 'Jami')}: {total}</span>
           {/* Рядом с блоком «Ошибка загрузки» бейдж не рисуем: на экране оказались бы
               два разных предложения обновиться и «Обновлено 25 минут назад» под
               заголовком о том, что данных нет. */}
@@ -297,6 +302,8 @@ export function ListsPage() {
                   const lifecycle = list.advanced_features ? statusView[list.reservation_status] : { label: tr('Сохранён', 'Saqlangan'), tone: 'neutral' }
                   const isExporting = exporting?.id === list.id
                   const listNumber = (currentPage - 1) * pageSize + index + 1
+                  // created_at в схеме nullable; поведение прежнее: пустое значение даёт эпоху
+                  const createdAt = new Intl.DateTimeFormat(locale).format(new Date(list.created_at ?? 0))
                   return (
                     <article
                       className="list-card"
@@ -309,15 +316,15 @@ export function ListsPage() {
                         <span className={`badge badge--${lifecycle.tone}`}><i />{lifecycle.label}</span>
                       </div>
                       <div>
-                        <p className="eyebrow">{list.list_mode === 'specific' ? tr('Фактический комплект', 'Haqiqiy jamlanma') : tr('План по моделям', 'Modellar bo‘yicha reja')}</p>
+                        <p className="eyebrow">{list.list_mode === 'specific' ? tr('С серийными номерами', 'Seriya raqamlari bilan') : tr('Только модели', 'Faqat modellar')}</p>
                         <h3>{list.name}</h3>
                         <p>{[list.client_name, list.venue, list.description].filter(Boolean).join(' · ') || tr('Без описания', 'Tavsifsiz')}</p>
                       </div>
-                      <div className="reservation-window"><CalendarRange size={15} /><span>{formatDate(list.reservation_start, locale, tr)} — {formatDate(list.reservation_end, locale, tr)}</span></div>
+                      <div className="reservation-window"><CalendarRange size={15} /><span>{formatEventRange(list.reservation_start, list.reservation_end, locale, tr)}</span></div>
                       <div className="list-card__meta">
                         <span><strong>{listSize(list)}</strong> {tr('единиц', 'birlik')}</span>
-                        {/* created_at в схеме nullable; поведение прежнее: пустое значение даёт эпоху */}
-                        <span>{new Intl.DateTimeFormat(locale).format(new Date(list.created_at ?? 0))}</span>
+                        {/* Подпись обязательна: без неё две даты на карточке неразличимы */}
+                        <span>{tr(`создан ${createdAt}`, `${createdAt} yaratilgan`)}</span>
                       </div>
                       <div className="list-card__actions">
                         <button className="button button--secondary list-card__details" onClick={() => setSelected(list)}><Clock3 size={16} /> {tr('Открыть детали списка', 'Ro‘yxat tafsilotlarini ochish')}</button>
@@ -382,6 +389,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   const [hasTrackingWarning, setHasTrackingWarning] = useState(false)
   const action = list.advanced_features ? transitionCopy[list.reservation_status] : undefined
   const lifecycle = statusView[list.reservation_status]
+  const contacts = [list.client_name, list.venue].filter(Boolean).join(' · ')
   const cannotIssuePlan = list.reservation_status === 'confirmed' && list.list_mode === 'abstract'
   const missingLegacyDates = list.reservation_status === 'draft' && (!list.reservation_start || !list.reservation_end)
 
@@ -450,8 +458,8 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
       await deleteEquipmentList(list.id)
       onChanged()
       onClose()
-    } catch {
-      setError('delete')
+    } catch (deleteError) {
+      setError(deleteError instanceof Error && deleteError.message === LIST_DELETE_FORBIDDEN ? 'delete-forbidden' : 'delete')
     } finally {
       setIsDeleting(false)
     }
@@ -468,7 +476,14 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
           <span className={`badge badge--${lifecycle.tone}`}><i />{lifecycle.label}</span>
           <div className="reservation-summary">
             <CalendarRange size={19} />
-            <div><strong>{formatDate(list.reservation_start, locale, tr)} — {formatDate(list.reservation_end, locale, tr)}</strong><span>{list.list_mode === 'specific' ? tr('Фактический комплект', 'Haqiqiy jamlanma') : tr('План по моделям', 'Modellar bo‘yicha reja')} · {listSize(list)} {tr('единиц', 'birlik')}</span></div>
+            <div>
+              <strong>{formatEventRange(list.reservation_start, list.reservation_end, locale, tr)}</strong>
+              <span>{list.list_mode === 'specific' ? tr('С серийными номерами', 'Seriya raqamlari bilan') : tr('Только модели', 'Faqat modellar')} · {listSize(list)} {tr('единиц', 'birlik')}</span>
+              {/* Реквизиты показываем только заполненные: у старых списков их нет, и пустая
+                  строка-заглушка сообщала бы о них больше, чем их отсутствие */}
+              {contacts && <span className="reservation-summary__meta">{contacts}</span>}
+              {list.description && <span className="reservation-summary__meta">{list.description}</span>}
+            </div>
           </div>
         </div>
 
@@ -506,10 +521,8 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
             <p className="availability-warning"><CircleAlert size={16} />{tr('Этот список сохранён как обычный документ. Учёт выдачи и возврата для него не включён.', 'Bu ro‘yxat oddiy hujjat sifatida saqlangan. Berish va qaytarish hisobi yoqilmagan.')}</p>
           ) : (
             <details className="tracking-details">
-            <summary><span><strong>{tr('Учёт выдачи и возврата', 'Berish va qaytarish hisobi')}</strong><small>{tr('Необязательно — открывайте только для складского учёта', 'Ixtiyoriy — faqat ombor hisobi uchun oching')}</small></span><ChevronRight size={18} /></summary>
+            <summary><span><strong>{tr('Выдача и возврат', 'Berish va qaytarish')}</strong><small>{tr('Подтвердить → выдать → принять возврат', 'Tasdiqlash → berish → qaytarishni qabul qilish')}</small></span><ChevronRight size={18} /></summary>
             <div className="tracking-details__body">
-              <div className="optional-tracking-note"><CircleAlert size={18} /><span><strong>{tr('Что это такое', 'Bu nima')}</strong><small>{tr('Здесь можно подтвердить комплект, отметить его выдачу и возврат. Для обычного списка и скачивания Excel этот раздел не нужен.', 'Bu yerda jamlanmani tasdiqlash, berish va qaytarishni belgilash mumkin. Oddiy ro‘yxat va Excel yuklash uchun bu bo‘lim kerak emas.')}</small></span></div>
-
               {hasTrackingWarning && <p className="availability-warning"><CircleAlert size={16} />{tr(
                 'Дополнительный складской учёт временно не обновился. Состав списка и Excel доступны как обычно.',
                 'Qo‘shimcha ombor hisobi vaqtincha yangilanmadi. Ro‘yxat tarkibi va Excel odatdagidek mavjud.',
@@ -517,15 +530,17 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
 
               {isTrackingLoading ? <div className="detail-skeleton" /> : shortages.length > 0 ? (
                 <section className="shortage-panel">
-                  <div><TriangleAlert size={19} /><span><strong>{tr('Есть прогнозируемая нехватка', 'Kutilayotgan yetishmovchilik bor')}</strong><small>{tr('Список можно подтвердить. Перед выдачей потребуется фактическое наличие.', 'Ro‘yxatni tasdiqlash mumkin. Berishdan oldin haqiqiy mavjudlik talab qilinadi.')}</small></span></div>
+                  <div><TriangleAlert size={19} /><span><strong>{tr('На дату мероприятия техники не хватает', 'Tadbir sanasida uskuna yetishmaydi')}</strong><small>{tr('Подтвердить можно; до выдачи нехватку нужно закрыть.', 'Tasdiqlash mumkin; berishdan oldin yetishmovchilikni yopish kerak.')}</small></span></div>
                   <ul>{shortages.map((item) => <li key={`${item.brand}-${item.model}-${item.type}-${item.subtype}`}><span>{item.brand} {item.model}</span><strong>−{item.shortage} {tr('шт.', 'dona')}</strong><small>{tr('нужно', 'kerak')} {item.requested}, {tr('доступно на даты', 'sanalarda mavjud')} {item.available}</small></li>)}</ul>
                 </section>
               ) : (
                 <div className="availability-ok"><PackageCheck size={18} /><span>{tr('По текущим данным комплект доступен на выбранные даты.', 'Joriy ma’lumotlarga ko‘ra jamlanma tanlangan sanalarda mavjud.')}</span></div>
               )}
 
-              {missingLegacyDates && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Исторический список без дат', 'Sanasiz tarixiy ro‘yxat')}</strong><br />{tr('Он сохранён без выдуманного периода. Для нового учёта создайте новый список.', 'U taxminiy davrsiz saqlangan. Yangi hisob uchun yangi ro‘yxat yarating.')}</p></div>}
-              {cannotIssuePlan && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Сначала назначьте конкретные единицы', 'Avval aniq birliklarni belgilang')}</strong><br />{tr('План по моделям можно подтвердить, но выдавать допустимо только фактический комплект.', 'Modellar bo‘yicha rejani tasdiqlash mumkin, ammo faqat haqiqiy jamlanmani berish mumkin.')}</p></div>}
+              {missingLegacyDates && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Список без даты мероприятия', 'Tadbir sanasisiz ro‘yxat')}</strong><br />{tr('Сохранён до появления учёта выдачи. Для выдачи и возврата соберите новый список с датой.', 'Berish hisobi paydo bo‘lgunga qadar saqlangan. Berish va qaytarish uchun sanasi bilan yangi ro‘yxat yig‘ing.')}</p></div>}
+              {/* Кнопки возврата в черновик нет намеренно: серверного перехода confirmed → draft
+                  пока не существует, и плашка говорит только то, что человек может сделать сейчас */}
+              {cannotIssuePlan && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Выдать нельзя: в списке только модели, без серийных номеров', 'Berib bo‘lmaydi: ro‘yxatda faqat modellar, seriya raqamlarisiz')}</strong><br />{tr('Подтверждённый список изменить нельзя — соберите новый с серийными номерами.', 'Tasdiqlangan ro‘yxatni o‘zgartirib bo‘lmaydi — seriya raqamlari bilan yangisini yig‘ing.')}</p></div>}
 
               {action && !missingLegacyDates && !cannotIssuePlan && (
                 <section className="transition-panel">
