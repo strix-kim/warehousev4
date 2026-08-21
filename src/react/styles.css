@@ -158,7 +158,6 @@ h2 { letter-spacing: -0.025em; }
 .app-select__popover { position: fixed; z-index: 70; max-height: min(330px, calc(100dvh - 24px)); padding: 6px; overflow-y: auto; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.98); box-shadow: 0 18px 46px rgba(15,22,28,.18), 0 2px 8px rgba(15,22,28,.08); backdrop-filter: blur(16px); animation: popover-in .16s ease-out; }
 .app-select__popover button { width: 100%; min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 0; border-radius: 7px; color: var(--ink-soft); background: transparent; font-size: 13px; font-weight: 650; text-align: left; }
 
-
 /* Меню действий. Внешний вид попапа общий с AppSelect, отличается содержимое
    пункта: иконка + название + подсказка в две строки, без галочки «выбрано». */
 .action-menu { position: relative; }
@@ -567,48 +566,13 @@ h2 { letter-spacing: -0.025em; }
 .saved-list-delete--open strong { font-size: 13px; }
 .saved-list-delete--open small { color: var(--ink-soft); font-size: 12px; line-height: 1.45; }
 .saved-list-delete__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-.tracking-details { margin-top: 12px; border: 1px solid var(--line); border-radius: 11px; background: #fff; overflow: hidden; }
-.reservation-drawer__footer .tracking-details { margin-top: 0; }
-.reservation-drawer__footer .tracking-details__body { max-height: min(43dvh, 410px); overflow-y: auto; overscroll-behavior: contain; }
-.tracking-details > summary { min-height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 15px; cursor: pointer; list-style: none; }
-.tracking-details > summary::-webkit-details-marker { display: none; }
-.tracking-details > summary > span { display: flex; flex-direction: column; gap: 4px; }
-.tracking-details > summary strong { color: var(--ink); font-size: 13px; }
-.tracking-details > summary small { color: var(--ink-faint); font-size: 11px; line-height: 1.4; }
-.tracking-details > summary > svg { flex: 0 0 auto; color: var(--ink-faint); transition: transform .18s ease; }
-.tracking-details[open] > summary { border-bottom: 1px solid var(--line); background: var(--surface-soft); }
-.tracking-details[open] > summary > svg { transform: rotate(90deg); }
-.tracking-details__body { padding: 14px; }
 .editor-open-error { margin-bottom: 18px; border: 1px solid #efc6c6; border-radius: var(--radius-md); }
 .editor-draft-notice { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-soft); }
 .editor-draft-notice > svg { flex: 0 0 auto; color: var(--accent); }
 .editor-draft-notice > span { display: flex; flex: 1 1 auto; flex-direction: column; gap: 3px; min-width: 0; }
 .editor-draft-notice strong { font-size: 13px; }
 .editor-draft-notice small { color: var(--ink-faint); font-size: 12px; line-height: 1.45; }
-.shortage-panel { margin-bottom: 14px; border: 1px solid #f0d99d; border-radius: 10px; background: #fffaf0; overflow: hidden; }
-.shortage-panel > div { display: flex; gap: 10px; padding: 13px; color: var(--warning); }
-.shortage-panel > div svg { flex: 0 0 auto; }
-.shortage-panel > div span { display: flex; flex-direction: column; gap: 3px; }
-.shortage-panel > div strong { font-size: 13px; }
-.shortage-panel > div small { color: #826d4a; font-size: 12px; line-height: 1.5; }
-.shortage-panel ul { margin: 0; padding: 0; list-style: none; background: #fff; }
-.shortage-panel li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; padding: 10px 13px; border-top: 1px solid #f2e7c9; font-size: 12px; }
-.shortage-panel li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.shortage-panel li > strong { color: var(--danger); }
-.shortage-panel li > small { grid-column: 1 / -1; color: var(--ink-faint); }
-.availability-ok { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; padding: 12px 13px; border-radius: 9px; color: var(--success); background: var(--success-bg); font-size: 12px; font-weight: 700; }
 .detail-skeleton { height: 58px; margin-bottom: 14px; border-radius: 9px; background: linear-gradient(90deg, #f0f2ef 25%, #f7f8f6 50%, #f0f2ef 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
-.transition-panel { margin: 15px 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; }
-.transition-panel > div > strong { font-size: 14px; }
-.transition-panel > div > p { margin: 5px 0 14px; color: var(--ink-soft); font-size: 12px; line-height: 1.55; }
-.transition-panel .field { margin-bottom: 12px; }
-/* Тот же блок, но в футере первым и всегда развёрнутым: это текущий шаг, а не
-   «необязательная» подробность, поэтому он выделен фоном и отбит от остального. */
-.transition-panel--primary { margin: 0 0 12px; border-color: var(--line-strong); background: var(--surface-soft); }
-.transition-panel--primary > div > p { margin-bottom: 12px; }
-.transition-panel--primary .availability-warning { margin-bottom: 12px; }
-.transition-panel__note-toggle { display: flex; align-items: center; gap: 7px; min-height: 34px; margin-bottom: 12px; padding: 0; border: 0; color: var(--ink-soft); background: none; font-size: 12px; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
-.transition-panel__note-toggle svg { color: var(--ink-faint); }
 .history-section { margin-top: 22px; border-top: 1px solid var(--line); }
 .history-section .panel-heading { padding-inline: 0; }
 .history-section .panel-heading h3 { margin: 0 0 3px; font-size: 16px; }
@@ -837,7 +801,6 @@ h2 { letter-spacing: -0.025em; }
   .reservation-drawer__top { padding: 20px 18px 0; }
   .reservation-drawer__body { padding: 0 18px 14px; }
   .reservation-drawer__footer { padding: 12px 18px max(14px, env(safe-area-inset-bottom)); }
-  .reservation-drawer__footer .tracking-details__body { max-height: 38dvh; }
   .list-card__actions .button { min-width: 0; }
   .login-page { display: block; }
   .login-brand-panel { min-height: 210px; padding: 25px; }

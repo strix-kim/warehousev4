@@ -95,7 +95,6 @@ function AppShell() {
         listsApi.fetchEquipmentLists({
           page: 1,
           search: '',
-          status: 'all',
           // Тот же довод, что и у каталога: размер страницы входит в ключ кэша,
           // и прогрев обязан спросить его у самой фичи.
           pageSize: listsApi.preferredListsPageSize(),

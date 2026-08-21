@@ -6,16 +6,10 @@ import {
   Download,
   FileSpreadsheet,
   FileCheck2,
-  FolderOpen,
-  MessageSquarePlus,
-  PackageCheck,
   PencilLine,
   Plus,
-  RotateCcw,
   Search,
-  SlidersHorizontal,
   Trash2,
-  TriangleAlert,
   X,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -31,21 +25,13 @@ import {
   buildSavedListComposition,
   deleteEquipmentList,
   fetchEquipmentLists,
-  fetchReservationHistory,
-  fetchReservationShortages,
   LIST_DELETE_FORBIDDEN,
   prefetchSavedListDetails,
   preferredListsPageSize,
-  readCachedReservationHistory,
-  readCachedReservationShortages,
   readCachedEquipmentLists,
   readCachedEquipmentListsMeta,
   readCachedSavedListComposition,
-  transitionEquipmentList,
   type EquipmentList,
-  type ReservationHistory,
-  type ReservationShortage,
-  type ReservationStatus,
   type SavedListComposition,
 } from './api'
 import { useLanguage } from '../../lib/i18n'
@@ -57,7 +43,7 @@ type Tr = (ru: string, uz: string) => string
 // Причина отказа в деталях списка. Код, а не готовая строка: строка потянула бы
 // tr в зависимости эффекта загрузки, и смена языка перезапрашивала бы состав,
 // историю и дефицит.
-type DrawerErrorCode = '' | 'composition' | 'issue-shortage' | 'transition' | 'delete' | 'delete-forbidden'
+type DrawerErrorCode = '' | 'composition' | 'delete' | 'delete-forbidden'
 
 const emptyComposition: SavedListComposition = { rows: [], missingUnits: 0 }
 
@@ -67,11 +53,6 @@ function getDrawerErrorMessage(code: DrawerErrorCode, tr: Tr) {
       'Не удалось загрузить состав списка. Закройте детали и попробуйте открыть их ещё раз.',
       'Ro‘yxat tarkibini yuklab bo‘lmadi. Tafsilotlarni yoping va yana ochib ko‘ring.',
     )
-    case 'issue-shortage': return tr(
-      'Фактического оборудования уже недостаточно для выдачи. Резерв сохранён — скорректируйте комплект или остаток.',
-      'Berish uchun haqiqiy uskuna yetarli emas. Bandlov saqlandi — jamlanma yoki qoldiqni tuzating.',
-    )
-    case 'transition': return tr('Не удалось изменить этап. Данные не были изменены.', 'Bosqichni o‘zgartirib bo‘lmadi. Ma’lumotlar o‘zgartirilmadi.')
     // Отказ права и сбой сети разведены: «попробуйте ещё раз» на отказе RLS отправляет
     // человека жать кнопку, которая не сработает ни разу.
     case 'delete-forbidden': return tr(
@@ -80,23 +61,6 @@ function getDrawerErrorMessage(code: DrawerErrorCode, tr: Tr) {
     )
     case 'delete': return tr('Не удалось удалить список. Попробуйте ещё раз.', 'Ro‘yxatni o‘chirib bo‘lmadi. Qayta urinib ko‘ring.')
     default: return ''
-  }
-}
-
-function getStatusView(tr: Tr): Record<ReservationStatus, { label: string; tone: string }> {
-  return {
-    draft: { label: tr('Черновик', 'Qoralama'), tone: 'neutral' },
-    confirmed: { label: tr('Подтверждён', 'Tasdiqlangan'), tone: 'warning' },
-    issued: { label: tr('Выдан', 'Berilgan'), tone: 'danger' },
-    returned: { label: tr('Возвращён', 'Qaytarilgan'), tone: 'success' },
-  }
-}
-
-function getTransitionCopy(tr: Tr): Partial<Record<ReservationStatus, { target: ReservationStatus; label: string; description: string }>> {
-  return {
-    draft: { target: 'confirmed', label: tr('Подтвердить комплект', 'Jamlanmani tasdiqlash'), description: tr('Техника будет закреплена за списком на дату мероприятия. Если чего-то не хватает — покажем предупреждением, подтвердить это не помешает.', 'Uskunalar tadbir sanasida ro‘yxatga biriktiriladi. Nimadir yetishmasa — ogohlantirish ko‘rsatamiz, bu tasdiqlashga xalaqit bermaydi.') },
-    confirmed: { target: 'issued', label: tr('Отметить выдачу', 'Berishni belgilash'), description: tr('Техника уедет со склада: остаток уменьшится, серийные единицы получат статус «выдано».', 'Uskunalar ombordan chiqadi: qoldiq kamayadi, seriyali birliklar «berilgan» holatini oladi.') },
-    issued: { target: 'returned', label: tr('Принять возврат', 'Qaytarishni qabul qilish'), description: tr('Техника вернётся на склад и снова станет доступной для списков.', 'Uskunalar omborga qaytadi va yana ro‘yxatlar uchun mavjud bo‘ladi.') },
   }
 }
 
@@ -146,15 +110,13 @@ function formatCardDate(start: string | null, end: string | null, locale: string
 export function ListsPage() {
   const navigate = useNavigate()
   const { tr, locale, language } = useLanguage()
-  const statusView = getStatusView(tr)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(preferredListsPageSize)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState<'all' | ReservationStatus>('all')
   const [period, setPeriod] = useState<ListsPeriod>('all')
   const { from: periodFrom, to: periodTo } = getPeriodRange(period)
-  const [initialResult] = useState(() => readCachedEquipmentLists({ page: 1, search: '', status: 'all', pageSize }))
+  const [initialResult] = useState(() => readCachedEquipmentLists({ page: 1, search: '', pageSize }))
   const [rows, setRows] = useState<EquipmentList[]>(() => initialResult?.rows ?? [])
   const [total, setTotal] = useState(() => initialResult?.total ?? 0)
   const [isLoading, setIsLoading] = useState(() => !initialResult)
@@ -179,7 +141,7 @@ export function ListsPage() {
 
   // Поиск и фильтр теперь считает база, поэтому total — это счётчик ТЕКУЩЕЙ
   // выборки: без фильтров «всего», с фильтрами «найдено».
-  const isFiltered = Boolean(search) || status !== 'all' || period !== 'all'
+  const isFiltered = Boolean(search) || period !== 'all'
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   // Номер страницы зажимается на рендере: удалили единственный список второй
   // страницы — pageCount стал 1, а page остался 2, и панель показывала
@@ -210,24 +172,16 @@ export function ListsPage() {
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
-  useEffect(() => setPage(1), [status, period])
+  useEffect(() => setPage(1), [period])
 
-  // Открытый дровер держит СВОЮ копию строки, а смена этапа перезагружает список.
-  // Без пересадки на свежую строку человек, нажавший «Подтвердить комплект»,
-  // видел бы ту же кнопку и тот же бейдж — то есть решил бы, что не сработало.
-  // Зависимость только от rows: selected здесь пишется, и добавь мы его в
-  // зависимости, эффект гонялся бы сам за собой.
-  useEffect(() => {
-    setSelected((current) => (current ? rows.find((row) => row.id === current.id) ?? current : current))
-  }, [rows])
 
   useEffect(() => {
     let isCurrent = true
-    const cached = readCachedEquipmentLists({ page: currentPage, search, status, periodFrom, periodTo, pageSize })
+    const cached = readCachedEquipmentLists({ page: currentPage, search, periodFrom, periodTo, pageSize })
     // Возраст спрашиваем у кэша, а не считаем от момента ответа: запись обновляется
     // только на УСПЕШНОМ ответе, поэтому после сбоя сети здесь остаётся старая метка —
     // ровно то, что бейдж и должен показать.
-    const readAge = () => readCachedEquipmentListsMeta({ page: currentPage, search, status, periodFrom, periodTo, pageSize })?.touchedAt ?? null
+    const readAge = () => readCachedEquipmentListsMeta({ page: currentPage, search, periodFrom, periodTo, pageSize })?.touchedAt ?? null
     // Метка ДО запроса. Отказ сети не всегда доходит до .catch: при живой записи
     // в кэше cachedQuery подменяет провал последним значением и промис
     // РЕЗОЛВИТСЯ. Единственный честный признак «ответа с сервера не было» —
@@ -245,7 +199,7 @@ export function ListsPage() {
     // там, где исход запроса уже известен, — в .then и в .catch.
     setDataAt(null)
 
-    fetchEquipmentLists({ page: currentPage, search, status, periodFrom, periodTo, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
+    fetchEquipmentLists({ page: currentPage, search, periodFrom, periodTo, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
       .then((result) => {
         if (!isCurrent) return
         setIsFetching(false)
@@ -254,8 +208,9 @@ export function ListsPage() {
         const freshAge = readAge()
         setLastFetchFailed(freshAge !== null && freshAge === ageBefore)
         setDataAt(freshAge)
-        // Открытые детали переезжают на свежую строку: смена этапа и удаление
-        // возвращаются сюда через reloadKey.
+        // Открытые детали переезжают на свежую строку: правка и удаление
+        // возвращаются сюда через reloadKey. Строка исчезла — дровер закрывается
+        // сам, показывать состав удалённого списка нечестно.
         setSelected((current) => current ? result.rows.find((item) => item.id === current.id) ?? null : null)
       })
       .catch((error: unknown) => {
@@ -271,7 +226,7 @@ export function ListsPage() {
       .finally(() => { if (isCurrent) setIsLoading(false) })
 
     return () => { isCurrent = false }
-  }, [currentPage, pageSize, periodFrom, periodTo, reloadKey, search, status])
+  }, [currentPage, pageSize, periodFrom, periodTo, reloadKey, search])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -323,19 +278,6 @@ export function ListsPage() {
             <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder={tr('Название, заказчик или площадка…', 'Nomi, buyurtmachi yoki maydon…')} aria-label={tr('Поиск списков по названию, заказчику и площадке', 'Ro‘yxatlarni nomi, buyurtmachisi va maydoni bo‘yicha qidirish')} />
           </label>
           <AppSelect
-            value={status}
-            onChange={setStatus}
-            icon={<SlidersHorizontal size={17} />}
-            ariaLabel={tr('Статус списка', 'Ro‘yxat holati')}
-            options={[
-              { value: 'all', label: tr('Все этапы', 'Barcha bosqichlar') },
-              { value: 'draft', label: tr('Черновики', 'Qoralamalar') },
-              { value: 'confirmed', label: tr('Подтверждённые', 'Tasdiqlanganlar') },
-              { value: 'issued', label: tr('Выданные', 'Berilganlar') },
-              { value: 'returned', label: tr('Возвращённые', 'Qaytarilganlar') },
-            ]}
-          />
-          <AppSelect
             value={period}
             onChange={setPeriod}
             icon={<CalendarRange size={17} />}
@@ -363,16 +305,9 @@ export function ListsPage() {
             {isLoading && rows.length === 0
               ? Array.from({ length: 6 }, (_, index) => <div className="list-card list-card--loading" key={index} />)
               : rows.map((list) => {
-                  const lifecycle = list.advanced_features ? statusView[list.reservation_status] : { label: tr('Сохранён', 'Saqlangan'), tone: 'neutral' }
                   const isExporting = exporting?.id === list.id
                   // created_at в схеме nullable; поведение прежнее: пустое значение даёт эпоху
                   const createdAt = new Intl.DateTimeFormat(locale).format(new Date(list.created_at ?? 0))
-                  // Черновик продолжают собирать, а не разглядывают: первичная кнопка
-                  // ведёт его сразу в редактор. Детали при этом обязаны остаться
-                  // достижимыми и для него — только там живёт переход «Подтвердить
-                  // комплект», и без второй двери подтвердить список стало бы нечем.
-                  const isDraft = list.reservation_status === 'draft'
-                  const primaryAction = () => { if (isDraft) navigate(`/lists/${list.id}/edit`); else setSelected(list) }
                   const isEmpty = listSize(list) === 0
                   return (
                     <article
@@ -388,12 +323,11 @@ export function ListsPage() {
                           <p className="list-card__date">{formatCardDate(list.reservation_start, list.reservation_end, locale, tr)}</p>
                           <p className="list-card__client">{[list.client_name, list.venue].filter(Boolean).join(' · ') || tr('Заказчик не указан', 'Buyurtmachi ko‘rsatilmagan')}</p>
                         </div>
-                        <span className={`badge badge--${lifecycle.tone}`}><i />{lifecycle.label}</span>
                       </div>
                       <div>
                         {/* Название — вторичная строка, и одновременно вход в детали:
                             его псевдоэлемент растянут на карточку, поэтому «клик куда
-                            угодно» открывает состав, историю и этапы. */}
+                            угодно» открывает состав документа. */}
                         <h3><button type="button" className="list-card__title" onClick={() => setSelected(list)}>{list.name}</button></h3>
                         {list.description && <p className="list-card__description">{list.description}</p>}
                       </div>
@@ -403,8 +337,8 @@ export function ListsPage() {
                         <span>{tr(`создан ${createdAt}`, `${createdAt} yaratilgan`)}</span>
                       </div>
                       <div className="list-card__actions">
-                        <button className="button button--primary list-card__open" onClick={primaryAction}>
-                          {isDraft ? <><PencilLine size={16} /> {tr('Изменить', 'O‘zgartirish')}</> : <><FolderOpen size={16} /> {tr('Открыть', 'Ochish')}</>}
+                        <button className="button button--primary list-card__open" onClick={() => navigate(`/lists/${list.id}/edit`)}>
+                          <PencilLine size={16} /> {tr('Изменить', 'O‘zgartirish')}
                         </button>
                         <ActionMenu
                           className="list-card__export"
@@ -468,95 +402,29 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   const navigate = useNavigate()
   const { tr, locale, language } = useLanguage()
   useModalLayer(onClose)
-  const statusView = getStatusView(tr)
-  const transitionCopy = getTransitionCopy(tr)
-  const [shortages, setShortages] = useState<ReservationShortage[]>(() => readCachedReservationShortages(list.id) ?? [])
-  const [history, setHistory] = useState<ReservationHistory[]>(() => readCachedReservationHistory(list.id) ?? [])
   const [composition, setComposition] = useState<SavedListComposition>(() => readCachedSavedListComposition(list.id) ?? emptyComposition)
-  const [note, setNote] = useState('')
-  // Комментарий к переходу свёрнут: он необязателен, а развёрнутое поле на два
-  // ряда отодвигало бы саму кнопку этапа за сгиб — ровно то, из-за чего переход
-  // и был незаметен.
-  const [noteOpen, setNoteOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(() => readCachedSavedListComposition(list.id) === null)
-  const [isTrackingLoading, setIsTrackingLoading] = useState(() => {
-    if (!list.advanced_features) return false
-    const hasHistory = readCachedReservationHistory(list.id) !== null
-    const hasShortages = !list.reservation_start || !list.reservation_end || readCachedReservationShortages(list.id) !== null
-    return !hasHistory || !hasShortages
-  })
-  const [isTransitioning, setIsTransitioning] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState<DrawerErrorCode>('')
-  const [hasTrackingWarning, setHasTrackingWarning] = useState(false)
-  const action = list.advanced_features ? transitionCopy[list.reservation_status] : undefined
-  const lifecycle = statusView[list.reservation_status]
   const contacts = [list.client_name, list.venue].filter(Boolean).join(' · ')
-  const cannotIssuePlan = list.reservation_status === 'confirmed' && list.list_mode === 'abstract'
-  const missingLegacyDates = list.reservation_status === 'draft' && (!list.reservation_start || !list.reservation_end)
 
   async function loadDetails() {
-    const cachedComposition = readCachedSavedListComposition(list.id)
-    const cachedHistory = list.advanced_features ? readCachedReservationHistory(list.id) : []
-    const needsShortages = Boolean(list.advanced_features && list.reservation_start && list.reservation_end)
-    const cachedShortages = needsShortages ? readCachedReservationShortages(list.id) : []
-    if (cachedComposition !== null) setComposition(cachedComposition)
-    if (cachedHistory !== null) setHistory(cachedHistory)
-    if (cachedShortages !== null) setShortages(cachedShortages)
-    setIsLoading(cachedComposition === null)
-    setIsTrackingLoading(cachedHistory === null || cachedShortages === null)
+    const cached = readCachedSavedListComposition(list.id)
+    if (cached !== null) setComposition(cached)
+    setIsLoading(cached === null)
     setError('')
-    setHasTrackingWarning(false)
-    const trackingRequest = Promise.allSettled([
-      list.advanced_features ? fetchReservationHistory(list.id, { bypassCache: cachedHistory !== null }) : Promise.resolve([]),
-      needsShortages ? fetchReservationShortages(list.id, { bypassCache: cachedShortages !== null }) : Promise.resolve([]),
-    ])
-
     try {
-      setComposition(await buildSavedListComposition(list, { bypassCache: cachedComposition !== null }))
+      setComposition(await buildSavedListComposition(list, { bypassCache: cached !== null }))
     } catch {
-      if (cachedComposition === null) setComposition(emptyComposition)
+      if (cached === null) setComposition(emptyComposition)
       setError('composition')
     } finally {
       setIsLoading(false)
     }
-
-    const [historyResult, shortagesResult] = await trackingRequest
-
-    if (historyResult.status === 'fulfilled') setHistory(historyResult.value)
-    else setHistory([])
-
-    if (shortagesResult.status === 'fulfilled') setShortages(shortagesResult.value)
-    else setShortages([])
-
-    if (historyResult.status === 'rejected' || shortagesResult.status === 'rejected') {
-      setHasTrackingWarning(true)
-    }
-
-    setIsTrackingLoading(false)
   }
 
-  useEffect(() => { void loadDetails() }, [list.id, list.reservation_status])
-
-  async function runTransition() {
-    if (!action || cannotIssuePlan || missingLegacyDates) return
-    setIsTransitioning(true)
-    setError('')
-    try {
-      await transitionEquipmentList(list.id, action.target, note)
-      // Комментарий описывал ПРОШЕДШИЙ шаг: оставить его в поле — значит
-      // приклеить к следующему переходу чужой текст.
-      setNote('')
-      setNoteOpen(false)
-      onChanged()
-    } catch (transitionError) {
-      const message = transitionError instanceof Error ? transitionError.message : ''
-      setError(message.includes('physically available') || message.includes('shortage') ? 'issue-shortage' : 'transition')
-    } finally {
-      setIsTransitioning(false)
-    }
-  }
+  useEffect(() => { void loadDetails() }, [list.id])
 
   async function runDelete() {
     setIsDeleting(true)
@@ -577,10 +445,9 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
       <aside className="drawer reservation-drawer" onMouseDown={(event) => event.stopPropagation()}>
         <div className="reservation-drawer__top">
           <div className="drawer__header">
-            <div><p className="eyebrow">{tr('Детали списка', 'Ro‘yxat tafsilotlari')}</p><h2>{list.name}</h2><p className="drawer__lead">{tr('Состав, доступность и необязательный учёт выдачи', 'Tarkib, mavjudlik va ixtiyoriy berish hisobi')}</p></div>
+            <div><p className="eyebrow">{tr('Детали списка', 'Ro‘yxat tafsilotlari')}</p><h2>{list.name}</h2><p className="drawer__lead">{tr('Состав списка и реквизиты документа', 'Ro‘yxat tarkibi va hujjat rekvizitlari')}</p></div>
             <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
           </div>
-          <span className={`badge badge--${lifecycle.tone}`}><i />{lifecycle.label}</span>
           <div className="reservation-summary">
             <CalendarRange size={19} />
             <div>
@@ -620,77 +487,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
         </div>
 
         <div className="reservation-drawer__footer">
-          {/* Текущий шаг жизненного цикла — первым и всегда развёрнутым. До волны 2
-              он лежал внутри свёрнутого «Необязательно…» с собственной прокруткой:
-              тот, кто пришёл выдавать комплект, читал подпись как «не сюда». */}
-          {action && !missingLegacyDates && !cannotIssuePlan && (
-            <section className="transition-panel transition-panel--primary">
-              <div><strong>{action.label}</strong><p>{action.description}</p></div>
-              {/* Дефицит подробно разобран в «Подробностях учёта», но одной строкой
-                  он обязан быть здесь: иначе подтверждают вслепую. */}
-              {shortages.length > 0 && (
-                <p className="availability-warning"><TriangleAlert size={16} />{tr(
-                  `На дату мероприятия не хватает позиций: ${shortages.length}. Подробности — ниже.`,
-                  `Tadbir sanasida yetishmayotgan pozitsiyalar: ${shortages.length}. Tafsilotlar — quyida.`,
-                )}</p>
-              )}
-              {noteOpen ? (
-                <label className="field"><span>{tr('Комментарий к смене статуса (необязательно)', 'Holat o‘zgarishiga izoh (ixtiyoriy)')}</span><textarea autoFocus value={note} onChange={(event) => setNote(event.target.value)} rows={2} placeholder={tr('Например: выдал Алексей, комплект проверен', 'Masalan: Aleksey berdi, jamlanma tekshirildi')} /></label>
-              ) : (
-                <button type="button" className="transition-panel__note-toggle" onClick={() => setNoteOpen(true)}><MessageSquarePlus size={15} />{tr('Добавить комментарий', 'Izoh qo‘shish')}</button>
-              )}
-              <button className="button button--primary button--wide" onClick={() => void runTransition()} disabled={isTransitioning}>
-                {action.target === 'returned' ? <RotateCcw size={17} /> : <PackageCheck size={17} />}
-                {isTransitioning ? tr('Обновляем…', 'Yangilanmoqda…') : action.label}
-              </button>
-            </section>
-          )}
-
-          {/* Плашки «почему действия нет» — сразу под тем местом, где действие ожидали */}
-          {missingLegacyDates && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Список без даты мероприятия', 'Tadbir sanasisiz ro‘yxat')}</strong><br />{tr('Сохранён до появления учёта выдачи. Для выдачи и возврата соберите новый список с датой.', 'Berish hisobi paydo bo‘lgunga qadar saqlangan. Berish va qaytarish uchun sanasi bilan yangi ro‘yxat yig‘ing.')}</p></div>}
-          {/* Кнопки возврата в черновик нет намеренно: серверного перехода confirmed → draft
-              пока не существует, и плашка говорит только то, что человек может сделать сейчас */}
-          {cannotIssuePlan && <div className="drawer__notice"><CircleAlert size={18} /><p><strong>{tr('Выдать нельзя: в списке только модели, без серийных номеров', 'Berib bo‘lmaydi: ro‘yxatda faqat modellar, seriya raqamlarisiz')}</strong><br />{tr('Подтверждённый список изменить нельзя — соберите новый с серийными номерами.', 'Tasdiqlangan ro‘yxatni o‘zgartirib bo‘lmaydi — seriya raqamlari bilan yangisini yig‘ing.')}</p></div>}
-
-          {list.reservation_status === 'draft' && (
-            <button className="button button--secondary button--wide saved-list-edit" onClick={() => navigate(`/lists/${list.id}/edit`)}><PencilLine size={17} />{tr('Открыть и изменить список', 'Ro‘yxatni ochish va o‘zgartirish')}</button>
-          )}
-
-          {!list.advanced_features ? (
-            <p className="availability-warning"><CircleAlert size={16} />{tr('Этот список сохранён как обычный документ. Учёт выдачи и возврата для него не включён.', 'Bu ro‘yxat oddiy hujjat sifatida saqlangan. Berish va qaytarish hisobi yoqilmagan.')}</p>
-          ) : (
-            <details className="tracking-details">
-            <summary><span><strong>{tr('Подробности учёта', 'Hisob tafsilotlari')}</strong><small>{tr('Доступность на дату и история статусов', 'Sanadagi mavjudlik va holatlar tarixi')}</small></span><ChevronRight size={18} /></summary>
-            <div className="tracking-details__body">
-              {hasTrackingWarning && <p className="availability-warning"><CircleAlert size={16} />{tr(
-                'Дополнительный складской учёт временно не обновился. Состав списка и Excel доступны как обычно.',
-                'Qo‘shimcha ombor hisobi vaqtincha yangilanmadi. Ro‘yxat tarkibi va Excel odatdagidek mavjud.',
-              )}</p>}
-
-              {isTrackingLoading ? <div className="detail-skeleton" /> : shortages.length > 0 ? (
-                <section className="shortage-panel">
-                  <div><TriangleAlert size={19} /><span><strong>{tr('На дату мероприятия техники не хватает', 'Tadbir sanasida uskuna yetishmaydi')}</strong><small>{tr('Подтвердить можно; до выдачи нехватку нужно закрыть.', 'Tasdiqlash mumkin; berishdan oldin yetishmovchilikni yopish kerak.')}</small></span></div>
-                  <ul>{shortages.map((item) => <li key={`${item.brand}-${item.model}-${item.type}-${item.subtype}`}><span>{item.brand} {item.model}</span><strong>−{item.shortage} {tr('шт.', 'dona')}</strong><small>{tr('нужно', 'kerak')} {item.requested}, {tr('доступно на даты', 'sanalarda mavjud')} {item.available}</small></li>)}</ul>
-                </section>
-              ) : (
-                <div className="availability-ok"><PackageCheck size={18} /><span>{tr('По текущим данным комплект доступен на выбранные даты.', 'Joriy ma’lumotlarga ko‘ra jamlanma tanlangan sanalarda mavjud.')}</span></div>
-              )}
-
-              <section className="history-section">
-                <div className="panel-heading"><div><h3>{tr('История выдачи и возврата', 'Berish va qaytarish tarixi')}</h3><p>{tr('Изменения статуса и комментарии сотрудников', 'Holat o‘zgarishlari va xodim izohlari')}</p></div></div>
-                <div className="timeline">
-                  {history.map((entry) => (
-                    <div className="timeline__item" key={entry.id}>
-                      <i />
-                      <div><strong>{statusView[entry.to_status].label}</strong><span>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(entry.changed_at))}</span>{entry.note && <p>{entry.note}</p>}</div>
-                    </div>
-                  ))}
-                  {!isTrackingLoading && history.length === 0 && <p className="muted">{tr('История пока пуста.', 'Tarix hozircha bo‘sh.')}</p>}
-                </div>
-              </section>
-            </div>
-            </details>
-          )}
+          <button className="button button--primary button--wide saved-list-edit" onClick={() => navigate(`/lists/${list.id}/edit`)}><PencilLine size={17} />{tr('Открыть и изменить список', 'Ro‘yxatni ochish va o‘zgartirish')}</button>
 
           <section className={`saved-list-delete ${deleteConfirmOpen ? 'saved-list-delete--open' : ''}`}>
           {!deleteConfirmOpen ? (
@@ -703,7 +500,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
                 <Trash2 size={19} />
                 <span>
                   <strong>{tr('Удалить этот список?', 'Bu ro‘yxat o‘chirilsinmi?')}</strong>
-                  <small>{tr('Список, его резерв и история будут удалены без возможности восстановления.', 'Ro‘yxat, uning bandlovi va tarixi qayta tiklash imkonisiz o‘chiriladi.')}</small>
+                  <small>{tr('Список будет удалён без возможности восстановления.', 'Ro‘yxat qayta tiklash imkonisiz o‘chiriladi.')}</small>
                 </span>
               </div>
               <div className="saved-list-delete__actions">

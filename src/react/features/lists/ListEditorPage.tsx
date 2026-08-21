@@ -57,7 +57,7 @@ type SelectedGroup = {
 // Причина отказа при открытии сохранённого списка. Держим кодом, а не готовой
 // строкой: строка потянула бы tr в зависимости эффекта, и смена языка
 // перезапрашивала бы список из базы.
-type OpenErrorCode = '' | 'not-draft' | 'failed'
+type OpenErrorCode = '' | 'failed'
 
 // Высота липкой полосы табов на телефоне (8 сверху + кнопка 44 + 4 снизу + рамка 1).
 // Держится в паре с .mobile-editor-tabs и .quick-catalog-toolbar в styles.css:
@@ -118,7 +118,7 @@ export function ListEditorPage() {
   const [hasLoadError, setHasLoadError] = useState(false)
   const [openError, setOpenError] = useState<OpenErrorCode>('')
   const [isOpening, setIsOpening] = useState(Boolean(listId && !cachedList))
-  const [listToEdit, setListToEdit] = useState<EquipmentList | null>(() => cachedList?.reservation_status === 'draft' ? cachedList : null)
+  const [listToEdit, setListToEdit] = useState<EquipmentList | null>(() => cachedList ?? null)
   const [saveError, setSaveError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   // Незаполненные реквизиты, на которые указала попытка собрать документ на
@@ -185,23 +185,18 @@ export function ListEditorPage() {
     }
     let current = true
     const cached = readCachedEquipmentList(listId)
-    if (cached?.reservation_status === 'draft') setListToEdit(cached)
+    if (cached) setListToEdit(cached)
     setIsOpening(!cached)
     setOpenError('')
     fetchEquipmentList(listId, { bypassCache: Boolean(cached) })
       .then((list) => {
         if (!current) return
-        if (list.reservation_status !== 'draft') throw new Error('not-draft')
         setListToEdit(list)
       })
-      .catch((error) => {
+      .catch(() => {
         if (!current) return
-        if (error instanceof Error && error.message === 'not-draft') {
-          setListToEdit(null)
-          setOpenError('not-draft')
-          return
-        }
-        if (cached?.reservation_status === 'draft') return
+        // Живой кэш уже показан — сбой обновления не повод рушить открытый редактор.
+        if (cached) return
         setOpenError('failed')
       })
       .finally(() => { if (current) setIsOpening(false) })
@@ -649,9 +644,7 @@ export function ListEditorPage() {
         <div className="editor-header__actions">{actionButtons}</div>
       </header>
 
-      {openError && <div className="state-block state-block--error editor-open-error"><CircleAlert size={23} /><strong>{tr('Список не открыт', 'Ro‘yxat ochilmadi')}</strong><span>{openError === 'not-draft'
-        ? tr('Изменять можно только черновики. Подтверждённый или выданный список доступен в режиме просмотра.', 'Faqat qoralamalarni o‘zgartirish mumkin. Tasdiqlangan yoki berilgan ro‘yxat faqat ko‘rish rejimida mavjud.')
-        : tr('Не удалось открыть сохранённый список.', 'Saqlangan ro‘yxatni ochib bo‘lmadi.')}</span><button className="button button--secondary" onClick={() => navigate('/lists')}>{tr('Вернуться к спискам', 'Ro‘yxatlarga qaytish')}</button></div>}
+      {openError && <div className="state-block state-block--error editor-open-error"><CircleAlert size={23} /><strong>{tr('Список не открыт', 'Ro‘yxat ochilmadi')}</strong><span>{tr('Не удалось открыть сохранённый список.', 'Saqlangan ro‘yxatni ochib bo‘lmadi.')}</span><button className="button button--secondary" onClick={() => navigate('/lists')}>{tr('Вернуться к спискам', 'Ro‘yxatlarga qaytish')}</button></div>}
 
       {draftNotice && (
         <div className="editor-draft-notice">

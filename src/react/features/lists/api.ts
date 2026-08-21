@@ -9,8 +9,6 @@ import type { Equipment } from '../equipment/types'
 import { LIST_DRAFT_CACHE_KEY, LIST_DRAFT_TTL_MS, listCompositionCacheKey } from './cacheKeys'
 import type { ExportListRow } from './xlsxExport'
 
-export type ReservationStatus = 'draft' | 'confirmed' | 'issued' | 'returned'
-
 export type EquipmentListItem = Pick<Equipment, 'brand' | 'model' | 'type' | 'subtype'> & {
   count: number
   equipment_id?: string
@@ -23,64 +21,29 @@ type EquipmentListRow = Pick<
   Tables<'equipment_lists'>,
   'id' | 'name' | 'description' | 'client_name' | 'venue' | 'type' | 'list_mode'
   | 'equipment_ids' | 'equipment_items' | 'created_at' | 'is_archived'
-  | 'reservation_status' | 'reservation_start' | 'reservation_end' | 'shortage_snapshot'
+  | 'reservation_start' | 'reservation_end'
 >
 
-// Набор колонок старой схемы: полей брони в ней ещё нет.
+// Набор колонок старой схемы: реквизитов заказчика в ней ещё нет.
 type LegacyEquipmentListRow = Pick<
   Tables<'equipment_lists'>,
   'id' | 'name' | 'description' | 'type' | 'list_mode' | 'equipment_ids'
   | 'equipment_items' | 'created_at' | 'is_archived'
 >
 
-// Доменный список: строка базы, где текстовые статусы под CHECK и jsonb-колонки
-// сужены до наших типов, плюс advanced_features — вычисляемый клиентом признак
-// того, что схема отдала колонки брони.
+// Доменный список: строка базы, где текстовый list_mode под CHECK и jsonb-колонка
+// состава сужены до наших типов.
 export type EquipmentList = Omit<
   EquipmentListRow,
-  'list_mode' | 'reservation_status' | 'equipment_items' | 'shortage_snapshot'
+  'list_mode' | 'equipment_items'
 > & {
   list_mode: 'specific' | 'abstract'
-  reservation_status: ReservationStatus
   equipment_items: EquipmentListItem[] | null
-  shortage_snapshot: ReservationShortage[] | null
-  advanced_features: boolean
 }
 
-export type ReservationShortage = {
-  brand: string
-  model: string
-  type: string
-  subtype: string
-  requested: number
-  capacity: number
-  reserved: number
-  available: number
-  specific_conflicts: number
-  shortage: number
-}
-
-// Колонки reservation_status_history, которые читает интерфейс.
-type ReservationHistoryRow = Pick<
-  Tables<'reservation_status_history'>,
-  'id' | 'from_status' | 'to_status' | 'note' | 'shortage_snapshot' | 'changed_at'
->
-
-// Статусы в журнале так же лежат текстом под CHECK, а снимок дефицита — в jsonb.
-export type ReservationHistory = Omit<
-  ReservationHistoryRow,
-  'from_status' | 'to_status' | 'shortage_snapshot'
-> & {
-  from_status: ReservationStatus | null
-  to_status: ReservationStatus
-  shortage_snapshot: ReservationShortage[] | null
-}
-
-const listColumns = 'id,name,description,client_name,venue,type,list_mode,equipment_ids,equipment_items,created_at,is_archived,reservation_status,reservation_start,reservation_end,shortage_snapshot'
+const listColumns = 'id,name,description,client_name,venue,type,list_mode,equipment_ids,equipment_items,created_at,is_archived,reservation_start,reservation_end'
 
 const legacyListColumns = 'id,name,description,type,list_mode,equipment_ids,equipment_items,created_at,is_archived'
-
-const reservationStatuses: ReservationStatus[] = ['draft', 'confirmed', 'issued', 'returned']
 
 // Коды, которые означают ровно одно: в базе НЕТ того, что мы просим, — таблицы
 // (PGRST205, 42P01) или колонки (PGRST204, 42703). Только они разрешают повтор
@@ -117,12 +80,8 @@ export function preferredListsPageSize() {
   return window.matchMedia(MOBILE_MEDIA_QUERY).matches ? MOBILE_LISTS_PAGE_SIZE : LISTS_PAGE_SIZE
 }
 
-// list_mode и reservation_status держит CHECK в базе, но в схеме это обычный text —
-// сужаем на входе, чтобы дальше по коду ходил доменный тип.
-function toReservationStatus(value: string): ReservationStatus {
-  return reservationStatuses.find((status) => status === value) ?? 'draft'
-}
-
+// list_mode держит CHECK в базе, но в схеме это обычный text — сужаем на входе,
+// чтобы дальше по коду ходил доменный тип.
 function toListMode(value: string | null): 'specific' | 'abstract' {
   return value === 'abstract' ? 'abstract' : 'specific'
 }
@@ -133,32 +92,16 @@ function toEquipmentListItems(value: Json): EquipmentListItem[] | null {
   return Array.isArray(value) ? (value as EquipmentListItem[]) : null
 }
 
-function toReservationShortages(value: Json): ReservationShortage[] | null {
-  return Array.isArray(value) ? (value as ReservationShortage[]) : null
-}
-
 function normalizeList(row: EquipmentListRow): EquipmentList {
   return {
     ...row,
     list_mode: toListMode(row.list_mode),
-    reservation_status: toReservationStatus(row.reservation_status),
     equipment_items: toEquipmentListItems(row.equipment_items),
-    shortage_snapshot: toReservationShortages(row.shortage_snapshot),
-    advanced_features: true,
   }
 }
 
-function normalizeHistoryEntry(row: ReservationHistoryRow): ReservationHistory {
-  return {
-    ...row,
-    from_status: row.from_status === null ? null : toReservationStatus(row.from_status),
-    to_status: toReservationStatus(row.to_status),
-    shortage_snapshot: toReservationShortages(row.shortage_snapshot),
-  }
-}
-
-// Старая схема без колонок брони: недостающие поля добираем теми же значениями,
-// что подставлял фолбэк раньше.
+// Старая схема без реквизитов и дат: недостающие поля добираем теми же
+// значениями, что подставлял фолбэк раньше.
 function normalizeLegacyList(row: LegacyEquipmentListRow): EquipmentList {
   return {
     ...row,
@@ -166,18 +109,14 @@ function normalizeLegacyList(row: LegacyEquipmentListRow): EquipmentList {
     equipment_items: toEquipmentListItems(row.equipment_items),
     client_name: null,
     venue: null,
-    reservation_status: 'draft',
     reservation_start: null,
     reservation_end: null,
-    shortage_snapshot: null,
-    advanced_features: false,
   }
 }
 
 export type EquipmentListsQuery = {
   page?: number
   search?: string
-  status?: 'all' | ReservationStatus
   // Период приходит готовыми границами (YYYY-MM-DD), а не названием («этот
   // месяц»): название в ключе кэша означало бы, что первого числа страница
   // покажет прошлый месяц под видом текущего — границы же меняются сами и
@@ -197,8 +136,8 @@ export type EquipmentListsPage = {
 
 type NormalizedListsQuery = Required<Omit<EquipmentListsQuery, 'bypassCache'>>
 
-function normalizeListsQuery({ page = 1, search = '', status = 'all', periodFrom = '', periodTo = '', pageSize = LISTS_PAGE_SIZE }: EquipmentListsQuery): NormalizedListsQuery {
-  return { page, search: search.trim(), status, periodFrom, periodTo, pageSize }
+function normalizeListsQuery({ page = 1, search = '', periodFrom = '', periodTo = '', pageSize = LISTS_PAGE_SIZE }: EquipmentListsQuery): NormalizedListsQuery {
+  return { page, search: search.trim(), periodFrom, periodTo, pageSize }
 }
 
 // Ключ остаётся под префиксом `equipment-lists:` — его целиком сбрасывает любая
@@ -221,7 +160,7 @@ export async function fetchEquipmentLists(query: EquipmentListsQuery = {}): Prom
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
   const normalized = normalizeListsQuery(query)
-  const { page, search, status, periodFrom, periodTo, pageSize } = normalized
+  const { page, search, periodFrom, periodTo, pageSize } = normalized
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
   const namePattern = search ? `%${escapeLikePattern(search)}%` : ''
@@ -233,16 +172,11 @@ export async function fetchEquipmentLists(query: EquipmentListsQuery = {}): Prom
 
   return cachedQuery(equipmentListsCacheKey(normalized), 10 * 60 * 1000, () => withLegacySchemaFallback(async (schema) => {
     if (schema === 'legacy') {
-      // В старой схеме нет ни reservation_status, ни client_name/venue, ни
-      // reservation_start: поиск остаётся по одному названию, а этап и период
-      // разбираем здесь. normalizeLegacyList помечает ВСЕ такие строки
-      // черновиком, поэтому «все этапы» и «черновики» пропускают выборку как
-      // есть, а любой другой этап заведомо пуст — и страница, и счётчик.
-      // Период пуст всегда: дата мероприятия там NULL, а NULL не попадает ни в
-      // один период — то же правило, что и в современной ветке. Отдать вместо
-      // этого невыбранную выборку было бы ложью: человек спросил месяц.
-      // Фильтровать после .range() нельзя: страницы разъехались бы.
-      if (status !== 'all' && status !== 'draft') return { rows: [], total: 0 }
+      // В старой схеме нет ни client_name/venue, ни reservation_start: поиск
+      // остаётся по одному названию, а период здесь пуст всегда — дата
+      // мероприятия там NULL, а NULL не попадает ни в один период, то же
+      // правило, что и в современной ветке. Отдать вместо этого невыбранную
+      // выборку было бы ложью: человек спросил месяц.
       if (periodFrom || periodTo) return { rows: [], total: 0 }
       let legacyQuery = client
         .from('equipment_lists')
@@ -269,7 +203,6 @@ export async function fetchEquipmentLists(query: EquipmentListsQuery = {}): Prom
       .order('id', { ascending: false })
       .range(from, to)
     if (searchExpression) listsQuery = listsQuery.or(searchExpression)
-    if (status !== 'all') listsQuery = listsQuery.eq('reservation_status', status)
     // Период меряется по дате НАЧАЛА мероприятия: список без даты (колонка
     // nullable) в любой период не попадает — сравнение с NULL ложно, и это
     // честнее, чем показывать «этот месяц» вперемешку с недатированными.
@@ -288,24 +221,8 @@ function equipmentListCacheKey(listId: string) {
   return `equipment-lists:detail:${listId}`
 }
 
-function reservationShortagesCacheKey(listId: string) {
-  return `equipment-lists:shortages:${listId}`
-}
-
-function reservationHistoryCacheKey(listId: string) {
-  return `equipment-lists:history:${listId}`
-}
-
 export function readCachedEquipmentList(listId: string) {
   return readCachedQuery<EquipmentList>(equipmentListCacheKey(listId))
-}
-
-export function readCachedReservationShortages(listId: string) {
-  return readCachedQuery<ReservationShortage[]>(reservationShortagesCacheKey(listId))
-}
-
-export function readCachedReservationHistory(listId: string) {
-  return readCachedQuery<ReservationHistory[]>(reservationHistoryCacheKey(listId))
 }
 
 export async function fetchEquipmentList(listId: string, { bypassCache = false } = {}) {
@@ -525,46 +442,4 @@ export async function deleteEquipmentList(listId: string) {
   if (!data) throw new Error(LIST_DELETE_FORBIDDEN)
   invalidateCachePrefix('equipment-lists:')
   return data.id as string
-}
-
-export async function fetchReservationShortages(listId: string, { bypassCache = false } = {}) {
-  if (!supabase) throw new Error('Supabase не настроен')
-  const client = supabase
-  return cachedQuery(reservationShortagesCacheKey(listId), 5 * 60 * 1000, async () => {
-    const { data, error } = await client.rpc('reservation_shortages', { p_list_id: listId })
-    if (error && (error.code === 'PGRST202' || error.code === '42883')) return []
-    if (error) throw error
-    // Строки RPC уже типизированы схемой — приведение больше не нужно.
-    return (data ?? []).filter((item) => item.shortage > 0)
-  }, { bypass: bypassCache })
-}
-
-export async function transitionEquipmentList(listId: string, targetStatus: ReservationStatus, note = '') {
-  if (!supabase) throw new Error('Supabase не настроен')
-  const { data, error } = await supabase.rpc('transition_equipment_list_status', {
-    p_list_id: listId,
-    p_target_status: targetStatus,
-    // У p_note в SQL есть default null, поэтому пустую заметку просто не передаём:
-    // supabase-js выкидывает undefined из тела запроса, база подставляет свой null.
-    p_note: note || undefined,
-  })
-  if (error) throw error
-  invalidateCachePrefix('equipment-lists:')
-  invalidateCachePrefix('equipment:')
-  return data as { id: string; status: ReservationStatus; shortages: ReservationShortage[] }
-}
-
-export async function fetchReservationHistory(listId: string, { bypassCache = false } = {}) {
-  if (!supabase) throw new Error('Supabase не настроен')
-  const client = supabase
-  return cachedQuery(reservationHistoryCacheKey(listId), 5 * 60 * 1000, async () => {
-    const { data, error } = await client
-      .from('reservation_status_history')
-      .select('id,from_status,to_status,note,shortage_snapshot,changed_at')
-      .eq('list_id', listId)
-      .order('changed_at', { ascending: false })
-    if (error && (error.code === 'PGRST205' || error.code === '42P01')) return []
-    if (error) throw error
-    return (data ?? []).map((row) => normalizeHistoryEntry(row))
-  }, { bypass: bypassCache })
 }
