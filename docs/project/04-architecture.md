@@ -4,6 +4,18 @@
 где живут данные и кэш, и где приложение падает целиком.
 
 Все якоря `файл:строка` в этой странице проверены чтением файла на дату написания.
+
+> **УСТАРЕЛО ЧАСТИЧНО — сессия 10 (2026-08-22).** Жизненный цикл списков
+> (подтверждение → выдача → возврат) **удалён из продукта, кода и прод-схемы**.
+> Ниже он местами описан как живой — это неправда. Больше НЕ существует:
+> таблицы `reservation_status_history` и `equipment_reservation_items`, RPC
+> `transition_equipment_list_status` и `reservation_shortages`, колонки
+> `reservation_status`, `confirmed_at`, `issued_at`, `returned_at`,
+> `status_changed_at`, `status_changed_by`, `shortage_snapshot`, триггеры
+> `trg_reservation_status_history` и `trg_guard_reservation_list_update`,
+> признак `advanced_features` и всё, что читало дефицит и историю статусов.
+> **Колонки `reservation_start` / `reservation_end` ЖИВЫ** — это дата
+> мероприятия, реквизит документа. Полная сверка страницы — задача `/doc-audit`.
 **Внимание: с5 и с6 патчили страницу по горячим следам, полной автосверки (`/doc-audit`)
 не было ни разу — номера строк в якорях старше с5 могли уехать.** Живой код — только
 `src/react` (**40 файлов, 7261 строка**). Дерево чистое: легаси-Vue удалён из рабочей
@@ -26,11 +38,11 @@
 
 | Файл | Строк | За что отвечает |
 |---|---:|---|
-| `styles.css` | 784 | Вся дизайн-система одним файлом: токены, сетка, компоненты, мобильные брейкпойнты. Импортируется один раз в `main.tsx` |
-| `lib/database.types.ts` | 723 | **Сгенерированная** схема базы: `Database`, `Tables<>`, `Json`, сигнатуры всех RPC. Снята с прода `generate_typescript_types` 2026-08-20. Правится только генератором; три ручные вставки помечены комментарием «ПРАВКА РУКАМИ» (`:503`, `:565`, `:574`) |
-| `features/lists/ListEditorPage.tsx` | 668 | Редактор списка (создание `/lists/new` и правка `/lists/:listId/edit`): состояние выборки, гидратация из базы и из черновика, сборка позиций, сохранение через RPC, экспорт |
-| `features/lists/ListsPage.tsx` | 584 | Реестр списков (серверные поиск, фильтр и страницы), карточка-drawer со сводкой, история этапов, дефицит, переходы статусов, удаление |
-| `features/lists/api.ts` | 545 | Единственная точка доступа к `equipment_lists` / `reservation_status_history` и четырём RPC списков. Здесь же серверная пагинация, legacy-фолбэк (раздел 9) и черновик редактора |
+| `styles.css` | 888 | Вся дизайн-система одним файлом: токены, сетка, компоненты, мобильные брейкпойнты. Импортируется один раз в `main.tsx` |
+| `lib/database.types.ts` | 579 | **Сгенерированная** схема базы: `Database`, `Tables<>`, `Json`, сигнатуры всех RPC. Снята с прода `generate_typescript_types` 2026-08-22, после удаления жизненного цикла. Правится только генератором; четыре ручные вставки помечены комментарием «ПРАВКА РУКАМИ» — генератор не выражает nullable-аргументы RPC, и без них сборка красная |
+| `features/lists/ListEditorPage.tsx` | 794 | Редактор списка (создание `/lists/new` и правка `/lists/:listId/edit`): состояние выборки, гидратация из базы и из черновика, сборка позиций, сохранение через RPC, экспорт |
+| `features/lists/ListsPage.tsx` | 519 | Реестр списков: серверные поиск по названию/заказчику/площадке, фильтр периода и страницы, карточка с датой мероприятия и меню экспорта, drawer со составом и удалением |
+| `features/lists/api.ts` | 446 | Единственная точка доступа к `equipment_lists` и двум RPC списков. Здесь же серверная пагинация, legacy-фолбэк (раздел 9) и черновик редактора |
 | `features/equipment/api.ts` | 415 | Единственная точка доступа к `equipment` / `equipment_movements` и двум RPC. Здесь же нормализация `tracking_mode` / `inventory_code` |
 | `features/equipment/EquipmentDrawer.tsx` | 309 | Карточка единицы: перечитывание с сервера при открытии, режим правки, оптимистическая блокировка по `updated_at`, история движений |
 | `features/equipment/EquipmentPage.tsx` | 309 | Каталог: поиск с дебаунсом, фильтр статуса, пагинация с зажимом номера страницы, префетч следующей |
@@ -40,7 +52,9 @@
 | `app/App.tsx` | 240 | Роутер, гейт сессии с сохранением исходного пути, `AppShell` (сайдбар + прогрев), `RouteBoundary` (граница + Suspense), dev-триггер крэша, два скелетона |
 | `generated/equipmentImages.ts` | 194 | Сгенерированная карта `brand::model` → путь к WebP в `public/equipment-images/`, плюс сам контракт именования (`normalize`, `equipmentImageKey`). Правится только генератором |
 | `features/lists/ListEditorCatalog.tsx` | 155 | Каталожная половина редактора: поиск, фильтры, «показать ещё», превью-drawer модели |
+| `components/ActionMenu.tsx` | 100 | Меню ДЕЙСТВИЙ рядом с кнопкой (экспорт на карточке списка). Не `AppSelect`: тот выбирает значение и метит выбранное галочкой, здесь же каждый пункт что-то делает — отсюда роли `menu`/`menuitem` |
 | `components/AppDatePicker.tsx` | 138 | Собственный календарь в портале: позиционирование, узбекские месяцы зашиты в код, возврат фокуса на триггер |
+| `lib/popoverPosition.ts` | 23 | Координаты попапа, который рисуется порталом в body. Общий для `AppSelect` и `ActionMenu`: высота не измеряется, а оценивается — координаты нужны до появления попапа в DOM, иначе первый кадр он рисует в углу и прыгает на место |
 | `lib/reportAppError.ts` | 136 | Единственный канал диагностики и единственное место с `console.*`: `reportAppError`, шов `setErrorSink` под Sentry, глобальные слушатели. Разобран в разделе 5.3 |
 | `components/EquipmentVisual.tsx` | 125 | Подбор картинки по ключу из генератора (`:33-35`), прелоад пачками, фолбэк на иконку категории |
 | `features/auth/LoginPage.tsx` | 123 | Экран входа, возврат на исходный путь после входа, единственный `role="alert"` в проекте (`:113`) |
@@ -576,13 +590,10 @@ grep -rnE "\.storage|\.channel\(|realtime|\.functions\." src/react → 0
 | `equipment` | `equipment/api.ts, 132, 152, 166, 185, 227, 261, 288, 361` | select ×8, insert ×1 (`:227-242`) |
 | `equipment_movements` | `equipment/api.ts` | select, `.limit(50)` |
 | `equipment_lists` | `lists/api.ts, 244, 290, 299, 487` | select ×4, delete ×1 (`:487`) |
-| `reservation_status_history` | `lists/api.ts` | select |
 | `update_equipment_model_and_unit` | `equipment/api.ts` | rpc |
 | `count_equipment_model_units` | `equipment/api.ts` | rpc (заведена в с5) |
 | `create_equipment_list_document` | `lists/api.ts` | rpc |
 | `update_equipment_list_document` | `lists/api.ts` | rpc |
-| `reservation_shortages` | `lists/api.ts` | rpc |
-| `transition_equipment_list_status` | `lists/api.ts` | rpc |
 
 Асимметрия: чтение везде идёт прямым select по таблицам, а запись — почти везде через
 RPC. Два исключения из «запись только через RPC» — insert оборудования
@@ -687,10 +698,8 @@ id, и на общем ноутбуке первый кадр следующег
 | `equipment:model-count:<brand>::<model>` | 10 мин | `equipment/api.ts` (ключ `:272`) | Число единиц модели |
 | `equipment:movements:<equipmentId>` | 5 мин | `equipment/api.ts` | До 50 движений |
 | `equipment-taxonomy:v2` | **24 ч** | `equipment/api.ts`, `fetchEquipmentTaxonomy` | `{types, subtypes, subtypesByType}` — `v2` с с8: форма сменилась, старая запись без карты жила бы сутки. Читается батчами по 1000 с порядком `type, subtype, id` |
-| `equipment-lists:page:{"page":N,"search":…,"status":…,"pageSize":N}` | 10 мин | `lists/api.ts` (ключ `:200-202`) | Страница реестра `{rows, total}` |
+| `equipment-lists:page:{"page":N,"search":…,"periodFrom":…,"periodTo":…,"pageSize":N}` | 10 мин | `lists/api.ts`, `equipmentListsCacheKey` | Страница реестра `{rows, total}`. Форма ключа сменилась в с10: фильтр этапа ушёл, границы периода вошли |
 | `equipment-lists:detail:<listId>` | 10 мин | `lists/api.ts`, плюс `primeCachedQuery` из прогрева `:393` | Один список |
-| `equipment-lists:shortages:<listId>` | 5 мин | `lists/api.ts` | Дефицит |
-| `equipment-lists:history:<listId>` | 5 мин | `lists/api.ts` | История этапов |
 | `equipment-lists:composition:v2:<listId>` | 10 мин | `lists/api.ts` (ключ `cacheKeys.ts`) | `{rows, missingUnits}` для деталей и Excel |
 | `list-draft:new` | **24 ч** | `lists/api.ts` (ключ `cacheKeys.ts`) | Черновик несохранённого списка |
 
@@ -990,7 +999,7 @@ async function withLegacySchemaFallback(run) {                                  
 | Drawer | Компонент/якорь | Хук | Что показывает |
 |---|---|---|---|
 | Карточка оборудования | `EquipmentDrawer.tsx` | `:60` | Единица склада, режим редактирования, история движений |
-| Карточка списка | `ListsPage.tsx` | `:331` | Состав, дефицит, история этапов, переходы, удаление |
+| Карточка списка | `ListsPage.tsx`, `ReservationDrawer` | Состав, реквизиты, переход в редактор, удаление |
 | Превью модели | `ListEditorCatalog.tsx` | `:125` | Описание модели в каталоге редактора |
 
 Разметка у всех трёх одинакова: `<div className="drawer-layer" role="dialog"

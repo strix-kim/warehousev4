@@ -5,6 +5,18 @@
 Веха = проверяемый руками чекпоинт: «открываю систему и вижу/делаю X».
 Непроверяемых вех не бывает. Порядок задан зависимостями, а не желанием.
 
+> **УСТАРЕЛО ЧАСТИЧНО — сессия 10 (2026-08-22).** Жизненный цикл списков
+> (подтверждение → выдача → возврат) **удалён из продукта, кода и прод-схемы**.
+> Ниже он местами описан как живой — это неправда. Больше НЕ существует:
+> таблицы `reservation_status_history` и `equipment_reservation_items`, RPC
+> `transition_equipment_list_status` и `reservation_shortages`, колонки
+> `reservation_status`, `confirmed_at`, `issued_at`, `returned_at`,
+> `status_changed_at`, `status_changed_by`, `shortage_snapshot`, триггеры
+> `trg_reservation_status_history` и `trg_guard_reservation_list_update`,
+> признак `advanced_features` и всё, что читало дефицит и историю статусов.
+> **Колонки `reservation_start` / `reservation_end` ЖИВЫ** — это дата
+> мероприятия, реквизит документа. Полная сверка страницы — задача `/doc-audit`.
+
 **Порядок ниже — предложение агента. Прораб может перебить его своим.** Перебитая
 веха сдвигается вниз, а не исчезает.
 

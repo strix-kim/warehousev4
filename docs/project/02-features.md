@@ -5,6 +5,18 @@
 Все якоря `файл:строка` проверены чтением файла при написании страницы. Пути — от корня
 репозитория `warehouse.argomedia.uz`.
 
+> **УСТАРЕЛО ЧАСТИЧНО — сессия 10 (2026-08-22).** Жизненный цикл списков
+> (подтверждение → выдача → возврат) **удалён из продукта, кода и прод-схемы**.
+> Ниже он местами описан как живой — это неправда. Больше НЕ существует:
+> таблицы `reservation_status_history` и `equipment_reservation_items`, RPC
+> `transition_equipment_list_status` и `reservation_shortages`, колонки
+> `reservation_status`, `confirmed_at`, `issued_at`, `returned_at`,
+> `status_changed_at`, `status_changed_by`, `shortage_snapshot`, триггеры
+> `trg_reservation_status_history` и `trg_guard_reservation_list_update`,
+> признак `advanced_features` и всё, что читало дефицит и историю статусов.
+> **Колонки `reservation_start` / `reservation_end` ЖИВЫ** — это дата
+> мероприятия, реквизит документа. Полная сверка страницы — задача `/doc-audit`.
+
 ## 0. Как читать эту страницу
 
 Три вещи, без которых любой факт ниже будет прочитан неверно.
@@ -28,15 +40,15 @@
    | table | `equipment` | `features/equipment/api.ts` (9 вызовов `.from`) |
    | table | `equipment_lists` | `features/lists/api.ts` (5 вызовов `.from`) |
    | table | `equipment_movements` | `equipment/api.ts` |
-   | table | `reservation_status_history` | `lists/api.ts` |
    | rpc | `create_equipment_list_document` | `lists/api.ts` |
    | rpc | `update_equipment_list_document` | `lists/api.ts` |
-   | rpc | `reservation_shortages` | `lists/api.ts` |
-   | rpc | `transition_equipment_list_status` | `lists/api.ts` |
    | rpc | `update_equipment_model_and_unit` | `equipment/api.ts` |
    | rpc | `count_equipment_model_units` | `equipment/api.ts` (заведена в с5) |
 
-   К `public.users` и `public.equipment_reservation_items` клиент не обращается ни разу.
+   К `public.users` клиент не обращается ни разу. Строки про
+   `reservation_status_history`, `equipment_reservation_items`,
+   `reservation_shortages` и `transition_equipment_list_status` сняты в с10 —
+   этих объектов больше нет в базе.
 
 Сквозная деталь: **почти всякое чтение идёт через `lib/persistentCache.ts`** — память
 плюс `localStorage` с ключами вида `argo-warehouse:v4:<id пользователя>:<ключ>`
