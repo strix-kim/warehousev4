@@ -150,6 +150,9 @@ h2 { letter-spacing: -0.025em; }
 
 .data-panel { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); box-shadow: 0 3px 18px rgba(15,22,28,.035); overflow: hidden; }
 .toolbar { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.data-age { flex: 0 0 auto; margin-left: auto; display: inline-flex; align-items: center; gap: 10px; color: var(--ink-faint); font-size: 13px; }
+.data-age button { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: var(--ink-soft); background: transparent; font-size: 13px; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+.data-age button:disabled { color: var(--ink-faint); text-decoration: none; }
 .search-field { max-width: 510px; min-width: 260px; flex: 1; height: 42px; display: flex; align-items: center; gap: 10px; padding: 0 10px 0 13px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--ink-faint); background: #fff; }
 .search-field:focus-within { border-color: #8d989f; box-shadow: 0 0 0 3px rgba(23,28,32,.06); }
 .search-field input { min-width: 0; flex: 1; height: 100%; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 14px; }
@@ -678,6 +681,8 @@ h2 { letter-spacing: -0.025em; }
   .metric { min-width: 0; border-right: 0; border-bottom: 1px solid var(--line); }
   .metric:last-child { border-bottom: 0; }
   .toolbar { align-items: stretch; flex-direction: column; }
+  .data-age { margin-left: 0; justify-content: space-between; }
+  .data-age button { min-height: 44px; }
   .search-field { max-width: none; min-width: 0; height: 44px; }
   .search-field input { align-self: stretch; height: auto; }
   .pagination { align-items: flex-start; flex-direction: column; }

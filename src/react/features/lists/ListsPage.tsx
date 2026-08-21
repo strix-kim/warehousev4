@@ -19,6 +19,7 @@ import {
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
+import { DataAge } from '../../components/DataAge'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useModalLayer } from '../../lib/useModalLayer'
@@ -33,6 +34,7 @@ import {
   readCachedReservationHistory,
   readCachedReservationShortages,
   readCachedEquipmentLists,
+  readCachedEquipmentListsMeta,
   readCachedSavedListComposition,
   transitionEquipmentList,
   type EquipmentList,
@@ -42,6 +44,7 @@ import {
   type SavedListComposition,
 } from './api'
 import { useLanguage } from '../../lib/i18n'
+import { reportAppError } from '../../lib/reportAppError'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
 type Tr = (ru: string, uz: string) => string
@@ -113,6 +116,13 @@ export function ListsPage() {
   // Только флаг: текст ошибки собирается на рендере. Строка в стейте потянула бы
   // tr в зависимости эффекта загрузки, и смена языка перезапрашивала бы списки.
   const [hasLoadError, setHasLoadError] = useState(false)
+  // Момент записи показанной страницы списков. Значение принадлежит
+  // persistentCache — здесь только перечитывается, ничего производного не храним.
+  const [dataAt, setDataAt] = useState<number | null>(null)
+  // Отдельный флаг от isLoading: isLoading означает «показывать нечего, рисуем
+  // скелет» и при живом кэше всегда false, а кнопке «Обновить» нужен признак
+  // «запрос в полёте» — иначе офлайн она не отвечает на нажатие ничем.
+  const [isFetching, setIsFetching] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [selected, setSelected] = useState<EquipmentList | null>(null)
   const [exporting, setExporting] = useState<{ id: string; mode: 'working' | 'approval' } | null>(null)
@@ -156,23 +166,42 @@ export function ListsPage() {
   useEffect(() => {
     let isCurrent = true
     const cached = readCachedEquipmentLists({ page: currentPage, search, status, pageSize })
+    // Возраст спрашиваем у кэша, а не считаем от момента ответа: запись обновляется
+    // только на УСПЕШНОМ ответе, поэтому после сбоя сети здесь остаётся старая метка —
+    // ровно то, что бейдж и должен показать.
+    const readAge = () => readCachedEquipmentListsMeta({ page: currentPage, search, status, pageSize })?.touchedAt ?? null
     if (cached) {
       setRows(cached.rows)
       setTotal(cached.total)
     }
     setIsLoading(!cached)
+    setIsFetching(true)
     setHasLoadError(false)
+    // Возраст сбрасываем ДО запроса: при живой сети свежий ответ придёт через
+    // мгновение, и бейдж успел бы мигнуть на пустом месте. Возраст ставится только
+    // там, где исход запроса уже известен, — в .then и в .catch.
+    setDataAt(null)
 
     fetchEquipmentLists({ page: currentPage, search, status, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
       .then((result) => {
         if (!isCurrent) return
+        setIsFetching(false)
         setRows(result.rows)
         setTotal(result.total)
+        setDataAt(readAge())
         // Открытые детали переезжают на свежую строку: смена этапа и удаление
         // возвращаются сюда через reloadKey.
         setSelected((current) => current ? result.rows.find((item) => item.id === current.id) ?? null : null)
       })
-      .catch(() => { if (isCurrent && !cached) setHasLoadError(true) })
+      .catch((error: unknown) => {
+        // Отчёт — только для живого эффекта: отменённая загрузка (сменили фильтр,
+        // ушли со страницы) не отказ приложения, и шуметь ею в канал незачем.
+        if (!isCurrent) return
+        setIsFetching(false)
+        reportAppError(error, { scope: 'loader', route: '/lists', detail: { servedFromCache: Boolean(cached) } })
+        setDataAt(readAge())
+        if (!cached) setHasLoadError(true)
+      })
       .finally(() => { if (isCurrent) setIsLoading(false) })
 
     return () => { isCurrent = false }
@@ -250,6 +279,10 @@ export function ListsPage() {
               { value: 'returned', label: tr('Возвращённые', 'Qaytarilganlar') },
             ]}
           />
+          {/* Рядом с блоком «Ошибка загрузки» бейдж не рисуем: на экране оказались бы
+              два разных предложения обновиться и «Обновлено 25 минут назад» под
+              заголовком о том, что данных нет. */}
+          {!hasLoadError && <DataAge touchedAt={dataAt} isRefreshing={isFetching} onRefresh={() => setReloadKey((current) => current + 1)} />}
         </div>
 
         {exportError && <p className="form-error list-export-error"><CircleAlert size={14} /> {exportError}</p>}

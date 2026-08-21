@@ -35,7 +35,10 @@ let legacyEntriesSwept = false
 // 401 — ответ без валидного ключа.
 const authErrorCodes = new Set(['401', 'PGRST301', '42501'])
 
-function isAuthError(error: unknown) {
+// Экспортируется, потому что тот же список кодов нужен каналу ошибок
+// (reportAppError): отказ авторизации там помечается level: 'auth' и не считается
+// падением. Копии списка не заводим — источник правды один.
+export function isAuthError(error: unknown) {
   if (!error || typeof error !== 'object') return false
   const candidate = error as { code?: unknown; status?: unknown }
   if (typeof candidate.code === 'string' && authErrorCodes.has(candidate.code)) return true
@@ -113,6 +116,19 @@ export function readCachedQuery<T>(key: string): T | null {
   const entry = readEntry<T>(key)
   if (!entry || entry.expiresAt <= Date.now()) return null
   return entry.value
+}
+
+export type CacheEntryMeta = { touchedAt: number }
+
+// Возраст записи читается БЕЗ гейта по TTL — в отличие от readCachedQuery выше.
+// Спрашивают его ровно про то значение, которое отдала ветка отказа cachedQuery,
+// а она отдаёт просроченное: гейт вернул бы null именно тогда, когда возраст нужен.
+export function readCachedQueryMeta(key: string): CacheEntryMeta | null {
+  const entry = readEntry<unknown>(key)
+  // touchedAt появился в раскладке v4, но запись в localStorage правится руками и
+  // приезжает из другой вкладки: без числа возраст неизвестен, и врать нечем.
+  if (!entry || typeof entry.touchedAt !== 'number') return null
+  return { touchedAt: entry.touchedAt }
 }
 
 function trimStorage() {

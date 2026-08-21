@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase'
-import { cachedQuery, invalidateCachePrefix, readCachedQuery } from '../../lib/persistentCache'
+import { cachedQuery, invalidateCachePrefix, readCachedQuery, readCachedQueryMeta } from '../../lib/persistentCache'
 import type { Json } from '../../lib/database.types'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 // Только листовой cacheKeys, не lists/api: обратное ребро замкнуло бы цикл фич.
@@ -70,6 +70,12 @@ function equipmentPageCacheKey({ page, search, availability, pageSize = EQUIPMEN
 
 export function readCachedEquipment(query: Omit<EquipmentQuery, 'bypassCache'>) {
   return readCachedQuery<EquipmentPageResult>(equipmentPageCacheKey(query))
+}
+
+// Возраст той же записи каталога. Ключ собирает та же приватная функция: второй
+// сборки ключа не заводим — разъехались бы молча.
+export function readCachedEquipmentMeta(query: Omit<EquipmentQuery, 'bypassCache'>) {
+  return readCachedQueryMeta(equipmentPageCacheKey(query))
 }
 
 export function readCachedAllEquipment() {

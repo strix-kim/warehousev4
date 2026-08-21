@@ -12,11 +12,19 @@ type LanguageContextValue = {
 const STORAGE_KEY = 'argo:language'
 const LanguageContext = createContext<LanguageContextValue | null>(null)
 
+// Ключ языка читается ровно здесь: тем же чтением пользуется корневая граница ошибок,
+// которая стоит выше провайдера и до контекста дотянуться не может. localStorage умеет
+// бросать (приватный режим), а фолбэк границы падать не имеет права — отсюда catch.
+export function readStoredLanguage(): Language {
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) === 'uz' ? 'uz' : 'ru'
+  } catch {
+    return 'ru'
+  }
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguage] = useState<Language>(() => {
-    const saved = window.localStorage.getItem(STORAGE_KEY)
-    return saved === 'uz' ? 'uz' : 'ru'
-  })
+  const [language, setLanguage] = useState<Language>(readStoredLanguage)
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, language)

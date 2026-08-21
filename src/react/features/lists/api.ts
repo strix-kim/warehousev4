@@ -1,8 +1,9 @@
 import { supabase } from '../../lib/supabase'
-import { cachedQuery, invalidateCachePrefix, primeCachedQuery, readCachedQuery } from '../../lib/persistentCache'
+import { cachedQuery, invalidateCachePrefix, primeCachedQuery, readCachedQuery, readCachedQueryMeta } from '../../lib/persistentCache'
 import type { Json, Tables } from '../../lib/database.types'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { escapeLikePattern } from '../../lib/postgrest'
+import { reportAppError } from '../../lib/reportAppError'
 import { fetchEquipmentByIds } from '../equipment/api'
 import type { Equipment } from '../equipment/types'
 import { LIST_DRAFT_CACHE_KEY, LIST_DRAFT_TTL_MS, listCompositionCacheKey } from './cacheKeys'
@@ -205,6 +206,11 @@ export function readCachedEquipmentLists(query: Omit<EquipmentListsQuery, 'bypas
   return readCachedQuery<EquipmentListsPage>(equipmentListsCacheKey(normalizeListsQuery(query)))
 }
 
+// Возраст той же страницы списков: ключ собирают те же две функции, что и выше.
+export function readCachedEquipmentListsMeta(query: Omit<EquipmentListsQuery, 'bypassCache'> = {}) {
+  return readCachedQueryMeta(equipmentListsCacheKey(normalizeListsQuery(query)))
+}
+
 export async function fetchEquipmentLists(query: EquipmentListsQuery = {}): Promise<EquipmentListsPage> {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
@@ -391,7 +397,7 @@ export function buildSavedListComposition(list: EquipmentList, { bypassCache = f
 // звать её вслепую на шесть карточек нечем оправдать.
 export function prefetchSavedListDetails(list: EquipmentList) {
   primeCachedQuery(equipmentListCacheKey(list.id), 10 * 60 * 1000, list)
-  return buildSavedListComposition(list).catch(() => undefined)
+  return buildSavedListComposition(list).catch((error: unknown) => reportAppError(error, { scope: 'prefetch', detail: { source: 'list-composition', listId: list.id } }))
 }
 
 // Черновик редактора нового списка. Позиция хранится КЛЮЧОМ ГРУППЫ, а не снимком
