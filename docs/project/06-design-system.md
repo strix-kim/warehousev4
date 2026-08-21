@@ -131,19 +131,25 @@ inline-теней `rgba(...)` уникальных под конкретный �
 | `styles.css:241` | `max-width: 520px` | Заголовок дровера в перенос, `.equipment-edit-grid` в одну колонку |
 | `styles.css:625` | `max-width: 1500px` | Плитка главной `.home-destinations` — 3 колонки → 2, карточка «Сотрудники» растягивается на всю ширину |
 | `styles.css:632` | `max-width: 1050px` | Сайдбар схлопывается в узкую колонку (76px, иконки без подписей), `.list-grid` 3→2 колонки, `.editor-grid` в 1 колонку |
-| `styles.css:660` | `max-width: 820px` | Главный мобильный брейкпоинт: сайдбар превращается в нижний таб-бар, таблицы становятся карточками (`.data-table tbody tr` — grid вместо строк), дровера — на весь экран, появляются `.mobile-editor-tabs`/`.mobile-selection-bar`; сюда же с с5 влиты тач-донастройки бывшего второго блока — `44px` для `.icon-button`/`.picker-item__action`/`.app-select`, `font-size: 16px` на полях ввода (чтобы iOS Safari не зумил при фокусе) |
+| `styles.css` | `(min-width: 701px) and (max-width: 1050px)` | Планшет (с8): панели редактора рядом — `.editor-grid { grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr) }` поверх `height: auto` и панелей по 520 px из блока 1050 |
+| `styles.css` | `max-width: 820px` | Главный мобильный брейкпоинт ОБОЛОЧКИ: сайдбар превращается в нижний таб-бар, над контентом полоса `.mobile-account`, таблицы становятся карточками (`.data-table tbody tr` — grid вместо строк), дровера — на весь экран, `.page-description` скрыт, `.toolbar` в столбик с селектами на всю ширину; тач-размеры — `44px` для `.icon-button`/`.picker-item__action`/`.app-select`/`.serial-picker button`/`.clear-selection`, степпер 46 px, `font-size: 16px` на полях ввода (чтобы iOS Safari не зумил при фокусе) |
+| `styles.css` | `max-width: 700px` | Телефонная раскладка РЕДАКТОРА (с8, разрез 820 → 700): `.mobile-editor-tabs` (sticky `top: 0`, 57 px) и `.mobile-selection-bar`, панели по одной (`.mobile-active`), тулбар каталога sticky `top: 57px`, шапка статичная без кнопок, действия в `.selection-footer__mobile`, реквизиты в одну колонку |
 
-С с5 блок `@media (max-width: 820px)` в файле один: второй (readability-pass)
-влит в него при схлопывании; reduced-motion-блок тоже один — `:621`.
+С с8 мобильных блоков три: 820 — оболочка и палец, 700 — раскладка редактора,
+701–1050 — планшетная сетка редактора; JS-граница `lib/breakpoints.ts` по-прежнему
+одна (820) и редактор её не читает. Высота липких табов (57) живёт в двух местах
+синхронно — `.quick-catalog-toolbar { top }` и `MOBILE_TABS_HEIGHT` в
+`ListEditorPage.tsx`. Reduced-motion-блок один.
 
 ## 6. Мобильные правила и reduced-motion
 
 **Зоны касания 44px** — объявлены точечно, не единой утилитой. После схлопывания
 с5 базовые правила уже несут итоговые размеры (`.button` — `min-height: 44px` в
 базовом объявлении, дубль из readability-pass исчез), мобильные донастройки живут
-в единственном `@media 820px`: `.language-switch--compact button`, `.icon-button`
-(44×44), `.editor-header`, `.mobile-editor-tabs button`, `.picker-item`,
-`.app-select`. Точечные номера строк прежней версии убраны — файл пересобран,
+в блоке `@media 820px`: `.language-switch--compact button`, `.icon-button`
+(44×44), `.picker-item`, `.app-select`, `.serial-picker button`, `.clear-selection`,
+`.quantity-stepper` (46); раскладочные правила редактора (`.editor-header`,
+`.mobile-editor-tabs button` и т. д.) с с8 — в блоке 700. Точечные номера строк прежней версии убраны — файл пересобран,
 актуальную позицию ищи по селектору.
 `.mode-switch button` из этого перечня удалён: класса `.mode-switch` нет в разметке,
 его правила снесены как мёртвый CSS (заодно с `.select-field`).
@@ -181,11 +187,11 @@ inline-теней `rgba(...)` уникальных под конкретный �
 фокус возвращается на триггер (`:117, 158-159`).
 
 **Поведение поповера при скролле/ресайзе — у обоих одинаковое: закрытие, а не
-репозиционирование.** `window.addEventListener('resize'|'scroll', closeOnViewportChange)`
-и обработчик — `() => setOpen(false)` (`AppSelect.tsx:51-55`,
-`AppDatePicker.tsx:89-93`). Позиция считается один раз при открытии
-(`useLayoutEffect` без пересчёта на скролл), поэтому решение «закрыть, а не
-двигать» — единственный способ не оставить попап оторванным от триггера.
+репозиционирование** (общий `lib/usePopoverLayer.ts`, `04-architecture` §11). Позиция
+считается один раз при открытии (`useLayoutEffect` без пересчёта на скролл), поэтому
+решение «закрыть, а не двигать» — единственный способ не оставить попап оторванным от
+триггера. Исключение с с8: прокрутка внутри самого списка попап не закрывает — иначе
+длинный список (56 подкатегорий) нельзя было пролистать.
 
 Оба компонента закрываются по `Escape` и клику вне (`pointerdown` вне `rootRef`
 и `popoverRef`).
