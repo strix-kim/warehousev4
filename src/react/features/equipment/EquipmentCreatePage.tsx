@@ -5,9 +5,9 @@ import { AppSelect } from '../../components/AppSelect'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
 import {
   createEquipment,
+  emptyEquipmentTaxonomy,
   fetchEquipmentTaxonomy,
   serialNumberExists,
-  type EquipmentTaxonomy,
 } from './api'
 import {
   equipmentAvailabilityLabel,
@@ -23,8 +23,6 @@ type RecordKind = 'serialized' | 'quantity'
 // Результат проверки серийника на дубли. 'failed' — проверка НЕ прошла: это не
 // «дубля нет», а «мы не знаем», и сохранять по нему нельзя (gotchas §11).
 type SerialCheck = 'idle' | 'unique' | 'duplicate' | 'failed'
-
-const initialTaxonomy: EquipmentTaxonomy = { types: [], subtypes: [] }
 
 // Локация — ДАННЫЕ, а не текст интерфейса: в базе лежит один словарь значений
 // на всех. Через tr() при языке uz в базу уезжало 'Ofis' и заводило вторую
@@ -51,7 +49,7 @@ export function EquipmentCreatePage() {
   const [length, setLength] = useState('')
   const [specification, setSpecification] = useState('')
   const [description, setDescription] = useState('')
-  const [taxonomy, setTaxonomy] = useState(initialTaxonomy)
+  const [taxonomy, setTaxonomy] = useState(emptyEquipmentTaxonomy)
   const newEquipmentAvailabilityOptions = equipmentAvailabilityOptions(tr, newEquipmentAvailabilityCodes)
   const [serialCheck, setSerialCheck] = useState<SerialCheck>('idle')
   const [isCheckingSerial, setIsCheckingSerial] = useState(false)
@@ -59,6 +57,10 @@ export function EquipmentCreatePage() {
   const [error, setError] = useState('')
   const [createdId, setCreatedId] = useState('')
   const brandInputRef = useRef<HTMLInputElement>(null)
+  // Первое уникальное поле единицы: серийный номер, а у количественного учёта —
+  // внутренний код. Обе ветки отдают ссылку сюда, потому что рендерится всегда
+  // ровно одна из них.
+  const serialInputRef = useRef<HTMLInputElement>(null)
   const canSave = Boolean(
     brand.trim()
     && model.trim()
@@ -104,6 +106,19 @@ export function EquipmentCreatePage() {
     setCreatedId('')
     // Форма монтируется тем же кадром, что и сброс, — фокус ставим после него.
     window.requestAnimationFrame(() => brandInputRef.current?.focus())
+  }
+
+  // Партия одинаковых устройств заводится подряд, и бренд, модель, категория и
+  // характеристики у них общие: чистится только то, что принадлежит конкретной
+  // единице. Полный resetForm на этом сценарии заставлял вводить модель заново.
+  function resetForSameModel() {
+    setSerialNumber('')
+    setInventoryCode('')
+    if (kind === 'serialized') setCount(1)
+    setSerialCheck('idle')
+    setError('')
+    setCreatedId('')
+    window.requestAnimationFrame(() => serialInputRef.current?.focus())
   }
 
   async function checkSerial(): Promise<SerialCheck> {
@@ -177,7 +192,8 @@ export function EquipmentCreatePage() {
         <p>{brand} {model} {tr('сохранено в каталоге. Другие записи не изменялись.', 'katalogga saqlandi. Boshqa yozuvlar o‘zgartirilmadi.')}</p>
         <div>
           <button className="button button--primary" onClick={() => navigate('/equipment')}>{tr('Открыть каталог', 'Katalogni ochish')}</button>
-          <button className="button button--secondary" onClick={resetForm}>{tr('Добавить ещё', 'Yana qo‘shish')}</button>
+          <button className="button button--secondary" onClick={resetForSameModel}>{tr('Добавить ещё такую же', 'Xuddi shunday yana qo‘shish')}</button>
+          <button className="button button--secondary" onClick={resetForm}>{tr('Добавить другую', 'Boshqasini qo‘shish')}</button>
         </div>
       </section>
     )
@@ -229,6 +245,7 @@ export function EquipmentCreatePage() {
                 <label className="field">
                   <span>{tr('Серийный номер', 'Seriya raqami')} *</span>
                   <input
+                    ref={serialInputRef}
                     value={serialNumber}
                     onChange={(event) => { setSerialNumber(event.target.value); setSerialCheck('idle') }}
                     onBlur={() => void checkSerial()}
@@ -236,20 +253,25 @@ export function EquipmentCreatePage() {
                     placeholder={tr('С корпуса устройства', 'Qurilma korpusidan')}
                     required
                   />
-                  <small className={serialCheck === 'duplicate' || serialCheck === 'failed' ? 'field-hint field-hint--error' : 'field-hint'}>
-                    {isCheckingSerial
-                      ? tr('Проверяем номер…', 'Raqam tekshirilmoqda…')
-                      : serialCheck === 'duplicate'
-                        ? tr('Этот номер уже используется.', 'Bu raqam allaqachon ishlatilmoqda.')
-                        : serialCheck === 'failed'
-                          ? tr('Проверить номер не удалось. Сохранение попробует ещё раз.', 'Raqamni tekshirib bo‘lmadi. Saqlash yana urinib ko‘radi.')
-                          : tr('Номер проверяется на дубли перед сохранением.', 'Saqlashdan oldin raqam takrorlanishi tekshiriladi.')}
-                  </small>
+                  {/* Обещание проверки под ПУСТЫМ полем — обещание о том, чего ещё
+                      нет. Подсказка появляется, когда есть что проверять или когда
+                      проверка уже что-то сказала. */}
+                  {(serialNumber.trim() !== '' || isCheckingSerial || serialCheck === 'duplicate' || serialCheck === 'failed') && (
+                    <small className={serialCheck === 'duplicate' || serialCheck === 'failed' ? 'field-hint field-hint--error' : 'field-hint'}>
+                      {isCheckingSerial
+                        ? tr('Проверяем номер…', 'Raqam tekshirilmoqda…')
+                        : serialCheck === 'duplicate'
+                          ? tr('Этот номер уже используется.', 'Bu raqam allaqachon ishlatilmoqda.')
+                          : serialCheck === 'failed'
+                            ? tr('Проверить номер не удалось. Сохранение попробует ещё раз.', 'Raqamni tekshirib bo‘lmadi. Saqlash yana urinib ko‘radi.')
+                            : tr('Номер проверяется на дубли перед сохранением.', 'Saqlashdan oldin raqam takrorlanishi tekshiriladi.')}
+                    </small>
+                  )}
                 </label>
               ) : (
                 <label className="field">
                   <span>{tr('Внутренний код / номер партии', 'Ichki kod / partiya raqami')}</span>
-                  <input value={inventoryCode} onChange={(event) => setInventoryCode(event.target.value)} placeholder={tr('Необязательно', 'Ixtiyoriy')} />
+                  <input ref={serialInputRef} value={inventoryCode} onChange={(event) => setInventoryCode(event.target.value)} placeholder={tr('Необязательно', 'Ixtiyoriy')} />
                   <small className="field-hint">{tr('Можно оставить пустым — в списке позиция будет учитываться количеством.', 'Bo‘sh qoldirish mumkin — ro‘yxatda pozitsiya miqdor bo‘yicha hisoblanadi.')}</small>
                 </label>
               )}
@@ -275,6 +297,15 @@ export function EquipmentCreatePage() {
           </div>
 
           {error && <p className="form-error form-error--inline"><CircleAlert size={16} /> {error}</p>}
+
+          {/* На телефоне предпросмотр с кнопкой скрыт, а шапка формы уезжает вверх
+              вместе с прокруткой: единственное сохранение оказывалось за экраном.
+              На десктопе этот дубль скрыт CSS. */}
+          <div className="form-submit-mobile">
+            <button className="button button--primary button--wide" disabled={isSaving || !canSave}>
+              <Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Добавить в каталог', 'Katalogga qo‘shish')}
+            </button>
+          </div>
         </section>
 
         <aside className="data-panel equipment-preview">

@@ -67,10 +67,6 @@ h2 { letter-spacing: -0.025em; }
 .sidebar__nav a.active::before { content: ''; position: absolute; left: 0; width: 3px; height: 22px; border-radius: 4px; background: var(--accent); }
 .sidebar__nav a.active svg { color: var(--accent); }
 .sidebar__utility { display: grid; gap: 10px; margin: 14px 0 18px; }
-.sidebar__signal { min-height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 9px; color: #7f8b92; font-size: 10px; font-weight: 700; letter-spacing: .035em; }
-.sidebar__signal svg { color: var(--accent); }
-.sidebar__signal i { width: 7px; height: 7px; margin-left: auto; border-radius: 50%; background: #40c57b; box-shadow: 0 0 0 4px rgba(64,197,123,.1); animation: signal-pulse 2.4s ease-in-out infinite; }
-.sidebar__signal--bottom { margin-top: auto; margin-bottom: 8px; }
 .sidebar__quick-action { min-height: 68px; display: grid; grid-template-columns: 38px minmax(0, 1fr) 16px; align-items: center; gap: 10px; padding: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; color: #fff; background: linear-gradient(135deg, rgba(255,255,255,.075), rgba(255,255,255,.025)); box-shadow: inset 0 1px rgba(255,255,255,.04); text-decoration: none; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
 .sidebar__quick-action:hover { border-color: rgba(239,18,54,.42); background: linear-gradient(135deg, rgba(239,18,54,.15), rgba(255,255,255,.035)); transform: translateY(-1px); }
 .sidebar__quick-action > span { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 9px; color: #fff; background: var(--accent); box-shadow: 0 6px 18px rgba(239,18,54,.22); }
@@ -78,15 +74,10 @@ h2 { letter-spacing: -0.025em; }
 .sidebar__quick-action strong { font-size: 13px; }
 .sidebar__quick-action small { color: #7f8990; font-size: 10px; }
 .sidebar__quick-action > svg { color: #7c878e; }
-.sidebar__flow { margin: 5px 10px 0; padding: 12px 0 2px; border-top: 1px solid rgba(255,255,255,.065); }
-.sidebar__flow p { margin: 0 0 10px; color: #59656d; font-size: 9px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-.sidebar__flow ol { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
-.sidebar__flow li { position: relative; min-height: 34px; display: grid; grid-template-columns: 27px 1fr; align-items: center; gap: 8px; color: #7f8a91; font-size: 11px; font-weight: 650; }
-.sidebar__flow li:not(:last-child)::after { content: ''; position: absolute; left: 12px; top: 24px; width: 1px; height: 20px; background: linear-gradient(rgba(239,18,54,.55), rgba(255,255,255,.08)); }
-.sidebar__flow i { width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.09); border-radius: 7px; color: #c5ccc8; background: rgba(255,255,255,.035); font-family: inherit; font-size: 9px; font-style: normal; }
-.sidebar__scope { display: flex; align-items: center; gap: 10px; margin-top: 0; margin-bottom: 12px; padding: 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; color: #9fa8ae; }
+/* Нижний блок сайдбара прижат к низу отсюда: раньше это делала строка «Склад в
+   рабочем режиме» своим margin-top: auto, и вместе с ней он бы всплыл к навигации. */
+.sidebar__scope { display: flex; align-items: center; gap: 10px; margin-top: auto; margin-bottom: 12px; padding: 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; color: #9fa8ae; }
 .sidebar__scope > span { min-width: 0; flex: 1; display: flex; flex-direction: column; }
-.sidebar__scope small { color: #69747c; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; }
 .sidebar__scope strong { overflow: hidden; color: #e9edeb; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar__language { margin-bottom: 10px; }
 .language-switch { width: max-content; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin: 0 0 24px auto; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); }
@@ -105,12 +96,12 @@ h2 { letter-spacing: -0.025em; }
 .app-shell--sidebar-collapsed { grid-template-columns: 76px minmax(0, 1fr); }
 .app-shell--sidebar-collapsed .sidebar { padding-inline: 10px; }
 .app-shell--sidebar-collapsed .sidebar__brand { justify-content: center; }
-.app-shell--sidebar-collapsed .sidebar__brand .brand-lockup, .app-shell--sidebar-collapsed .nav-section-label, .app-shell--sidebar-collapsed .sidebar__nav a span, .app-shell--sidebar-collapsed .sidebar__scope span, .app-shell--sidebar-collapsed .sidebar__scope > svg:last-child, .app-shell--sidebar-collapsed .user-copy { display: none; }
+.app-shell--sidebar-collapsed .sidebar__brand .brand-lockup, .app-shell--sidebar-collapsed .nav-section-label, .app-shell--sidebar-collapsed .sidebar__nav a span, .app-shell--sidebar-collapsed .sidebar__scope span, .app-shell--sidebar-collapsed .user-copy { display: none; }
 .app-shell--sidebar-collapsed .sidebar__brand > button { display: grid; }
 .app-shell--sidebar-collapsed .sidebar__nav a { justify-content: center; padding: 0; }
 .app-shell--sidebar-collapsed .sidebar__scope { justify-content: center; padding: 12px 0; }
 .app-shell--sidebar-collapsed .sidebar__footer { grid-template-columns: 1fr; justify-items: center; }
-.app-shell--sidebar-collapsed .sidebar__utility, .app-shell--sidebar-collapsed .sidebar__signal--bottom { display: none; }
+.app-shell--sidebar-collapsed .sidebar__utility { display: none; }
 .app-shell--sidebar-collapsed .sidebar__language { width: 100%; }
 .app-shell--sidebar-collapsed .language-switch--compact { grid-template-columns: 1fr; }
 .app-shell--sidebar-collapsed .language-switch--compact button { width: 100%; min-width: 0; padding-inline: 0; }
@@ -139,19 +130,15 @@ h2 { letter-spacing: -0.025em; }
 .icon-button--bordered { border: 1px solid var(--line); background: #fff; }
 .icon-button--inside { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); }
 
-.metric-strip { min-height: 88px; display: grid; grid-template-columns: minmax(210px, .72fr) minmax(220px, .9fr) minmax(360px, 1.55fr); align-items: stretch; margin-bottom: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: rgba(255,255,255,.72); overflow: hidden; }
-.metric { min-width: 0; display: flex; align-items: center; gap: 11px; padding: 16px 20px; border-right: 1px solid var(--line); }
-.metric__label { color: var(--ink-soft); font-size: 14px; line-height: 1.5; }
-.metric strong { margin-left: auto; font-family: inherit; font-size: 24px; }
-.metric--context, .metric--notice { min-width: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.5; }
-.metric--context > span:last-child, .metric--notice > span:last-child { min-width: 0; overflow-wrap: anywhere; }
-.metric--notice { border-right: 0; }
-.metric--notice svg { color: var(--warning); }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; }
-.status-dot--success { background: #43a873; box-shadow: 0 0 0 4px #e6f5ec; }
-
 .data-panel { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); box-shadow: 0 3px 18px rgba(15,22,28,.035); overflow: hidden; }
-.toolbar { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+/* Перенос вместо клипа: .data-panel обрезает содержимое по overflow: hidden, и
+   тулбар, не поместившийся в строку, терял бы правый край вместе с бейджем
+   возраста. У реестра с одним селектом перенос не наступает никогда. */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+/* В каталоге фильтров три: при 260 px на селект строка не помещается в панель на
+   1440 (сайдбар 256 + поля страницы оставляют ~1037 px). Поиск остаётся растяжимым. */
+.toolbar--catalog .search-field { min-width: 200px; }
+.toolbar--catalog .app-select { width: min(200px, 100%); }
 .data-age { flex: 0 0 auto; margin-left: auto; display: inline-flex; align-items: center; gap: 10px; color: var(--ink-faint); font-size: 13px; }
 .data-age button { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: var(--ink-soft); background: transparent; font-size: 13px; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
 .data-age button:disabled { color: var(--ink-faint); text-decoration: none; }
@@ -201,12 +188,13 @@ h2 { letter-spacing: -0.025em; }
 .table-scroll--refreshing::after { content: ''; position: absolute; z-index: 2; top: 0; left: 0; width: 32%; height: 2px; border-radius: 99px; background: var(--accent); animation: refresh-progress .9s ease-in-out infinite alternate; }
 .data-table { width: 100%; min-width: 1050px; border-collapse: collapse; table-layout: fixed; }
 .data-table th { height: 40px; padding: 0 15px; border-bottom: 1px solid var(--line); color: #747e84; background: var(--surface-soft); font-size: 11px; font-weight: 800; letter-spacing: .09em; text-align: left; text-transform: uppercase; }
-.data-table th:nth-child(1) { width: 31%; }
-.data-table th:nth-child(2) { width: 21%; }
-.data-table th:nth-child(3) { width: 16%; }
-.data-table th:nth-child(4) { width: 9%; }
-.data-table th:nth-child(5) { width: 13%; }
-.data-table th:nth-child(6) { width: 10%; }
+/* Пять колонок вместо шести: «Локация» ушла из каталога (значение одно на все
+   строки), её проценты разошлись по оставшимся. */
+.data-table th:nth-child(1) { width: 34%; }
+.data-table th:nth-child(2) { width: 22%; }
+.data-table th:nth-child(3) { width: 18%; }
+.data-table th:nth-child(4) { width: 11%; }
+.data-table th:nth-child(5) { width: 15%; }
 .data-table td { height: 72px; padding: 9px 15px; border-bottom: 1px solid #edf0ec; color: #4f5a61; font-size: 14px; vertical-align: middle; }
 .data-table tbody tr { cursor: pointer; transition: background .15s ease; }
 .data-table tbody tr:hover { background: #fafbf8; }
@@ -226,6 +214,9 @@ h2 { letter-spacing: -0.025em; }
 .equipment-thumb--compact img { position: relative; inset: auto; width: 100%; height: 100%; border-radius: 6px; object-fit: contain; object-position: center; transition: opacity .16s ease, transform .18s ease; }
 .equipment-cell:hover .equipment-thumb--compact img, .picker-item__preview:hover .equipment-thumb--compact img { transform: scale(1.025); }
 .equipment-thumb--large { width: 100%; height: 220px; margin: 20px 0; border-radius: 12px; color: var(--accent); background: linear-gradient(145deg, #f7f8f5, #ecefea); }
+/* Без фотографии 220 px — это 220 px пустоты с иконкой посередине: у модели без
+   снимка заглушка занимала первый экран карточки. */
+.equipment-thumb--large:not(.equipment-thumb--photo) { height: 96px; margin: 14px 0; }
 .equipment-thumb--large.equipment-thumb--photo { width: min(100%, var(--equipment-image-width, 420px)); height: auto; min-height: 0; aspect-ratio: var(--equipment-image-ratio, 1.6); margin-inline: auto; border-color: #e1e5e0; background: #fff; box-shadow: 0 12px 30px rgba(15,22,28,.08); }
 .equipment-thumb--large img { padding: 0; }
 @keyframes equipment-image-arrive {
@@ -616,13 +607,15 @@ h2 { letter-spacing: -0.025em; }
 .equipment-preview dt { color: var(--ink-faint); font-size: 12px; }
 .equipment-preview dd { max-width: 58%; margin: 0; overflow: hidden; color: var(--ink); font-size: 13px; font-weight: 700; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .equipment-preview__notice { margin-bottom: 16px; }
+/* Дубль кнопки сохранения в конце формы — только для телефона: на десктопе
+   кнопка есть и в шапке, и в предпросмотре (см. блок ≤820). */
+.form-submit-mobile { display: none; }
 .success-state { max-width: 620px; margin: 12vh auto 0; padding: 50px; text-align: center; animation: scale-in .32s ease both; }
 .success-state__icon { width: 64px; height: 64px; display: grid; place-items: center; margin: 0 auto 22px; border-radius: 50%; color: var(--success); background: var(--success-bg); }
 .success-state > p:not(.eyebrow) { color: var(--ink-soft); font-size: 12px; }
 .success-state > div { display: flex; justify-content: center; gap: 9px; margin-top: 25px; }
 
 .page-header, .editor-header { animation: rise-in .3s cubic-bezier(.2,.7,.2,1) both; }
-.metric-strip { animation: rise-in .35s .04s cubic-bezier(.2,.7,.2,1) both; }
 .data-panel, .editor-grid { animation: rise-in .38s .08s cubic-bezier(.2,.7,.2,1) both; }
 .list-card { animation: soft-in .28s ease both; }
 .list-card:nth-child(2) { animation-delay: .025s; }
@@ -655,6 +648,7 @@ h2 { letter-spacing: -0.025em; }
 .password-field { position: relative; display: block; }
 .password-field > input { padding-right: 45px; }
 .form-error { margin: -2px 0 14px; padding: 10px 12px; border-radius: 7px; color: var(--danger); background: var(--danger-bg); font-size: 13px; }
+.login-help { margin: 14px 0 0; color: var(--ink-faint); font-size: 12px; line-height: 1.5; }
 
 .app-loader { min-height: 100vh; display: grid; place-content: center; gap: 18px; background: #f3f4f2; }
 .route-loader { min-height: min(520px, calc(100vh - 96px)); display: grid; align-content: start; gap: 16px; padding-top: 4px; }
@@ -664,7 +658,6 @@ h2 { letter-spacing: -0.025em; }
 .loader-line { width: 120px; height: 2px; overflow: hidden; background: #dfe2de; }
 .loader-line::after { content: ''; width: 45px; height: 100%; display: block; background: #1f272c; animation: loader 1s ease-in-out infinite alternate; }
 @keyframes loader { to { transform: translateX(75px); } }
-@keyframes signal-pulse { 50% { opacity: .55; box-shadow: 0 0 0 7px rgba(64,197,123,.035); } }
 @keyframes popover-in { from { opacity: 0; transform: translateY(-4px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -682,20 +675,17 @@ h2 { letter-spacing: -0.025em; }
   .app-shell { grid-template-columns: 76px minmax(0, 1fr); }
   .sidebar { padding-inline: 10px; }
   .sidebar__brand { justify-content: center; }
-  .sidebar .brand-name, .sidebar__brand > button, .nav-section-label, .sidebar__nav a span, .sidebar__scope span, .sidebar__scope > svg:last-child, .user-copy { display: none; }
+  .sidebar .brand-name, .sidebar__brand > button, .nav-section-label, .sidebar__nav a span, .sidebar__scope span, .user-copy { display: none; }
   .sidebar__nav a { justify-content: center; padding: 0; }
   .sidebar__scope { justify-content: center; padding: 12px 0; }
   .sidebar__footer { grid-template-columns: 1fr; justify-items: center; }
   .sidebar__utility { display: none; }
-  .sidebar__signal--bottom { display: none; }
   .app-shell--sidebar-collapsed .sidebar__brand .brand-lockup { display: flex; }
   .app-shell--sidebar-collapsed .sidebar__brand > button { display: none; }
   .sidebar__language { width: 100%; overflow: hidden; }
   .language-switch--compact { grid-template-columns: 1fr; }
   .language-switch--compact button { width: 100%; min-width: 0; padding-inline: 0; }
   .list-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .metric-strip { grid-template-columns: minmax(190px, .65fr) minmax(0, 1.35fr); }
-  .metric--context { display: none; }
   .quick-list-meta { grid-template-columns: 1fr 1fr; }
   .quick-list-meta__notes { grid-column: 1 / -1; }
   .editor-grid { grid-template-columns: 1fr; }
@@ -737,14 +727,13 @@ h2 { letter-spacing: -0.025em; }
   .page-header .button { width: 100%; }
   .button { min-height: 44px; }
   .icon-button { width: 44px; height: 44px; }
-  .metric-strip { min-height: auto; display: flex; flex-direction: column; }
-  .metric { min-width: 0; border-right: 0; border-bottom: 1px solid var(--line); }
-  .metric:last-child { border-bottom: 0; }
   .toolbar { align-items: stretch; flex-direction: column; }
   .data-age { margin-left: 0; justify-content: space-between; }
   .data-age button { min-height: 44px; }
   .search-field { max-width: none; min-width: 0; height: 44px; }
   .search-field input { align-self: stretch; height: auto; }
+  /* Тулбар в столбик — селекты на всю ширину, а не 200/260 px посреди экрана */
+  .toolbar .app-select { width: 100%; }
   .pagination { align-items: flex-start; flex-direction: column; }
   .pagination__controls { width: 100%; justify-content: space-between; }
   .table-scroll { overflow: visible; }
@@ -808,6 +797,7 @@ h2 { letter-spacing: -0.025em; }
   .record-kind-grid, .form-grid { grid-template-columns: 1fr; }
   .form-grid__wide { grid-column: auto; }
   .equipment-preview { display: none; }
+  .form-submit-mobile { display: block; padding: 0 16px 20px; }
   .success-state { margin-top: 6vh; padding: 32px 20px; }
   .success-state > div { flex-direction: column; }
   .state-block--roomy { min-height: 340px; }

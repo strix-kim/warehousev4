@@ -14,7 +14,9 @@ import { AppSelect } from '../../components/AppSelect'
 import { DataAge } from '../../components/DataAge'
 import { EquipmentVisual, preloadEquipmentImages } from '../../components/EquipmentVisual'
 import {
+  emptyEquipmentTaxonomy,
   fetchEquipment,
+  fetchEquipmentTaxonomy,
   MOBILE_EQUIPMENT_PAGE_SIZE,
   preferredEquipmentPageSize,
   readCachedEquipment,
@@ -22,7 +24,7 @@ import {
 } from './api'
 import { equipmentAvailabilityOptions, equipmentAvailabilityView } from './availability'
 import { EquipmentDrawer } from './EquipmentDrawer'
-import { equipmentCode, equipmentIdentifier } from './format'
+import { equipmentIdentifier } from './format'
 import type { Equipment } from './types'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
@@ -44,6 +46,9 @@ export function EquipmentPage() {
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [availability, setAvailability] = useState('')
+  const [type, setType] = useState('')
+  const [subtype, setSubtype] = useState('')
+  const [taxonomy, setTaxonomy] = useState(emptyEquipmentTaxonomy)
   const [selected, setSelected] = useState<Equipment | null>(null)
   const [isLoading, setIsLoading] = useState(() => !initialResult)
   // Только флаг: текст ошибки собирается на рендере. Строка в стейте потянула бы
@@ -56,8 +61,27 @@ export function EquipmentPage() {
   // скелет» и при живом кэше всегда false, а кнопке «Обновить» нужен признак
   // «запрос в полёте» — иначе офлайн она не отвечает на нажатие ничем.
   const [isFetching, setIsFetching] = useState(false)
+  // Исход ПОСЛЕДНЕГО запроса: бейдж возраста обязан отличать «данные старые» от
+  // «обновиться не удалось». Ставится в .then и в .catch, то есть только там,
+  // где исход уже известен.
+  const [lastFetchFailed, setLastFetchFailed] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
+  // Значения категорий — ДАННЫЕ из базы: в опции они уезжают как есть, а через
+  // tr не проходят вовсе; на узбекском их переводит словарь таксономии.
+  const typeOptions = [
+    { value: '', label: tr('Все категории', 'Barcha toifalar') },
+    ...taxonomy.types.map((value) => ({ value, label: translateEquipmentTaxonomy(value, language) })),
+  ]
+  // При выбранной категории список подкатегорий сужается до её собственных;
+  // без категории предлагаются все, какие есть в каталоге.
+  const subtypeOptions = [
+    { value: '', label: tr('Все подкатегории', 'Barcha quyi toifalar') },
+    ...(type ? taxonomy.subtypesByType[type] ?? [] : taxonomy.subtypes).map((value) => ({ value, label: translateEquipmentTaxonomy(value, language) })),
+  ]
+  // Фильтр и поиск считает база, поэтому total — счётчик ТЕКУЩЕЙ выборки:
+  // без фильтров это весь каталог, с фильтрами — найденное.
+  const isFiltered = Boolean(search || availability || type || subtype)
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   // Номер страницы зажимается на рендере: каталог мог сократиться (удалили
   // позиции, сузился фильтр), и page остался за пределами — без зажима выходила
@@ -82,13 +106,26 @@ export function EquipmentPage() {
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
+  // Справочник категорий грузится один раз на заход: он живёт в кэше сутки и
+  // прогревается в App.tsx вместе с данными редактора.
+  useEffect(() => {
+    fetchEquipmentTaxonomy()
+      .then(setTaxonomy)
+      .catch((error: unknown) => reportAppError(error, { scope: 'prefetch', route: '/equipment', detail: { source: 'taxonomy' } }))
+  }, [])
+
   useEffect(() => {
     let isCurrent = true
-    const cached = readCachedEquipment({ page: currentPage, search, availability, pageSize })
+    const cached = readCachedEquipment({ page: currentPage, search, availability, type, subtype, pageSize })
     // Возраст спрашиваем у кэша, а не считаем от момента ответа: запись обновляется
     // только на УСПЕШНОМ ответе, поэтому после сбоя сети здесь остаётся старая метка —
     // ровно то, что бейдж и должен показать.
-    const readAge = () => readCachedEquipmentMeta({ page: currentPage, search, availability, pageSize })?.touchedAt ?? null
+    const readAge = () => readCachedEquipmentMeta({ page: currentPage, search, availability, type, subtype, pageSize })?.touchedAt ?? null
+    // Метка ДО запроса. Отказ сети не всегда доходит до .catch: при живой записи
+    // в кэше cachedQuery подменяет провал последним значением и промис
+    // РЕЗОЛВИТСЯ. Единственный честный признак «ответа с сервера не было» —
+    // несдвинувшаяся метка: кэш обновляет её только на успешном ответе.
+    const ageBefore = readAge()
     if (cached) {
       setRows(cached.rows)
       setTotal(cached.total)
@@ -102,17 +139,19 @@ export function EquipmentPage() {
     // там, где исход запроса уже известен, — в .then и в .catch.
     setDataAt(null)
 
-    fetchEquipment({ page: currentPage, search, availability, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
+    fetchEquipment({ page: currentPage, search, availability, type, subtype, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
       .then((result) => {
         if (!isCurrent) return
         setIsFetching(false)
         setRows(result.rows)
         setTotal(result.total)
-        setDataAt(readAge())
+        const freshAge = readAge()
+        setLastFetchFailed(freshAge !== null && freshAge === ageBefore)
+        setDataAt(freshAge)
         preloadEquipmentImages(result.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 24)
         const nextPage = currentPage + 1
         if (nextPage <= Math.ceil(result.total / pageSize)) {
-          void fetchEquipment({ page: nextPage, search, availability, pageSize })
+          void fetchEquipment({ page: nextPage, search, availability, type, subtype, pageSize })
             .then((nextResult) => preloadEquipmentImages(nextResult.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 16))
             .catch((error: unknown) => reportAppError(error, { scope: 'prefetch', route: '/equipment', detail: { page: nextPage } }))
         }
@@ -122,6 +161,7 @@ export function EquipmentPage() {
         // ушли со страницы) не отказ приложения, и шуметь ею в канал незачем.
         if (!isCurrent) return
         setIsFetching(false)
+        setLastFetchFailed(true)
         reportAppError(error, { scope: 'loader', route: '/equipment', detail: { servedFromCache: Boolean(cached) } })
         setDataAt(readAge())
         if (!cached) setHasLoadError(true)
@@ -133,7 +173,7 @@ export function EquipmentPage() {
     return () => {
       isCurrent = false
     }
-  }, [availability, currentPage, pageSize, reloadKey, search])
+  }, [availability, currentPage, pageSize, reloadKey, search, subtype, type])
 
   const range = useMemo(() => {
     if (!total) return '0'
@@ -155,23 +195,8 @@ export function EquipmentPage() {
         </button>
       </header>
 
-      <section className="metric-strip" aria-label={tr('Сводка каталога', 'Katalog xulosasi')}>
-        <div className="metric">
-          <span className="metric__label">{tr('Позиций в базе', 'Bazadagi pozitsiyalar')}</span>
-          <strong>{total.toLocaleString(locale)}</strong>
-        </div>
-        <div className="metric metric--context">
-          <span className="status-dot status-dot--success" />
-          <span>{tr('Подключены реальные данные Supabase', 'Supabase haqiqiy ma’lumotlari ulangan')}</span>
-        </div>
-        <div className="metric metric--notice">
-          <CircleAlert size={17} />
-          <span>{tr('Общие данные модели и состояние каждой единицы можно редактировать отдельно', 'Modelning umumiy ma’lumotlari va har bir birlik holatini alohida tahrirlash mumkin')}</span>
-        </div>
-      </section>
-
       <section className="data-panel">
-        <div className="toolbar">
+        <div className="toolbar toolbar--catalog">
           <label className="search-field">
             <Search size={18} />
             <input
@@ -187,6 +212,27 @@ export function EquipmentPage() {
             )}
           </label>
           <AppSelect
+            value={type}
+            options={typeOptions}
+            onChange={(value) => {
+              setType(value)
+              // Подкатегория принадлежит категории: оставленная от прошлой
+              // категории, она дала бы заведомо пустую выборку.
+              setSubtype('')
+              setPage(1)
+            }}
+            ariaLabel={tr('Фильтр по категории', 'Toifa bo‘yicha filtr')}
+          />
+          <AppSelect
+            value={subtype}
+            options={subtypeOptions}
+            onChange={(value) => {
+              setSubtype(value)
+              setPage(1)
+            }}
+            ariaLabel={tr('Фильтр по подкатегории', 'Quyi toifa bo‘yicha filtr')}
+          />
+          <AppSelect
             value={availability}
             options={availabilityOptions}
             icon={<SlidersHorizontal size={17} />}
@@ -196,10 +242,11 @@ export function EquipmentPage() {
             }}
             ariaLabel={tr('Фильтр по статусу', 'Holat bo‘yicha filtr')}
           />
+          <span className="toolbar__count">{isFiltered ? tr('Найдено', 'Topildi') : tr('Позиций в базе', 'Bazadagi pozitsiyalar')}: {total.toLocaleString(locale)}</span>
           {/* Рядом с блоком «Ошибка загрузки» бейдж не рисуем: на экране оказались бы
               два разных предложения обновиться и «Обновлено 25 минут назад» под
               заголовком о том, что данных нет. */}
-          {!hasLoadError && <DataAge touchedAt={dataAt} isRefreshing={isFetching} onRefresh={() => setReloadKey((value) => value + 1)} />}
+          {!hasLoadError && <DataAge touchedAt={dataAt} isRefreshing={isFetching} failed={lastFetchFailed} onRefresh={() => setReloadKey((value) => value + 1)} />}
         </div>
 
         {hasLoadError ? (
@@ -219,14 +266,13 @@ export function EquipmentPage() {
                   <th>{tr('Номер / учёт', 'Raqam / hisob')}</th>
                   <th>{tr('Кол-во', 'Soni')}</th>
                   <th>{tr('Статус', 'Holat')}</th>
-                  <th>{tr('Локация', 'Joylashuv')}</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading && rows.length === 0
                   ? Array.from({ length: 8 }, (_, index) => (
                       <tr key={index} className="skeleton-row">
-                        <td colSpan={6}><span /></td>
+                        <td colSpan={5}><span /></td>
                       </tr>
                     ))
                   : rows.map((item) => {
@@ -248,7 +294,9 @@ export function EquipmentPage() {
                               <EquipmentVisual item={item} />
                               <span>
                                 <strong>{item.brand} {item.model}</strong>
-                                <small>{equipmentCode(item.id)} · {translateEquipmentTaxonomy(item.subtype, language)}</small>
+                                {/* Код EQ-… ушёл: он не написан на технике и не ищется
+                                    поиском. В карточке единицы он остаётся. */}
+                                <small>{translateEquipmentTaxonomy(item.subtype, language)}</small>
                               </span>
                             </div>
                           </td>
@@ -256,7 +304,6 @@ export function EquipmentPage() {
                           <td data-label={item.tracking_mode === 'quantity' ? tr('Количественный учёт', 'Miqdor bo‘yicha hisob') : tr('Серийный номер', 'Seriya raqami')} className="mono">{equipmentIdentifier(item, tr)}</td>
                           <td data-label={tr('Количество', 'Miqdor')}><strong>{item.count}</strong> {tr('шт.', 'dona')}</td>
                           <td data-label={tr('Статус', 'Holat')}><span className={`badge badge--${status.tone}`}><i />{status.label}</span></td>
-                          <td data-label={tr('Локация', 'Joylashuv')}>{item.location || '—'}</td>
                         </tr>
                       )
                     })}
@@ -266,8 +313,13 @@ export function EquipmentPage() {
             {!isLoading && !rows.length && (
               <div className="state-block">
                 <PackageOpen size={27} />
-                <strong>{tr('Ничего не найдено', 'Hech narsa topilmadi')}</strong>
-                <span>{tr('Измените запрос или сбросьте фильтры.', 'So‘rovni o‘zgartiring yoki filtrlarni tozalang.')}</span>
+                {/* Пустой ответ БЕЗ запроса и фильтров — это не «ничего не найдено»:
+                    у сотрудника без строки в public.users каталог закрыт политикой
+                    и приходит пустым. Почту администратора в бандл не кладём. */}
+                <strong>{isFiltered ? tr('Ничего не найдено', 'Hech narsa topilmadi') : tr('Каталог пуст или недоступен', 'Katalog bo‘sh yoki mavjud emas')}</strong>
+                <span>{isFiltered
+                  ? tr('Измените запрос или сбросьте фильтры.', 'So‘rovni o‘zgartiring yoki filtrlarni tozalang.')
+                  : tr('Если вы только что получили доступ, обратитесь к администратору склада.', 'Agar siz endigina ruxsat olgan bo‘lsangiz, ombor administratoriga murojaat qiling.')}</span>
               </div>
             )}
           </div>

@@ -116,6 +116,13 @@ export function LoginPage() {
             {isSubmitting ? tr('Входим…', 'Kirilmoqda…') : tr('Войти', 'Kirish')}
             {!isSubmitting && <ArrowRight size={18} />}
           </button>
+
+          {/* Куда идти, если войти не получилось. Почту администратора в бандл не
+              кладём: всё, что уезжает на клиент, читается любым посетителем. */}
+          <p className="login-help">{tr(
+            'Нет доступа или забыли пароль — напишите администратору склада.',
+            'Kirish huquqi yo‘q yoki parolni unutdingizmi — ombor administratoriga yozing.',
+          )}</p>
         </form>
       </section>
     </main>

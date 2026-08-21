@@ -1,4 +1,4 @@
-import { ArrowUpRight, Boxes, ChevronDown, ClipboardList, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, RadioTower, Warehouse } from 'lucide-react'
+import { ArrowUpRight, Boxes, ClipboardList, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Warehouse } from 'lucide-react'
 import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AppErrorBoundary } from '../components/AppErrorBoundary'
@@ -162,22 +162,14 @@ function AppShell() {
             <div><strong>{tr('Новый список', 'Yangi ro‘yxat')}</strong><small>{tr('Собрать комплект', 'Jamlanma tuzish')}</small></div>
             <ArrowUpRight size={16} />
           </NavLink>
-          <div className="sidebar__flow" aria-hidden="true">
-            <p>{tr('Быстрый процесс', 'Tezkor jarayon')}</p>
-            <ol>
-              <li><i>01</i><span>{tr('Найти технику', 'Uskunani topish')}</span></li>
-              <li><i>02</i><span>{tr('Собрать комплект', 'Jamlanma tuzish')}</span></li>
-              <li><i>03</i><span>{tr('Скачать Excel', 'Excel yuklash')}</span></li>
-            </ol>
-          </div>
         </div>
 
-        <div className="sidebar__signal sidebar__signal--bottom"><RadioTower size={14} /><span>{tr('Склад в рабочем режиме', 'Ombor ish rejimida')}</span><i /></div>
-
+        {/* Локация одна на весь каталог, выбирать не из чего: строка осталась
+            реквизитом склада — без подписи «текущая» и без шеврона, который
+            ничего не открывал. */}
         <div className="sidebar__scope">
           <Warehouse size={18} />
-          <span><small>{tr('Текущая локация', 'Joriy joylashuv')}</small><strong>{tr('Офис · Ташкент', 'Ofis · Toshkent')}</strong></span>
-          <ChevronDown size={16} />
+          <span><strong>{tr('Офис · Ташкент', 'Ofis · Toshkent')}</strong></span>
         </div>
 
         <div className="sidebar__language"><LanguageSwitcher compact /></div>

@@ -15,9 +15,13 @@ type Props = {
   touchedAt: number | null
   isRefreshing: boolean
   onRefresh: () => void
+  // Последний запрос страницы отказал. «Старое» и «не обновилось» — разные
+  // состояния: при отказе порог «моложе минуты» не действует, иначе минуту после
+  // обрыва связи бейдж молчал бы, а человек считал бы данные свежими.
+  failed?: boolean
 }
 
-export function DataAge({ touchedAt, isRefreshing, onRefresh }: Props) {
+export function DataAge({ touchedAt, isRefreshing, onRefresh, failed = false }: Props) {
   const { tr, locale } = useLanguage()
   // Тик существует только чтобы вызвать перерисовку: сама строка считается на
   // рендере из touchedAt. Держать готовый текст в стейте — это вторая копия
@@ -30,16 +34,23 @@ export function DataAge({ touchedAt, isRefreshing, onRefresh }: Props) {
     return () => window.clearInterval(timer)
   }, [touchedAt])
 
-  if (touchedAt === null || Date.now() - touchedAt < MIN_VISIBLE_AGE_MS) return null
+  if (touchedAt === null && !failed) return null
+  if (touchedAt !== null && !failed && Date.now() - touchedAt < MIN_VISIBLE_AGE_MS) return null
 
   // Фраза собирается целиком внутри tr, а не склейкой «причастие + возраст»: в
   // узбекском причастие идёт в конец («40 daqiqa oldin yangilangan»), и склейка
   // давала бы порядок слов русского предложения.
-  const age = formatAge(touchedAt, locale, tr)
+  const age = touchedAt === null ? '' : formatAge(touchedAt, locale, tr)
+  // Возраста нет (в кэше пусто) — называть нечего, остаётся сам факт отказа.
+  const label = failed
+    ? (touchedAt === null
+      ? tr('Не удалось обновить', 'Yangilab bo‘lmadi')
+      : tr(`Не удалось обновить · данные от ${age}`, `Yangilab bo‘lmadi · ma’lumotlar ${age}`))
+    : tr(`Обновлено ${age}`, `${age} yangilangan`)
 
   return (
     <div className="data-age" role="status">
-      <span>{tr(`Обновлено ${age}`, `${age} yangilangan`)}</span>
+      <span>{label}</span>
       <button type="button" onClick={onRefresh} disabled={isRefreshing}>
         <RotateCw size={14} />
         {isRefreshing ? tr('Обновляем…', 'Yangilanmoqda…') : tr('Обновить', 'Yangilash')}

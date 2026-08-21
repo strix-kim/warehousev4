@@ -137,6 +137,10 @@ export function ListsPage() {
   // скелет» и при живом кэше всегда false, а кнопке «Обновить» нужен признак
   // «запрос в полёте» — иначе офлайн она не отвечает на нажатие ничем.
   const [isFetching, setIsFetching] = useState(false)
+  // Исход ПОСЛЕДНЕГО запроса: бейдж возраста обязан отличать «данные старые» от
+  // «обновиться не удалось». Ставится в .then и в .catch, то есть только там,
+  // где исход уже известен.
+  const [lastFetchFailed, setLastFetchFailed] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [selected, setSelected] = useState<EquipmentList | null>(null)
   const [exporting, setExporting] = useState<{ id: string; mode: 'working' | 'approval' } | null>(null)
@@ -184,6 +188,11 @@ export function ListsPage() {
     // только на УСПЕШНОМ ответе, поэтому после сбоя сети здесь остаётся старая метка —
     // ровно то, что бейдж и должен показать.
     const readAge = () => readCachedEquipmentListsMeta({ page: currentPage, search, status, pageSize })?.touchedAt ?? null
+    // Метка ДО запроса. Отказ сети не всегда доходит до .catch: при живой записи
+    // в кэше cachedQuery подменяет провал последним значением и промис
+    // РЕЗОЛВИТСЯ. Единственный честный признак «ответа с сервера не было» —
+    // несдвинувшаяся метка: кэш обновляет её только на успешном ответе.
+    const ageBefore = readAge()
     if (cached) {
       setRows(cached.rows)
       setTotal(cached.total)
@@ -202,7 +211,9 @@ export function ListsPage() {
         setIsFetching(false)
         setRows(result.rows)
         setTotal(result.total)
-        setDataAt(readAge())
+        const freshAge = readAge()
+        setLastFetchFailed(freshAge !== null && freshAge === ageBefore)
+        setDataAt(freshAge)
         // Открытые детали переезжают на свежую строку: смена этапа и удаление
         // возвращаются сюда через reloadKey.
         setSelected((current) => current ? result.rows.find((item) => item.id === current.id) ?? null : null)
@@ -212,6 +223,7 @@ export function ListsPage() {
         // ушли со страницы) не отказ приложения, и шуметь ею в канал незачем.
         if (!isCurrent) return
         setIsFetching(false)
+        setLastFetchFailed(true)
         reportAppError(error, { scope: 'loader', route: '/lists', detail: { servedFromCache: Boolean(cached) } })
         setDataAt(readAge())
         if (!cached) setHasLoadError(true)
@@ -287,7 +299,7 @@ export function ListsPage() {
           {/* Рядом с блоком «Ошибка загрузки» бейдж не рисуем: на экране оказались бы
               два разных предложения обновиться и «Обновлено 25 минут назад» под
               заголовком о том, что данных нет. */}
-          {!hasLoadError && <DataAge touchedAt={dataAt} isRefreshing={isFetching} onRefresh={() => setReloadKey((current) => current + 1)} />}
+          {!hasLoadError && <DataAge touchedAt={dataAt} isRefreshing={isFetching} failed={lastFetchFailed} onRefresh={() => setReloadKey((current) => current + 1)} />}
         </div>
 
         {exportError && <p className="form-error list-export-error"><CircleAlert size={14} /> {exportError}</p>}

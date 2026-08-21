@@ -14,6 +14,7 @@ const uzbekTaxonomy: Record<string, string> = {
   'PCI-карты': 'PCI kartalari',
   'PTZ-контроллер': 'PTZ kontrolleri',
   'SFP-модуль': 'SFP moduli',
+  'UPS': 'UPS (uzluksiz quvvat manbai)',
   'USB-интерфейсы, HDMI-сплиттеры, контроллеры': 'USB interfeyslar, HDMI splitterlar, kontrollerlar',
   'UTP-кабели': 'UTP kabellari',
   'Wi-Fi роутеры, коммутаторы': 'Wi-Fi routerlar va kommutatorlar',

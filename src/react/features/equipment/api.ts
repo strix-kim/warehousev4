@@ -56,6 +56,11 @@ type EquipmentQuery = {
   page: number
   search: string
   availability: string
+  // Фильтр по категории и подкатегории. Пустая строка — «все»; оба поля входят в
+  // ключ кэша ВСЕГДА, поэтому прогрев в App.tsx без них попадает в ту же запись,
+  // что и страница с пустыми фильтрами.
+  type?: string
+  subtype?: string
   pageSize?: number
   bypassCache?: boolean
 }
@@ -64,8 +69,8 @@ function safeSearch(value: string) {
   return value.trim().replace(/[,%()]/g, ' ').replace(/\s+/g, ' ')
 }
 
-function equipmentPageCacheKey({ page, search, availability, pageSize = EQUIPMENT_PAGE_SIZE }: Omit<EquipmentQuery, 'bypassCache'>) {
-  return `equipment:${JSON.stringify({ page, search: safeSearch(search), availability, pageSize })}`
+function equipmentPageCacheKey({ page, search, availability, type = '', subtype = '', pageSize = EQUIPMENT_PAGE_SIZE }: Omit<EquipmentQuery, 'bypassCache'>) {
+  return `equipment:${JSON.stringify({ page, search: safeSearch(search), availability, type, subtype, pageSize })}`
 }
 
 export function readCachedEquipment(query: Omit<EquipmentQuery, 'bypassCache'>) {
@@ -82,11 +87,11 @@ export function readCachedAllEquipment() {
   return readCachedQuery<Equipment[]>('equipment:all')
 }
 
-export async function fetchEquipment({ page, search, availability, pageSize = EQUIPMENT_PAGE_SIZE, bypassCache = false }: EquipmentQuery): Promise<EquipmentPageResult> {
+export async function fetchEquipment({ page, search, availability, type = '', subtype = '', pageSize = EQUIPMENT_PAGE_SIZE, bypassCache = false }: EquipmentQuery): Promise<EquipmentPageResult> {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
 
-  const cacheKey = equipmentPageCacheKey({ page, search, availability, pageSize })
+  const cacheKey = equipmentPageCacheKey({ page, search, availability, type, subtype, pageSize })
   return cachedQuery(cacheKey, 10 * 60 * 1000, async () => {
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
@@ -110,11 +115,9 @@ export async function fetchEquipment({ page, search, availability, pageSize = EQ
       }
     }
 
-    if (availability === '__available__') {
-      query = query.eq('availability', 'available')
-    } else if (availability) {
-      query = query.eq('availability', availability)
-    }
+    if (availability) query = query.eq('availability', availability)
+    if (type) query = query.eq('type', type)
+    if (subtype) query = query.eq('subtype', subtype)
 
     const { data, count, error } = await query
     if (error) throw error
@@ -181,21 +184,51 @@ export async function fetchEquipmentById(id: string): Promise<Equipment | null> 
 export type EquipmentTaxonomy = {
   types: string[]
   subtypes: string[]
+  // Подкатегории по категориям: фильтр каталога сужает второй селект первым, и
+  // считать эту карту на клиенте из каталога нельзя — на экране одна страница.
+  subtypesByType: Record<string, string[]>
 }
+
+export const emptyEquipmentTaxonomy: EquipmentTaxonomy = { types: [], subtypes: [], subtypesByType: {} }
 
 export async function fetchEquipmentTaxonomy(): Promise<EquipmentTaxonomy> {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
-  return cachedQuery('equipment-taxonomy', 24 * 60 * 60 * 1000, async () => {
-    const { data, error } = await client
-      .from('equipment')
-      .select('type,subtype')
-      .range(0, 1999)
+  // v2 в ключе — форма записи изменилась: старая запись без subtypesByType живёт
+  // в localStorage сутки и уронила бы селект подкатегорий на неопределённом поле.
+  return cachedQuery('equipment-taxonomy:v2', 24 * 60 * 60 * 1000, async () => {
+    // Батчами, а не одним .range(0, 1999): Data API отдаёт не больше 1000 строк за
+    // ответ (gotchas §1), и с явным порядком по type обрезка стала бы РОВНОЙ —
+    // последняя категория пропала бы из фильтра целиком.
+    const rows: { type: string; subtype: string }[] = []
+    const batchSize = 1000
+    for (let from = 0; ; from += batchSize) {
+      const { data: batch, error } = await client
+        .from('equipment')
+        .select('type,subtype')
+        .order('type', { ascending: true })
+        .order('subtype', { ascending: true })
+        // id — на случай одинаковых пар: без полного порядка страницы могут
+        // перекрываться и терять строки между собой.
+        .order('id', { ascending: true })
+        .range(from, from + batchSize - 1)
+      if (error) throw error
+      rows.push(...(batch ?? []))
+      if ((batch ?? []).length < batchSize) break
+    }
 
-    if (error) throw error
+    const byType = new Map<string, Set<string>>()
+    for (const item of rows) {
+      if (!item.type || !item.subtype) continue
+      const bucket = byType.get(item.type) ?? new Set<string>()
+      bucket.add(item.subtype)
+      byType.set(item.type, bucket)
+    }
+    const byRu = (a: string, b: string) => a.localeCompare(b, 'ru')
     return {
-      types: [...new Set((data ?? []).map((item) => item.type).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')),
-      subtypes: [...new Set((data ?? []).map((item) => item.subtype).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')),
+      types: [...new Set(rows.map((item) => item.type).filter(Boolean))].sort(byRu),
+      subtypes: [...new Set(rows.map((item) => item.subtype).filter(Boolean))].sort(byRu),
+      subtypesByType: Object.fromEntries([...byType].map(([type, values]) => [type, [...values].sort(byRu)])),
     }
   })
 }
