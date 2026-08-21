@@ -1,30 +1,23 @@
 import { useEffect } from 'react'
-import { listDocumentDefaults } from './documentDefaults'
 import { clearListDraft, saveListDraft, type ListDraft, type ListDraftItem } from './api'
-
-// Реквизит считается нетронутым, если он пуст или совпадает с дефолтом ЛЮБОГО из
-// языков: пользователь мог переключить язык, не притронувшись к полю.
-function isDefaultDocumentValue(value: string, field: 'name' | 'clientName' | 'venue') {
-  const trimmed = value.trim()
-  return !trimmed || Object.values(listDocumentDefaults).some((item) => item[field] === trimmed)
-}
 
 // «Пустой» черновик не хранится и стирает уже записанный: иначе один заход на
 // /lists/new без единого действия подсовывал бы плашку «черновик восстановлен».
-// Дата и формат Excel в проверку не входят — у них дефолт есть всегда.
+// Дата в проверку не входит — у неё дефолт есть всегда. Реквизиты сравнивать не
+// с чем: подставленных значений у полей больше нет, нетронутое поле просто пусто.
 function isDraftEmpty(draft: ListDraft) {
   return draft.items.length === 0
     && !draft.description.trim()
-    && isDefaultDocumentValue(draft.name, 'name')
-    && isDefaultDocumentValue(draft.clientName, 'clientName')
-    && isDefaultDocumentValue(draft.venue, 'venue')
+    && !draft.name.trim()
+    && !draft.clientName.trim()
+    && !draft.venue.trim()
 }
 
 // Автосейв черновика: пауза 1 с после последнего изменения. Режим
 // редактирования сюда не заходит — там «сохранить» пишет в базу.
 // restoredRef — тот же флаг «восстановление закончилось», что и в редакторе:
 // читается в момент срабатывания таймера, поэтому передаётся ссылкой.
-export function useListDraftAutosave({ listId, restoredRef, name, clientName, venue, description, eventDate, documentMode, items }: {
+export function useListDraftAutosave({ listId, restoredRef, name, clientName, venue, description, eventDate, items }: {
   listId: string | undefined
   restoredRef: { current: boolean }
   name: string
@@ -32,16 +25,15 @@ export function useListDraftAutosave({ listId, restoredRef, name, clientName, ve
   venue: string
   description: string
   eventDate: string
-  documentMode: 'working' | 'approval'
   items: ListDraftItem[]
 }) {
   useEffect(() => {
     if (listId || !restoredRef.current) return
     const timer = window.setTimeout(() => {
-      const draft: ListDraft = { name, clientName, venue, description, eventDate, documentMode, items }
+      const draft: ListDraft = { name, clientName, venue, description, eventDate, items }
       if (isDraftEmpty(draft)) clearListDraft()
       else saveListDraft(draft)
     }, 1000)
     return () => window.clearTimeout(timer)
-  }, [clientName, description, documentMode, eventDate, items, listId, name, restoredRef, venue])
+  }, [clientName, description, eventDate, items, listId, name, restoredRef, venue])
 }

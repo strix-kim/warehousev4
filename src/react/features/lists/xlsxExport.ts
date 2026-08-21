@@ -1,4 +1,5 @@
-import { companyDetails, companyLegalName, listDocumentDefaults } from './documentDefaults'
+import { toDateValue } from '../../lib/date'
+import { companyDetails, companyLegalName } from './documentDefaults'
 
 export type ExportListRow = {
   category: string
@@ -44,24 +45,51 @@ function formulaCell(reference: string, formula: string, cachedValue: number, st
   return `<c r="${reference}" s="${style}"><f>${xml(formula)}</f><v>${cachedValue}</v></c>`
 }
 
-function getSheetMetrics(input: ExportListInput) {
+function sheetTexts(language: 'ru' | 'uz') {
+  return language === 'uz'
+    ? { title: 'USKUNALAR RO‘YXATI', project: 'Loyiha / tadbir', client: 'Buyurtmachi / tashkilotchi', venue: 'Maydon / joylashuv', date: 'Tadbir sanasi', description: 'Hujjatga izoh', generated: 'Tuzilgan', number: '№', equipment: 'Uskuna', count: 'Miqdor', serials: 'Seriya raqamlari', note: 'Eslatma', total: 'Jami birliklar', noSerials: '—', contents: 'JAMLAMA TARKIBI', positions: 'Pozitsiyalar', units: 'Birliklar' }
+    : { title: 'СПИСОК ОБОРУДОВАНИЯ', project: 'Проект / мероприятие', client: 'Заказчик / организатор', venue: 'Площадка / локация', date: 'Дата мероприятия', description: 'Комментарий к документу', generated: 'Сформирован', number: '№', equipment: 'Оборудование', count: 'Кол-во', serials: 'Серийные номера', note: 'Примечание', total: 'Всего единиц', noSerials: '—', contents: 'СОСТАВ КОМПЛЕКТА', positions: 'Позиций', units: 'Единиц' }
+}
+
+type SheetTexts = ReturnType<typeof sheetTexts>
+
+// Строка шапки документа: подпись, значение и ключ. Ключ нужен потому, что сетка
+// листа стала переменной — по индексу строку «Комментарий» уже не опознать.
+type MetadataRow = [label: string, value: string, key: 'project' | 'client' | 'venue' | 'date' | 'description' | 'generated']
+
+function formatEventDate(input: ExportListInput) {
+  return input.eventDate
+    ? new Intl.DateTimeFormat(input.locale).format(new Date(`${input.eventDate}T12:00:00`))
+    : '—'
+}
+
+// Пустые реквизиты в документ не выводятся вовсе. Раньше на их месте стояли
+// выдуманные дефолты («Заказчик не указан»), и файл под грифом «УТВЕРЖДАЮ» врал.
+// Отсюда же берётся число строк метаданных: позиции остальных строк листа
+// считаются от него, а не от зашитой шестёрки.
+function buildMetadata(input: ExportListInput, t: SheetTexts): MetadataRow[] {
+  const rows: MetadataRow[] = [[t.project, input.name, 'project']]
+  if (input.clientName.trim()) rows.push([t.client, input.clientName, 'client'])
+  if (input.venue.trim()) rows.push([t.venue, input.venue, 'venue'])
+  rows.push([t.date, formatEventDate(input), 'date'])
+  if (input.description.trim()) rows.push([t.description, input.description, 'description'])
+  rows.push([t.generated, new Intl.DateTimeFormat(input.locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date()), 'generated'])
+  return rows
+}
+
+function getSheetMetrics(input: ExportListInput, metadataRows: number) {
   const metadataStart = input.documentMode === 'approval' ? 7 : 3
-  const headerRow = metadataStart + 8
+  const headerRow = metadataStart + metadataRows + 2
   const dataStart = headerRow + 1
   return { metadataStart, headerRow, dataStart, totalRow: dataStart + input.rows.length }
 }
 
 function buildSheet(input: ExportListInput) {
-  const defaults = listDocumentDefaults[input.language]
-  const t = input.language === 'uz'
-    ? { title: 'USKUNALAR RO‘YXATI', project: 'Loyiha / tadbir', client: 'Buyurtmachi / tashkilotchi', venue: 'Maydon / joylashuv', date: 'Tadbir sanasi', description: 'Hujjatga izoh', generated: 'Tuzilgan', number: '№', equipment: 'Uskuna', count: 'Miqdor', serials: 'Seriya raqamlari', note: 'Eslatma', total: 'Jami birliklar', noSerials: '—', contents: 'JAMLAMA TARKIBI', positions: 'Pozitsiyalar', units: 'Birliklar' }
-    : { title: 'СПИСОК ОБОРУДОВАНИЯ', project: 'Проект / мероприятие', client: 'Заказчик / организатор', venue: 'Площадка / локация', date: 'Дата мероприятия', description: 'Комментарий к документу', generated: 'Сформирован', number: '№', equipment: 'Оборудование', count: 'Кол-во', serials: 'Серийные номера', note: 'Примечание', total: 'Всего единиц', noSerials: '—', contents: 'СОСТАВ КОМПЛЕКТА', positions: 'Позиций', units: 'Единиц' }
-  const date = input.eventDate
-    ? new Intl.DateTimeFormat(input.locale).format(new Date(`${input.eventDate}T12:00:00`))
-    : '—'
-  const generatedAt = new Intl.DateTimeFormat(input.locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date())
+  const t = sheetTexts(input.language)
+  const date = formatEventDate(input)
   const approvalMode = input.documentMode === 'approval'
-  const { metadataStart, headerRow, dataStart, totalRow } = getSheetMetrics(input)
+  const metadata = buildMetadata(input, t)
+  const { metadataStart, headerRow, dataStart, totalRow } = getSheetMetrics(input, metadata.length)
   const total = input.rows.reduce((sum, item) => sum + item.count, 0)
   const rows: string[] = []
   const merges: string[] = []
@@ -89,18 +117,9 @@ function buildSheet(input: ExportListInput) {
     merges.push('B1:E1')
   }
 
-  // Пары «подпись → значение»: тип кортежем, иначе деструктуризация даёт string | undefined
-  const metadata: [string, string][] = [
-    [t.project, input.name || defaults.name],
-    [t.client, input.clientName || defaults.clientName],
-    [t.venue, input.venue || defaults.venue],
-    [t.date, date],
-    [t.description, input.description || '—'],
-    [t.generated, generatedAt],
-  ]
-  metadata.forEach(([label, value], index) => {
+  metadata.forEach(([label, value, key], index) => {
     const rowNumber = metadataStart + index
-    const rowHeight = index === 4 ? 38 : 27
+    const rowHeight = key === 'description' ? 38 : 27
     rows.push(`<row r="${rowNumber}" ht="${rowHeight}" customHeight="1">${textCell(`A${rowNumber}`, label, 2)}${textCell(`C${rowNumber}`, value, 4)}</row>`)
     merges.push(`A${rowNumber}:B${rowNumber}`, `C${rowNumber}:E${rowNumber}`)
   })
@@ -134,7 +153,7 @@ function buildSheet(input: ExportListInput) {
   <printOptions horizontalCentered="1"/>
   <pageMargins left="0.35" right="0.35" top="0.55" bottom="0.55" header="0.25" footer="0.25"/>
   <pageSetup orientation="portrait" fitToWidth="1" fitToHeight="0" paperSize="9" pageOrder="downThenOver"/>
-  <headerFooter differentOddEven="1"><oddHeader>&amp;LARGO MEDIA&amp;R${xml(input.name || defaults.name)}</oddHeader><evenHeader>&amp;LARGO MEDIA&amp;R${xml(input.name || defaults.name)}</evenHeader><oddFooter>&amp;LARGO MEDIA&amp;C${input.language === 'uz' ? 'Sahifa' : 'Страница'} &amp;P / &amp;N&amp;R${date}</oddFooter><evenFooter>&amp;LARGO MEDIA&amp;C${input.language === 'uz' ? 'Sahifa' : 'Страница'} &amp;P / &amp;N&amp;R${date}</evenFooter></headerFooter>
+  <headerFooter differentOddEven="1"><oddHeader>&amp;LARGO MEDIA&amp;R${xml(input.name)}</oddHeader><evenHeader>&amp;LARGO MEDIA&amp;R${xml(input.name)}</evenHeader><oddFooter>&amp;LARGO MEDIA&amp;C${input.language === 'uz' ? 'Sahifa' : 'Страница'} &amp;P / &amp;N&amp;R${date}</oddFooter><evenFooter>&amp;LARGO MEDIA&amp;C${input.language === 'uz' ? 'Sahifa' : 'Страница'} &amp;P / &amp;N&amp;R${date}</evenFooter></headerFooter>
 </worksheet>`
 }
 
@@ -239,9 +258,21 @@ function safeFileName(value: string) {
   return value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').slice(0, 80) || 'equipment-list'
 }
 
+// Имя файла: дата мероприятия, название и режим документа. До этого оба режима
+// давали одно и то же имя — второй файл ложился в загрузки как «… (1)», и понять,
+// где рабочий список, а где документ с реквизитами, можно было только открыв оба.
+function exportFileName(input: ExportListInput) {
+  const suffix = input.documentMode === 'approval'
+    ? (input.language === 'uz' ? 'kelishuvga' : 'на-согласование')
+    : (input.language === 'uz' ? 'ishchi' : 'рабочий')
+  return `${input.eventDate ?? toDateValue(new Date())}_${safeFileName(input.name)}_${suffix}.xlsx`
+}
+
 function createEquipmentListXlsxBlob(input: ExportListInput) {
   const sheetName = input.language === 'uz' ? 'Uskunalar' : 'Оборудование'
-  const { headerRow, totalRow } = getSheetMetrics(input)
+  // Область печати и повтор шапки считаются по той же сетке, что и сам лист:
+  // число строк метаданных зависит от заполненных реквизитов.
+  const { headerRow, totalRow } = getSheetMetrics(input, buildMetadata(input, sheetTexts(input.language)).length)
   const files = [
     { name: '[Content_Types].xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>` },
     { name: '_rels/.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>` },
@@ -260,7 +291,7 @@ export function downloadEquipmentListXlsx(input: ExportListInput) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `${safeFileName(input.name)}.xlsx`
+  anchor.download = exportFileName(input)
   document.body.append(anchor)
   anchor.click()
   anchor.remove()

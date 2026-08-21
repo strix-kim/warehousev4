@@ -14,25 +14,32 @@ export function HomePage() {
       </header>
 
       <div className="home-destinations">
-        <Link className="home-destination home-destination--equipment" to="/equipment">
+        {/* Плитка — <article>, а не <a>: подпись-действие ведёт своим адресом, а вложить
+            ссылку в ссылку нельзя. Тело плитки кликается растянутой .home-destination__link. */}
+        <article className="home-destination home-destination--equipment">
           <img className="home-destination__art home-destination__art--equipment" src="/illustrations/av-warehouse.webp" alt="" aria-hidden="true" loading="eager" decoding="async" fetchPriority="high" />
-          <span className="home-destination__icon"><Boxes size={34} /></span>
-          <span className="home-destination__arrow"><ArrowUpRight size={24} /></span>
-          <span className="eyebrow">{tr('Склад и карточки', 'Ombor va kartalar')}</span>
-          <strong>{tr('Оборудование', 'Uskunalar')}</strong>
-          <p>{tr('Найти технику, проверить количество, серийный номер, описание и расположение.', 'Uskunani topish, miqdor, seriya raqami, tavsif va joylashuvni tekshirish.')}</p>
-          <span className="home-destination__action">{tr('Открыть каталог', 'Katalogni ochish')} <ArrowUpRight size={16} /></span>
-        </Link>
+          <Link className="home-destination__link" to="/equipment">
+            <span className="home-destination__icon"><Boxes size={34} /></span>
+            <span className="home-destination__arrow"><ArrowUpRight size={24} /></span>
+            <span className="eyebrow">{tr('Склад и карточки', 'Ombor va kartalar')}</span>
+            <strong>{tr('Оборудование', 'Uskunalar')}</strong>
+            <p>{tr('Найти технику, проверить количество, серийный номер, описание и расположение.', 'Uskunani topish, miqdor, seriya raqami, tavsif va joylashuvni tekshirish.')}</p>
+            {/* Каталогу отдельная цель не нужна — действие совпадает с самой плиткой */}
+            <span className="home-destination__action">{tr('Открыть каталог', 'Katalogni ochish')} <ArrowUpRight size={16} /></span>
+          </Link>
+        </article>
 
-        <Link className="home-destination home-destination--lists" to="/lists">
+        <article className="home-destination home-destination--lists">
           <img className="home-destination__art home-destination__art--lists" src="/illustrations/equipment-kit.webp" alt="" aria-hidden="true" loading="eager" decoding="async" fetchPriority="high" />
-          <span className="home-destination__icon"><ClipboardList size={34} /></span>
-          <span className="home-destination__arrow"><ArrowUpRight size={24} /></span>
-          <span className="eyebrow">{tr('Быстрый документ', 'Tezkor hujjat')}</span>
-          <strong>{tr('Списки оборудования', 'Uskunalar ro‘yxatlari')}</strong>
-          <p>{tr('Быстро собрать комплект, указать количество и скачать готовый Excel.', 'Jamlanmani tez yig‘ish, miqdorni ko‘rsatish va tayyor Excelni yuklash.')}</p>
-          <span className="home-destination__action"><Plus size={16} /> {tr('Создать список', 'Ro‘yxat yaratish')}</span>
-        </Link>
+          <Link className="home-destination__link" to="/lists">
+            <span className="home-destination__icon"><ClipboardList size={34} /></span>
+            <span className="home-destination__arrow"><ArrowUpRight size={24} /></span>
+            <span className="eyebrow">{tr('Быстрый документ', 'Tezkor hujjat')}</span>
+            <strong>{tr('Списки оборудования', 'Uskunalar ro‘yxatlari')}</strong>
+            <p>{tr('Быстро собрать комплект, указать количество и скачать готовый Excel.', 'Jamlanmani tez yig‘ish, miqdorni ko‘rsatish va tayyor Excelni yuklash.')}</p>
+          </Link>
+          <Link className="home-destination__action" to="/lists/new"><Plus size={16} /> {tr('Создать список', 'Ro‘yxat yaratish')}</Link>
+        </article>
 
         <article className="home-destination home-destination--employees home-destination--coming-soon" aria-label={tr('Сотрудники — раздел готовится', 'Xodimlar — bo‘lim tayyorlanmoqda')}>
           <img className="home-destination__art home-destination__art--employees" src="/illustrations/av-team.webp" alt="" aria-hidden="true" loading="eager" decoding="async" fetchPriority="high" />

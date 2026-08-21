@@ -11,7 +11,7 @@ import {
   type EquipmentMovement,
 } from './api'
 import { equipmentAvailabilityOptions, equipmentAvailabilityView } from './availability'
-import { equipmentCode, equipmentIdentifier } from './format'
+import { equipmentCode, equipmentIdentifier, formatUnitCount } from './format'
 import type { Equipment } from './types'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
@@ -67,7 +67,9 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
   const [isSaving, setIsSaving] = useState(false)
   const [editError, setEditError] = useState('')
   const [editSuccess, setEditSuccess] = useState('')
-  const [modelUnitCount, setModelUnitCount] = useState(1)
+  // null — числа НЕТ: счёт ещё идёт или отказал. Единица по умолчанию делала из
+  // отказа факт «правка заденет одну запись», хотя их могло быть 596.
+  const [modelUnitCount, setModelUnitCount] = useState<number | null>(null)
   const [draft, setDraft] = useState(() => toEditDraft(item))
   // 'stale' — перечитать карточку не удалось, на экране данные из каталога;
   // 'missing' — записи в базе больше нет.
@@ -121,9 +123,10 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
 
   useEffect(() => {
     let current = true
+    setModelUnitCount(null)
     countEquipmentModelUnits(item.brand, item.model)
       .then((value) => { if (current) setModelUnitCount(Math.max(1, value)) })
-      .catch(() => { if (current) setModelUnitCount(1) })
+      .catch(() => { if (current) setModelUnitCount(null) })
     return () => { current = false }
   }, [item.brand, item.model])
 
@@ -233,7 +236,11 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
             <section className="equipment-edit-section">
               <div className="equipment-edit-section__heading">
                 <div><h3>{tr('Данные модели', 'Model ma’lumotlari')}</h3><p>{tr('Изменятся у всех экземпляров с тем же брендом и моделью.', 'Xuddi shu brend va modeldagi barcha nusxalarda o‘zgaradi.')}</p></div>
-                <span className="read-only-label">{modelUnitCount} {tr('единиц', 'birlik')}</span>
+                {/* Без числа бейдж честно говорит «у всех», а не выдаёт неизвестное
+                    за единицу: цена ошибки — правка описания у 596 единиц под видом одной. */}
+                <span className="read-only-label">{modelUnitCount === null
+                  ? tr('у всех единиц этой модели', 'bu modelning barcha birliklarida')
+                  : formatUnitCount(modelUnitCount, tr)}</span>
               </div>
               <div className="equipment-edit-grid">
                 <label className="field"><span>{tr('Бренд', 'Brend')} *</span><input value={brand} onChange={(event) => changeDraft('brand', event.target.value)} /></label>
@@ -253,7 +260,11 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
                 <div className="field"><span>{tr('Статус', 'Holat')}</span><AppSelect value={availability} onChange={(value) => changeDraft('availability', value)} ariaLabel={tr('Статус оборудования', 'Uskuna holati')} options={equipmentAvailabilityOptions(tr)} /></div>
                 <label className="field"><span>{tr('Локация', 'Joylashuv')} *</span><input value={location} onChange={(event) => changeDraft('location', event.target.value)} required /></label>
                 <label className="field"><span>{item.tracking_mode === 'quantity' ? tr('Внутренний код', 'Ichki kod') : tr('Серийный номер', 'Seriya raqami')}</span><input value={equipmentIdentifier(item, tr)} readOnly /></label>
-                <label className="field"><span>{tr('Количество', 'Miqdor')}</span><input type="number" min="0" max="9999" value={item.tracking_mode === 'serialized' ? 1 : count} onChange={(event) => changeDraft('count', Number(event.target.value))} disabled={item.tracking_mode === 'serialized'} /></label>
+                {/* У серийной единицы количество всегда 1 и в базу не уезжает —
+                    показывать заблокированное поле незачем. */}
+                {item.tracking_mode === 'quantity' && (
+                  <label className="field"><span>{tr('Количество', 'Miqdor')}</span><input type="number" min="0" max="9999" value={count} onChange={(event) => changeDraft('count', Number(event.target.value))} /></label>
+                )}
               </div>
             </section>
             {editError && <p className="form-error"><CircleAlert size={15} /> {editError}</p>}

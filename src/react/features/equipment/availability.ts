@@ -9,7 +9,9 @@ type Tr = (ru: string, uz: string) => string
 export const equipmentAvailabilityCodes: EquipmentAvailability[] = ['available', 'unavailable', 'diagnostics', 'issued']
 
 const availabilityDictionary: Record<EquipmentAvailability, { tone: string; label: (tr: Tr) => string }> = {
-  available: { tone: 'success', label: (tr) => tr('В наличии', 'Mavjud') },
+  // «На складе», а не «В наличии»: код означает «не выдано», а не «свободно на
+  // нужную дату» — бронь на будущее статус не видит.
+  available: { tone: 'success', label: (tr) => tr('На складе', 'Omborda') },
   unavailable: { tone: 'neutral', label: (tr) => tr('Нет на складе', 'Omborda yo‘q') },
   diagnostics: { tone: 'warning', label: (tr) => tr('Диагностика', 'Diagnostika') },
   issued: { tone: 'danger', label: (tr) => tr('Выдано', 'Berilgan') },

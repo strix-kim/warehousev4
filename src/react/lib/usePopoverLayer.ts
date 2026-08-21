@@ -41,15 +41,23 @@ export function usePopoverLayer(
       onCloseRef.current()
     }
     const closeOnViewportChange = () => onCloseRef.current()
+    // Прокрутка СВОЕГО списка — не смена вьюпорта: у длинного списка (56
+    // подкатегорий) попап закрывался на первом же движении колеса внутри себя.
+    // У прокрутки элемента target — сам элемент, у прокрутки страницы — document.
+    const closeOnOutsideScroll = (event: Event) => {
+      const target = event.target
+      if (target instanceof Node && insideRefsRef.current.some((ref) => ref.current?.contains(target))) return
+      onCloseRef.current()
+    }
     document.addEventListener('pointerdown', closeOnOutside)
     window.addEventListener('keydown', closeOnEscape, true)
     window.addEventListener('resize', closeOnViewportChange)
-    window.addEventListener('scroll', closeOnViewportChange, true)
+    window.addEventListener('scroll', closeOnOutsideScroll, true)
     return () => {
       document.removeEventListener('pointerdown', closeOnOutside)
       window.removeEventListener('keydown', closeOnEscape, true)
       window.removeEventListener('resize', closeOnViewportChange)
-      window.removeEventListener('scroll', closeOnViewportChange, true)
+      window.removeEventListener('scroll', closeOnOutsideScroll, true)
     }
   }, [open])
 }
