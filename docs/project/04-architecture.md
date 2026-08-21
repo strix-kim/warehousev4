@@ -26,7 +26,7 @@
 
 | Файл | Строк | За что отвечает |
 |---|---:|---|
-| `styles.css` | 784 | Вся дизайн-система одним файлом: токены, сетка, компоненты, мобильные брейкпойнты. Импортируется один раз в `main.tsx:7` |
+| `styles.css` | 784 | Вся дизайн-система одним файлом: токены, сетка, компоненты, мобильные брейкпойнты. Импортируется один раз в `main.tsx` |
 | `lib/database.types.ts` | 723 | **Сгенерированная** схема базы: `Database`, `Tables<>`, `Json`, сигнатуры всех RPC. Снята с прода `generate_typescript_types` 2026-08-20. Правится только генератором; три ручные вставки помечены комментарием «ПРАВКА РУКАМИ» (`:503`, `:565`, `:574`) |
 | `features/lists/ListEditorPage.tsx` | 668 | Редактор списка (создание `/lists/new` и правка `/lists/:listId/edit`): состояние выборки, гидратация из базы и из черновика, сборка позиций, сохранение через RPC, экспорт |
 | `features/lists/ListsPage.tsx` | 584 | Реестр списков (серверные поиск, фильтр и страницы), карточка-drawer со сводкой, история этапов, дефицит, переходы статусов, удаление |
@@ -82,13 +82,13 @@
 
 Граф импортов между фичами остался **ациклическим**, и держится это одним приёмом:
 
-- `lists/api.ts:6` импортирует `fetchEquipmentByIds` из `equipment/api` — ребро
+- `lists/api.ts` импортирует `fetchEquipmentByIds` из `equipment/api` — ребро
   lists → equipment, одностороннее;
 - обратное ребро нужно тоже: правка модели меняет подписи в составе сохранённых
   списков, поэтому `equipment/api` обязан сбросить их кэш. Чтобы не замкнуть цикл,
   ключ вынесен в **листовой** `lists/cacheKeys.ts` (импортирует только
-  `persistentCache`), и `equipment/api.ts:6` зависит от него, а не от `lists/api`.
-  Причина записана прямо в обоих файлах (`equipment/api.ts:5`, `cacheKeys.ts:3-8`).
+  `persistentCache`), и `equipment/api.ts` зависит от него, а не от `lists/api`.
+  Причина записана прямо в обоих файлах (`equipment/api.ts`, `cacheKeys.ts`).
 
 Похожая односторонность внутри фичи списков: `ListEditorCatalog` знает о выборке
 ровно счётчик (`SelectionCount`, `:10-12`), а тип элемента выборки живёт на странице —
@@ -103,26 +103,26 @@
 | HTML | `index.html:2` | `<html lang="ru">` — стартовое значение, позже перезаписывается (раздел 10) |
 | HTML | `index.html:15` | `<div id="root">` |
 | HTML | `index.html:16` | `<script type="module" src="/src/react/main.tsx">` — единственная точка входа |
-| JS | `main.tsx:9` | `createRoot(document.getElementById('root')!)` — non-null assertion, без проверки |
-| JS | `main.tsx:10` | `StrictMode` (в dev даёт двойной прогон эффектов — важно помнить про таймеры прогрева) |
-| JS | `main.tsx:11` | `BrowserRouter` |
-| JS | `main.tsx:12` | `LanguageProvider` |
-| JS | `main.tsx:13` | `AuthProvider` |
-| JS | `main.tsx:14` | `App` |
-| CSS | `main.tsx:7` | `import './styles.css'` — единственный импорт стилей во всём приложении |
+| JS | `main.tsx` | `createRoot(document.getElementById('root')!)` — non-null assertion, без проверки |
+| JS | `main.tsx` | `StrictMode` (в dev даёт двойной прогон эффектов — важно помнить про таймеры прогрева) |
+| JS | `main.tsx` | `BrowserRouter` |
+| JS | `main.tsx` | `LanguageProvider` |
+| JS | `main.tsx` | `AuthProvider` |
+| JS | `main.tsx` | `App` |
+| CSS | `main.tsx` | `import './styles.css'` — единственный импорт стилей во всём приложении |
 
 `index.html:9-11` — три `<link rel="preload">` на аватар и две иллюстрации; это
 единственная предзагрузка на уровне разметки.
 
 Порядок значим: `LanguageProvider` снаружи `AuthProvider`, поэтому экран входа уже
-локализован. `AuthProvider` снаружи `App`, поэтому `App.tsx:22` может читать `useAuth()`
+локализован. `AuthProvider` снаружи `App`, поэтому `App.tsx` может читать `useAuth()`
 безусловно.
 
 ---
 
 ## 3. Маршруты
 
-Определение — `App.tsx:26-37`. Гейт сессии — безымянный `Route` (`App.tsx:28`):
+Определение — `App.tsx`. Гейт сессии — безымянный `Route` (`App.tsx`):
 `session ? <AppShell/> : <LoginRedirect/>`. Его детей ровно шесть
 (`:29-34`) — это все экраны под сайдбаром. Вне гейта, соседними элементами того же
 `<Routes>`, объявлены ещё два маршрута: `/login` (`:27`, объявлен ДО гейта, ребёнком
@@ -131,7 +131,7 @@
 
 | Путь | Компонент | Ленивый | Что видит пользователь |
 |---|---|---|---|
-| `/login` | `LoginPage` (`App.tsx:27`) | да (`:14`) | Форма входа. Вне `AppShell` — без сайдбара |
+| `/login` | `LoginPage` (`App.tsx`) | да (`:14`) | Форма входа. Вне `AppShell` — без сайдбара |
 | `/` (index) | `HomePage` (`:29`) | да (`:19`) | Развилка: каталог или списки |
 | `/equipment` | `EquipmentPage` (`:30`) | да (`:15`) | Каталог с поиском, фильтром, пагинацией |
 | `/equipment/new` | `EquipmentCreatePage` (`:31`) | да (`:16`) | Форма новой единицы |
@@ -140,17 +140,17 @@
 | `/lists/:listId/edit` | `ListEditorPage` (`:34`) | да (`:18`) | Тот же редактор с загрузкой существующего списка |
 | `*` | — (`:36`) | — | `<Navigate to={session ? '/' : '/login'} replace/>` — 404-страницы нет |
 
-Пока `AuthProvider` не ответил (`App.tsx:24`), рендерится `AppLoader` (`:193-200`) —
+Пока `AuthProvider` не ответил (`App.tsx`), рендерится `AppLoader` (`:193-200`) —
 брендовая заглушка вместо всего приложения.
 
 **Гейт запоминает, куда шёл человек (с5).** Раньше он был голым
 `<Navigate to="/login" replace/>`, и адрес терялся: после входа пользователь всегда
 оказывался на главной. Теперь это отдельный компонент `LoginRedirect`
-(`App.tsx:43-50`): путь целиком (`pathname + search + hash`) кладётся в
+(`App.tsx`): путь целиком (`pathname + search + hash`) кладётся в
 `state.from` (`:45`, `:49`), а `LoginPage` уводит на него после успешного входа
-(`LoginPage.tsx:21`, `:28`). Внутренним считается только `/…`: строка вида `//host`
+(`LoginPage.tsx`, `:28`). Внутренним считается только `/…`: строка вида `//host`
 читается браузером как чужой сайт, поэтому проверка стоит **дважды** — при записи
-(`App.tsx:48`) и при чтении (`LoginPage.tsx:12-15`), потому что `state` истории
+(`App.tsx`) и при чтении (`LoginPage.tsx`), потому что `state` истории
 правится из консоли.
 
 Оговорка про гейт: это UX-гейт, а не защита. Он лишь прячет экраны от анонима;
@@ -170,40 +170,40 @@
 
 ## 4. Ленивая загрузка и прогрев
 
-Все шесть страниц объявлены дважды: сначала функцией-загрузчиком (`App.tsx:7-12`),
+Все шесть страниц объявлены дважды: сначала функцией-загрузчиком (`App.tsx`),
 затем обёрткой `lazyWithReload()` (`App.tsx`, до с6 — голый `lazy()`; разбор обёртки —
 5.2). Разделение сделано ради прогрева: те же
 функции переиспользуются в таймерах, поэтому прогрев и рендер бьют в один и тот же
 модульный кэш браузера.
 
-`AppShell` в `useEffect` (`App.tsx:62-112`) заводит три отложенных таймера:
+`AppShell` в `useEffect` (`App.tsx`) заводит три отложенных таймера:
 
 | Таймер | Задержка | Якорь | Что делает |
 |---|---:|---|---|
-| `moduleTimer` | 0 мс | `App.tsx:63-71` | `Promise.allSettled` на пять `import()` страниц (кроме `LoginPage`). Прогревает только JS-чанки |
-| `primaryDataTimer` | 120 мс | `App.tsx:72-94` | Импортирует оба api-модуля и дёргает `fetchEquipment({page:1, search:'', availability:'', pageSize})` (`:77-84`) и `fetchEquipmentLists({page:1, search:'', status:'all', pageSize})` (`:85-92`) |
-| `editorDataTimer` | 700 мс | `App.tsx:95-106` | `fetchAllEquipment()` + `fetchEquipmentTaxonomy()` (`:101-102`), затем `preloadEquipmentImages(equipment, 32)` (`:104`) — первые 32 картинки |
+| `moduleTimer` | 0 мс | `App.tsx` | `Promise.allSettled` на пять `import()` страниц (кроме `LoginPage`). Прогревает только JS-чанки |
+| `primaryDataTimer` | 120 мс | `App.tsx` | Импортирует оба api-модуля и дёргает `fetchEquipment({page:1, search:'', availability:'', pageSize})` (`:77-84`) и `fetchEquipmentLists({page:1, search:'', status:'all', pageSize})` (`:85-92`) |
+| `editorDataTimer` | 700 мс | `App.tsx` | `fetchAllEquipment()` + `fetchEquipmentTaxonomy()` (`:101-102`), затем `preloadEquipmentImages(equipment, 32)` (`:104`) — первые 32 картинки |
 
 Все три снимаются в cleanup (`:107-111`).
 
 **Размер страницы прогрев не считает сам, а спрашивает у фичи.** `pageSize` входит в
 ключ кэша, поэтому копия формулы «мобильный или нет» в `App.tsx` рано или поздно
 разошлась бы с копией на странице, и прогрев лёг бы мимо ключа. Число отдают
-`equipmentApi.preferredEquipmentPageSize()` (`App.tsx:83` → `equipment/api.ts:16-18`)
-и `listsApi.preferredListsPageSize()` (`App.tsx:91` → `lists/api.ts:115-117`); обе
-читают одну и ту же константу брейкпойнта `lib/breakpoints.ts:8-10`.
+`equipmentApi.preferredEquipmentPageSize()` (`App.tsx` → `equipment/api.ts`)
+и `listsApi.preferredListsPageSize()` (`App.tsx` → `lists/api.ts`); обе
+читают одну и ту же константу брейкпойнта `lib/breakpoints.ts`.
 
 **Ключевой момент: прогрев и есть источник первого кадра.** `fetchEquipment` и
-`fetchEquipmentLists` внутри обёрнуты в `cachedQuery` (`equipment/api.ts:84`,
-`lists/api.ts:217`), то есть кладут результат в `persistentCache`. Страницы при монтировании
+`fetchEquipmentLists` внутри обёрнуты в `cachedQuery` (`equipment/api.ts`,
+`lists/api.ts`), то есть кладут результат в `persistentCache`. Страницы при монтировании
 читают ровно тот же кэш синхронно, в инициализаторе `useState`:
 
-- `EquipmentPage.tsx:38` — `readCachedEquipment({page:1, search:'', availability:'', pageSize})`;
-  ключ совпадает с прогревочным вызовом байт в байт (`equipmentPageCacheKey`, `api.ts:67-69`),
+- `EquipmentPage.tsx` — `readCachedEquipment({page:1, search:'', availability:'', pageSize})`;
+  ключ совпадает с прогревочным вызовом байт в байт (`equipmentPageCacheKey`, `api.ts`),
   поэтому переход на `/equipment` рисует данные в первом же кадре, `isLoading` стартует
   как `false` (`:45`);
-- `ListsPage.tsx:109` — `readCachedEquipmentLists({page:1, search:'', status:'all', pageSize})`;
-- `ListEditorPage.tsx:86-87` — `readCachedAllEquipment()` и `readCachedEquipmentList(listId)`.
+- `ListsPage.tsx` — `readCachedEquipmentLists({page:1, search:'', status:'all', pageSize})`;
+- `ListEditorPage.tsx` — `readCachedAllEquipment()` и `readCachedEquipmentList(listId)`.
 
 Отсюда правило: **менять сигнатуру прогревочного вызова в `App.tsx` нельзя в отрыве
 от `readCached*` на странице.** Разошёлся хоть один параметр ключа — прогрев остаётся
@@ -216,17 +216,17 @@
 Экран от этого не изменился: прогрев по-прежнему не имеет права ничего показывать.
 
 **Прогрев карточек списка ужат вчетверо (с5).** Реестр после отрисовки греет первые
-шесть карточек (`ListsPage.tsx:181-186`), плюс то же делает наведение курсора
+шесть карточек (`ListsPage.tsx`), плюс то же делает наведение курсора
 (`:271-272`). Раньше каждый такой прогрев звал четыре запроса — деталь, состав,
 дефицит, историю, — то есть залп до 24 запросов на один заход на `/lists`.
-Теперь `prefetchSavedListDetails` (`lists/api.ts:392-395`) стоит **ровно один**
+Теперь `prefetchSavedListDetails` (`lists/api.ts`) стоит **ровно один**
 запрос: строка списка уже на руках (она собрана тем же селектом, что и одиночная
 выборка) и кладётся в кэш детали напрямую через `primeCachedQuery` (`:393`), а
 дефицит и история грузятся лениво — только при открытии деталей
-(`ListsPage.tsx:367-370`). Итог захода на `/lists`: одна страница списков плюс до
+(`ListsPage.tsx`). Итог захода на `/lists`: одна страница списков плюс до
 шести составов, ≤7 запросов вместо ~24. Мотив у ленивости не только числовой:
 `reservation_shortages` — полная агрегация склада, звать её вслепую на шесть
-карточек нечем оправдать (комментарий `lists/api.ts:387-391`).
+карточек нечем оправдать (комментарий `lists/api.ts`).
 
 ---
 
@@ -246,7 +246,7 @@
 
 | Граница | Где стоит | Что переживает | Фолбэк |
 |---|---|---|---|
-| Корневая, `variant="app"` | `main.tsx:29`, самая внешняя — выше `BrowserRouter`, `LanguageProvider`, `AuthProvider` | падение самих провайдеров и роутера | полноэкранный: `<main className="app-loader">` + блок ошибки, сайдбара под ней нет |
+| Корневая, `variant="app"` | `main.tsx`, самая внешняя — выше `BrowserRouter`, `LanguageProvider`, `AuthProvider` | падение самих провайдеров и роутера | полноэкранный: `<main className="app-loader">` + блок ошибки, сайдбара под ней нет |
 | Постраничная, `variant="page"` | `App.tsx`, внутри `RouteBoundary` — на каждом маршруте, включая `/login` | падение любой страницы | блок `.state-block--error` внутри `.app-content`, сайдбар и навигация целы |
 
 Только постраничная пропускала бы крэш в `AppShell` (`session.user.email`,
@@ -386,7 +386,7 @@ installGlobalErrorReporting(): void
 красный оверлей Vite на React-ошибках больше не всплывает (диагностика ушла в
 консоль и в `<pre>` фолбэка), выгода — прод-ветка канала проверяется каждый день.
 
-Плюс `build.sourcemap: true` (`vite.config.ts:29`) с с5: `.map` уезжают на прод
+Плюс `build.sourcemap: true` (`vite.config.ts`) с с5: `.map` уезжают на прод
 рядом с чанками, и стек в консоли читается.
 
 ### 5.4. Офлайн: возраст данных объявляется, самого офлайна интерфейс не видит
@@ -432,7 +432,7 @@ installGlobalErrorReporting(): void
 
 - `App.tsx` — чтение `argo:sidebar-collapsed` в инициализаторе `useState`;
 - `LanguageProvider` — `setItem(STORAGE_KEY, language)` в эффекте после первого рендера;
-- `sweepLegacyEntries` (`persistentCache.ts:50-60`, появилось в с5) перебирает
+- `sweepLegacyEntries` (`persistentCache.ts`, появилось в с5) перебирает
   `window.localStorage` целиком при первой установке scope, то есть на пути входа.
 
 Если localStorage недоступен (Safari в приватном режиме, отключённые данные сайтов,
@@ -461,21 +461,21 @@ installGlobalErrorReporting(): void
 | `ListsPage.tsx`, загрузчик реестра | — | Блок «Ошибка загрузки» | `loader` |
 | `lists/api.ts::prefetchSavedListDetails` | Прогрев состава карточки | Ничего; состав догрузится при открытии | `prefetch` |
 | `EquipmentCreatePage.tsx` | `fetchEquipmentTaxonomy()` в форме создания | Пустые подсказки типа/подтипа | `prefetch` |
-| `persistentCache.ts:198-204` | Сетевая ошибка при кэше **в пределах TTL** | Данные из кэша — **теперь с бейджем возраста** (5.4) | нет (штатная ветка) |
-| `persistentCache.ts:104-106`, `:135-137`, `:162-164` | Порча/переполнение localStorage | Ничего | **нет — осталось молчащим** |
-| `AuthProvider.tsx:46-50` | Отказ `getSession()` | Считается «нет сессии» → редирект на `/login` | **нет — осталось молчащим** |
+| `persistentCache.ts` | Сетевая ошибка при кэше **в пределах TTL** | Данные из кэша — **теперь с бейджем возраста** (5.4) | нет (штатная ветка) |
+| `persistentCache.ts`, `:135-137`, `:162-164` | Порча/переполнение localStorage | Ничего | **нет — осталось молчащим** |
+| `AuthProvider.tsx` | Отказ `getSession()` | Считается «нет сессии» → редирект на `/login` | **нет — осталось молчащим** |
 | `ListsPage.tsx::exportSavedList` | Сборка Excel | Сообщение об ошибке экспорта | **нет — `catch` без параметра, в backlog** |
 
 **Строки про уникальность серийника в этом списке больше нет — с5 её закрыл.**
 `catch` в `checkSerial` возвращал `false`, то есть «дубля нет», и любой сбой запроса
 разрешал вставку. Теперь у проверки четыре состояния, и отказ — отдельное `'failed'`
-(`EquipmentCreatePage.tsx:22-24`, `:119-126`), по которому `handleSubmit` **не
+(`EquipmentCreatePage.tsx`, `:119-126`), по которому `handleSubmit` **не
 сохраняет** и пишет об этом (`:137-143`). Ни один `catch` в таблице выше больше не
 возвращает разрешающего значения: они глушат ускорение и подсказки, но не защиту.
 Разбор — `02-features` §5.1.
 
 Второе исправление того же класса: `cachedQuery` больше не подменяет старым значением
-ошибки `401` / `PGRST301` / `42501` — они пробрасываются наружу (`persistentCache.ts:36-43`,
+ошибки `401` / `PGRST301` / `42501` — они пробрасываются наружу (`persistentCache.ts`,
 `:201`). Глушить «тебя разлогинило» кэшем значило показывать экран, за которым нет
 доступа.
 
@@ -495,11 +495,11 @@ installGlobalErrorReporting(): void
   иначе экспортируется **`null`**.
 
 Поведение при отсутствии переменных: приложение стартует, экран входа рисуется.
-`AuthProvider.tsx:34-37` при `supabase === null` сразу снимает `isLoading`, а
-`LoginPage.tsx:37-43` при попытке входа говорит правду отдельным сообщением, не выдавая
+`AuthProvider.tsx` при `supabase === null` сразу снимает `isLoading`, а
+`LoginPage.tsx` при попытке входа говорит правду отдельным сообщением, не выдавая
 это за «неверный пароль». Все функции обоих api-модулей начинаются с
 `if (!supabase) throw new Error('Supabase не настроен')` (например
-`equipment/api.ts:80`, `lists/api.ts:209`), но до них без сессии не доходит.
+`equipment/api.ts`, `lists/api.ts`), но до них без сессии не доходит.
 Оговорка: с с5 **сборка без переменных вообще не проходит** — гейт в `vite.config.ts`
 (раздел 12), — так что этот путь остался только для локального запуска `dev`.
 
@@ -515,10 +515,10 @@ installGlobalErrorReporting(): void
 | Что | Якорь |
 |---|---|
 | Сгенерированная схема: `Database`, `Tables<>`, `Json`, сигнатуры RPC | `lib/database.types.ts` (723 строки), снята с прода `generate_typescript_types` 2026-08-20 |
-| Типизированный клиент | `lib/supabase.ts:10` — `createClient<Database>` |
-| Строка склада выведена из схемы | `features/equipment/types.ts:1-4` — `EquipmentRow = Tables<'equipment'>` |
-| Колонки списка выведены из схемы | `features/lists/api.ts:21-33` — `Pick<Tables<'equipment_lists'>, …>`; `:63-66` — то же для истории |
-| jsonb приходит как `Json`, а не как готовый тип | `lists/api.ts:131-137`, `equipment/api.ts:327-331` |
+| Типизированный клиент | `lib/supabase.ts` — `createClient<Database>` |
+| Строка склада выведена из схемы | `features/equipment/types.ts` — `EquipmentRow = Tables<'equipment'>` |
+| Колонки списка выведены из схемы | `features/lists/api.ts` — `Pick<Tables<'equipment_lists'>, …>`; `:63-66` — то же для истории |
+| jsonb приходит как `Json`, а не как готовый тип | `lists/api.ts`, `equipment/api.ts` |
 
 Что это даёт практически: **опечатка в имени таблицы, колонки или RPC-аргумента теперь
 валит `tsc`, а не прод.** Проверяется за десять секунд — подставить в любой `.from()`
@@ -539,17 +539,17 @@ installGlobalErrorReporting(): void
 перегенерация.
 
 Оставшиеся ручные сужения живут не здесь, а в доменных типах, и каждое объяснено на
-месте: `Equipment` переопределяет три поля поверх `EquipmentRow` (`types.ts:6-18`),
-`EquipmentList` сужает текстовые статусы под CHECK и jsonb-колонки (`lists/api.ts:35-47`).
+месте: `Equipment` переопределяет три поля поверх `EquipmentRow` (`types.ts`),
+`EquipmentList` сужает текстовые статусы под CHECK и jsonb-колонки (`lists/api.ts`).
 Это не рассинхрон со схемой, а нормализация на границе — разбор в `03-data-model` §1.4.
 
 ### Кто ходит в базу
 
 ```
 grep -rn "lib/supabase" src/react
-→ features/lists/api.ts:1
-→ features/equipment/api.ts:1
-→ features/auth/AuthProvider.tsx:3
+→ features/lists/api.ts
+→ features/equipment/api.ts
+→ features/auth/AuthProvider.tsx
 ```
 
 Ровно три импортёра, из них два ходят в данные (`.from()`, `.rpc()`), а `AuthProvider`
@@ -573,20 +573,20 @@ grep -rnE "\.storage|\.channel\(|realtime|\.functions\." src/react → 0
 
 | Таблица / RPC | Где | Операция |
 |---|---|---|
-| `equipment` | `equipment/api.ts:88, 132, 152, 166, 185, 227, 261, 288, 361` | select ×8, insert ×1 (`:227-242`) |
-| `equipment_movements` | `equipment/api.ts:400` | select, `.limit(50)` |
-| `equipment_lists` | `lists/api.ts:226, 244, 290, 299, 487` | select ×4, delete ×1 (`:487`) |
-| `reservation_status_history` | `lists/api.ts:531` | select |
-| `update_equipment_model_and_unit` | `equipment/api.ts:352` | rpc |
-| `count_equipment_model_units` | `equipment/api.ts:277` | rpc (заведена в с5) |
-| `create_equipment_list_document` | `lists/api.ts:447` | rpc |
-| `update_equipment_list_document` | `lists/api.ts:466` | rpc |
-| `reservation_shortages` | `lists/api.ts:503` | rpc |
-| `transition_equipment_list_status` | `lists/api.ts:513` | rpc |
+| `equipment` | `equipment/api.ts, 132, 152, 166, 185, 227, 261, 288, 361` | select ×8, insert ×1 (`:227-242`) |
+| `equipment_movements` | `equipment/api.ts` | select, `.limit(50)` |
+| `equipment_lists` | `lists/api.ts, 244, 290, 299, 487` | select ×4, delete ×1 (`:487`) |
+| `reservation_status_history` | `lists/api.ts` | select |
+| `update_equipment_model_and_unit` | `equipment/api.ts` | rpc |
+| `count_equipment_model_units` | `equipment/api.ts` | rpc (заведена в с5) |
+| `create_equipment_list_document` | `lists/api.ts` | rpc |
+| `update_equipment_list_document` | `lists/api.ts` | rpc |
+| `reservation_shortages` | `lists/api.ts` | rpc |
+| `transition_equipment_list_status` | `lists/api.ts` | rpc |
 
 Асимметрия: чтение везде идёт прямым select по таблицам, а запись — почти везде через
 RPC. Два исключения из «запись только через RPC» — insert оборудования
-(`equipment/api.ts:226-242`) и delete списка (`lists/api.ts:486-491`), они бьют в таблицу
+(`equipment/api.ts`) и delete списка (`lists/api.ts`), они бьют в таблицу
 напрямую и опираются целиком на RLS.
 
 Девятый select по `equipment` — с5: `fetchEquipmentById` (`:163-173`), одна карточка
@@ -602,14 +602,14 @@ RPC. Два исключения из «запись только через RPC
 `EquipmentRow` выведен из `Tables<'equipment'>` (`:1-4`), и колонки приезжают из схемы.
 Руками поверх неё добавлены только два поля, и они заведомо **не колонки**:
 
-- `tracking_mode` (`types.ts:16`) и `inventory_code` (`types.ts:17`) вычисляются на
-  клиенте функцией `normalizeEquipment` (`equipment/api.ts:22-46`) разбором строки
+- `tracking_mode` (`types.ts`) и `inventory_code` (`types.ts`) вычисляются на
+  клиенте функцией `normalizeEquipment` (`equipment/api.ts`) разбором строки
   `serialnumber` по префиксам `QTY::CODE::`, `QTY::AUTO::`, `AUTO-` и списку
   плейсхолдеров (`:20`).
 
-Ещё три поля того же типа переопределены осознанно и объяснены на месте (`types.ts:6-18`):
+Ещё три поля того же типа переопределены осознанно и объяснены на месте (`types.ts`):
 `serialnumber` наружу отдаётся `string | null`, `availability` и `count` сужаются с
-nullable до `''` и `0`. Аналогично `advanced_features` (`lists/api.ts:46`) — не колонка,
+nullable до `''` и `0`. Аналогично `advanced_features` (`lists/api.ts`) — не колонка,
 а флаг, который проставляет сам клиент (раздел 9). Разбор — `03-data-model` §1.4 и §9.
 
 ### Выгрузка .xlsx — экранирование XML закрыто
@@ -639,7 +639,7 @@ nullable до `''` и `0`. Аналогично `advanced_features` (`lists/api.
 
 Дефолты шапки документа и реквизиты юрлица экспорт берёт из общего
 `features/lists/documentDefaults.ts` — того же, что читает форма редактора. Раньше
-строки лежали двумя копиями и могли разъехаться (комментарий `documentDefaults.ts:1-3`,
+строки лежали двумя копиями и могли разъехаться (комментарий `documentDefaults.ts`,
 `:18-20`).
 
 Вывод: название списка или заказчика с `&`, `<`, `>` битого .xlsx не даёт — вопрос
@@ -670,7 +670,7 @@ id, и на общем ноутбуке первый кадр следующег
 |---|---|---|
 | `setCacheScope(userId)` | `:64-74` | Ставит владельца. Смена — полный сброс: `cacheGeneration += 1`, `memoryCache.clear()`, `pendingLoads.clear()` |
 | `purgeCacheScope(userId)` | `:77-87` | Стирает из localStorage все ключи ушедшего пользователя |
-| Вызовы обоих | `AuthProvider.tsx:26-32`, `:43`, `:48`, `:57` | `applyCacheScope` выполняется **до** `setSession` — и на инициализации, и на каждом `onAuthStateChange`, включая `SIGNED_OUT` из другой вкладки |
+| Вызовы обоих | `AuthProvider.tsx`, `:43`, `:48`, `:57` | `applyCacheScope` выполняется **до** `setSession` — и на инициализации, и на каждом `onAuthStateChange`, включая `SIGNED_OUT` из другой вкладки |
 | Одноразовый вымет `v3` | `:50-60`, вызов `:65` | При первой установке scope все ключи `argo-warehouse:v3:` удаляются: и чтобы не осталось «ничьих» данных, и чтобы освободить квоту — там лежал каталог на ~1.4 МБ |
 
 Отсюда важное: **без scope не персистится ничего.** `storageKey` возвращает `null`,
@@ -683,27 +683,27 @@ id, и на общем ноутбуке первый кадр следующег
 | Ключ | TTL | Где пишется | Что лежит |
 |---|---:|---|---|
 | `equipment:{"page":N,"search":…,"availability":…,"type":…,"subtype":…,"pageSize":N}` | 10 мин | `equipment/api.ts`, `equipmentPageCacheKey` | Страница каталога `{rows, total}`. `type`/`subtype` в ключе **всегда** (с8, дефолт `''`): прогрев в `App.tsx` без них и страница без фильтров читают одну запись |
-| `equipment:all` | 10 мин | `equipment/api.ts:127` | Весь склад массивом. **`persist: false`** (`:145`) — только память сессии |
-| `equipment:model-count:<brand>::<model>` | 10 мин | `equipment/api.ts:273` (ключ `:272`) | Число единиц модели |
-| `equipment:movements:<equipmentId>` | 5 мин | `equipment/api.ts:398` | До 50 движений |
+| `equipment:all` | 10 мин | `equipment/api.ts` | Весь склад массивом. **`persist: false`** (`:145`) — только память сессии |
+| `equipment:model-count:<brand>::<model>` | 10 мин | `equipment/api.ts` (ключ `:272`) | Число единиц модели |
+| `equipment:movements:<equipmentId>` | 5 мин | `equipment/api.ts` | До 50 движений |
 | `equipment-taxonomy:v2` | **24 ч** | `equipment/api.ts`, `fetchEquipmentTaxonomy` | `{types, subtypes, subtypesByType}` — `v2` с с8: форма сменилась, старая запись без карты жила бы сутки. Читается батчами по 1000 с порядком `type, subtype, id` |
-| `equipment-lists:page:{"page":N,"search":…,"status":…,"pageSize":N}` | 10 мин | `lists/api.ts:217` (ключ `:200-202`) | Страница реестра `{rows, total}` |
-| `equipment-lists:detail:<listId>` | 10 мин | `lists/api.ts:287`, плюс `primeCachedQuery` из прогрева `:393` | Один список |
-| `equipment-lists:shortages:<listId>` | 5 мин | `lists/api.ts:502` | Дефицит |
-| `equipment-lists:history:<listId>` | 5 мин | `lists/api.ts:529` | История этапов |
-| `equipment-lists:composition:v2:<listId>` | 10 мин | `lists/api.ts:384` (ключ `cacheKeys.ts:15-17`) | `{rows, missingUnits}` для деталей и Excel |
-| `list-draft:new` | **24 ч** | `lists/api.ts:420-422` (ключ `cacheKeys.ts:28-29`) | Черновик несохранённого списка |
+| `equipment-lists:page:{"page":N,"search":…,"status":…,"pageSize":N}` | 10 мин | `lists/api.ts` (ключ `:200-202`) | Страница реестра `{rows, total}` |
+| `equipment-lists:detail:<listId>` | 10 мин | `lists/api.ts`, плюс `primeCachedQuery` из прогрева `:393` | Один список |
+| `equipment-lists:shortages:<listId>` | 5 мин | `lists/api.ts` | Дефицит |
+| `equipment-lists:history:<listId>` | 5 мин | `lists/api.ts` | История этапов |
+| `equipment-lists:composition:v2:<listId>` | 10 мин | `lists/api.ts` (ключ `cacheKeys.ts`) | `{rows, missingUnits}` для деталей и Excel |
+| `list-draft:new` | **24 ч** | `lists/api.ts` (ключ `cacheKeys.ts`) | Черновик несохранённого списка |
 
 Две вещи в этой таблице стоит прочитать медленно:
 
-- **`equipment:all` не персистится** (`equipment/api.ts:145`). Полная выгрузка — ~1.4 МБ
+- **`equipment:all` не персистится** (`equipment/api.ts`). Полная выгрузка — ~1.4 МБ
   JSON, в localStorage она одна съедала треть квоты Safari. Цена решения названа прямо
   в комментарии (`:120-123`): после перезагрузки страницы редактор списка ждёт сеть
   вместо первого кадра из кэша.
-- **`list-draft:new` намеренно живёт ВНЕ префикса `equipment-lists:`** (`cacheKeys.ts:23-27`).
+- **`list-draft:new` намеренно живёт ВНЕ префикса `equipment-lists:`** (`cacheKeys.ts`).
   Тот префикс целиком сбрасывается на каждом создании, правке, удалении и смене этапа —
   и унёс бы с собой работу, которую пользователь ещё не сохранял.
-- **`composition` носит в ключе `v2`** (`cacheKeys.ts:11-14`): форма значения сменилась
+- **`composition` носит в ключе `v2`** (`cacheKeys.ts`): форма значения сменилась
   с массива строк на `{rows, missingUnits}`, и без смены ключа первый кадр после выкатки
   читал бы массив как объект. Старые ключи остались под тем же префиксом и сбрасываются
   вместе с новыми.
@@ -778,20 +778,20 @@ id, и на общем ноутбуке первый кадр следующег
 
 | Действие | Якорь | Что сбрасывает |
 |---|---|---|
-| `createEquipment` | `equipment/api.ts:245-246` | `equipment:`, `equipment-taxonomy` |
-| `updateEquipmentModelAndUnit` | `equipment/api.ts:367-370` | `equipment:`, `equipment-taxonomy`, `equipment-lists:composition:` |
-| `createEquipmentList` | `lists/api.ts:459` | `equipment-lists:` |
-| `updateEquipmentList` | `lists/api.ts:479` | `equipment-lists:` |
-| `deleteEquipmentList` | `lists/api.ts:495` | `equipment-lists:` |
-| `transitionEquipmentList` | `lists/api.ts:521-522` | `equipment-lists:`, `equipment:` |
-| `clearListDraft` | `lists/api.ts:428-431` | `list-draft:new` |
+| `createEquipment` | `equipment/api.ts` | `equipment:`, `equipment-taxonomy` |
+| `updateEquipmentModelAndUnit` | `equipment/api.ts` | `equipment:`, `equipment-taxonomy`, `equipment-lists:composition:` |
+| `createEquipmentList` | `lists/api.ts` | `equipment-lists:` |
+| `updateEquipmentList` | `lists/api.ts` | `equipment-lists:` |
+| `deleteEquipmentList` | `lists/api.ts` | `equipment-lists:` |
+| `transitionEquipmentList` | `lists/api.ts` | `equipment-lists:`, `equipment:` |
+| `clearListDraft` | `lists/api.ts` | `list-draft:new` |
 
 Тонкость префиксов: `equipment:` накрывает `equipment:all`, `equipment:model-count:`
 и `equipment:movements:`, но **не** накрывает `equipment-taxonomy` и `equipment-lists:*`
 (другой разделитель). Поэтому таксономия сбрасывается отдельной строкой — при добавлении
 нового ключа с дефисом это легко забыть.
 
-Отдельная тонкость у `clearListDraft` (`lists/api.ts:428-431`): точечного удаления
+Отдельная тонкость у `clearListDraft` (`lists/api.ts`): точечного удаления
 одного ключа у кэша нет, стирать приходится префиксом, а `invalidateCachePrefix`
 поднимает поколение — то есть **отменяет запись всех ответов, летящих прямо сейчас**.
 Поэтому пустой вызов гасится сразу проверкой `readListDraft() === null`: обычный заход
@@ -808,20 +808,20 @@ id, и на общем ноутбуке первый кадр следующег
 
 | Запрос | Якорь | Порция | Риск |
 |---|---|---:|---|
-| `fetchEquipment` | `equipment/api.ts:94` | `.range(from, to)`, `pageSize` 50 (`:11`) или 8 на мобильном (`:12`, выбор `:16-18`) | Нет. Честная серверная пагинация с `count: 'exact'` (`:89`) |
-| `fetchEquipmentLists` | `lists/api.ts:248` (и `:230` в legacy-ветке) | `.range(from, to)`, `pageSize` 12 (`:109`) или 6 на мобильном (`:110`, выбор `:115-117`) | Нет. **Стало серверным в с5** — разбор ниже |
-| `fetchAllEquipment` | `equipment/api.ts:130-143` | Цикл по 1000: `.range(from, from+999)` | **Есть, см. ниже** |
-| `fetchEquipmentTaxonomy` | `equipment/api.ts:187` | `.range(0, 1999)` одним запросом | **Есть, см. ниже** |
-| `fetchEquipmentByIds` | `equipment/api.ts:148-158` | `.in('id', ids)` без `range` | Список с более чем `db-max-rows` единицами обрежется молча; плюс длина URL при большом `in` |
-| `fetchEquipmentMovements` | `equipment/api.ts:404` | `.limit(50)` | Осознанная отсечка истории |
-| `fetchReservationHistory` | `lists/api.ts:530-534` | Без `limit` и без `range` | Обрежется по `db-max-rows` молча |
+| `fetchEquipment` | `equipment/api.ts` | `.range(from, to)`, `pageSize` 50 (`:11`) или 8 на мобильном (`:12`, выбор `:16-18`) | Нет. Честная серверная пагинация с `count: 'exact'` (`:89`) |
+| `fetchEquipmentLists` | `lists/api.ts` (и `:230` в legacy-ветке) | `.range(from, to)`, `pageSize` 12 (`:109`) или 6 на мобильном (`:110`, выбор `:115-117`) | Нет. **Стало серверным в с5** — разбор ниже |
+| `fetchAllEquipment` | `equipment/api.ts` | Цикл по 1000: `.range(from, from+999)` | **Есть, см. ниже** |
+| `fetchEquipmentTaxonomy` | `equipment/api.ts` | `.range(0, 1999)` одним запросом | **Есть, см. ниже** |
+| `fetchEquipmentByIds` | `equipment/api.ts` | `.in('id', ids)` без `range` | Список с более чем `db-max-rows` единицами обрежется молча; плюс длина URL при большом `in` |
+| `fetchEquipmentMovements` | `equipment/api.ts` | `.limit(50)` | Осознанная отсечка истории |
+| `fetchReservationHistory` | `lists/api.ts` | Без `limit` и без `range` | Обрежется по `db-max-rows` молча |
 
 ### Реестр списков стал серверным (с5)
 
 До с5 `fetchEquipmentLists` брал `.limit(50)` без окна, а поиск и фильтр этапа
 работали по этим пятидесяти строкам в браузере: 51-й список был недостижим из
 интерфейса вообще, а счётчик `count: 'exact'` показывал больше, чем можно открыть.
-Теперь запрос принимает `{page, search, status, pageSize}` (`lists/api.ts:176-182`) и
+Теперь запрос принимает `{page, search, status, pageSize}` (`lists/api.ts`) и
 делает окно `.range(from, to)` с `count: 'exact'` (`:245-248`); фильтр этапа — `.eq`
 (`:250`), поиск — `.ilike('name', …)` по экранированному шаблону (`:215`, `:249`).
 
@@ -832,15 +832,15 @@ id, и на общем ноутбуке первый кадр следующег
    попасть на две соседние страницы сразу либо не попасть ни на одну. Причина записана
    в коде (`:240-242`).
 2. **Экранирование шаблона обязательно.** `%` и `_` в ILIKE — подстановочные знаки:
-   без `escapeLikePattern` (`lib/postgrest.ts:8-9`) один символ `%` в поле поиска
+   без `escapeLikePattern` (`lib/postgrest.ts`) один символ `%` в поле поиска
    вернул бы весь архив.
 3. **Размер страницы входит в ключ кэша** (`:200-202`), поэтому его выбирает сама фича
    (`:112-117`), а прогрев в `App.tsx` спрашивает то же число (раздел 4).
 
 Счётчик в шапке реестра после этого означает разное в разных состояниях: без фильтров
-это «Всего списков», с фильтрами — «Найдено» (`ListsPage.tsx:225`, флаг `isFiltered`
+это «Всего списков», с фильтрами — «Найдено» (`ListsPage.tsx`, флаг `isFiltered`
 `:123`). Второй ходки за общим числом нет намеренно, и это записано в типе
-(`lists/api.ts:184-189`).
+(`lists/api.ts`).
 
 ### Где именно упирается в 1000
 
@@ -851,12 +851,12 @@ Data API (PostgREST) режет ответ по настройке `db-max-rows`
 
 Два места ломаются тихо, если лимит равен 1000 или меньше:
 
-1. **`fetchAllEquipment` (`equipment/api.ts:130-143`).** Условие выхода из цикла —
+1. **`fetchAllEquipment` (`equipment/api.ts`).** Условие выхода из цикла —
    `if (batch.length < batchSize) break` (`:142`). Оно смешивает «таблица кончилась»
    и «сервер обрезал страницу». При `db-max-rows < 1000` первая же порция придёт
    короче 1000 → цикл выйдет после одной итерации → **весь редактор списка получит
    усечённый склад и не узнает об этом**. При ровно 1000 логика верна.
-2. **`fetchEquipmentTaxonomy` (`equipment/api.ts:184-187`).** Запрошено 2000 строк,
+2. **`fetchEquipmentTaxonomy` (`equipment/api.ts`).** Запрошено 2000 строк,
    но выдадут не больше `db-max-rows`, а `.order()` в этом запросе **нет** — порядок
    строк не определён. Значит набор типов и подтипов собирается из произвольного
    подмножества склада, и подсказки в форме создания могут не содержать существующих
@@ -911,16 +911,16 @@ async function withLegacySchemaFallback(run) {                                  
 
 Это привело файл к конвенции, которая в проекте уже была:
 
-- `fetchReservationShortages` — `lists/api.ts:504`: `PGRST202` / `42883` → `[]`;
-- `fetchReservationHistory` — `lists/api.ts:535`: `PGRST205` / `42P01` → `[]`;
-- `fetchEquipmentMovements` — `equipment/api.ts:405`: та же пара.
+- `fetchReservationShortages` — `lists/api.ts`: `PGRST202` / `42883` → `[]`;
+- `fetchReservationHistory` — `lists/api.ts`: `PGRST205` / `42P01` → `[]`;
+- `fetchEquipmentMovements` — `equipment/api.ts`: та же пара.
 
 ### Что осталось и о чём помнить
 
 1. **Legacy-ветка сама по себе никуда не делась** — она просто стала недостижимой без
    реального отсутствия колонки. Если такая колонка исчезнет, поведение прежнее:
    `advanced_features: false` и `reservation_status: 'draft'` у всех строк, а значит
-   карточка покажет «Сохранён» (`ListsPage.tsx:264`), кнопки переходов исчезнут (`:350`),
+   карточка покажет «Сохранён» (`ListsPage.tsx`), кнопки переходов исчезнут (`:350`),
    история и дефицит не запросятся (`:357-359`). Разница в том, что теперь это
    означает настоящую поломку схемы, а не мигнувший Wi-Fi.
 2. **Фильтр этапа в legacy-ветке разбирается на клиенте** (`:218-224`), и это
@@ -947,11 +947,11 @@ async function withLegacySchemaFallback(run) {                                  
 | Контракт | `:9`, `:31` | `tr: (ru, uz) => string` — обе строки передаются в месте вызова. Строка физически не может появиться на одном языке |
 | Локаль | `:7`, `:29` | `locale: 'ru-RU' \| 'uz-UZ'` — для `Intl.DateTimeFormat` |
 | Мемо | `:27-32` | Значение контекста пересобирается только при смене языка |
-| Провайдер | `:34`, `main.tsx:12` | Обёрнут вокруг `AuthProvider` — вход тоже локализован |
+| Провайдер | `:34`, `main.tsx` | Обёрнут вокруг `AuthProvider` — вход тоже локализован |
 | Гард | `:37-41` | `useLanguage` вне провайдера бросает |
 | Переключатель | `:43-51` | Две кнопки RU/UZ, `role="group"` (`:47`), `aria-pressed` (`:48-49`) |
 
-`index.html:2` задаёт `lang="ru"` статически; `i18n.tsx:23` перезаписывает атрибут после
+`index.html:2` задаёт `lang="ru"` статически; `i18n.tsx` перезаписывает атрибут после
 первого эффекта. То есть при выбранном узбекском в первом кадре документ ещё объявлен
 русским — для скринридера это заметно, для верстки нет.
 
@@ -964,12 +964,12 @@ async function withLegacySchemaFallback(run) {                                  
 
 | Где | Что в стейте | Якорь |
 |---|---|---|
-| Каталог | `hasLoadError: boolean` | `EquipmentPage.tsx:46-48`, текст `:174-180` |
-| Реестр списков | `hasLoadError: boolean` | `ListsPage.tsx:113-115`, текст `:257-258` |
-| Детали списка | `DrawerErrorCode` — union из пяти значений | `ListsPage.tsx:49-52`, разбор `:56-70` |
-| Открытие списка в редакторе | `OpenErrorCode` — union из трёх | `ListEditorPage.tsx:58-61`, текст `:456-458` |
-| Каталог редактора | `hasLoadError: boolean` | `ListEditorPage.tsx:93-94` |
-| История движений | `hasHistoryError: boolean` | `EquipmentDrawer.tsx:63-65` |
+| Каталог | `hasLoadError: boolean` | `EquipmentPage.tsx`, текст `:174-180` |
+| Реестр списков | `hasLoadError: boolean` | `ListsPage.tsx`, текст `:257-258` |
+| Детали списка | `DrawerErrorCode` — union из пяти значений | `ListsPage.tsx`, разбор `:56-70` |
+| Открытие списка в редакторе | `OpenErrorCode` — union из трёх | `ListEditorPage.tsx`, текст `:456-458` |
+| Каталог редактора | `hasLoadError: boolean` | `ListEditorPage.tsx` |
+| История движений | `hasHistoryError: boolean` | `EquipmentDrawer.tsx` |
 
 Причина записана прямо у каждого объявления — это не стиль, а защита от сетевого залпа
 на клик по переключателю языка.
@@ -977,7 +977,7 @@ async function withLegacySchemaFallback(run) {                                  
 Исключение из правила «локализация — это `tr`»: `lib/equipmentTaxonomy.ts` — обычный
 словарь `Record<string, string>` для типов и подтипов оборудования (значения приходят
 из базы, инлайн-парой их не покроешь). Второе исключение — узбекские месяцы и дни недели,
-зашитые прямо в `components/AppDatePicker.tsx:5-6`.
+зашитые прямо в `components/AppDatePicker.tsx`.
 
 ---
 
@@ -989,15 +989,15 @@ async function withLegacySchemaFallback(run) {                                  
 
 | Drawer | Компонент/якорь | Хук | Что показывает |
 |---|---|---|---|
-| Карточка оборудования | `EquipmentDrawer.tsx:211` | `:60` | Единица склада, режим редактирования, история движений |
-| Карточка списка | `ListsPage.tsx:428` | `:331` | Состав, дефицит, история этапов, переходы, удаление |
-| Превью модели | `ListEditorCatalog.tsx:134` | `:125` | Описание модели в каталоге редактора |
+| Карточка оборудования | `EquipmentDrawer.tsx` | `:60` | Единица склада, режим редактирования, история движений |
+| Карточка списка | `ListsPage.tsx` | `:331` | Состав, дефицит, история этапов, переходы, удаление |
+| Превью модели | `ListEditorCatalog.tsx` | `:125` | Описание модели в каталоге редактора |
 
 Разметка у всех трёх одинакова: `<div className="drawer-layer" role="dialog"
 aria-modal="true" aria-label={…} onMouseDown={onClose}>` с `onMouseDown` +
 `stopPropagation` на внутренней `<aside>` — закрытие по клику вне панели.
 Первым фокусируемым элементом стоит кнопка закрытия с `autoFocus`
-(`EquipmentDrawer.tsx:220`, `ListsPage.tsx:433`, `ListEditorCatalog.tsx:138`).
+(`EquipmentDrawer.tsx`, `ListsPage.tsx`, `ListEditorCatalog.tsx`).
 
 `lib/useModalLayer.ts` — общая часть слоя drawer'а:
 
@@ -1018,8 +1018,8 @@ aria-modal="true" aria-label={…} onMouseDown={onClose}>` с `onMouseDown` +
 Два поповера в `components/` ведут себя как модалки, но модалками не являются:
 `AppSelect` (`:62-85`, портал в `document.body`) и `AppDatePicker` (`:110-112`,
 `role="dialog" aria-modal="false"`). Раньше каждый нёс свою копию «закрыться по клику
-мимо / по Escape / при сдвиге вьюпорта»; теперь это один хук (`AppSelect.tsx:45`,
-`AppDatePicker.tsx:72`).
+мимо / по Escape / при сдвиге вьюпорта»; теперь это один хук (`AppSelect.tsx`,
+`AppDatePicker.tsx`).
 
 Две неочевидные вещи в нём, обе объяснены в докблоке (`:3-18`):
 
@@ -1058,7 +1058,7 @@ aria-modal="true" aria-label={…} onMouseDown={onClose}>` с `onMouseDown` +
 | `strict` | `:10` | `true` |
 | **`noUnusedLocals` / `noUnusedParameters`** | `:11-12` | `true` — мёртвая переменная роняет `tsc`, а не копится |
 | **`noFallthroughCasesInSwitch`** | `:13` | `true` |
-| **`noUncheckedIndexedAccess`** | `:14` | `true` — `arr[0]` типизируется как `T \| undefined`; отсюда `group.allItems[0]` через `?.` в `ListEditorCatalog.tsx:126`, `:147-148` |
+| **`noUncheckedIndexedAccess`** | `:14` | `true` — `arr[0]` типизируется как `T \| undefined`; отсюда `group.allItems[0]` через `?.` в `ListEditorCatalog.tsx`, `:147-148` |
 | `forceConsistentCasingInFileNames` | `:15` | `true` |
 | `module` / `moduleResolution` | `:16-17` | `ESNext` / `Bundler` |
 | `isolatedModules`, `noEmit` | `:19-20` | `true` / `true` (эмитит Vite) |
@@ -1085,7 +1085,7 @@ aria-modal="true" aria-label={…} onMouseDown={onClose}>` с `onMouseDown` +
 Нарезка адресная и узкая: `react`, `react-dom`, `react-router`, `react-router-dom`,
 `scheduler` → `react-vendor` (`:37`); `@supabase/*` → `supabase` (`:38`); всё остальное
 из `node_modules` возвращает `undefined`, то есть решает Rollup. Разделение чанков
-страниц по-прежнему определяется динамическими `import()` из `App.tsx:7-12`.
+страниц по-прежнему определяется динамическими `import()` из `App.tsx`.
 
 **Фактические размеры** (`npm run build`, 2026-08-21, после вехи 2 — 21 JS-чанк):
 
@@ -1157,11 +1157,11 @@ api-модулем.
 
 ### Переменные окружения
 
-Ровно две, обе читаются в одном месте — `lib/supabase.ts:4-5`:
+Ровно две, обе читаются в одном месте — `lib/supabase.ts`:
 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. Шаблон — `.env.example`.
 Префикс `VITE_` означает попадание в бандл; для публикуемого ключа Supabase это штатно
 (CLAUDE.md, правило 3). С с5 их отсутствие — **ошибка сборки**, а не тихо сломанный
-прод: гейт в `vite.config.ts:10-19`. Практическое следствие, о которое легко споткнуться:
+прод: гейт в `vite.config.ts`. Практическое следствие, о которое легко споткнуться:
 переменные должны быть заведены не только для Production, но и для Preview — иначе
 превью-деплой ветки падает на этом гейте.
 
@@ -1213,21 +1213,21 @@ semi: false, singleQuote: true, tabWidth: 2, trailingComma: es5`. Совпада
 
 | Механизм | Якоря |
 |---|---|
-| `role="alert"` — единственный на весь проект | `features/auth/LoginPage.tsx:113` |
-| `role="status"` на скелетоне маршрута | `app/App.tsx:186` (`aria-label="Загрузка раздела"` — жёстко по-русски, мимо `tr`) |
-| `role="dialog" aria-modal="true"` + `aria-label` у трёх drawer'ов | `EquipmentDrawer.tsx:211`, `ListsPage.tsx:428`, `ListEditorCatalog.tsx:134` |
-| Начальный фокус на кнопке закрытия | `EquipmentDrawer.tsx:220`, `ListsPage.tsx:433`, `ListEditorCatalog.tsx:138` |
-| Escape закрывает слой | `useModalLayer.ts:15-17`, `:24` |
-| Escape в попапе закрывает **только попап**, второй — drawer | `usePopoverLayer.ts:38-42`, `:45` (фаза перехвата) |
-| Блокировка скролла фона без дёрганья | `useModalLayer.ts:19-23` |
-| `role="tablist"` / `role="tab"` + `aria-selected` в мобильном редакторе | `ListEditorPage.tsx:570`, `:571`, `:572` |
-| `role="group"` + `aria-pressed` у переключателя языка | `i18n.tsx:47`, `:48-49` |
-| Возврат фокуса на триггер в поповерах | `AppSelect.tsx:76`; `AppDatePicker.tsx:89`, `:131` |
-| Блок `@media (prefers-reduced-motion: reduce)` | `styles.css:621` |
-| `document.documentElement.lang` следует за выбором языка | `i18n.tsx:23` |
+| `role="alert"` — единственный на весь проект | `features/auth/LoginPage.tsx` |
+| `role="status"` на скелетоне маршрута | `app/App.tsx` (`aria-label="Загрузка раздела"` — жёстко по-русски, мимо `tr`) |
+| `role="dialog" aria-modal="true"` + `aria-label` у трёх drawer'ов | `EquipmentDrawer.tsx`, `ListsPage.tsx`, `ListEditorCatalog.tsx` |
+| Начальный фокус на кнопке закрытия | `EquipmentDrawer.tsx`, `ListsPage.tsx`, `ListEditorCatalog.tsx` |
+| Escape закрывает слой | `useModalLayer.ts`, `:24` |
+| Escape в попапе закрывает **только попап**, второй — drawer | `usePopoverLayer.ts`, `:45` (фаза перехвата) |
+| Блокировка скролла фона без дёрганья | `useModalLayer.ts` |
+| `role="tablist"` / `role="tab"` + `aria-selected` в мобильном редакторе | `ListEditorPage.tsx`, `:571`, `:572` |
+| `role="group"` + `aria-pressed` у переключателя языка | `i18n.tsx`, `:48-49` |
+| Возврат фокуса на триггер в поповерах | `AppSelect.tsx`; `AppDatePicker.tsx`, `:131` |
+| Блок `@media (prefers-reduced-motion: reduce)` | `styles.css` |
+| `document.documentElement.lang` следует за выбором языка | `i18n.tsx` |
 
 Полный инвентарь ролей по `src/react` (grep): `status` ×1, `alert` ×1, `dialog` ×4
-(три drawer'а + поповер календаря `AppDatePicker.tsx:110`), `listbox` ×1, `option` ×1,
+(три drawer'а + поповер календаря `AppDatePicker.tsx`), `listbox` ×1, `option` ×1,
 `tablist` ×1, `tab` ×2, `group` ×1.
 
 Оговорка про `prefers-reduced-motion`: блок теперь **один**, а не два. Второй ушёл при
@@ -1239,14 +1239,14 @@ semi: false, singleQuote: true, tabWidth: 2, trailingComma: es5`. Совпада
 1. **Фокус-ловушки в drawer'ах и возврата фокуса на триггер.** `useModalLayer` этого
    не делает; ничего рядом тоже. Tab из открытой панели уходит в фон под ней, а после
    закрытия фокус теряется в начало документа. При этом в поповерах возврат фокуса
-   реализован (`AppSelect.tsx:76`, `AppDatePicker.tsx:89`, `:131`) — **проект не
+   реализован (`AppSelect.tsx`, `AppDatePicker.tsx`, `:131`) — **проект не
    согласован сам с собой**, и образец правильного поведения лежит в соседнем каталоге.
 2. **`AppSelect` не выполняет объявленный listbox-контракт.** Заявлено:
    `aria-haspopup="listbox"` (`:54`), `aria-expanded` (`:55`), `role="listbox"` (`:66`),
    `role="option"` (`:73`), `aria-selected` (`:74`). Не реализовано: навигация стрелками
    Up/Down, Home/End, выбор по Enter/Space, `aria-activedescendant`. Единственный
    клавиатурный обработчик — Escape, и тот пришёл из общего хука
-   (`usePopoverLayer.ts:38-42`). Для скринридера это хуже нативного `<select>`:
+   (`usePopoverLayer.ts`). Для скринридера это хуже нативного `<select>`:
    контракт обещан и не исполнен.
 3. **`aria-live` нет ни одного** (`grep -rn "aria-live" src/react` → 0). Кроме `role="alert"`
    на экране входа, ни одно асинхронное событие не объявляется: успех сохранения
@@ -1254,12 +1254,12 @@ semi: false, singleQuote: true, tabWidth: 2, trailingComma: es5`. Совпада
    Excel, плашка «Черновик восстановлен» — всё это меняет DOM молча. Для незрячего
    пользователя нажатие «Сохранить» не даёт обратной связи вообще.
 4. **Поповеры закрываются вместо перепозиционирования** при скролле и ресайзе
-   (`usePopoverLayer.ts:43`, `:46-47`). Пользователь с экранной лупой или зумом теряет
+   (`usePopoverLayer.ts`, `:46-47`). Пользователь с экранной лупой или зумом теряет
    открытый список от любого сдвига вьюпорта. С с5 это одно место на оба поповера, то
    есть чинить придётся один раз, а не дважды.
 5. **Skip-link'а к основному содержимому нет** — при табуляции придётся пройти весь
-   сайдбар (`App.tsx:116-171`) на каждой странице.
-6. `role="status"` на `RouteLoader` (`App.tsx:186`) имеет `aria-label` строкой в коде
+   сайдбар (`App.tsx`) на каждой странице.
+6. `role="status"` на `RouteLoader` (`App.tsx`) имеет `aria-label` строкой в коде
    мимо `tr` — узбекскому пользователю объявится по-русски.
 
 Зоны касания 44 px и контраст относятся к дизайн-системе — их разбор в странице
