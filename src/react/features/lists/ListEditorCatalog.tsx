@@ -36,10 +36,12 @@ export function CatalogPanel({ panelRef, isMobileActive, groups, equipmentCount,
 
   const categories = useMemo(() => [...new Set(groups.map((group) => group.type))]
     .sort((a, b) => translateEquipmentTaxonomy(a, language).localeCompare(translateEquipmentTaxonomy(b, language), locale)), [groups, language, locale])
-  const subcategories = useMemo(() => category
-    ? [...new Set(groups.filter((group) => group.type === category).map((group) => group.subtype))]
-      .sort((a, b) => translateEquipmentTaxonomy(a, language).localeCompare(translateEquipmentTaxonomy(b, language), locale))
-    : [], [category, groups, language, locale])
+  // Без выбранной категории — подтипы всего каталога: «микрофоны» ищут напрямую,
+  // не вспоминая, в какой из семи категорий они лежат.
+  const subcategories = useMemo(() => [...new Set(groups
+    .filter((group) => !category || group.type === category)
+    .map((group) => group.subtype))]
+    .sort((a, b) => translateEquipmentTaxonomy(a, language).localeCompare(translateEquipmentTaxonomy(b, language), locale)), [category, groups, language, locale])
   const filteredGroups = useMemo(() => {
     const terms = search.trim().toLocaleLowerCase(locale).split(/\s+/).filter(Boolean)
     return groups.filter((group) => {
@@ -71,7 +73,7 @@ export function CatalogPanel({ panelRef, isMobileActive, groups, equipmentCount,
           onChange={setCategory}
           ariaLabel={tr('Категория', 'Toifa')}
         />
-        {category && subcategories.length > 1 && (
+        {subcategories.length > 1 && (
           <AppSelect
             value={subcategory}
             options={[{ value: '', label: tr('Все подкатегории', 'Barcha quyi toifalar') }, ...subcategories.map((value) => ({ value, label: translateEquipmentTaxonomy(value, language) }))]}

@@ -25,6 +25,12 @@ export function formatDateTime(value: number, locale: string) {
   return new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 }
 
+// Часы и минуты момента. Нужны автоимени списка: дата отвечает на «когда
+// мероприятие», время — на «который из сегодняшних списков это был».
+export function formatTime(value: number, locale: string) {
+  return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+}
+
 type Tr = (ru: string, uz: string) => string
 
 // Возраст данных словами. Числительные и склонения («2 минуты», «5 минут»,

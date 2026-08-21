@@ -19,7 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AppDatePicker } from '../../components/AppDatePicker'
 import { preloadEquipmentImages } from '../../components/EquipmentVisual'
-import { formatDateTime, todayDateValue } from '../../lib/date'
+import { formatDateTime, formatTime, parseDateValue, todayDateValue } from '../../lib/date'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
 import { useArmedAction } from '../../lib/useArmedAction'
@@ -36,7 +36,6 @@ import {
   type EquipmentListItem,
 } from './api'
 import { buildCatalogGroups, groupKey, type CatalogGroup } from './catalogGroups'
-import { listDocumentDefaults } from './documentDefaults'
 import { CatalogPanel, CatalogPreviewDrawer } from './ListEditorCatalog'
 import { useListDraftAutosave } from './useListDraftAutosave'
 import { downloadEquipmentListXlsx } from './xlsxExport'
@@ -61,6 +60,11 @@ type SelectedGroup = {
 // перезапрашивала бы список из базы.
 type OpenErrorCode = '' | 'not-draft' | 'failed'
 
+// Реквизиты, без которых не собирается документ на согласование. Проверка
+// клиентская и это UX: документ формируется здесь же, в браузере, пары в базе
+// у неё быть не может.
+type RequisiteField = 'name' | 'clientName' | 'venue'
+
 // Высота липкой полосы табов на телефоне (8 сверху + кнопка 44 + 4 снизу + рамка 1).
 // Держится в паре с .mobile-editor-tabs и .quick-catalog-toolbar в styles.css:
 // разъедется — таб «В списке» снова приземлится под срезанным заголовком.
@@ -70,8 +74,25 @@ const MOBILE_TABS_HEIGHT = 57
 // любое число, но в рабочем списке четырёхзначное количество означает опечатку.
 const MAX_ITEM_COUNT = 999
 
-function selectDefaultInputValue(input: HTMLInputElement, defaultValue: string) {
-  if (input.value === defaultValue) input.select()
+// Снимок документа одной строкой — по нему считается «есть несохранённые
+// правки». Серийники сортируются, порядок ключей фиксирован: иначе одна и та же
+// правка давала бы разные строки, и предупреждение загоралось бы на ровном месте.
+function serializeDocument(input: {
+  name: string
+  clientName: string
+  venue: string
+  description: string
+  eventDate: string
+  items: { key: string; count: number; serialIds: string[] }[]
+}) {
+  return JSON.stringify({
+    name: input.name.trim(),
+    clientName: input.clientName.trim(),
+    venue: input.venue.trim(),
+    description: input.description.trim(),
+    eventDate: input.eventDate,
+    items: input.items.map(({ key, count, serialIds }) => ({ key, count, serialIds: [...serialIds].sort() })),
+  })
 }
 
 function selectionLabel(group: CatalogGroup): SelectionLabel {
@@ -82,14 +103,13 @@ export function ListEditorPage() {
   const navigate = useNavigate()
   const { listId } = useParams<{ listId: string }>()
   const { tr, language, locale } = useLanguage()
-  const defaults = listDocumentDefaults[language]
   // Черновик восстанавливается ТОЛЬКО в режиме создания: у открытого списка
-  // источник правды — строка в базе. Шапка документа поднимается прямо в
-  // начальном стейте, поэтому эффект языковых дефолтов её уже не перетирает.
+  // источник правды — строка в базе. Реквизиты стартуют пустыми: подставленный
+  // текст пользователь принимал за свой и увозил в документ и в базу.
   const [restoredDraft] = useState(() => listId ? null : readListDraft())
-  const [name, setName] = useState<string>(() => restoredDraft?.name ?? listDocumentDefaults[language].name)
-  const [clientName, setClientName] = useState<string>(() => restoredDraft?.clientName ?? listDocumentDefaults[language].clientName)
-  const [venue, setVenue] = useState<string>(() => restoredDraft?.venue ?? listDocumentDefaults[language].venue)
+  const [name, setName] = useState<string>(() => restoredDraft?.name ?? '')
+  const [clientName, setClientName] = useState<string>(() => restoredDraft?.clientName ?? '')
+  const [venue, setVenue] = useState<string>(() => restoredDraft?.venue ?? '')
   const [description, setDescription] = useState(() => restoredDraft?.description ?? '')
   const [eventDate, setEventDate] = useState(() => restoredDraft?.eventDate ?? todayDateValue())
   const [cachedEquipment] = useState(readCachedAllEquipment)
@@ -107,6 +127,9 @@ export function ListEditorPage() {
   const [listToEdit, setListToEdit] = useState<EquipmentList | null>(() => cachedList?.reservation_status === 'draft' ? cachedList : null)
   const [saveError, setSaveError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  // Незаполненные реквизиты, на которые указала попытка собрать документ на
+  // согласование. Подсветка снимается с поля, как только его начали править.
+  const [requisiteErrors, setRequisiteErrors] = useState<Set<RequisiteField>>(() => new Set())
   // Момент последней записи в базу. Нужен только строке состояния в шапке.
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
   // Количество, которое пользователь СЕЙЧАС набирает. Держим отдельно от выборки:
@@ -116,6 +139,10 @@ export function ListEditorPage() {
   const [mobilePanel, setMobilePanel] = useState<'catalog' | 'selection'>('catalog')
   const catalogRef = useRef<HTMLElement>(null)
   const selectionRef = useRef<HTMLElement>(null)
+  const metaRef = useRef<HTMLElement>(null)
+  // Снимок документа на момент последней записи в базу. Пустая строка — снимка
+  // ещё нет (список не открыт или не догрузился), и предупреждать не о чем.
+  const savedSnapshotRef = useRef('')
   // Сколько позиций черновика не нашлось в живом каталоге. null — плашки нет.
   const [draftNotice, setDraftNotice] = useState<{ missingGroups: number } | null>(null)
   // Гидратация разведена на две: шапка документа заполняется сразу из строки
@@ -186,21 +213,14 @@ export function ListEditorPage() {
   useEffect(() => {
     if (!listToEdit || hydratedMetaRef.current === listToEdit.id) return
     setName(listToEdit.name)
-    setClientName(listToEdit.client_name ?? defaults.clientName)
-    setVenue(listToEdit.venue ?? defaults.venue)
+    setClientName(listToEdit.client_name ?? '')
+    setVenue(listToEdit.venue ?? '')
     setDescription(listToEdit.description ?? '')
     setEventDate(listToEdit.reservation_start ?? todayDateValue())
     const savedAt = Date.parse(listToEdit.created_at ?? '')
     setLastSavedAt(Number.isNaN(savedAt) ? null : savedAt)
     hydratedMetaRef.current = listToEdit.id
-  }, [defaults.clientName, defaults.venue, listToEdit])
-
-  useEffect(() => {
-    const allDefaults = Object.values(listDocumentDefaults)
-    setName((current) => allDefaults.some((item) => item.name === current) ? defaults.name : current)
-    setClientName((current) => allDefaults.some((item) => item.clientName === current) ? defaults.clientName : current)
-    setVenue((current) => allDefaults.some((item) => item.venue === current) ? defaults.venue : current)
-  }, [defaults])
+  }, [listToEdit])
 
   const groups = useMemo(() => buildCatalogGroups(equipment), [equipment])
 
@@ -229,7 +249,19 @@ export function ListEditorPage() {
       if (group) addRestored(group, Math.max(1, Number(item.count) || 1), item.tracking_mode === 'serialized' ? item.equipment_id : undefined)
     }
 
-    setSelected([...restored.values()])
+    const restoredItems = [...restored.values()]
+    setSelected(restoredItems)
+    // Точка отсчёта для «есть несохранённые правки»: считаем её по строке из
+    // базы, а не по стейту — стейт шапки мог уже разъехаться с ней, если
+    // пользователь начал печатать, пока ехал каталог.
+    savedSnapshotRef.current = serializeDocument({
+      name: listToEdit.name,
+      clientName: listToEdit.client_name ?? '',
+      venue: listToEdit.venue ?? '',
+      description: listToEdit.description ?? '',
+      eventDate: listToEdit.reservation_start ?? todayDateValue(),
+      items: restoredItems,
+    })
     hydratedSelectionRef.current = listToEdit.id
   }, [equipment, groups, groupsByKey, listToEdit])
 
@@ -265,17 +297,46 @@ export function ListEditorPage() {
 
   useListDraftAutosave({ listId, restoredRef: draftRestoredRef, name, clientName, venue, description, eventDate, items: draftItems })
 
-  // «Начать заново»: черновик стирается, форма возвращается к дефолтам.
+  // Правки сохранённого списка не автосохраняются, поэтому закрытие вкладки
+  // спрашивает подтверждение. На /lists/new предупреждения нет — там черновик
+  // лежит в localStorage. Текст диалога свой у каждого браузера, задать его нельзя.
+  const isDirty = savedSnapshotRef.current !== ''
+    && savedSnapshotRef.current !== serializeDocument({ name, clientName, venue, description, eventDate, items: draftItems })
+
+  useEffect(() => {
+    if (!listId || !isDirty) return
+    const warnOnUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      // Хвост для Chrome/Edge младше 119: они не смотрят на preventDefault, а
+      // диалог показывают, только если returnValue стал НЕ пустой строкой
+      // (пустая — его же значение по умолчанию, то есть присвоение впустую).
+      event.returnValue = true
+    }
+    window.addEventListener('beforeunload', warnOnUnload)
+    return () => window.removeEventListener('beforeunload', warnOnUnload)
+  }, [isDirty, listId])
+
+  // «Начать заново»: черновик стирается, форма пустеет.
   function discardDraft() {
     clearListDraft()
     setDraftNotice(null)
     setSelected([])
-    setName(defaults.name)
-    setClientName(defaults.clientName)
-    setVenue(defaults.venue)
+    setName('')
+    setClientName('')
+    setVenue('')
     setDescription('')
     setEventDate(todayDateValue())
     setSuccessMessage('')
+    setRequisiteErrors(new Set())
+  }
+
+  function clearRequisiteError(field: RequisiteField) {
+    setRequisiteErrors((current) => {
+      if (!current.has(field)) return current
+      const next = new Set(current)
+      next.delete(field)
+      return next
+    })
   }
 
   const selectedCount = selected.reduce((sum, item) => sum + item.count, 0)
@@ -402,20 +463,34 @@ export function ListEditorPage() {
     })
   }
 
+  // Имя собирается в момент действия и только если поле пустое: дата мероприятия
+  // отвечает на «что искать в реестре», время — на «который из сегодняшних».
+  // Само поле не трогаем — пустое поле законно, и подставлять в него нечего.
+  function resolveListName() {
+    const trimmed = name.trim()
+    if (trimmed) return trimmed
+    const date = new Intl.DateTimeFormat(locale).format(parseDateValue(eventDate) ?? new Date())
+    const time = formatTime(Date.now(), locale)
+    return tr(`Список ${date} · ${time}`, `Ro‘yxat ${date} · ${time}`)
+  }
+
   async function persistList() {
     const items = buildItems()
     const listMode: 'specific' | 'abstract' = items.every((item) => item.tracking_mode !== 'planned') ? 'specific' : 'abstract'
     const input = {
-      name: name.trim() || defaults.name,
+      name: resolveListName(),
       description,
-      clientName: clientName.trim() || defaults.clientName,
-      venue: venue.trim() || defaults.venue,
+      clientName: clientName.trim(),
+      venue: venue.trim(),
       listMode,
       reservationStart: eventDate || null,
       reservationEnd: eventDate || null,
       equipmentItems: items,
     }
-    return listId ? await updateEquipmentList(listId, input) : await createEquipmentList(input)
+    const id = listId ? await updateEquipmentList(listId, input) : await createEquipmentList(input)
+    // Имя возвращаем разрешённым: снимок «сохранено» должен совпасть с тем, что
+    // приедет из базы гидратацией, иначе список сразу окажется «изменённым».
+    return { id, name: input.name }
   }
 
   async function saveList() {
@@ -425,7 +500,12 @@ export function ListEditorPage() {
     setSaveError('')
     setSuccessMessage('')
     try {
-      const id = await persistList()
+      const saved = await persistList()
+      savedSnapshotRef.current = serializeDocument({ name: saved.name, clientName, venue, description, eventDate, items: draftItems })
+      // Пустое поле после записи показывает то имя, что уехало в базу: иначе у
+      // открытого списка (гидратация для него уже отработала) поле и h1 остались
+      // бы пустыми, а «есть несохранённые правки» — взведённым до перезагрузки.
+      if (!name.trim()) setName(saved.name)
       setSuccessMessage(isCreating ? tr('Список сохранён в системе.', 'Ro‘yxat tizimda saqlandi.') : tr('Изменения сохранены.', 'O‘zgarishlar saqlandi.'))
       setLastSavedAt(Date.now())
       // После создания источник правды — listId из URL: следующее «Сохранить» обновит эту же запись, а не заведёт вторую.
@@ -433,7 +513,7 @@ export function ListEditorPage() {
         // Черновик своё отработал: дальше запись живёт в базе.
         clearListDraft()
         setDraftNotice(null)
-        navigate(`/lists/${id}/edit`, { replace: true })
+        navigate(`/lists/${saved.id}/edit`, { replace: true })
       }
     } catch {
       setSaveError(tr('Не удалось сохранить список. Файл всё ещё можно скачать.', 'Ro‘yxatni saqlab bo‘lmadi. Faylni baribir yuklab olish mumkin.'))
@@ -444,14 +524,35 @@ export function ListEditorPage() {
 
   function exportList(documentMode: 'working' | 'approval') {
     if (!canSubmit) return
+    // Реквизиты обязательны только для документа на согласование: он идёт
+    // заказчику под грифом «УТВЕРЖДАЮ», и пустых строк в нём быть не должно.
+    // «Рабочий Excel» и «Сохранить» не требуют ни одного заполненного поля.
+    if (documentMode === 'approval') {
+      const fields: [RequisiteField, string][] = [['name', name], ['clientName', clientName], ['venue', venue]]
+      const missing = fields.filter(([, value]) => !value.trim()).map(([field]) => field)
+      if (missing.length > 0) {
+        setRequisiteErrors(new Set(missing))
+        setSaveError(tr(
+          'Для документа на согласование заполните название, заказчика и площадку.',
+          'Kelishuv hujjati uchun nom, buyurtmachi va maydonni to‘ldiring.',
+        ))
+        setSuccessMessage('')
+        metaRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+        // preventScroll обязателен: обычный фокус прыгает к полю мгновенно и
+        // обрывает плавную прокрутку к панели реквизитов.
+        document.getElementById(`quick-list-${missing[0]}`)?.focus({ preventScroll: true })
+        return
+      }
+    }
+    setRequisiteErrors(new Set())
     setIsExporting(documentMode)
     setSaveError('')
     setSuccessMessage('')
     try {
       downloadEquipmentListXlsx({
-        name: name.trim() || defaults.name,
-        clientName: clientName.trim() || defaults.clientName,
-        venue: venue.trim() || defaults.venue,
+        name: resolveListName(),
+        clientName: clientName.trim(),
+        venue: venue.trim(),
         description: description.trim(),
         eventDate: eventDate || null,
         locale,
@@ -541,25 +642,17 @@ export function ListEditorPage() {
         </div>
       )}
 
-      <section className="quick-list-meta data-panel">
+      <section ref={metaRef} className="quick-list-meta data-panel">
         <label className="field quick-list-meta__name">
-          <span>{tr('Проект или мероприятие', 'Loyiha yoki tadbir')} <small>{tr('можно не менять', 'o‘zgartirish shart emas')}</small></span>
+          <span>{tr('Проект или мероприятие', 'Loyiha yoki tadbir')} <small>{tr('необязательно: подставится дата', 'ixtiyoriy: sana qo‘yiladi')}</small></span>
           <input
+            id="quick-list-name"
+            className={requisiteErrors.has('name') ? 'input-error' : ''}
             value={name}
-            onFocus={(event) => selectDefaultInputValue(event.currentTarget, defaults.name)}
-            onPointerDown={(event) => {
-              if (event.currentTarget.value !== defaults.name) return
-              event.preventDefault()
-              event.currentTarget.focus()
-              event.currentTarget.select()
-            }}
-            onBlur={(event) => {
-              if (event.currentTarget.value.trim()) return
-              setName(defaults.name)
-            }}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => { setName(event.target.value); clearRequisiteError('name') }}
             placeholder={tr('Например, Форум в Hyatt', 'Masalan, Hyatt forumi')}
           />
+          {requisiteErrors.has('name') && <small className="field-hint field-hint--error">{tr('Обязательно для согласования', 'Kelishuv uchun majburiy')}</small>}
         </label>
         <div className="field">
           <span><CalendarDays size={13} /> {tr('Дата', 'Sana')} <small>{tr('сегодня по умолчанию', 'standart — bugun')}</small></span>
@@ -576,42 +669,26 @@ export function ListEditorPage() {
           />
         </div>
         <label className="field quick-list-meta__client">
-          <span>{tr('Заказчик / организатор', 'Buyurtmachi / tashkilotchi')} <small>{tr('можно уточнить', 'aniqlashtirish mumkin')}</small></span>
+          <span>{tr('Заказчик / организатор', 'Buyurtmachi / tashkilotchi')} <small>{tr('нужно для документа на согласование', 'kelishuv hujjati uchun kerak')}</small></span>
           <input
+            id="quick-list-clientName"
+            className={requisiteErrors.has('clientName') ? 'input-error' : ''}
             value={clientName}
-            onFocus={(event) => selectDefaultInputValue(event.currentTarget, defaults.clientName)}
-            onPointerDown={(event) => {
-              if (event.currentTarget.value !== defaults.clientName) return
-              event.preventDefault()
-              event.currentTarget.focus()
-              event.currentTarget.select()
-            }}
-            onBlur={(event) => {
-              if (event.currentTarget.value.trim()) return
-              setClientName(defaults.clientName)
-            }}
-            onChange={(event) => setClientName(event.target.value)}
+            onChange={(event) => { setClientName(event.target.value); clearRequisiteError('clientName') }}
             placeholder={tr('Например, ARGO Media', 'Masalan, ARGO Media')}
           />
+          {requisiteErrors.has('clientName') && <small className="field-hint field-hint--error">{tr('Обязательно для согласования', 'Kelishuv uchun majburiy')}</small>}
         </label>
         <label className="field quick-list-meta__venue">
-          <span>{tr('Площадка / локация', 'Maydon / joylashuv')} <small>{tr('можно уточнить', 'aniqlashtirish mumkin')}</small></span>
+          <span>{tr('Площадка / локация', 'Maydon / joylashuv')} <small>{tr('нужно для документа на согласование', 'kelishuv hujjati uchun kerak')}</small></span>
           <input
+            id="quick-list-venue"
+            className={requisiteErrors.has('venue') ? 'input-error' : ''}
             value={venue}
-            onFocus={(event) => selectDefaultInputValue(event.currentTarget, defaults.venue)}
-            onPointerDown={(event) => {
-              if (event.currentTarget.value !== defaults.venue) return
-              event.preventDefault()
-              event.currentTarget.focus()
-              event.currentTarget.select()
-            }}
-            onBlur={(event) => {
-              if (event.currentTarget.value.trim()) return
-              setVenue(defaults.venue)
-            }}
-            onChange={(event) => setVenue(event.target.value)}
+            onChange={(event) => { setVenue(event.target.value); clearRequisiteError('venue') }}
             placeholder={tr('Например, Hyatt Regency', 'Masalan, Hyatt Regency')}
           />
+          {requisiteErrors.has('venue') && <small className="field-hint field-hint--error">{tr('Обязательно для согласования', 'Kelishuv uchun majburiy')}</small>}
         </label>
         <label className="field quick-list-meta__notes">
           <span>{tr('Комментарий к документу', 'Hujjatga izoh')}</span>

@@ -1,23 +1,16 @@
 import { useEffect } from 'react'
-import { listDocumentDefaults } from './documentDefaults'
 import { clearListDraft, saveListDraft, type ListDraft, type ListDraftItem } from './api'
-
-// Реквизит считается нетронутым, если он пуст или совпадает с дефолтом ЛЮБОГО из
-// языков: пользователь мог переключить язык, не притронувшись к полю.
-function isDefaultDocumentValue(value: string, field: 'name' | 'clientName' | 'venue') {
-  const trimmed = value.trim()
-  return !trimmed || Object.values(listDocumentDefaults).some((item) => item[field] === trimmed)
-}
 
 // «Пустой» черновик не хранится и стирает уже записанный: иначе один заход на
 // /lists/new без единого действия подсовывал бы плашку «черновик восстановлен».
-// Дата в проверку не входит — у неё дефолт есть всегда.
+// Дата в проверку не входит — у неё дефолт есть всегда. Реквизиты сравнивать не
+// с чем: подставленных значений у полей больше нет, нетронутое поле просто пусто.
 function isDraftEmpty(draft: ListDraft) {
   return draft.items.length === 0
     && !draft.description.trim()
-    && isDefaultDocumentValue(draft.name, 'name')
-    && isDefaultDocumentValue(draft.clientName, 'clientName')
-    && isDefaultDocumentValue(draft.venue, 'venue')
+    && !draft.name.trim()
+    && !draft.clientName.trim()
+    && !draft.venue.trim()
 }
 
 // Автосейв черновика: пауза 1 с после последнего изменения. Режим

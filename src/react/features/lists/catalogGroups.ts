@@ -58,5 +58,8 @@ export function buildCatalogGroups(equipment: Equipment[]): CatalogGroup[] {
   }
   return [...map.values()]
     .map((group) => ({ ...group, serializedItems: group.serializedItems.sort((a, b) => (a.serialnumber ?? '').localeCompare(b.serialnumber ?? '')) }))
-    .sort((a, b) => `${a.type} ${a.brand} ${a.model}`.localeCompare(`${b.type} ${b.brand} ${b.model}`, 'ru'))
+    // Подтип в ключе сортировки стоит перед брендом: без него микрофоны, микшеры и
+    // стойки одной категории чередовались в ленте по алфавиту бренда, и глазу
+    // не за что было зацепиться.
+    .sort((a, b) => `${a.type} ${a.subtype} ${a.brand} ${a.model}`.localeCompare(`${b.type} ${b.subtype} ${b.brand} ${b.model}`, 'ru'))
 }
