@@ -762,6 +762,9 @@ h2 { letter-spacing: -0.025em; }
   .toolbar:not(.toolbar--catalog) .app-select { width: auto; }
   .pagination { align-items: flex-start; flex-direction: column; }
   .pagination__controls { width: 100%; justify-content: space-between; }
+  /* «Показать ещё» — основное действие подвала на телефоне, поэтому во всю ширину
+     и с тач-высотой: две круглые стрелки по 186 страницам здесь бесполезны. */
+  .catalog-more { width: 100%; min-height: 46px; }
   .table-scroll { overflow: visible; }
   .data-table { min-width: 0; display: block; table-layout: auto; }
   .data-table thead { display: none; }
