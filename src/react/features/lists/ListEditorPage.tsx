@@ -28,6 +28,7 @@ import {
   fetchEquipmentList,
   readCachedEquipmentList,
   readListDraft,
+  readListDraftMeta,
   updateEquipmentList,
   type EquipmentList,
   type EquipmentListItem,
@@ -101,6 +102,10 @@ export function ListEditorPage() {
   // источник правды — строка в базе. Реквизиты стартуют пустыми: подставленный
   // текст пользователь принимал за свой и увозил в документ и в базу.
   const [restoredDraft] = useState(() => listId ? null : readListDraft())
+  // Момент последней записи черновика — «изменён 21.08, 18:40» в плашке. Спрашиваем
+  // только про живой черновик: у меты нет гейта по TTL, и для протухшей записи она
+  // отдала бы время суточной давности.
+  const [restoredDraftAt] = useState(() => restoredDraft ? readListDraftMeta()?.touchedAt ?? null : null)
   const [name, setName] = useState<string>(() => restoredDraft?.name ?? '')
   const [clientName, setClientName] = useState<string>(() => restoredDraft?.clientName ?? '')
   const [venue, setVenue] = useState<string>(() => restoredDraft?.venue ?? '')
@@ -145,8 +150,9 @@ export function ListEditorPage() {
   // Снимок документа на момент последней записи в базу. Пустая строка — снимка
   // ещё нет (список не открыт или не догрузился), и предупреждать не о чем.
   const savedSnapshotRef = useRef('')
-  // Сколько позиций черновика не нашлось в живом каталоге. null — плашки нет.
-  const [draftNotice, setDraftNotice] = useState<{ missingGroups: number } | null>(null)
+  // Что именно восстановилось: сколько единиц вернулось и сколько позиций не
+  // нашлось в живом каталоге. null — плашки нет.
+  const [draftNotice, setDraftNotice] = useState<{ missingGroups: number; units: number } | null>(null)
   // Гидратация разведена на две: шапка документа заполняется сразу из строки
   // списка, состав — только когда приехал каталог.
   const hydratedMetaRef = useRef('')
@@ -282,7 +288,9 @@ export function ListEditorPage() {
     }
 
     setSelected(restored)
-    setDraftNotice({ missingGroups })
+    // Единицы, а не строки: то же число, что и «Всего единиц» в подвале выборки, —
+    // иначе плашка и подвал спорят друг с другом на одном экране.
+    setDraftNotice({ missingGroups, units: restored.reduce((sum, item) => sum + item.count, 0) })
     draftRestoredRef.current = true
   }, [groupsByKey, hasLoadError, isLoading, restoredDraft])
 
@@ -651,6 +659,15 @@ export function ListEditorPage() {
           <Info size={18} />
           <span>
             <strong>{tr('Черновик восстановлен', 'Qoralama tiklandi')}</strong>
+            {/* Что именно вернулось и когда: состав лежит на другой вкладке, и без
+                этих двух чисел «восстановлен» относится непонятно к чему, а решение
+                нажать «Начать заново» принимается вслепую. */}
+            <small>{restoredDraftAt === null
+              ? tr(`единиц: ${draftNotice.units}`, `birliklar: ${draftNotice.units}`)
+              : tr(
+                `единиц: ${draftNotice.units} · изменён ${formatDateTime(restoredDraftAt, locale)}`,
+                `birliklar: ${draftNotice.units} · ${formatDateTime(restoredDraftAt, locale)} da o‘zgartirilgan`,
+              )}</small>
             {draftNotice.missingGroups > 0 && <small>{tr(
               `позиций больше нет в каталоге: ${draftNotice.missingGroups}`,
               `katalogda qolmagan pozitsiyalar: ${draftNotice.missingGroups}`,

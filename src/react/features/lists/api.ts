@@ -364,6 +364,14 @@ export function saveListDraft(draft: ListDraft) {
   primeCachedQuery(LIST_DRAFT_CACHE_KEY, LIST_DRAFT_TTL_MS, draft)
 }
 
+// Момент последней записи черновика — «Не сохранён · изменён 21.08, 18:40» на
+// карточке реестра и в плашке восстановления. Спрашивать эту метку можно ТОЛЬКО
+// про черновик, который вернул readListDraft: гейта по TTL у меты нет, и для
+// протухшей записи она честно отдала бы время суточной давности.
+export function readListDraftMeta() {
+  return readCachedQueryMeta(LIST_DRAFT_CACHE_KEY)
+}
+
 // Точечного удаления одного ключа у persistentCache нет, поэтому стираем
 // префиксом. Пустой вызов гасим сразу: invalidateCachePrefix поднимает поколение
 // кэша, а это отменяет запись ВСЕХ ответов, летящих прямо сейчас, — и обычный

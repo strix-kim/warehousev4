@@ -19,10 +19,12 @@ import { AppSelect } from '../../components/AppSelect'
 import { DataAge } from '../../components/DataAge'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
-import { formatEventDate, monthRange, parseDateValue } from '../../lib/date'
+import { formatDateTime, formatEventDate, monthRange, parseDateValue } from '../../lib/date'
+import { useArmedAction } from '../../lib/useArmedAction'
 import { useModalLayer } from '../../lib/useModalLayer'
 import {
   buildSavedListComposition,
+  clearListDraft,
   deleteEquipmentList,
   fetchEquipmentLists,
   LIST_DELETE_FORBIDDEN,
@@ -31,6 +33,8 @@ import {
   readCachedEquipmentLists,
   readCachedEquipmentListsMeta,
   readCachedSavedListComposition,
+  readListDraft,
+  readListDraftMeta,
   type EquipmentList,
   type SavedListComposition,
 } from './api'
@@ -138,6 +142,14 @@ export function ListsPage() {
   const [selected, setSelected] = useState<EquipmentList | null>(null)
   const [exporting, setExporting] = useState<{ id: string; mode: 'working' | 'approval' } | null>(null)
   const [exportError, setExportError] = useState('')
+  // Несохранённый черновик /lists/new. Лежит локально, поэтому карточка в реестре
+  // не стоит ни одного запроса. Метку времени берём тем же кадром и только для
+  // живого черновика: у неё нет гейта по TTL (readListDraftMeta).
+  const [draft, setDraft] = useState(() => {
+    const value = readListDraft()
+    return value ? { value, touchedAt: readListDraftMeta()?.touchedAt ?? null } : null
+  })
+  const discardArmed = useArmedAction()
 
   // Поиск и фильтр теперь считает база, поэтому total — это счётчик ТЕКУЩЕЙ
   // выборки: без фильтров «всего», с фильтрами «найдено».
@@ -148,6 +160,12 @@ export function ListsPage() {
   // «Страница 2 из 1» без единой карточки. Зажатое значение и рисуется, и грузится.
   const currentPage = Math.min(page, pageCount)
   const visibleListIds = rows.map((list) => list.id).join(':')
+  // Черновика нет в базе, поэтому нет и в выборке: под поиском и периодом он лез бы
+  // в чужую выдачу, а счётчик «Найдено» его всё равно не считает. По той же причине
+  // он только на первой странице — пагинация нумерует строки базы, не локальный кэш.
+  const showDraftCard = Boolean(draft) && !isFiltered && currentPage === 1
+  const draftUnits = draft?.value.items.reduce((sum, item) => sum + item.count, 0) ?? 0
+  const draftChangedAt = draft?.touchedAt != null ? formatDateTime(draft.touchedAt, locale) : null
 
   useEffect(() => {
     const media = window.matchMedia(MOBILE_MEDIA_QUERY)
@@ -235,6 +253,13 @@ export function ListsPage() {
     return () => window.clearTimeout(timer)
   }, [visibleListIds])
 
+  // «Отбросить»: черновик стирается из кэша, карточка уходит. Двухшаговое
+  // подтверждение — как у «Начать заново» в редакторе: восстановить нечем.
+  function discardDraft() {
+    clearListDraft()
+    setDraft(null)
+  }
+
   async function exportSavedList(list: EquipmentList, documentMode: 'working' | 'approval') {
     setExporting({ id: list.id, mode: documentMode })
     setExportError('')
@@ -302,6 +327,36 @@ export function ListsPage() {
           <div className="state-block state-block--error"><CircleAlert size={25} /><strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong><span>{tr('Не удалось загрузить сохранённые списки.', 'Saqlangan ro‘yxatlarni yuklab bo‘lmadi.')}</span><button className="button button--secondary" onClick={() => setReloadKey((current) => current + 1)}>{tr('Повторить', 'Qayta urinish')}</button></div>
         ) : (
           <div className="list-grid">
+            {showDraftCard && draft && (
+              <article className="list-card list-card--draft">
+                <div className="list-card__top">
+                  <div className="list-card__identity">
+                    <p className="list-card__date">{formatCardDate(draft.value.eventDate, draft.value.eventDate, locale, tr)}</p>
+                    <p className="list-card__client">{[draft.value.clientName, draft.value.venue].filter(Boolean).join(' · ') || tr('Заказчик не указан', 'Buyurtmachi ko‘rsatilmagan')}</p>
+                  </div>
+                  {/* Бейдж, а не подпись мелким шрифтом: карточка во всём остальном
+                      неотличима от сохранённых, и «этого нет в системе» человек
+                      обязан прочитать раньше, чем нажмёт «Скачать» у соседней. */}
+                  <span className="list-card__draft-badge">{tr('Не сохранён', 'Saqlanmagan')}</span>
+                </div>
+                <div>
+                  <h3>{draft.value.name.trim() || tr('Новый список', 'Yangi ro‘yxat')}</h3>
+                  {draft.value.description && <p className="list-card__description">{draft.value.description}</p>}
+                </div>
+                <div className="list-card__meta">
+                  <span><strong>{draftUnits}</strong> {tr('единиц', 'birlik')}</span>
+                  {draftChangedAt && <span>{tr(`изменён ${draftChangedAt}`, `${draftChangedAt} da o‘zgartirilgan`)}</span>}
+                </div>
+                <div className="list-card__actions">
+                  <button className="button button--primary" onClick={() => navigate('/lists/new')}>
+                    <PencilLine size={16} /> {tr('Продолжить', 'Davom etish')}
+                  </button>
+                  <button className="button button--secondary" onClick={() => discardArmed.fire(discardDraft)} onBlur={discardArmed.disarm}>
+                    <Trash2 size={16} /> {discardArmed.armed ? tr('Да, отбросить', 'Ha, tashlansin') : tr('Отбросить', 'Tashlash')}
+                  </button>
+                </div>
+              </article>
+            )}
             {isLoading && rows.length === 0
               ? Array.from({ length: 6 }, (_, index) => <div className="list-card list-card--loading" key={index} />)
               : rows.map((list) => {
@@ -369,7 +424,7 @@ export function ListsPage() {
                 })}
           </div>
         )}
-        {!isLoading && !hasLoadError && rows.length === 0 && (
+        {!isLoading && !hasLoadError && rows.length === 0 && !showDraftCard && (
           total === 0 && !isFiltered ? (
             <div className="state-block state-block--illustrated state-block--roomy">
               <img src="/illustrations/equipment-kit.webp" alt="" aria-hidden="true" />
