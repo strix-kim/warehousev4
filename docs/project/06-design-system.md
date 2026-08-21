@@ -8,7 +8,7 @@
 `src/react/components/AppSelect.tsx`, `src/react/components/AppDatePicker.tsx`,
 `src/react/features/equipment/EquipmentVisual.tsx`, `public/`, `docs/handoffs/2026-08-19-0-audit.md`.
 
-## 1. Токены (`:root`, `styles.css:1-27`; сами переменные — `:7-26`)
+## 1. Токены (`:root`, `styles.css`; сами переменные — `:7-26`)
 
 Все переменные объявлены в одном блоке `:root`, без light/dark-разделения —
 тема одна, переключателя нет.
@@ -38,8 +38,8 @@
 
 Вне `:root` также объявлены переменные не в токен-блоке, а инлайново через
 `style={}` в React — `--equipment-image-ratio` и `--equipment-image-width`,
-задаются в `EquipmentVisual.tsx:100-105` и используются в
-`.equipment-thumb--large.equipment-thumb--photo` (`styles.css:227`).
+задаются в `EquipmentVisual.tsx` и используются в
+`.equipment-thumb--large.equipment-thumb--photo` (`styles.css`).
 
 ## 2. Палитра
 
@@ -72,7 +72,7 @@
 ```
 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
 ```
-Задан трижды одинаково: в `:root` (`styles.css:2`) и повторно в правилах
+Задан трижды одинаково: в `:root` (`styles.css`) и повторно в правилах
 `h1, h2, h3, .brand-name` (`:42`) и `.brand-mark` (`:60`) — тот же стек,
 избыточное повторение (наследование от `:root` уже покрывает это).
 
@@ -128,9 +128,9 @@ inline-теней `rgba(...)` уникальных под конкретный �
 
 | Строка | Условие | Что меняет (кратко) |
 |---|---|---|
-| `styles.css:241` | `max-width: 520px` | Заголовок дровера в перенос, `.equipment-edit-grid` в одну колонку |
-| `styles.css:625` | `max-width: 1500px` | Плитка главной `.home-destinations` — 3 колонки → 2, карточка «Сотрудники» растягивается на всю ширину |
-| `styles.css:632` | `max-width: 1050px` | Сайдбар схлопывается в узкую колонку (76px, иконки без подписей), `.list-grid` 3→2 колонки, `.editor-grid` в 1 колонку |
+| `styles.css` | `max-width: 520px` | Заголовок дровера в перенос, `.equipment-edit-grid` в одну колонку |
+| `styles.css` | `max-width: 1500px` | Плитка главной `.home-destinations` — 3 колонки → 2, карточка «Сотрудники» растягивается на всю ширину |
+| `styles.css` | `max-width: 1050px` | Сайдбар схлопывается в узкую колонку (76px, иконки без подписей), `.list-grid` 3→2 колонки, `.editor-grid` в 1 колонку |
 | `styles.css` | `(min-width: 701px) and (max-width: 1050px)` | Планшет (с8): панели редактора рядом — `.editor-grid { grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr) }` поверх `height: auto` и панелей по 520 px из блока 1050 |
 | `styles.css` | `max-width: 820px` | Главный мобильный брейкпоинт ОБОЛОЧКИ: сайдбар превращается в нижний таб-бар, над контентом полоса `.mobile-account`, таблицы становятся карточками (`.data-table tbody tr` — grid вместо строк), дровера — на весь экран, `.page-description` скрыт, `.toolbar` в столбик с селектами на всю ширину; тач-размеры — `44px` для `.icon-button`/`.picker-item__action`/`.app-select`/`.serial-picker button`/`.clear-selection`, степпер 46 px, `font-size: 16px` на полях ввода (чтобы iOS Safari не зумил при фокусе) |
 | `styles.css` | `max-width: 700px` | Телефонная раскладка РЕДАКТОРА (с8, разрез 820 → 700): `.mobile-editor-tabs` (sticky `top: 0`, 57 px) и `.mobile-selection-bar`, панели по одной (`.mobile-active`), тулбар каталога sticky `top: 57px`, шапка статичная без кнопок, действия в `.selection-footer__mobile`, реквизиты в одну колонку |
@@ -156,9 +156,9 @@ inline-теней `rgba(...)` уникальных под конкретный �
 
 **`prefers-reduced-motion: reduce`** — два блока, идентичных по содержанию,
 не объединены:
-- `styles.css:639-641` — гасит `scroll-behavior`, `animation-duration`,
+- `styles.css` — гасит `scroll-behavior`, `animation-duration`,
   `animation-iteration-count`, `transition-duration` до `.01ms`/`1`.
-- `styles.css:887-889` — то же самое, но **без** `transition-duration` в списке
+- `styles.css` — то же самое, но **без** `transition-duration` в списке
   (только `scroll-behavior`, `animation-duration`, `animation-iteration-count`) —
   второй блок уже первого, транзишены при reduced-motion этим блоком не гасятся
   (но уже погашены первым, так что итоговый эффект совпадает — оба блока
@@ -201,12 +201,12 @@ inline-теней `rgba(...)` уникальных под конкретный �
 **`public/brand/`** — 3 файла, все PNG: `apple-touch-icon.png` (24 553 байт),
 `favicon-32.png` (1650 байт), `video-engineer-avatar.png` (24 012 байт).
 Подключены в `index.html:7-9` (favicon, apple-touch-icon, preload аватара) и
-`app/App.tsx:146` (аватар пользователя в футере сайдбара).
+`app/App.tsx` (аватар пользователя в футере сайдбара).
 
 **`public/illustrations/`** — 3 файла, все WebP: `av-team.webp` (84 474 байт),
 `av-warehouse.webp` (69 536 байт), `equipment-kit.webp` (51 386 байт). Используются
-в `HomePage.tsx:18,28,38` (фон трёх карточек главной), `LoginPage.tsx:44` (панель
-входа), и как декор пустых состояний — `ListsPage.tsx:309` и `ListEditorPage.tsx:630`
+в `HomePage.tsx,28,38` (фон трёх карточек главной), `LoginPage.tsx` (панель
+входа), и как декор пустых состояний — `ListsPage.tsx` и `ListEditorPage.tsx`
 (`equipment-kit.webp` повторно). `av-warehouse.webp` и `equipment-kit.webp`
 дополнительно преload'ятся в `index.html:10-11`.
 

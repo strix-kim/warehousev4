@@ -36,7 +36,7 @@ Supabase MCP, а не реконструкция по TypeScript-типам, к�
 - **Файл идемпотентен и к проду не применялся** — он снят С прода. Версия
   `00000000000000` выбрана так, чтобы он всегда шёл первым, до миграций `20260819*`.
 - Типы и реальность разошлись ровно в одном месте, и оно осталось: `Equipment.tracking_mode`
-  и `Equipment.inventory_code` (`types.ts:6-7`) колонками **не являются** (см. §9).
+  и `Equipment.inventory_code` (`types.ts`) колонками **не являются** (см. §9).
 - Инструмента применения SQL в репозитории по-прежнему нет: ни `supabase/config.toml`,
   ни пакета `supabase` в `package.json` (`@supabase/supabase-js` — `package.json:17`),
   ни `.github/`. Миграции применяются вручную — через дашборд или Supabase MCP.
@@ -102,11 +102,11 @@ where table_schema = 'public' and grantee in ('anon','authenticated') order by 1
 
 | Таблица | Доступ клиента | Откуда факт |
 |---|---|---|
-| `public.equipment` | прямой `.from('equipment')` — `equipment/api.ts:88, 132, 152, 166, 185, 227, 261, 288, 361` (девять мест) | alter + TS; базового DDL нет |
-| `public.equipment_lists` | прямой `.from('equipment_lists')` — `lists/api.ts:226, 244, 290, 299, 487` | alter + TS; базового DDL нет |
-| `public.equipment_movements` | прямой `.from('equipment_movements')` — `equipment/api.ts:400`, только чтение (грант тоже только `select`, `…rls.sql:1061`) | **DDL есть**: `…rls.sql:135-154` |
-| `public.reservation_status_history` | прямой `.from('reservation_status_history')` — `lists/api.ts:531`, только чтение (грант только `select`, `…rls.sql:1060`) | **DDL есть**: `…rls.sql:120-133` |
-| `public.equipment_reservation_items` | **клиент не обращается ни разу**, хотя мог бы: полный CRUD-грант (`…rls.sql:1059`) и четыре RLS-политики (`…rls.sql:941-978`) на месте. Состав списка пишется только внутри RPC (`…rls.sql:684-699`, `migrations/20260819131611:98-116`), а обратно приходит агрегатом из `reservation_shortages` (`lists/api.ts:503`) | **DDL есть**: `scripts/2026-08-19_reservations_history_rls.sql:96-118` |
+| `public.equipment` | прямой `.from('equipment')` — `equipment/api.ts, 132, 152, 166, 185, 227, 261, 288, 361` (девять мест) | alter + TS; базового DDL нет |
+| `public.equipment_lists` | прямой `.from('equipment_lists')` — `lists/api.ts, 244, 290, 299, 487` | alter + TS; базового DDL нет |
+| `public.equipment_movements` | прямой `.from('equipment_movements')` — `equipment/api.ts`, только чтение (грант тоже только `select`, `…rls.sql:1061`) | **DDL есть**: `…rls.sql:135-154` |
+| `public.reservation_status_history` | прямой `.from('reservation_status_history')` — `lists/api.ts`, только чтение (грант только `select`, `…rls.sql:1060`) | **DDL есть**: `…rls.sql:120-133` |
+| `public.equipment_reservation_items` | **клиент не обращается ни разу**, хотя мог бы: полный CRUD-грант (`…rls.sql:1059`) и четыре RLS-политики (`…rls.sql:941-978`) на месте. Состав списка пишется только внутри RPC (`…rls.sql:684-699`, `migrations/20260819131611:98-116`), а обратно приходит агрегатом из `reservation_shortages` (`lists/api.ts`) | **DDL есть**: `scripts/2026-08-19_reservations_history_rls.sql:96-118` |
 | `public.users` | **клиент не обращается ни разу и не может**: у `authenticated` НЕТ НИ ОДНОГО гранта — проверено в проде. Таблицу читают только `security definer`-функции `private.*` — см. §4.1 | baseline; DDL: `baseline.sql`, §1 |
 
 Практический вывод: поверхность прямых обращений браузера — ровно **четыре таблицы**
@@ -173,15 +173,15 @@ where table_schema = 'public' and grantee in ('anon','authenticated') order by 1
 
 **`serialnumber` объявлен `not null` — расхождение с TS закрыто в с5.** Тип строки
 больше не пишется руками: он выводится из сгенерированной схемы —
-`EquipmentRow = Tables<'equipment'>` (`features/equipment/types.ts:1-4`), а клиент
-создаётся как `createClient<Database>` (`lib/supabase.ts:2`, `:10`). Доменный
-`Equipment` переопределяет ровно три поля и объясняет каждое (`types.ts:6-18`):
+`EquipmentRow = Tables<'equipment'>` (`features/equipment/types.ts`), а клиент
+создаётся как `createClient<Database>` (`lib/supabase.ts`, `:10`). Доменный
+`Equipment` переопределяет ровно три поля и объясняет каждое (`types.ts`):
 `serialnumber` наружу отдаётся `string | null`, потому что для количественного учёта
 в колонке лежит служебный идентификатор `QTY::…`, который нормализация прячет;
 `availability` и `count` в схеме nullable, а интерфейс считает их строкой и числом.
 То есть nullable в TS теперь не рассинхрон со схемой, а осознанное сужение на границе
 нормализации. Пустой серийник вдобавок отсекается до вставки, с внятным сообщением
-(`equipment/api.ts:218-224`), а не падением на `NOT NULL`.
+(`equipment/api.ts`), а не падением на `NOT NULL`.
 
 ### 1.5 `public.equipment_lists` — колонки
 
@@ -214,7 +214,7 @@ where table_schema = 'public' and grantee in ('anon','authenticated') order by 1
 `migrations/20260819131611_edit_saved_equipment_lists.sql:67-83`) и нормализованная
 таблица `equipment_reservation_items`. Расчёт дефицита (`reservation_shortages`)
 читает **только нормализованную**, а клиентский экспорт и старый UI — legacy-поля
-(`lists/api.ts:78` тянет `equipment_ids,equipment_items`). Если кто-то запишет в
+(`lists/api.ts` тянет `equipment_ids,equipment_items`). Если кто-то запишет в
 `equipment_lists` мимо RPC, два представления разъедутся.
 
 ### 1.6 `public.equipment_reservation_items` — DDL есть (`…rls.sql:96-118`)
@@ -372,7 +372,7 @@ using (
   аккаунта молча отберёт возможность удалять списки, и в интерфейсе это будет выглядеть
   как поломка приложения (см. абзац ниже про `lists/api.ts`). Долг записан в backlog.
 
-Клиент (`lists/api.ts:483-497`) делает обычный `delete … .select('id').maybeSingle()`
+Клиент (`lists/api.ts`) делает обычный `delete … .select('id').maybeSingle()`
 и при пустом ответе кидает `Equipment list cannot be deleted` (`:494`) — то есть
 отказ RLS выглядит как ошибка приложения, а не как отказ прав. Отличить один сценарий
 от другого по UI невозможно.
@@ -412,7 +412,7 @@ DELETE равен NULL). `scripts/2026-08-19_security_performance_hardening.sql:
   с текущим отменяет правку целиком: `raise exception 'Equipment card is stale' using
   errcode = '40001'` (`:59-62`). Код `40001` — стандартный `serialization_failure`,
   по нему клиент отличает конфликт версий от любого другого отказа
-  (`EquipmentDrawer.tsx:22-25`). `null` от клиента значит «не сверять».
+  (`EquipmentDrawer.tsx`). `null` от клиента значит «не сверять».
 - **Совместимость** заявлена явно (`:19-22`): оба новых аргумента имеют default, то
   есть старый клиент с 11 именованными аргументами проходит как раньше. Порядок
   выкатки любой.
@@ -520,9 +520,9 @@ RLS включён на девяти таблицах: `…rls.sql:882-890`.
 подписок на изменения в проде нет.
 
 `…rls.sql:1066` — `notify pgrst, 'reload schema'`. Без него PostgREST не увидит новые RPC.
-Клиентские фолбэки на коды `PGRST202/42883` (`lists/api.ts:504`) и `PGRST205/42P01`
-(`lists/api.ts:535`, `equipment/api.ts:405`) — это ровно защита от несброшенного кэша схемы.
-Там же лежит **временный** фолбэк `countEquipmentModelUnits` (`equipment/api.ts:286-294`):
+Клиентские фолбэки на коды `PGRST202/42883` (`lists/api.ts`) и `PGRST205/42P01`
+(`lists/api.ts`, `equipment/api.ts`) — это ровно защита от несброшенного кэша схемы.
+Там же лежит **временный** фолбэк `countEquipmentModelUnits` (`equipment/api.ts`):
 пока миграция `20260820172928` не применена, база отвечает «функции нет», и счёт идёт
 по-старому — `.eq` по сырым строкам. Гейт строго по коду отсутствия функции; после
 применения миграции ветка мертва и подлежит удалению вместе с комментарием (`:282-285`).
@@ -576,7 +576,7 @@ public, anon`; `grant usage … to authenticated`. Схема **не выста�
 
 **Побочное следствие, которое стоит признать честно.** Раз клиент не знает роли, он
 не может ни спрятать, ни объяснить недоступное действие. Пример: `createEquipment`
-(`equipment/api.ts:180-206`) делает прямой `insert` в `equipment`, а право даёт
+(`equipment/api.ts`) делает прямой `insert` в `equipment`, а право даёт
 `equipment_insert_for_inventory_team` (`…rls.sql:909-911`). Пользователь без роли
 `technician/manager/admin` получит сырую ошибку RLS от PostgREST. Это дефект UX,
 не безопасности.
@@ -673,13 +673,13 @@ Vue-версии, продукт её не трогает, так что дол�
 
 | RPC | Определена | Права | Вызывается клиентом |
 |---|---|---|---|
-| `public.reservation_shortages(uuid)` → set of 10 колонок | `…rls.sql:321-448` | revoke public/anon `:855`, grant authenticated `:858` | `lists/api.ts:503` |
+| `public.reservation_shortages(uuid)` → set of 10 колонок | `…rls.sql:321-448` | revoke public/anon `:855`, grant authenticated `:858` | `lists/api.ts` |
 | `public.create_equipment_list_with_items(text,text,text,date,date,jsonb)` → uuid | `…rls.sql:607-703` | `:856`, `:859` | нет — только через обёртку ниже |
-| `public.transition_equipment_list_status(uuid,text,text)` → jsonb | `…rls.sql:705-853` | `:857`, `:860` | `lists/api.ts:513` |
-| `public.create_equipment_list_document(text,text,text,text,text,date,date,jsonb)` → uuid | `…list_document_fields.sql:12-51` | `:53-59` | `lists/api.ts:447` |
-| `public.update_equipment_list_document(uuid,text,text,text,text,text,date,date,jsonb)` → uuid | `migrations/20260819131611:3-120` | `:122-128` | `lists/api.ts:466` |
-| `public.update_equipment_model_and_unit(uuid, 9×text, integer default null, timestamptz default null)` → jsonb | **действующая версия — `migrations/20260820183210:30-109`**; предыдущие: `…equipment_model_editing.sql:3-82`, `migrations/20260820163924:7-76` | `20260820183210:114-116` | `equipment/api.ts:352` |
-| `public.count_equipment_model_units(text, text)` → integer | `migrations/20260820172928:7-18` — `sql stable` **`security invoker`** | `20260820172928:22-23`, `20260820173459:5` | `equipment/api.ts:277` |
+| `public.transition_equipment_list_status(uuid,text,text)` → jsonb | `…rls.sql:705-853` | `:857`, `:860` | `lists/api.ts` |
+| `public.create_equipment_list_document(text,text,text,text,text,date,date,jsonb)` → uuid | `…list_document_fields.sql:12-51` | `:53-59` | `lists/api.ts` |
+| `public.update_equipment_list_document(uuid,text,text,text,text,text,date,date,jsonb)` → uuid | `migrations/20260819131611:3-120` | `:122-128` | `lists/api.ts` |
+| `public.update_equipment_model_and_unit(uuid, 9×text, integer default null, timestamptz default null)` → jsonb | **действующая версия — `migrations/20260820183210:30-109`**; предыдущие: `…equipment_model_editing.sql:3-82`, `migrations/20260820163924:7-76` | `20260820183210:114-116` | `equipment/api.ts` |
+| `public.count_equipment_model_units(text, text)` → integer | `migrations/20260820172928:7-18` — `sql stable` **`security invoker`** | `20260820172928:22-23`, `20260820173459:5` | `equipment/api.ts` |
 
 ### 6.1 `create_equipment_list_with_items` — что проверяет и что нет
 
@@ -781,9 +781,9 @@ technicalspecification, lengthinmeters, description) обновляются **у
 возвращает `updated_model_units` (`:94`, `:106`) — сколько строк задело.
 
 **Счётчик доезжает до пользователя (закрыто в с5).** Клиент берёт из ответа не только
-`error`, но и `data` (`equipment/api.ts:352-358`), достаёт `updated_model_units`
+`error`, но и `data` (`equipment/api.ts`), достаёт `updated_model_units`
 проверками, а не приведением типа (`readUpdatedModelUnits`, `:327-331`), и показывает
-это число в сообщении об успехе (`EquipmentDrawer.tsx:187-192`). Поля нет или оно не
+это число в сообщении об успехе (`EquipmentDrawer.tsx`). Поля нет или оно не
 число — сообщение выводится **без цифры**, выдуманное не подставляется. В журнал
 движений переименование модели по-прежнему не попадает (§5): триггер слушает только
 `count` и `availability`.
@@ -791,20 +791,20 @@ technicalspecification, lengthinmeters, description) обновляются **у
 **Три с5-правки в поведении, которые надо держать вместе:**
 
 1. **Версия карточки сверяется** (`:59-62`). Клиент шлёт `p_expected_updated_at` —
-   тот `updated_at`, на котором открыл карточку (`equipment/api.ts:347`,
-   `EquipmentDrawer.tsx:183`). Расхождение отменяет правку целиком, ни одно поле не
+   тот `updated_at`, на котором открыл карточку (`equipment/api.ts`,
+   `EquipmentDrawer.tsx`). Расхождение отменяет правку целиком, ни одно поле не
    записано, код ошибки — `40001`. `null` значит «сверить нечем».
 2. **`p_count` необязателен** (`:33`, `:100`). Серийная карточка количеством не
-   управляет и параметр не отправляет вовсе (`EquipmentDrawer.tsx:182`) — `count`
+   управляет и параметр не отправляет вовсе (`EquipmentDrawer.tsx`) — `count`
    остаётся прежним, `before = after`, и триггер `trg_equipment_movement_history`
    строку не пишет. Раньше принудительная `1` плодила фантомные «Изменено количество».
 3. **Пустая локация не затирает прежнюю** (`:99`, миграция `20260820163924`).
    Клиент при этом называет пустое поле сам, до запроса
-   (`EquipmentDrawer.tsx:160-163`), чтобы отказ не пришёл безымянным.
+   (`EquipmentDrawer.tsx`), чтобы отказ не пришёл безымянным.
 
 Предварительный счёт единиц модели, который карточка показывает **до** сохранения,
 с с5 тоже считает база — RPC `count_equipment_model_units` по тому же
-`lower(btrim(...))` (`equipment/api.ts:269-298`, вывод `EquipmentDrawer.tsx:236`).
+`lower(btrim(...))` (`equipment/api.ts`, вывод `EquipmentDrawer.tsx`).
 Прежний клиентский `.eq` по сырым строкам занижал оценку на записях с пробелами
 и другим регистром.
 
@@ -916,12 +916,12 @@ JSON — `…rls.sql:692-695` (создание) и `migrations/20260819131611:1
 ## 9. `tracking_mode` и `inventory_code` — это НЕ колонки
 
 `Equipment.tracking_mode` и `Equipment.inventory_code` объявлены в
-`src/react/features/equipment/types.ts:16-17`, но **колонок с такими именами в базе нет**.
+`src/react/features/equipment/types.ts`, но **колонок с такими именами в базе нет**.
 Обе величины — результат **разбора строки `serialnumber`** на лету. Это единственное
 место, где доменный тип добавляет к схеме то, чего в ней нет: остальные поля
-`Equipment` приходят из `Tables<'equipment'>` как есть (`types.ts:1-18`, §1.4).
+`Equipment` приходят из `Tables<'equipment'>` как есть (`types.ts`, §1.4).
 
-**Парсер №1 (TypeScript):** `src/react/features/equipment/api.ts:22-46`, применяется в
+**Парсер №1 (TypeScript):** `src/react/features/equipment/api.ts`, применяется в
 `normalizeEquipment` ко всем прочитанным строкам (`:116`, `:140`, `:157`, `:172`, `:371`).
 
 Строка считается `quantity`, если (`:26-30`): `count > 1`, **или** начинается с `AUTO-`,
@@ -937,7 +937,7 @@ JSON — `…rls.sql:692-695` (создание) и `migrations/20260819131611:1
 
 **Риск расхождения — не гипотетический, расхождение уже есть.**
 TS работает с **обрезанной** строкой: `const storedIdentifier = row.serialnumber.trim()`
-(`api.ts:23`; `?.` больше не нужен — схема объявляет колонку not null), и все проверки
+(`api.ts`; `?.` больше не нужен — схема объявляет колонку not null), и все проверки
 идут по ней. SQL обрезает **только** в проверке
 плейсхолдеров (`lower(btrim(e.serialnumber)) in (…)`, `:251`), а `like 'QTY::%'` (`:249`),
 `like 'AUTO-%'` (`:250`) и `~ '^0+$'` (`:252`) применяет к **сырому** значению.
@@ -992,9 +992,9 @@ U+FFFD REPLACEMENT CHARACTER. Файл пережил round-trip через ко
 Отдельно: клиентская эвристика `isAvailable` до сих пор понимает **русские** статусы
 (`status.startsWith('в н')`, `status.includes('диагност')`, `status.startsWith('не ')`)
 наравне с `'available'`/`'unavailable'`/`'issued'`. В с5 она переехала вместе с моделью
-групп каталога — теперь это `features/lists/catalogGroups.ts:23-27` (чистый перенос,
+групп каталога — теперь это `features/lists/catalogGroups.ts` (чистый перенос,
 поведение не менялось). Второе место с тем же разбором — `toEquipmentAvailability`
-в `features/equipment/availability.ts:21-28`, но оно работает иначе: неопознанное
+в `features/equipment/availability.ts`, но оно работает иначе: неопознанное
 значение остаётся неопознанным и показывается как есть (`:36-40`), а не подменяется
 «недоступно».
 
@@ -1084,7 +1084,7 @@ legacy-таблицы, действующая политика удаления 
 Остаётся не покрытым:
 
 1. **`equipment_lists.type`** — колонка заполняется литералом `'custom'` (`…rls.sql:678`)
-   и читается клиентом (`lists/api.ts:19,56`), но нигде не используется в логике. Какие
+   и читается клиентом (`lists/api.ts,56`), но нигде не используется в логике. Какие
    ещё значения там встречаются, по данным сказать нельзя: таблица в проде пуста.
 2. **Реальное поведение при конкурентных транзакциях** — блокировки `for update`
    расставлены (`…rls.sql:726`, `:764-769`, `:810-815`; `migrations/20260819131611:32`),
@@ -1136,9 +1136,9 @@ legacy-таблицы, действующая политика удаления 
 - **`README.md:53`** — «Редактирование и удаление исторических записей пока отключены
   до нормализации статусов и отдельной проверки RLS-политик». **Ложь.** Редактирование
   оборудования работает через `update_equipment_model_and_unit`
-  (`equipment/api.ts:333`, вызов из `EquipmentDrawer.tsx:168`); правка списков — через
-  `update_equipment_list_document` (`lists/api.ts:463`); удаление списка —
-  `deleteEquipmentList` (`lists/api.ts:483`, вызов `ListsPage.tsx:417`). Все три пути
+  (`equipment/api.ts`, вызов из `EquipmentDrawer.tsx`); правка списков — через
+  `update_equipment_list_document` (`lists/api.ts`); удаление списка —
+  `deleteEquipmentList` (`lists/api.ts`, вызов `ListsPage.tsx`). Все три пути
   живые и подкреплены серверными объектами.
 - **`docs/handoffs/2026-08-19-0-audit.md:73`** — «Убраны слишком широкие прямые права … на таблицу
   пользователей» подано как свершившийся факт. В репозитории это состояние
@@ -1149,14 +1149,14 @@ legacy-таблицы, действующая политика удаления 
 
   **Что осталось: `UNIQUE`-ограничения на `equipment.serialnumber` в проде НЕТ.**
   Есть только обычный btree `idx_equipment_serialnumber` (§1.4, §7). Единственная
-  преграда — клиентская `serialNumberExists` (`equipment/api.ts:258-267`, запрос
-  `.ilike`), вызываемая из `checkSerial()` (`EquipmentCreatePage.tsx:108-127`) перед
+  преграда — клиентская `serialNumberExists` (`equipment/api.ts`, запрос
+  `.ilike`), вызываемая из `checkSerial()` (`EquipmentCreatePage.tsx`) перед
   `createEquipment` (`:147`). Две одновременные вкладки пройдут проверку обе.
   Это по-прежнему нарушение правила 1 CLAUDE.md, и место ему — в backlog.
 
   **Что закрыто в с5: отказ проверки больше не читается как «дубля нет».** Результат
   проверки стал типом из четырёх значений, где `'failed'` — отдельное состояние
-  «мы не знаем» (`EquipmentCreatePage.tsx:22-24`). `catch` ставит именно его
+  «мы не знаем» (`EquipmentCreatePage.tsx`). `catch` ставит именно его
   (`:119-126`), а `handleSubmit` при `'failed'` **останавливает сохранение** и пишет
   «Не удалось проверить серийный номер на дубли. Запись не сохранена — повторите
   попытку.» (`:137-143`). Раньше `catch` возвращал `false`, то есть разрешал вставку
@@ -1165,8 +1165,8 @@ legacy-таблицы, действующая политика удаления 
 
   Отдельно про регистр и подстановочные знаки: проверка регистронезависимая (`.ilike`),
   и с с5 шаблон экранируется — `%`, `_` и `\` теряют спецсмысл
-  (`escapeLikePattern`, `equipment/api.ts:254-256`, применение `:263`). До этого
+  (`escapeLikePattern`, `equipment/api.ts`, применение `:263`). До этого
   серийник `AB_1234` совпадал с `AB-1234` и давал ложный дубль. INSERT кладёт
-  `input.serialnumber?.trim()` (`api.ts:221-223`, `:231`), так что «sn-001» при
+  `input.serialnumber?.trim()` (`api.ts`, `:231`), так что «sn-001» при
   существующем «SN-001» проверка **поймает**. Разойтись значения могут только в
   гонке двух вкладок — то есть ровно там, где нужен `UNIQUE`.
