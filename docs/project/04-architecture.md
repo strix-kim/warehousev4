@@ -157,9 +157,13 @@
 доступ к данным решает RLS в Postgres (см. страницу по БД). Обход гейта не даёт данных,
 но и не должен считаться «защитой маршрута».
 
-`AppShell` (`App.tsx:52-178`) — статический сайдбар: бренд, три `NavLink`, быстрое
-действие `/lists/new`, декоративный блок «Быстрый процесс», переключатель языка,
-подвал с email из `session?.user.email` (`:55`) и кнопкой выхода (`:169`).
+`AppShell` (`App.tsx`) — статический сайдбар: бренд, три `NavLink`, быстрое
+действие `/lists/new`, строка-реквизит «Офис · Ташкент» (с8 без подписи «Текущая
+локация» и без шеврона; декоративные «Быстрый процесс» и «Склад в рабочем режиме»
+сняты), переключатель языка, подвал с email из `session?.user.email` и кнопкой выхода.
+На ≤820 подвал сайдбара скрыт, поэтому внутри `<main className="app-content">` перед
+`<Outlet />` стоит полоса `.mobile-account` — почта и «Выйти» (с8, U5-минимум; на
+десктопе `display: none`).
 Состояние свёрнутости — `localStorage['argo:sidebar-collapsed']` (`:56`, `:59`).
 
 ---
@@ -678,11 +682,11 @@ id, и на общем ноутбуке первый кадр следующег
 
 | Ключ | TTL | Где пишется | Что лежит |
 |---|---:|---|---|
-| `equipment:{"page":N,"search":…,"availability":…,"pageSize":N}` | 10 мин | `equipment/api.ts:84` (ключ строит `:67-69`) | Страница каталога `{rows, total}` |
+| `equipment:{"page":N,"search":…,"availability":…,"type":…,"subtype":…,"pageSize":N}` | 10 мин | `equipment/api.ts`, `equipmentPageCacheKey` | Страница каталога `{rows, total}`. `type`/`subtype` в ключе **всегда** (с8, дефолт `''`): прогрев в `App.tsx` без них и страница без фильтров читают одну запись |
 | `equipment:all` | 10 мин | `equipment/api.ts:127` | Весь склад массивом. **`persist: false`** (`:145`) — только память сессии |
 | `equipment:model-count:<brand>::<model>` | 10 мин | `equipment/api.ts:273` (ключ `:272`) | Число единиц модели |
 | `equipment:movements:<equipmentId>` | 5 мин | `equipment/api.ts:398` | До 50 движений |
-| `equipment-taxonomy` | **24 ч** | `equipment/api.ts:183` | `{types, subtypes}` |
+| `equipment-taxonomy:v2` | **24 ч** | `equipment/api.ts`, `fetchEquipmentTaxonomy` | `{types, subtypes, subtypesByType}` — `v2` с с8: форма сменилась, старая запись без карты жила бы сутки. Читается батчами по 1000 с порядком `type, subtype, id` |
 | `equipment-lists:page:{"page":N,"search":…,"status":…,"pageSize":N}` | 10 мин | `lists/api.ts:217` (ключ `:200-202`) | Страница реестра `{rows, total}` |
 | `equipment-lists:detail:<listId>` | 10 мин | `lists/api.ts:287`, плюс `primeCachedQuery` из прогрева `:393` | Один список |
 | `equipment-lists:shortages:<listId>` | 5 мин | `lists/api.ts:502` | Дефицит |
@@ -1031,7 +1035,10 @@ aria-modal="true" aria-label={…} onMouseDown={onClose}>` с `onMouseDown` +
    в drawer — попап к этому моменту размонтирован и слушателя не ставит.
 
 Оба поповера при `resize`/`scroll` по-прежнему **закрываются**, а не перепозиционируются
-(`usePopoverLayer.ts:43`, `:46-47`).
+(`usePopoverLayer.ts`, `closeOnViewportChange` / `closeOnOutsideScroll`) — с одним
+исключением с с8: прокрутка **внутри собственного списка** (у `scroll` элемента `target` —
+сам элемент, у прокрутки страницы — `document`) попап не закрывает. До этого список из
+56 подкатегорий закрывался на первом движении колеса.
 
 ---
 
