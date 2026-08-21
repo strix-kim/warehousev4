@@ -771,6 +771,11 @@ h2 { letter-spacing: -0.025em; }
   .data-table td { min-width: 0; min-height: 48px; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 9px 12px; border: 0; border-top: 1px solid #edf0ec; }
   .data-table td::before { content: attr(data-label); color: var(--ink-faint); font-family: inherit; font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
   .data-table td:first-child { grid-column: 1 / -1; min-height: 64px; border-top: 0; }
+  /* Ячеек-констант (количество 1, «На складе») в строке может не оказаться, и тогда
+     оставшихся становится нечётное число. Последняя занимает обе колонки — иначе
+     рядом висит пустая половина с рамкой. Первая ячейка вне счёта: она и так во всю
+     ширину, поэтому «нечётно» — это last-child на ЧЁТНОЙ позиции. */
+  .data-table tbody td:last-child:nth-child(even) { grid-column: 1 / -1; }
   .data-table td:first-child::before { display: none; }
   .data-table .equipment-cell strong, .data-table .equipment-cell small { white-space: normal; }
   .data-table .mono { overflow-wrap: anywhere; }

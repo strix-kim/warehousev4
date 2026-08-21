@@ -22,7 +22,7 @@ import {
   readCachedEquipment,
   readCachedEquipmentMeta,
 } from './api'
-import { equipmentAvailabilityOptions, equipmentAvailabilityView } from './availability'
+import { equipmentAvailabilityOptions, equipmentAvailabilityView, toEquipmentAvailability } from './availability'
 import { EquipmentDrawer } from './EquipmentDrawer'
 import { equipmentIdentifier } from './format'
 import type { Equipment } from './types'
@@ -40,6 +40,11 @@ export function EquipmentPage() {
   ]
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(preferredEquipmentPageSize)
+  // Мобильная раскладка нужна не только стилям: на телефоне таблица становится
+  // карточками, и ячейки-константы убираются ИЗ DOM, а не прячутся `display: none`
+  // — спрятанный элемент остаётся в :last-child и nth-child и ломает чётность
+  // грида. Граница та же, что у CSS-карточек (820, lib/breakpoints).
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia(MOBILE_MEDIA_QUERY).matches)
   const [initialResult] = useState(() => readCachedEquipment({ page: 1, search: '', availability: '', pageSize }))
   const [rows, setRows] = useState<Equipment[]>(() => initialResult?.rows ?? [])
   const [total, setTotal] = useState(() => initialResult?.total ?? 0)
@@ -91,6 +96,7 @@ export function EquipmentPage() {
   useEffect(() => {
     const media = window.matchMedia(MOBILE_MEDIA_QUERY)
     const handleChange = () => {
+      setIsMobile(media.matches)
       setPageSize(preferredEquipmentPageSize())
       setPage(1)
     }
@@ -277,6 +283,13 @@ export function EquipmentPage() {
                     ))
                   : rows.map((item) => {
                       const status = equipmentAvailabilityView(item.availability, tr)
+                      // Ячейка, одинаковая почти у всех карточек подряд, на телефоне
+                      // только съедает экран: количество равно 1 у 1 446 строк из
+                      // 1 481, «На складе» — у 1 475. Отличающееся значение остаётся
+                      // видимым — информация именно в нём. Статус сверяем
+                      // нормализатором: в старых записях лежит русский текст.
+                      const showCount = !isMobile || item.count !== 1
+                      const showStatus = !isMobile || toEquipmentAvailability(item.availability) !== 'available'
                       return (
                         <tr
                           key={item.id}
@@ -302,8 +315,8 @@ export function EquipmentPage() {
                           </td>
                           <td data-label={tr('Категория', 'Toifa')}>{translateEquipmentTaxonomy(item.type, language)}</td>
                           <td data-label={item.tracking_mode === 'quantity' ? tr('Количественный учёт', 'Miqdor bo‘yicha hisob') : tr('Серийный номер', 'Seriya raqami')} className="mono">{equipmentIdentifier(item, tr)}</td>
-                          <td data-label={tr('Количество', 'Miqdor')}><strong>{item.count}</strong> {tr('шт.', 'dona')}</td>
-                          <td data-label={tr('Статус', 'Holat')}><span className={`badge badge--${status.tone}`}><i />{status.label}</span></td>
+                          {showCount && <td data-label={tr('Количество', 'Miqdor')}><strong>{item.count}</strong> {tr('шт.', 'dona')}</td>}
+                          {showStatus && <td data-label={tr('Статус', 'Holat')}><span className={`badge badge--${status.tone}`}><i />{status.label}</span></td>}
                         </tr>
                       )
                     })}
