@@ -35,6 +35,7 @@ import {
 import { buildCatalogGroups, groupKey, type CatalogGroup } from './catalogGroups'
 import { CatalogPanel, CatalogPreviewDrawer } from './ListEditorCatalog'
 import { ListEditorMeta, type ListMetaField, type RequisiteField } from './ListEditorMeta'
+import { useEditorChrome } from './useEditorChrome'
 import { useListDraftAutosave } from './useListDraftAutosave'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
@@ -130,9 +131,17 @@ export function ListEditorPage() {
   const [countDraft, setCountDraft] = useState<{ key: string; text: string } | null>(null)
   const [previewGroup, setPreviewGroup] = useState<CatalogGroup | null>(null)
   const [mobilePanel, setMobilePanel] = useState<'catalog' | 'selection'>('catalog')
+  // Панель реквизитов свёрнута по умолчанию: список собирают без неё, а документу
+  // на согласование страница раскроет её сама (см. exportList).
+  const [metaOpen, setMetaOpen] = useState(false)
   const catalogRef = useRef<HTMLElement>(null)
   const selectionRef = useRef<HTMLElement>(null)
   const metaRef = useRef<HTMLElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  // Прокрутка каждой вкладки телефона на момент ухода с неё: возврат в каталог
+  // приводит к той же модели, а не к первой.
+  const panelScrollRef = useRef<Partial<Record<'catalog' | 'selection', number>>>({})
+  useEditorChrome(gridRef)
   // Снимок документа на момент последней записи в базу. Пустая строка — снимка
   // ещё нет (список не открыт или не догрузился), и предупреждать не о чем.
   const savedSnapshotRef = useRef('')
@@ -357,8 +366,17 @@ export function ListEditorPage() {
   const canSubmit = selectedCount > 0 && !isOpening && !openError
 
   function moveToMobilePanel(panel: 'catalog' | 'selection') {
+    const switching = panel !== mobilePanel
+    if (switching) panelScrollRef.current[mobilePanel] = window.scrollY
     setMobilePanel(panel)
     window.requestAnimationFrame(() => {
+      // Вкладка уже открывалась — возвращаемся туда, где с неё ушли. Повторное
+      // нажатие на активную вкладку — к её заголовку, как и первое открытие.
+      const remembered = switching ? panelScrollRef.current[panel] : undefined
+      if (remembered !== undefined) {
+        window.scrollTo({ top: remembered })
+        return
+      }
       const target = panel === 'catalog' ? catalogRef.current : selectionRef.current
       if (!target) return
       // scrollIntoView прижимал панель к самому верху окна — липкие табы накрывали
@@ -542,10 +560,14 @@ export function ListEditorPage() {
           'Kelishuv hujjati uchun nom, buyurtmachi va maydonni to‘ldiring.',
         ))
         setSuccessMessage('')
-        metaRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-        // preventScroll обязателен: обычный фокус прыгает к полю мгновенно и
-        // обрывает плавную прокрутку к панели реквизитов.
-        document.getElementById(`quick-list-${missing[0]}`)?.focus({ preventScroll: true })
+        setMetaOpen(true)
+        // Поля свёрнутой панели появляются в DOM только после раскрытия, поэтому
+        // прокрутка и фокус — следующим кадром. preventScroll обязателен: обычный
+        // фокус прыгает к полю мгновенно и обрывает плавную прокрутку к панели.
+        window.requestAnimationFrame(() => {
+          metaRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+          document.getElementById(`quick-list-${missing[0]}`)?.focus({ preventScroll: true })
+        })
         return
       }
     }
@@ -651,8 +673,9 @@ export function ListEditorPage() {
         panelRef={metaRef}
         values={{ name, clientName, venue, description, eventDate }}
         requisiteErrors={requisiteErrors}
+        open={metaOpen}
+        onToggle={() => setMetaOpen((current) => !current)}
         onChange={changeMeta}
-        onGoToCatalog={() => moveToMobilePanel('catalog')}
       />
 
       <div className="mobile-editor-tabs" role="tablist" aria-label={tr('Раздел редактора', 'Tahrirchi bo‘limi')}>
@@ -660,7 +683,7 @@ export function ListEditorPage() {
         <button className={mobilePanel === 'selection' ? 'active' : ''} onClick={() => moveToMobilePanel('selection')} role="tab" aria-selected={mobilePanel === 'selection'}>{tr('В списке', 'Ro‘yxatda')} <strong>{selectedCount}</strong></button>
       </div>
 
-      <div className="editor-grid editor-grid--quick">
+      <div ref={gridRef} className="editor-grid editor-grid--quick">
         <CatalogPanel
           panelRef={catalogRef}
           isMobileActive={mobilePanel === 'catalog'}

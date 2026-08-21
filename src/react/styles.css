@@ -386,9 +386,10 @@ h2 { letter-spacing: -0.025em; }
 .editor-status--error { color: var(--danger); }
 .mobile-editor-tabs { display: none; }
 .editor-grid { height: clamp(520px, calc(100dvh - 380px), 760px); min-height: 0; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px, .85fr); gap: 18px; }
-/* 40 top + 58 header + 22 + 215 реквизиты + 18 + 56 bottom */
-.editor-grid--quick { --editor-chrome: 409px; }
-.editor-grid--quick { height: clamp(420px, calc(100dvh - var(--editor-chrome, 409px)), 900px); }
+/* Запасное значение на один кадр до измерения: 40 top + 58 шапка + 22 + 50 полоса
+   реквизитов + 18 + 56 нижний отступ. Живое ставит useEditorChrome инлайном,
+   измеряя всё, что реально стоит над сеткой (баннеры, раскрытые реквизиты). */
+.editor-grid--quick { --editor-chrome: 244px; height: clamp(420px, calc(100dvh - var(--editor-chrome)), 900px); }
 .catalog-picker, .selection-panel { min-height: 0; height: 100%; display: flex; flex-direction: column; }
 .catalog-picker .panel-heading, .selection-panel .panel-heading { flex: 0 0 auto; }
 .picker-results, .selection-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
@@ -440,7 +441,30 @@ h2 { letter-spacing: -0.025em; }
 /* Взведённое подтверждение: кнопка меняет вид, а не открывает модалку. */
 .clear-selection--armed { padding: 6px 10px; border-radius: 7px; color: #fff; background: var(--danger); }
 
-.quick-list-meta { display: grid; grid-template-columns: minmax(260px, 1.25fr) minmax(180px, .55fr) minmax(260px, 1fr); gap: 14px; margin-bottom: 18px; padding: 16px; overflow: visible; }
+/* Реквизиты — полоса в одну строку, по нажатию раскрывается в сетку полей.
+   scroll-margin — чтобы прокрутка к панели при пустых реквизитах не прятала её
+   под липкой шапкой. Попап даты живёт в портале с position: fixed, поэтому
+   overflow: hidden от .data-panel ему не мешает и снят быть не должен: он держит
+   фон полосы при :hover внутри скруглённой рамки. */
+.quick-list-meta { margin-bottom: 18px; scroll-margin-top: 100px; }
+/* Экспорт на согласование указал на пустые поля — полоса обязана показывать это
+   и в свёрнутом виде: сами поля с подсветкой сейчас размонтированы. */
+.quick-list-meta--invalid { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(182,66,66,.07); }
+.quick-list-meta--invalid .quick-list-strip__empty { color: var(--danger); font-weight: 700; }
+.quick-list-meta--invalid .quick-list-strip__toggle { color: var(--danger); }
+.quick-list-strip { width: 100%; min-height: 50px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 16px; border: 0; border-radius: var(--radius-md); color: inherit; background: transparent; text-align: left; }
+.quick-list-strip:hover { background: var(--surface-soft); }
+.quick-list-meta--open .quick-list-strip { border-bottom: 1px solid var(--line); border-radius: var(--radius-md) var(--radius-md) 0 0; }
+.quick-list-strip__summary { min-width: 0; display: flex; align-items: baseline; gap: 12px; }
+.quick-list-strip__summary strong { min-width: 0; flex: 0 1 auto; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.quick-list-strip__summary small { min-width: 0; flex: 1 1 auto; display: flex; overflow: hidden; color: var(--ink-soft); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.quick-list-strip__summary small > span { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.quick-list-strip__summary small > span + span::before { content: ' · '; }
+.quick-list-strip__empty { color: var(--ink-faint); font-weight: 500; }
+.quick-list-strip__toggle { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.quick-list-strip__toggle svg { transition: transform .18s ease; }
+.quick-list-meta--open .quick-list-strip__toggle svg { transform: rotate(180deg); }
+.quick-list-meta__fields { display: grid; grid-template-columns: minmax(260px, 1.25fr) minmax(180px, .55fr) minmax(260px, 1fr); gap: 14px; padding: 14px 16px 16px; }
 .quick-list-meta .field { margin: 0; }
 .quick-list-meta .field > span { min-height: 15px; display: flex; align-items: center; gap: 5px; }
 .quick-list-meta .field > span svg { color: var(--accent); }
@@ -448,9 +472,6 @@ h2 { letter-spacing: -0.025em; }
 .quick-list-meta .field > input { background: var(--surface-soft); }
 .quick-list-meta__venue { grid-column: 1 / 2; }
 .quick-list-meta__notes { grid-column: 2 / -1; }
-.quick-list-hint { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin-top: -2px; color: var(--ink-faint); font-size: 12px; line-height: 1.45; }
-.quick-list-hint svg { flex: 0 0 auto; color: var(--accent); }
-.quick-list-next { display: none; }
 .quick-catalog-toolbar { flex: 0 0 auto; display: grid; grid-template-columns: minmax(240px, 1fr) repeat(2, minmax(180px, 240px)); gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
 .quick-catalog-toolbar:not(:has(.app-select + .app-select)) { grid-template-columns: minmax(0, 1fr) 240px; }
 .quick-catalog-toolbar .search-field { width: 100%; max-width: none; min-width: 0; }
@@ -686,7 +707,7 @@ h2 { letter-spacing: -0.025em; }
   .language-switch--compact { grid-template-columns: 1fr; }
   .language-switch--compact button { width: 100%; min-width: 0; padding-inline: 0; }
   .list-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .quick-list-meta { grid-template-columns: 1fr 1fr; }
+  .quick-list-meta__fields { grid-template-columns: 1fr 1fr; }
   .quick-list-meta__notes { grid-column: 1 / -1; }
   .editor-grid { grid-template-columns: 1fr; }
   .editor-grid { height: auto; }
@@ -824,11 +845,19 @@ h2 { letter-spacing: -0.025em; }
   .editor-header--quick .editor-header__actions { display: none; }
   /* На телефоне формулы высоты нет — строке состояния можно переноситься, а не резаться. */
   .editor-header--quick .editor-status { min-height: 0; line-height: 1.35; white-space: normal; }
-  .quick-list-meta { grid-template-columns: 1fr; padding: 14px; }
-  .quick-list-meta__venue, .quick-list-meta__notes, .quick-list-hint { grid-column: auto; }
-  .quick-list-hint { align-items: flex-start; }
-  .quick-list-next { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: stretch; gap: 7px; padding-top: 2px; }
-  .quick-list-next small { color: var(--ink-faint); font-size: 11px; text-align: center; }
+  /* Реквизиты — под панелями: первый экран телефона отдан оборудованию, заказчика и
+     площадку уточняют, когда список собран. Порядок задаёт flex-контейнер страницы
+     (JSX общий с десктопом), :has ограничивает правило редактором. */
+  .app-content:has(.editor-grid--quick) { display: flex; flex-direction: column; }
+  .quick-list-meta { order: 1; scroll-margin-top: 64px; }
+  /* Плавающая полоса «добавлено в список» не должна накрывать последний блок страницы */
+  .app-content:has(.mobile-selection-bar) .quick-list-meta { margin-bottom: 94px; }
+  .quick-list-strip { min-height: 56px; padding: 0 14px; }
+  .quick-list-strip__summary { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .quick-list-strip__summary strong, .quick-list-strip__summary small { max-width: 100%; }
+  .quick-list-strip__summary small { flex-wrap: wrap; white-space: normal; }
+  .quick-list-meta__fields { grid-template-columns: 1fr; padding: 12px 14px 14px; }
+  .quick-list-meta__venue, .quick-list-meta__notes { grid-column: auto; }
   /* Полоса табов вынесена за поля страницы и прилипает к самой кромке: при
      top: 8px в просвете над ней проезжало содержимое. Итоговая высота — 57px
      (8 + кнопка 44 + 4 + рамка 1), от неё считаются top тулбара каталога и
@@ -842,7 +871,6 @@ h2 { letter-spacing: -0.025em; }
   .quick-catalog-toolbar, .quick-catalog-toolbar:not(:has(.app-select + .app-select)) { position: sticky; z-index: 7; top: 57px; grid-template-columns: 1fr; background: rgba(255,255,255,.96); backdrop-filter: blur(12px); }
   .quick-catalog-toolbar .app-select { width: 100%; }
   .picker-results, .selection-list { max-height: none; flex: 0 0 auto; overflow: visible; overscroll-behavior: auto; scrollbar-gutter: auto; }
-  .catalog-picker.mobile-active { padding-bottom: 76px; }
   .quick-selection-item__main { grid-template-columns: 38px minmax(0, 1fr) 40px 40px; }
   .quick-selection-item__copy strong, .quick-selection-item__copy small { white-space: normal; }
   .quick-selection-item__main > .quantity-stepper { grid-column: 2 / -1; grid-row: 2; justify-self: start; }

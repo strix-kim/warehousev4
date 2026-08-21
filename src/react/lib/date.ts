@@ -31,6 +31,25 @@ export function formatTime(value: number, locale: string) {
   return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 }
 
+// Узбекские месяцы держим списком: Intl для `uz` даёт латиницу вперемешку с
+// кириллицей в зависимости от движка, а дата мероприятия — то, что пользователь
+// сверяет глазами.
+const uzbekMonths = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr']
+
+// Календарный день словами («21 августа 2026», «21-avgust 2026-yil»). Живёт здесь,
+// а не в AppDatePicker: свёрнутая полоса реквизитов показывает ту же дату, что и
+// раскрытое поле, и разойтись эти два формата не должны.
+export function formatEventDate(date: Date, locale: string) {
+  if (locale.toLowerCase().startsWith('uz')) return `${date.getDate()}-${uzbekMonths[date.getMonth()]} ${date.getFullYear()}-yil`
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' }).format(date)
+}
+
+// Заголовок месяца в календаре — тот же список месяцев, без числа.
+export function formatMonthTitle(date: Date, locale: string) {
+  if (locale.toLowerCase().startsWith('uz')) return `${uzbekMonths[date.getMonth()]} ${date.getFullYear()}`
+  return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(date)
+}
+
 type Tr = (ru: string, uz: string) => string
 
 // Возраст данных словами. Числительные и склонения («2 минуты», «5 минут»,
