@@ -42,6 +42,7 @@ import {
   type SavedListComposition,
 } from './api'
 import { useLanguage } from '../../lib/i18n'
+import { reportAppError } from '../../lib/reportAppError'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
 type Tr = (ru: string, uz: string) => string
@@ -172,7 +173,10 @@ export function ListsPage() {
         // возвращаются сюда через reloadKey.
         setSelected((current) => current ? result.rows.find((item) => item.id === current.id) ?? null : null)
       })
-      .catch(() => { if (isCurrent && !cached) setHasLoadError(true) })
+      .catch((error: unknown) => {
+        reportAppError(error, { scope: 'loader', route: '/lists', detail: { servedFromCache: Boolean(cached) } })
+        if (isCurrent && !cached) setHasLoadError(true)
+      })
       .finally(() => { if (isCurrent) setIsLoading(false) })
 
     return () => { isCurrent = false }

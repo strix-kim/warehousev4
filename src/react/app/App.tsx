@@ -1,9 +1,10 @@
 import { ArrowUpRight, Boxes, ChevronDown, ClipboardList, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, RadioTower, Warehouse } from 'lucide-react'
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AppErrorBoundary } from '../components/AppErrorBoundary'
 import { useAuth } from '../features/auth/AuthProvider'
 import { LanguageSwitcher, useLanguage } from '../lib/i18n'
+import { lazyWithReload } from '../lib/lazyWithReload'
 import { reportAppError } from '../lib/reportAppError'
 
 const loadLoginPage = () => import('../features/auth/LoginPage').then((module) => ({ default: module.LoginPage }))
@@ -13,12 +14,12 @@ const loadListsPage = () => import('../features/lists/ListsPage').then((module) 
 const loadListEditorPage = () => import('../features/lists/ListEditorPage').then((module) => ({ default: module.ListEditorPage }))
 const loadHomePage = () => import('../features/home/HomePage').then((module) => ({ default: module.HomePage }))
 
-const LoginPage = lazy(loadLoginPage)
-const EquipmentPage = lazy(loadEquipmentPage)
-const EquipmentCreatePage = lazy(loadEquipmentCreatePage)
-const ListsPage = lazy(loadListsPage)
-const ListEditorPage = lazy(loadListEditorPage)
-const HomePage = lazy(loadHomePage)
+const LoginPage = lazyWithReload(loadLoginPage)
+const EquipmentPage = lazyWithReload(loadEquipmentPage)
+const EquipmentCreatePage = lazyWithReload(loadEquipmentCreatePage)
+const ListsPage = lazyWithReload(loadListsPage)
+const ListEditorPage = lazyWithReload(loadListEditorPage)
+const HomePage = lazyWithReload(loadHomePage)
 
 export function App() {
   const { isLoading, session } = useAuth()
