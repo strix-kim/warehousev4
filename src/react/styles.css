@@ -682,6 +682,7 @@ h2 { letter-spacing: -0.025em; }
   .metric:last-child { border-bottom: 0; }
   .toolbar { align-items: stretch; flex-direction: column; }
   .data-age { margin-left: 0; justify-content: space-between; }
+  .data-age button { min-height: 44px; }
   .search-field { max-width: none; min-width: 0; height: 44px; }
   .search-field input { align-self: stretch; height: auto; }
   .pagination { align-items: flex-start; flex-direction: column; }

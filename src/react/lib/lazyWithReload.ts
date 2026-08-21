@@ -15,7 +15,12 @@ function consumeReloadBudget(): boolean {
   try {
     const raw = window.sessionStorage.getItem(RELOAD_KEY)
     const lastAt = raw ? Number(raw) : 0
-    if (Number.isFinite(lastAt) && Date.now() - lastAt < RELOAD_COOLDOWN_MS) return false
+    // Сравниваем метку с моментом старта ДОКУМЕНТА, а не с моментом отказа: чанк
+    // умеет провалиться и через десять минут после загрузки (висящий коннект), и от
+    // Date.now() бюджет к тому времени всегда выглядел бы свободным — вкладка ушла бы
+    // в бесконечный круг перезагрузок. Метка, поставленная перед прошлой
+    // перезагрузкой, всегда впритык к timeOrigin текущего документа.
+    if (Number.isFinite(lastAt) && performance.timeOrigin - lastAt < RELOAD_COOLDOWN_MS) return false
     window.sessionStorage.setItem(RELOAD_KEY, String(Date.now()))
     return true
   } catch {
@@ -31,6 +36,11 @@ function consumeReloadBudget(): boolean {
 export function lazyWithReload<T extends ComponentType<any>>(loader: () => Promise<{ default: T }>) {
   return lazy(() => loader().catch((error: unknown) => {
     reportAppError(error, { scope: 'chunk', route: window.location.pathname })
+    // Без сети перезагрузка не чинит ничего: чанк провалился не потому, что его
+    // сменила выкатка, а потому что сети нет (прогрев провалился офлайн, человек
+    // нажал на раздел позже). reload() убил бы вкладку вместе с кэшем и показал
+    // браузерное «нет интернета»; граница хотя бы оставит приложение живым.
+    if (!navigator.onLine) throw error
     // Бюджет исчерпан — значит перезагрузка уже была и не помогла: отдаём ошибку
     // границе (AppErrorBoundary), она покажет экран с кнопкой.
     if (!consumeReloadBudget()) throw error

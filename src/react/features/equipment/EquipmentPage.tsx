@@ -52,6 +52,10 @@ export function EquipmentPage() {
   // Момент записи показанной страницы каталога. Ничего производного не храним:
   // значение принадлежит persistentCache, страница только перечитывает его.
   const [dataAt, setDataAt] = useState<number | null>(null)
+  // Отдельный флаг от isLoading: isLoading означает «показывать нечего, рисуем
+  // скелет» и при живом кэше всегда false, а кнопке «Обновить» нужен признак
+  // «запрос в полёте» — иначе офлайн она не отвечает на нажатие ничем.
+  const [isFetching, setIsFetching] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
@@ -91,12 +95,17 @@ export function EquipmentPage() {
       preloadEquipmentImages(cached.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 24)
     }
     setIsLoading(!cached)
+    setIsFetching(true)
     setHasLoadError(false)
-    setDataAt(readAge())
+    // Возраст сбрасываем ДО запроса: при живой сети свежий ответ придёт через
+    // мгновение, и бейдж успел бы мигнуть на пустом месте. Возраст ставится только
+    // там, где исход запроса уже известен, — в .then и в .catch.
+    setDataAt(null)
 
     fetchEquipment({ page: currentPage, search, availability, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
       .then((result) => {
         if (!isCurrent) return
+        setIsFetching(false)
         setRows(result.rows)
         setTotal(result.total)
         setDataAt(readAge())
@@ -112,6 +121,7 @@ export function EquipmentPage() {
         // Отчёт — только для живого эффекта: отменённая загрузка (сменили фильтр,
         // ушли со страницы) не отказ приложения, и шуметь ею в канал незачем.
         if (!isCurrent) return
+        setIsFetching(false)
         reportAppError(error, { scope: 'loader', route: '/equipment', detail: { servedFromCache: Boolean(cached) } })
         setDataAt(readAge())
         if (!cached) setHasLoadError(true)
@@ -186,7 +196,10 @@ export function EquipmentPage() {
             }}
             ariaLabel={tr('Фильтр по статусу', 'Holat bo‘yicha filtr')}
           />
-          <DataAge touchedAt={dataAt} isRefreshing={isLoading} onRefresh={() => setReloadKey((value) => value + 1)} />
+          {/* Рядом с блоком «Ошибка загрузки» бейдж не рисуем: на экране оказались бы
+              два разных предложения обновиться и «Обновлено 25 минут назад» под
+              заголовком о том, что данных нет. */}
+          {!hasLoadError && <DataAge touchedAt={dataAt} isRefreshing={isFetching} onRefresh={() => setReloadKey((value) => value + 1)} />}
         </div>
 
         {hasLoadError ? (

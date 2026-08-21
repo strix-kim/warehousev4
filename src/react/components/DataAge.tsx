@@ -32,9 +32,14 @@ export function DataAge({ touchedAt, isRefreshing, onRefresh }: Props) {
 
   if (touchedAt === null || Date.now() - touchedAt < MIN_VISIBLE_AGE_MS) return null
 
+  // Фраза собирается целиком внутри tr, а не склейкой «причастие + возраст»: в
+  // узбекском причастие идёт в конец («40 daqiqa oldin yangilangan»), и склейка
+  // давала бы порядок слов русского предложения.
+  const age = formatAge(touchedAt, locale, tr)
+
   return (
     <div className="data-age" role="status">
-      <span>{tr('Обновлено', 'Yangilangan')} {formatAge(touchedAt, locale, tr)}</span>
+      <span>{tr(`Обновлено ${age}`, `${age} yangilangan`)}</span>
       <button type="button" onClick={onRefresh} disabled={isRefreshing}>
         <RotateCw size={14} />
         {isRefreshing ? tr('Обновляем…', 'Yangilanmoqda…') : tr('Обновить', 'Yangilash')}

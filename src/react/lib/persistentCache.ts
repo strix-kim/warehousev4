@@ -118,7 +118,7 @@ export function readCachedQuery<T>(key: string): T | null {
   return entry.value
 }
 
-export type CacheEntryMeta = { touchedAt: number; expiresAt: number }
+export type CacheEntryMeta = { touchedAt: number }
 
 // Возраст записи читается БЕЗ гейта по TTL — в отличие от readCachedQuery выше.
 // Спрашивают его ровно про то значение, которое отдала ветка отказа cachedQuery,
@@ -128,7 +128,7 @@ export function readCachedQueryMeta(key: string): CacheEntryMeta | null {
   // touchedAt появился в раскладке v4, но запись в localStorage правится руками и
   // приезжает из другой вкладки: без числа возраст неизвестен, и врать нечем.
   if (!entry || typeof entry.touchedAt !== 'number') return null
-  return { touchedAt: entry.touchedAt, expiresAt: entry.expiresAt }
+  return { touchedAt: entry.touchedAt }
 }
 
 function trimStorage() {
