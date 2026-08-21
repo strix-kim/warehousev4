@@ -3,9 +3,10 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
-  Clock3,
+  Download,
   FileSpreadsheet,
   FileCheck2,
+  FolderOpen,
   PackageCheck,
   PencilLine,
   Plus,
@@ -18,11 +19,12 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ActionMenu } from '../../components/ActionMenu'
 import { AppSelect } from '../../components/AppSelect'
 import { DataAge } from '../../components/DataAge'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
-import { monthRange } from '../../lib/date'
+import { formatEventDate, monthRange, parseDateValue } from '../../lib/date'
 import { useModalLayer } from '../../lib/useModalLayer'
 import {
   buildSavedListComposition,
@@ -127,6 +129,17 @@ function formatDate(value: string | null, locale: string, tr: Tr) {
 function formatEventRange(start: string | null, end: string | null, locale: string, tr: Tr) {
   if (start && start === end) return formatDate(start, locale, tr)
   return `${formatDate(start, locale, tr)} — ${formatDate(end, locale, tr)}`
+}
+
+// Дата мероприятия крупной строкой — первичный идентификатор карточки. Один день
+// пишем словами («25 августа 2026»): так человек узнаёт свою работу, а не читает
+// номер. Диапазон остаётся числами — «25 августа 2026 — 3 сентября 2026» в две
+// строки заголовка не помещается и перестаёт читаться с одного взгляда.
+function formatCardDate(start: string | null, end: string | null, locale: string, tr: Tr) {
+  if (!start) return tr('Дата не указана', 'Sana ko‘rsatilmagan')
+  if (start !== end) return formatEventRange(start, end, locale, tr)
+  const parsed = parseDateValue(start)
+  return parsed ? formatEventDate(parsed, locale) : formatDate(start, locale, tr)
 }
 
 export function ListsPage() {
@@ -339,12 +352,17 @@ export function ListsPage() {
           <div className="list-grid">
             {isLoading && rows.length === 0
               ? Array.from({ length: 6 }, (_, index) => <div className="list-card list-card--loading" key={index} />)
-              : rows.map((list, index) => {
+              : rows.map((list) => {
                   const lifecycle = list.advanced_features ? statusView[list.reservation_status] : { label: tr('Сохранён', 'Saqlangan'), tone: 'neutral' }
                   const isExporting = exporting?.id === list.id
-                  const listNumber = (currentPage - 1) * pageSize + index + 1
                   // created_at в схеме nullable; поведение прежнее: пустое значение даёт эпоху
                   const createdAt = new Intl.DateTimeFormat(locale).format(new Date(list.created_at ?? 0))
+                  // Черновик продолжают собирать, а не разглядывают: он открывается
+                  // сразу в редакторе. Остальные этапы ведут в детали — там состав,
+                  // история и переход этапа.
+                  const isDraft = list.reservation_status === 'draft'
+                  const open = () => { if (isDraft) navigate(`/lists/${list.id}/edit`); else setSelected(list) }
+                  const isEmpty = listSize(list) === 0
                   return (
                     <article
                       className="list-card"
@@ -353,24 +371,50 @@ export function ListsPage() {
                       onFocusCapture={() => { void prefetchSavedListDetails(list) }}
                     >
                       <div className="list-card__top">
-                        <span className="list-card__number" aria-label={`${tr('Список', 'Ro‘yxat')} ${listNumber}`}>{String(listNumber).padStart(2, '0')}</span>
+                        <div className="list-card__identity">
+                          {/* Дата мероприятия и заказчик — то, чем человек помнит работу.
+                              Название у всех дефолтное, поэтому оно ниже и мельче. */}
+                          <p className="list-card__date">{formatCardDate(list.reservation_start, list.reservation_end, locale, tr)}</p>
+                          <p className="list-card__client">{[list.client_name, list.venue].filter(Boolean).join(' · ') || tr('Заказчик не указан', 'Buyurtmachi ko‘rsatilmagan')}</p>
+                        </div>
                         <span className={`badge badge--${lifecycle.tone}`}><i />{lifecycle.label}</span>
                       </div>
                       <div>
-                        <p className="eyebrow">{list.list_mode === 'specific' ? tr('С серийными номерами', 'Seriya raqamlari bilan') : tr('Только модели', 'Faqat modellar')}</p>
                         <h3>{list.name}</h3>
-                        <p>{[list.client_name, list.venue, list.description].filter(Boolean).join(' · ') || tr('Без описания', 'Tavsifsiz')}</p>
+                        {list.description && <p className="list-card__description">{list.description}</p>}
                       </div>
-                      <div className="reservation-window"><CalendarRange size={15} /><span>{formatEventRange(list.reservation_start, list.reservation_end, locale, tr)}</span></div>
                       <div className="list-card__meta">
-                        <span><strong>{listSize(list)}</strong> {tr('единиц', 'birlik')}</span>
+                        <span><strong>{listSize(list)}</strong> {tr('единиц', 'birlik')} · {list.list_mode === 'specific' ? tr('с серийными номерами', 'seriya raqamlari bilan') : tr('только модели', 'faqat modellar')}</span>
                         {/* Подпись обязательна: без неё две даты на карточке неразличимы */}
                         <span>{tr(`создан ${createdAt}`, `${createdAt} yaratilgan`)}</span>
                       </div>
                       <div className="list-card__actions">
-                        <button className="button button--secondary list-card__details" onClick={() => setSelected(list)}><Clock3 size={16} /> {tr('Открыть детали списка', 'Ro‘yxat tafsilotlarini ochish')}</button>
-                        <button className="button button--secondary list-export-button" onClick={() => void exportSavedList(list, 'working')} disabled={isExporting || listSize(list) === 0} title={tr('Только список оборудования — для команды и работы', 'Faqat uskunalar ro‘yxati — jamoa va ish uchun')}><FileSpreadsheet size={17} />{isExporting && exporting?.mode === 'working' ? tr('Готовим…', 'Tayyorlanmoqda…') : tr('Рабочий Excel', 'Ishchi Excel')}</button>
-                        <button className="button button--secondary list-export-button" onClick={() => void exportSavedList(list, 'approval')} disabled={isExporting || listSize(list) === 0} title={tr('Документ для заказчика: с реквизитами и подписями', 'Buyurtmachi uchun hujjat: rekvizitlar va imzolar bilan')}><FileCheck2 size={17} />{isExporting && exporting?.mode === 'approval' ? tr('Готовим…', 'Tayyorlanmoqda…') : tr('С реквизитами', 'Rekvizitlar bilan')}</button>
+                        <button className="button button--primary list-card__open" onClick={open}>
+                          {isDraft ? <><PencilLine size={16} /> {tr('Изменить', 'O‘zgartirish')}</> : <><FolderOpen size={16} /> {tr('Открыть', 'Ochish')}</>}
+                        </button>
+                        <ActionMenu
+                          className="list-card__export"
+                          label={isExporting ? tr('Готовим…', 'Tayyorlanmoqda…') : tr('Скачать', 'Yuklab olish')}
+                          ariaLabel={tr('Скачать Excel по списку', 'Ro‘yxat bo‘yicha Excelni yuklab olish')}
+                          icon={<Download size={16} />}
+                          disabled={isExporting || isEmpty}
+                          items={[
+                            {
+                              id: 'working',
+                              label: tr('Рабочий список', 'Ishchi ro‘yxat'),
+                              hint: tr('Для команды и склада', 'Jamoa va ombor uchun'),
+                              icon: <FileSpreadsheet size={16} />,
+                              onSelect: () => { void exportSavedList(list, 'working') },
+                            },
+                            {
+                              id: 'approval',
+                              label: tr('На согласование', 'Kelishuvga'),
+                              hint: tr('С реквизитами и подписями', 'Rekvizitlar va imzolar bilan'),
+                              icon: <FileCheck2 size={16} />,
+                              onSelect: () => { void exportSavedList(list, 'approval') },
+                            },
+                          ]}
+                        />
                       </div>
                     </article>
                   )

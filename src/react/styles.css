@@ -157,7 +157,18 @@ h2 { letter-spacing: -0.025em; }
 .app-select__trigger > svg.is-open { transform: rotate(180deg); }
 .app-select__popover { position: fixed; z-index: 70; max-height: min(330px, calc(100dvh - 24px)); padding: 6px; overflow-y: auto; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.98); box-shadow: 0 18px 46px rgba(15,22,28,.18), 0 2px 8px rgba(15,22,28,.08); backdrop-filter: blur(16px); animation: popover-in .16s ease-out; }
 .app-select__popover button { width: 100%; min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 0; border-radius: 7px; color: var(--ink-soft); background: transparent; font-size: 13px; font-weight: 650; text-align: left; }
-.app-select__popover button:hover { color: var(--ink); background: var(--surface-soft); }
+
+
+/* Меню действий. Внешний вид попапа общий с AppSelect, отличается содержимое
+   пункта: иконка + название + подсказка в две строки, без галочки «выбрано». */
+.action-menu { position: relative; }
+.action-menu__trigger { width: 100%; justify-content: center; }
+.action-menu__trigger > svg:last-child { transition: transform .16s ease; }
+.action-menu__trigger > svg.is-open { transform: rotate(180deg); }
+.action-menu__popover button { align-items: flex-start; justify-content: flex-start; min-height: 46px; }
+.action-menu__popover button > svg { flex: 0 0 auto; margin-top: 2px; color: var(--ink-faint); }
+.action-menu__label { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.action-menu__label small { color: var(--ink-faint); font-size: 11px; font-weight: 550; }.app-select__popover button:hover { color: var(--ink); background: var(--surface-soft); }
 .app-select__popover button.is-selected { color: var(--ink); background: rgba(239,18,54,.07); }
 .app-select__popover button.is-selected svg { flex: 0 0 auto; color: var(--accent); }
 .field > .app-select { width: 100%; height: 45px; }
@@ -296,20 +307,31 @@ h2 { letter-spacing: -0.025em; }
 .panel-heading p { margin: 0; color: var(--ink-faint); font-size: 13px; line-height: 1.5; }
 .read-only-label { min-height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 5px 10px; border-radius: 99px; color: #727c82; background: #eef0ee; font-size: 11px; font-weight: 800; line-height: 1; letter-spacing: .05em; text-align: center; text-transform: uppercase; white-space: nowrap; }
 .list-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); }
-.list-card { min-height: 250px; display: flex; flex-direction: column; gap: 20px; padding: 20px; background: #fff; }
-.list-card__top { display: flex; justify-content: space-between; align-items: center; }
-.list-card__number { min-width: 46px; height: 46px; display: grid; place-items: center; padding: 0 10px; border-radius: 11px; color: #fff; background: var(--accent); box-shadow: 0 8px 20px rgba(239,18,54,.22); font-size: 18px; font-weight: 850; font-variant-numeric: tabular-nums; letter-spacing: -.04em; line-height: 1; }
-.list-card h3 { margin-bottom: 7px; font-size: 17px; }
-.list-card p:not(.eyebrow) { display: -webkit-box; margin: 0; overflow: hidden; color: var(--ink-soft); font-size: 13px; line-height: 1.5; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.list-card { position: relative; min-height: 250px; display: flex; flex-direction: column; gap: 20px; padding: 20px; background: #fff; transition: border-color .16s ease; }
+.list-card__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+/* Дата мероприятия и заказчик — первичный идентификатор списка вместо названия:
+   название у всех дефолтное, а «форум в Hyatt 25 августа» человек помнит. */
+.list-card__identity { min-width: 0; }
+.list-card__date { font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; }
+.list-card__client { margin-top: 3px; color: var(--ink-soft); font-size: 13px; }
+.list-card__identity p { overflow: hidden; text-overflow: ellipsis; }
+.list-card h3 { margin-bottom: 7px; color: var(--ink-soft); font-size: 14px; font-weight: 650; }
+/* Кламп адресован ОПИСАНИЮ, а не любому <p> в карточке: дата и заказчик — тоже
+   абзацы, и общий селектор бил их специфичностью, навязывая цвет и две строки. */
+.list-card__description { display: -webkit-box; margin: 0; overflow: hidden; color: var(--ink-soft); font-size: 13px; line-height: 1.5; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .list-card__meta { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: 12px; }
 .list-card__meta strong { color: var(--ink); }
 .list-card--loading { min-height: 250px; background: linear-gradient(90deg, #f7f8f6 25%, #fff 50%, #f7f8f6 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
-.reservation-window { min-height: 35px; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; color: var(--ink-soft); background: var(--surface-soft); font-size: 12px; }
-.reservation-window svg { flex: 0 0 auto; color: var(--accent); }
 .list-card__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .list-card__actions .button { min-width: 0; padding-inline: 10px; font-size: 12px; }
-.list-card__details { grid-column: 1 / -1; }
-.list-export-button svg { flex: 0 0 auto; }
+/* Кликабельна вся карточка, но интерактивный элемент в разметке ОДИН: псевдоэлемент
+   первичной кнопки растянут на карточку. Обёртка-кнопка вокруг всего содержимого
+   дала бы вложенные кнопки, а onClick на article — область, недостижимую с
+   клавиатуры. Меню лежит выше по z-index и перехватывает свои клики само. */
+.list-card__open::after { content: ''; position: absolute; z-index: 0; inset: 0; border-radius: inherit; }
+.list-card__export { position: relative; z-index: 1; }
+.list-card:has(.list-card__open:hover) { border-color: var(--line-strong); }
+.list-card:has(.list-card__open:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 .home-page { min-height: calc(100dvh - 70px); display: flex; flex-direction: column; justify-content: center; }
 .home-page__header { max-width: 720px; margin-bottom: 32px; animation: rise-in .3s cubic-bezier(.2,.7,.2,1) both; }
@@ -799,8 +821,9 @@ h2 { letter-spacing: -0.025em; }
   .home-destination--employees strong, .home-destination--employees p, .home-destination--employees .home-destination__action { max-width: 76%; }
   .home-destination__art--employees { display: none; }
   .list-card, .list-card--loading { min-height: 195px; gap: 14px; padding: 16px; }
-  .list-card__actions { grid-template-columns: 1fr; }
-  .list-card__details { grid-column: auto; }
+  /* Кнопок теперь две вместо трёх — они помещаются в ряд и не съедают
+     150 px высоты карточки, как столбик до волны 2 */
+  .list-card__date { font-size: 16px; }
   .drawer { padding: 22px 18px calc(30px + env(safe-area-inset-bottom)); }
   .reservation-drawer { height: 100dvh; padding: 0; }
   .reservation-drawer__top { padding: 20px 18px 0; }

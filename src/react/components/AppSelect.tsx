@@ -2,6 +2,7 @@ import { Check, ChevronDown } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { computePopoverPosition } from '../lib/popoverPosition'
 import { usePopoverLayer } from '../lib/usePopoverLayer'
 
 export type AppSelectOption<T extends string> = {
@@ -33,13 +34,7 @@ export function AppSelect<T extends string>({
 
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return
-    const rect = triggerRef.current.getBoundingClientRect()
-    const width = Math.max(rect.width, 220)
-    const left = Math.min(rect.left, window.innerWidth - width - 12)
-    const estimatedHeight = Math.min(options.length * 42 + 12, 330)
-    const below = rect.bottom + 7
-    const top = below + estimatedHeight <= window.innerHeight ? below : Math.max(12, rect.top - estimatedHeight - 7)
-    setPosition({ top, left: Math.max(12, left), width })
+    setPosition(computePopoverPosition(triggerRef.current.getBoundingClientRect(), options.length))
   }, [open, options.length])
 
   usePopoverLayer(open, () => setOpen(false), [rootRef, popoverRef])
