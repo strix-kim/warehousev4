@@ -1,6 +1,6 @@
 import { ArrowUpRight, Boxes, ChevronDown, ClipboardList, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, RadioTower, Warehouse } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
-import { Link, Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom'
+import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthProvider'
 import { LanguageSwitcher, useLanguage } from '../lib/i18n'
 
@@ -25,7 +25,7 @@ export function App() {
 
   return <Routes>
       <Route path="/login" element={<Suspense fallback={<AppLoader />}><LoginPage /></Suspense>} />
-      <Route element={session ? <AppShell /> : <Navigate to="/login" replace />}>
+      <Route element={session ? <AppShell /> : <LoginRedirect />}>
         <Route index element={<RouteBoundary><HomePage /></RouteBoundary>} />
         <Route path="/equipment" element={<RouteBoundary><EquipmentPage /></RouteBoundary>} />
         <Route path="/equipment/new" element={<RouteBoundary><EquipmentCreatePage /></RouteBoundary>} />
@@ -35,6 +35,18 @@ export function App() {
       </Route>
       <Route path="*" element={<Navigate to={session ? '/' : '/login'} replace />} />
     </Routes>
+}
+
+// Гейт сессии уводил на /login простым Navigate, и адрес, за которым человек
+// пришёл, терялся: после входа он всегда оказывался на главной. Путь кладём в
+// state перехода — LoginPage вернёт на него.
+function LoginRedirect() {
+  const location = useLocation()
+  const target = `${location.pathname}${location.search}${location.hash}`
+  // Внутренним считаем только `/…`: строка вида `//host` читается браузером как
+  // адрес другого сайта, и «возврат» после входа увёл бы наружу.
+  const isInternal = target.startsWith('/') && !target.startsWith('//')
+  return <Navigate to="/login" replace state={isInternal ? { from: target } : undefined} />
 }
 
 function AppShell() {
@@ -66,15 +78,24 @@ function AppShell() {
           page: 1,
           search: '',
           availability: '',
-          pageSize: window.matchMedia('(max-width: 820px)').matches ? 8 : equipmentApi.EQUIPMENT_PAGE_SIZE,
+          // Размер страницы входит в ключ кэша: прогрев обязан спросить его у самой фичи,
+          // иначе страница промахнётся мимо прогретой записи.
+          pageSize: equipmentApi.preferredEquipmentPageSize(),
         }),
-        listsApi.fetchEquipmentLists(),
+        listsApi.fetchEquipmentLists({
+          page: 1,
+          search: '',
+          status: 'all',
+          // Тот же довод, что и у каталога: размер страницы входит в ключ кэша,
+          // и прогрев обязан спросить его у самой фичи.
+          pageSize: listsApi.preferredListsPageSize(),
+        }),
       ])).catch(() => undefined)
     }, 120)
     const editorDataTimer = window.setTimeout(() => {
       void Promise.all([
         import('../features/equipment/api'),
-        import('../features/equipment/EquipmentVisual'),
+        import('../components/EquipmentVisual'),
       ]).then(async ([equipmentApi, visuals]) => {
         const [equipment] = await Promise.all([
           equipmentApi.fetchAllEquipment(),

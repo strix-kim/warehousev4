@@ -1,23 +1,47 @@
 import { ArrowRight, Eye, EyeOff, LockKeyhole } from 'lucide-react'
 import { FormEvent, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './AuthProvider'
 import { LanguageSwitcher, useLanguage } from '../../lib/i18n'
+import { isSupabaseConfigured } from '../../lib/supabase'
+
+// Путь, за которым пришёл неавторизованный пользователь: его кладёт в state
+// гейт сессии (LoginRedirect в App.tsx). State истории правится из консоли, так
+// что здесь он перепроверяется заново — уводить после входа можно только внутрь
+// приложения, и `//host` внутренним не считается.
+function readReturnPath(value: unknown) {
+  if (typeof value !== 'string') return null
+  return value.startsWith('/') && !value.startsWith('//') ? value : null
+}
 
 export function LoginPage() {
   const { session, signIn } = useAuth()
   const { tr } = useLanguage()
+  const location = useLocation()
+  const returnPath = readReturnPath((location.state as { from?: unknown } | null)?.from)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  if (session) return <Navigate to="/" replace />
+  if (session) return <Navigate to={returnPath ?? '/'} replace />
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
+
+    // Провал конфигурации — не «неверный пароль»: без переменных окружения
+    // клиента Supabase просто нет, и signIn упал бы в общий catch, обвинив
+    // пользователя. Гейт сборки ловит пустые переменные, но не протухший ключ.
+    if (!isSupabaseConfigured) {
+      setError(tr(
+        'Приложение не настроено: нет связи с сервером данных. Сообщите администратору.',
+        'Ilova sozlanmagan: ma’lumotlar serveri bilan aloqa yo‘q. Administratorga xabar bering.',
+      ))
+      return
+    }
+
     setIsSubmitting(true)
 
     try {

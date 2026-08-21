@@ -1,17 +1,29 @@
 import { supabase } from '../../lib/supabase'
 import { cachedQuery, invalidateCachePrefix, readCachedQuery } from '../../lib/persistentCache'
+import type { Json } from '../../lib/database.types'
+import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
+// Только листовой cacheKeys, не lists/api: обратное ребро замкнуло бы цикл фич.
+import { invalidateListCompositionCache } from '../lists/cacheKeys'
+import type { EquipmentAvailability } from './availability'
 import type { EquipmentPageResult } from './types'
-import type { Equipment } from './types'
+import type { Equipment, EquipmentRow } from './types'
 
 export const EQUIPMENT_PAGE_SIZE = 50
+export const MOBILE_EQUIPMENT_PAGE_SIZE = 8
+
+// Размер страницы каталога входит в ключ кэша, поэтому его выбирает эта фича:
+// прогрев в App.tsx и сама страница обязаны спрашивать одно и то же число.
+export function preferredEquipmentPageSize() {
+  return window.matchMedia(MOBILE_MEDIA_QUERY).matches ? MOBILE_EQUIPMENT_PAGE_SIZE : EQUIPMENT_PAGE_SIZE
+}
 
 const quantityPlaceholders = new Set(['', 'n/a', 'na', 'нет', 'без номера', 'б/н', 'none', 'null', '-'])
 
-function normalizeEquipment(row: Omit<Equipment, 'tracking_mode' | 'inventory_code'>): Equipment {
-  const storedIdentifier = row.serialnumber?.trim() ?? ''
+function normalizeEquipment(row: EquipmentRow): Equipment {
+  const storedIdentifier = row.serialnumber.trim()
   const normalizedIdentifier = storedIdentifier.toLowerCase()
   const generatedQuantityCode = storedIdentifier.startsWith('QTY::')
-  const isQuantity = row.count > 1
+  const isQuantity = (row.count ?? 0) > 1
     || storedIdentifier.startsWith('AUTO-')
     || generatedQuantityCode
     || quantityPlaceholders.has(normalizedIdentifier)
@@ -25,6 +37,8 @@ function normalizeEquipment(row: Omit<Equipment, 'tracking_mode' | 'inventory_co
 
   return {
     ...row,
+    availability: row.availability ?? '',
+    count: row.count ?? 0,
     serialnumber: isQuantity ? null : storedIdentifier,
     tracking_mode: isQuantity ? 'quantity' : 'serialized',
     inventory_code: inventoryCode,
@@ -103,6 +117,10 @@ export async function fetchEquipment({ page, search, availability, pageSize = EQ
   }, { bypass: bypassCache })
 }
 
+// Полная выгрузка каталога — это ~1.4 МБ JSON, поэтому она живёт ТОЛЬКО в памяти
+// сессии (persist: false): в localStorage она одна съедала треть квоты Safari,
+// а с сервера батчами приезжает за секунды. Цена — после перезагрузки страницы
+// редактор списка ждёт сеть вместо первого кадра из кэша.
 export async function fetchAllEquipment({ bypassCache = false } = {}): Promise<Equipment[]> {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
@@ -124,7 +142,7 @@ export async function fetchAllEquipment({ bypassCache = false } = {}): Promise<E
       if (batch.length < batchSize) break
     }
     return rows
-  }, { bypass: bypassCache })
+  }, { bypass: bypassCache, persist: false })
 }
 
 export async function fetchEquipmentByIds(ids: string[]): Promise<Equipment[]> {
@@ -137,6 +155,21 @@ export async function fetchEquipmentByIds(ids: string[]): Promise<Equipment[]> {
 
   if (error) throw error
   return (data ?? []).map((row) => normalizeEquipment(row))
+}
+
+// Одна карточка прямо с сервера, в обход кэша каталога: drawer перечитывает ею
+// запись при открытии и после конфликта версий. null — строки в базе больше нет,
+// это НЕ отказ запроса (отказ прилетает исключением).
+export async function fetchEquipmentById(id: string): Promise<Equipment | null> {
+  if (!supabase) throw new Error('Supabase не настроен')
+  const { data, error } = await supabase
+    .from('equipment')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) throw error
+  return data ? normalizeEquipment(data) : null
 }
 
 export type EquipmentTaxonomy = {
@@ -170,7 +203,10 @@ export type CreateEquipmentInput = {
   type: string
   subtype: string
   count: number
-  availability: string
+  // Новая запись заводится только с кодом из словаря; правка существующей
+  // единицы (UpdateEquipmentInput) остаётся строкой — там в поле может лежать
+  // историческое значение, которое интерфейс не сужает.
+  availability: EquipmentAvailability
   location: string
   technicalspecification?: string
   lengthinmeters?: string
@@ -179,14 +215,20 @@ export type CreateEquipmentInput = {
 
 export async function createEquipment(input: CreateEquipmentInput) {
   if (!supabase) throw new Error('Supabase не настроен')
+  // serialnumber в базе NOT NULL: для серийного учёта номер обязателен, для
+  // количественного его заменяет служебный идентификатор. Раньше пустое значение
+  // уезжало в базу и падало там же на NOT NULL — теперь отказ виден на месте.
+  const serialnumber = input.trackingMode === 'serialized'
+    ? input.serialnumber?.trim()
+    : storedQuantityIdentifier(input.inventoryCode)
+  if (!serialnumber) throw new Error('Серийный номер обязателен')
+
   const { data, error } = await supabase
     .from('equipment')
     .insert({
       brand: input.brand.trim(),
       model: input.model.trim(),
-      serialnumber: input.trackingMode === 'serialized'
-        ? input.serialnumber?.trim()
-        : storedQuantityIdentifier(input.inventoryCode),
+      serialnumber,
       type: input.type.trim(),
       subtype: input.subtype.trim(),
       count: input.count,
@@ -205,12 +247,20 @@ export async function createEquipment(input: CreateEquipmentInput) {
   return data.id as string
 }
 
+// В шаблоне LIKE/ILIKE `%` и `_` — подстановочные знаки, а `\` — знак
+// экранирования. Без экранирования серийник `AB_1234` совпадал с `AB-1234`
+// и давал ложный дубль. Обратная косая идёт первой, иначе она экранировала бы
+// уже добавленные косые.
+function escapeLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`)
+}
+
 export async function serialNumberExists(serialNumber: string) {
   if (!supabase) throw new Error('Supabase не настроен')
   const { count, error } = await supabase
     .from('equipment')
     .select('id', { count: 'exact', head: true })
-    .ilike('serialnumber', serialNumber.trim())
+    .ilike('serialnumber', escapeLikePattern(serialNumber.trim()))
 
   if (error) throw error
   return (count ?? 0) > 0
@@ -221,14 +271,29 @@ export async function countEquipmentModelUnits(brand: string, model: string) {
   const client = supabase
   const cacheKey = `equipment:model-count:${brand.trim().toLocaleLowerCase('ru')}::${model.trim().toLocaleLowerCase('ru')}`
   return cachedQuery(cacheKey, 10 * 60 * 1000, async () => {
-    const { count, error } = await client
-      .from('equipment')
-      .select('id', { count: 'exact', head: true })
-      .eq('brand', brand)
-      .eq('model', model)
+    // Считает база по тому же правилу, по которому правит модель серверная RPC:
+    // lower(btrim(brand/model)). Клиентский .eq по сырым строкам расходился с ней
+    // на записях с ведущими пробелами.
+    const { data, error } = await client.rpc('count_equipment_model_units', {
+      p_brand: brand,
+      p_model: model,
+    })
 
+    // ВРЕМЕННЫЙ фолбэк: пока миграция с count_equipment_model_units не применена,
+    // база отвечает «функции нет» — считаем по-старому, .eq по сырым строкам.
+    // Гейт строго по коду отсутствия функции. После применения миграции ветка
+    // мертва — удалить вместе с этим комментарием.
+    if (error && (error.code === 'PGRST202' || error.code === '42883')) {
+      const legacy = await client
+        .from('equipment')
+        .select('id', { count: 'exact', head: true })
+        .eq('brand', brand)
+        .eq('model', model)
+      if (legacy.error) throw legacy.error
+      return legacy.count ?? 0
+    }
     if (error) throw error
-    return count ?? 0
+    return data ?? 0
   })
 }
 
@@ -243,13 +308,32 @@ export type UpdateEquipmentInput = {
   description: string
   availability: string
   location: string
-  count: number
+  // Количество принадлежит количественному учёту: для серийной карточки поле не
+  // заполняется, и параметр не уезжает в базу вовсе.
+  count?: number
+  // Версия записи, на которой открыли карточку. Разошлась с базой — RPC отказывает
+  // кодом 40001. null (у записи нет updated_at) значит «сверить нечем».
+  updatedAt: string | null
 }
 
-export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput) {
+export type UpdateEquipmentResult = {
+  item: Equipment
+  // Сколько строк реально задел серверный update. null — ответ без счётчика, число называть нельзя.
+  updatedModelUnits: number | null
+}
+
+// Счётчик задетых строк из ответа update_equipment_model_and_unit. RPC возвращает
+// jsonb, то есть Json, — число подтверждаем проверками, а не приведением типа.
+function readUpdatedModelUnits(value: Json): number | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null
+  const reported = value.updated_model_units
+  return typeof reported === 'number' && Number.isFinite(reported) ? reported : null
+}
+
+export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput): Promise<UpdateEquipmentResult> {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
-  const { error } = await client.rpc('update_equipment_model_and_unit', {
+  const args = {
     p_equipment_id: input.id,
     p_brand: input.brand.trim(),
     p_model: input.model.trim(),
@@ -260,9 +344,18 @@ export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput) {
     p_description: input.description.trim(),
     p_availability: input.availability,
     p_location: input.location.trim(),
-    p_count: input.count,
-  })
+    p_expected_updated_at: input.updatedAt,
+  }
+  // Без count база оставляет его как есть. Раньше серийная карточка всегда
+  // отправляла 1 и на записи с другим количеством плодила фантомную строку
+  // «Изменено количество» в журнале движения при правке одного описания.
+  const { data: rpcResult, error } = await client.rpc(
+    'update_equipment_model_and_unit',
+    input.count === undefined ? args : { ...args, p_count: input.count },
+  )
   if (error) throw error
+
+  const updatedModelUnits = readUpdatedModelUnits(rpcResult)
 
   const { data, error: fetchError } = await client
     .from('equipment')
@@ -273,8 +366,9 @@ export async function updateEquipmentModelAndUnit(input: UpdateEquipmentInput) {
 
   invalidateCachePrefix('equipment:')
   invalidateCachePrefix('equipment-taxonomy')
-  invalidateCachePrefix('equipment-lists:composition:')
-  return normalizeEquipment(data)
+  // Состав сохранённых списков подписан данными модели — ключ принадлежит фиче списков.
+  invalidateListCompositionCache()
+  return { item: normalizeEquipment(data), updatedModelUnits }
 }
 
 export type EquipmentMovement = {

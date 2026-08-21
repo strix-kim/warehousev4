@@ -3,9 +3,7 @@ import {
   ChevronRight,
   CircleAlert,
   PackageOpen,
-  Pencil,
   Plus,
-  Save,
   Search,
   SlidersHorizontal,
   X,
@@ -13,62 +11,30 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
+import { EquipmentVisual, preloadEquipmentImages } from '../../components/EquipmentVisual'
 import {
-  countEquipmentModelUnits,
-  EQUIPMENT_PAGE_SIZE,
   fetchEquipment,
-  fetchEquipmentMovements,
+  MOBILE_EQUIPMENT_PAGE_SIZE,
+  preferredEquipmentPageSize,
   readCachedEquipment,
-  readCachedEquipmentMovements,
-  updateEquipmentModelAndUnit,
-  type EquipmentMovement,
 } from './api'
-import { EquipmentVisual, preloadEquipmentImages } from './EquipmentVisual'
+import { equipmentAvailabilityOptions, equipmentAvailabilityView } from './availability'
+import { EquipmentDrawer } from './EquipmentDrawer'
+import { equipmentCode, equipmentIdentifier } from './format'
 import type { Equipment } from './types'
+import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
-import { useModalLayer } from '../../lib/useModalLayer'
-
-const MOBILE_EQUIPMENT_PAGE_SIZE = 8
-
-function preferredPageSize() {
-  return window.matchMedia('(max-width: 820px)').matches
-    ? MOBILE_EQUIPMENT_PAGE_SIZE
-    : EQUIPMENT_PAGE_SIZE
-}
-
-function availabilityView(value: string, tr: (ru: string, uz: string) => string) {
-  const normalized = value.toLowerCase()
-  if (normalized === 'available' || normalized.includes('налич')) {
-    return { label: tr('В наличии', 'Mavjud'), tone: 'success' }
-  }
-  if (normalized === 'diagnostics' || normalized.includes('диагност')) return { label: tr('Диагностика', 'Diagnostika'), tone: 'warning' }
-  if (normalized === 'issued') return { label: tr('Выдано', 'Berilgan'), tone: 'danger' }
-  if (normalized === 'unavailable' || normalized.includes('не на складе')) return { label: tr('Нет на складе', 'Omborda yo‘q'), tone: 'neutral' }
-  return { label: value || tr('Не указано', 'Ko‘rsatilmagan'), tone: 'neutral' }
-}
-
-function equipmentCode(id: string) {
-  return `EQ-${id.slice(0, 6).toUpperCase()}`
-}
-
-function equipmentIdentifier(item: Equipment, tr: (ru: string, uz: string) => string) {
-  if (item.tracking_mode === 'quantity') return item.inventory_code || tr('Без серийного номера', 'Seriya raqamisiz')
-  return item.serialnumber || tr('Без серийного номера', 'Seriya raqamisiz')
-}
 
 export function EquipmentPage() {
   const navigate = useNavigate()
   const { tr, locale, language } = useLanguage()
   const availabilityOptions = [
     { value: '', label: tr('Все статусы', 'Barcha holatlar') },
-    { value: 'available', label: tr('В наличии', 'Mavjud') },
-    { value: 'unavailable', label: tr('Нет на складе', 'Omborda yo‘q') },
-    { value: 'diagnostics', label: tr('Диагностика', 'Diagnostika') },
-    { value: 'issued', label: tr('Выдано', 'Berilgan') },
+    ...equipmentAvailabilityOptions(tr),
   ]
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(preferredPageSize)
+  const [pageSize, setPageSize] = useState(preferredEquipmentPageSize)
   const [initialResult] = useState(() => readCachedEquipment({ page: 1, search: '', availability: '', pageSize }))
   const [rows, setRows] = useState<Equipment[]>(() => initialResult?.rows ?? [])
   const [total, setTotal] = useState(() => initialResult?.total ?? 0)
@@ -77,13 +43,21 @@ export function EquipmentPage() {
   const [availability, setAvailability] = useState('')
   const [selected, setSelected] = useState<Equipment | null>(null)
   const [isLoading, setIsLoading] = useState(() => !initialResult)
-  const [error, setError] = useState('')
+  // Только флаг: текст ошибки собирается на рендере. Строка в стейте потянула бы
+  // tr в зависимости эффекта загрузки, и смена языка перезагружала бы каталог.
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  // Номер страницы зажимается на рендере: каталог мог сократиться (удалили
+  // позиции, сузился фильтр), и page остался за пределами — без зажима выходила
+  // «Страница 3 из 1» с пустой таблицей. Зажатое значение и рисуется, и грузится.
+  const currentPage = Math.min(page, pageCount)
+
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 820px)')
+    const media = window.matchMedia(MOBILE_MEDIA_QUERY)
     const handleChange = () => {
-      setPageSize(preferredPageSize())
+      setPageSize(preferredEquipmentPageSize())
       setPage(1)
     }
     media.addEventListener('change', handleChange)
@@ -100,22 +74,22 @@ export function EquipmentPage() {
 
   useEffect(() => {
     let isCurrent = true
-    const cached = readCachedEquipment({ page, search, availability, pageSize })
+    const cached = readCachedEquipment({ page: currentPage, search, availability, pageSize })
     if (cached) {
       setRows(cached.rows)
       setTotal(cached.total)
       preloadEquipmentImages(cached.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 24)
     }
     setIsLoading(!cached)
-    setError('')
+    setHasLoadError(false)
 
-    fetchEquipment({ page, search, availability, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
+    fetchEquipment({ page: currentPage, search, availability, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
       .then((result) => {
         if (!isCurrent) return
         setRows(result.rows)
         setTotal(result.total)
         preloadEquipmentImages(result.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 24)
-        const nextPage = page + 1
+        const nextPage = currentPage + 1
         if (nextPage <= Math.ceil(result.total / pageSize)) {
           void fetchEquipment({ page: nextPage, search, availability, pageSize })
             .then((nextResult) => preloadEquipmentImages(nextResult.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 16))
@@ -123,7 +97,7 @@ export function EquipmentPage() {
         }
       })
       .catch(() => {
-        if (isCurrent && !cached) setError(tr('Не удалось загрузить оборудование. Повторите попытку.', 'Uskunalarni yuklab bo‘lmadi. Qayta urinib ko‘ring.'))
+        if (isCurrent && !cached) setHasLoadError(true)
       })
       .finally(() => {
         if (isCurrent) setIsLoading(false)
@@ -132,15 +106,14 @@ export function EquipmentPage() {
     return () => {
       isCurrent = false
     }
-  }, [availability, page, pageSize, reloadKey, search, tr])
+  }, [availability, currentPage, pageSize, reloadKey, search])
 
-  const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const range = useMemo(() => {
     if (!total) return '0'
-    const from = (page - 1) * pageSize + 1
-    const to = Math.min(page * pageSize, total)
+    const from = (currentPage - 1) * pageSize + 1
+    const to = Math.min(currentPage * pageSize, total)
     return `${from}–${to}`
-  }, [page, pageSize, total])
+  }, [currentPage, pageSize, total])
 
   return (
     <>
@@ -198,11 +171,11 @@ export function EquipmentPage() {
           />
         </div>
 
-        {error ? (
+        {hasLoadError ? (
           <div className="state-block state-block--error">
             <CircleAlert size={24} />
             <strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong>
-            <span>{error}</span>
+            <span>{tr('Не удалось загрузить оборудование. Повторите попытку.', 'Uskunalarni yuklab bo‘lmadi. Qayta urinib ko‘ring.')}</span>
             <button className="button button--secondary" onClick={() => setReloadKey((value) => value + 1)}>{tr('Повторить', 'Qayta urinish')}</button>
           </div>
         ) : (
@@ -226,7 +199,7 @@ export function EquipmentPage() {
                       </tr>
                     ))
                   : rows.map((item) => {
-                      const status = availabilityView(item.availability, tr)
+                      const status = equipmentAvailabilityView(item.availability, tr)
                       return (
                         <tr
                           key={item.id}
@@ -272,11 +245,11 @@ export function EquipmentPage() {
         <footer className="pagination">
           <span>{tr('Показано', 'Ko‘rsatildi')} {range} {tr('из', 'dan')} {total.toLocaleString(locale)}</span>
           <div className="pagination__controls">
-            <button className="icon-button icon-button--bordered" disabled={page <= 1 || isLoading} onClick={() => setPage((value) => value - 1)} aria-label={tr('Предыдущая страница', 'Oldingi sahifa')}>
+            <button className="icon-button icon-button--bordered" disabled={currentPage <= 1 || isLoading} onClick={() => setPage(currentPage - 1)} aria-label={tr('Предыдущая страница', 'Oldingi sahifa')}>
               <ChevronLeft size={18} />
             </button>
-            <span>{tr('Страница', 'Sahifa')} <strong>{page}</strong> {tr('из', 'dan')} {pageCount}</span>
-            <button className="icon-button icon-button--bordered" disabled={page >= pageCount || isLoading} onClick={() => setPage((value) => value + 1)} aria-label={tr('Следующая страница', 'Keyingi sahifa')}>
+            <span>{tr('Страница', 'Sahifa')} <strong>{currentPage}</strong> {tr('из', 'dan')} {pageCount}</span>
+            <button className="icon-button icon-button--bordered" disabled={currentPage >= pageCount || isLoading} onClick={() => setPage(currentPage + 1)} aria-label={tr('Следующая страница', 'Keyingi sahifa')}>
               <ChevronRight size={18} />
             </button>
           </div>
@@ -287,6 +260,12 @@ export function EquipmentPage() {
         <EquipmentDrawer
           item={selected}
           onClose={() => setSelected(null)}
+          onRefreshed={(fresh) => {
+            // Перечитанная карточка обновляет только саму запись и её строку в
+            // таблице: гонять весь каталог заново из-за открытия drawer'а незачем.
+            setSelected(fresh)
+            setRows((current) => current.map((row) => row.id === fresh.id ? fresh : row))
+          }}
           onUpdated={(updated) => {
             setSelected(updated)
             setRows((current) => current.map((row) => row.id === updated.id ? updated : row))
@@ -296,217 +275,4 @@ export function EquipmentPage() {
       )}
     </>
   )
-}
-
-function EquipmentDrawer({ item, onClose, onUpdated }: { item: Equipment; onClose: () => void; onUpdated: (item: Equipment) => void }) {
-  const { tr, locale, language } = useLanguage()
-  useModalLayer(onClose)
-  const status = availabilityView(item.availability, tr)
-  const [movements, setMovements] = useState<EquipmentMovement[]>(() => readCachedEquipmentMovements(item.id) ?? [])
-  const [historyError, setHistoryError] = useState('')
-  const [isEditing, setIsEditing] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [editError, setEditError] = useState('')
-  const [editSuccess, setEditSuccess] = useState('')
-  const [modelUnitCount, setModelUnitCount] = useState(1)
-  const [brand, setBrand] = useState(item.brand)
-  const [model, setModel] = useState(item.model)
-  const [type, setType] = useState(item.type)
-  const [subtype, setSubtype] = useState(item.subtype)
-  const [specification, setSpecification] = useState(item.technicalspecification ?? '')
-  const [length, setLength] = useState(item.lengthinmeters === 'N/A' ? '' : item.lengthinmeters ?? '')
-  const [description, setDescription] = useState(item.description ?? '')
-  const [availability, setAvailability] = useState(item.availability)
-  const [location, setLocation] = useState(item.location ?? '')
-  const [count, setCount] = useState(item.count)
-  const canSave = Boolean(brand.trim() && model.trim() && type.trim() && subtype.trim() && count >= 0)
-
-  useEffect(() => {
-    setBrand(item.brand)
-    setModel(item.model)
-    setType(item.type)
-    setSubtype(item.subtype)
-    setSpecification(item.technicalspecification ?? '')
-    setLength(item.lengthinmeters === 'N/A' ? '' : item.lengthinmeters ?? '')
-    setDescription(item.description ?? '')
-    setAvailability(item.availability)
-    setLocation(item.location ?? '')
-    setCount(item.count)
-  }, [item])
-
-  useEffect(() => {
-    let current = true
-    countEquipmentModelUnits(item.brand, item.model)
-      .then((value) => { if (current) setModelUnitCount(Math.max(1, value)) })
-      .catch(() => { if (current) setModelUnitCount(1) })
-    return () => { current = false }
-  }, [item.brand, item.model])
-
-  useEffect(() => {
-    let current = true
-    const cached = readCachedEquipmentMovements(item.id)
-    if (cached) {
-      setMovements(cached)
-      setHistoryError('')
-    } else {
-      setMovements([])
-    }
-    fetchEquipmentMovements(item.id, { bypassCache: Boolean(cached) })
-      .then((data) => {
-        if (!current) return
-        setMovements(data)
-        setHistoryError('')
-      })
-      .catch(() => {
-        if (current && !cached) setHistoryError(tr('История временно недоступна.', 'Tarix vaqtincha mavjud emas.'))
-      })
-    return () => { current = false }
-  }, [item.id, tr])
-
-  function cancelEditing() {
-    setBrand(item.brand)
-    setModel(item.model)
-    setType(item.type)
-    setSubtype(item.subtype)
-    setSpecification(item.technicalspecification ?? '')
-    setLength(item.lengthinmeters === 'N/A' ? '' : item.lengthinmeters ?? '')
-    setDescription(item.description ?? '')
-    setAvailability(item.availability)
-    setLocation(item.location ?? '')
-    setCount(item.count)
-    setEditError('')
-    setIsEditing(false)
-  }
-
-  async function saveChanges() {
-    if (!canSave) return
-    setIsSaving(true)
-    setEditError('')
-    setEditSuccess('')
-    try {
-      const updated = await updateEquipmentModelAndUnit({
-        id: item.id,
-        brand,
-        model,
-        type,
-        subtype,
-        technicalspecification: specification,
-        lengthinmeters: length,
-        description,
-        availability,
-        location,
-        count: item.tracking_mode === 'serialized' ? 1 : count,
-      })
-      onUpdated(updated)
-      setIsEditing(false)
-      setEditSuccess(tr(
-        `Изменения сохранены. Данные модели обновлены у ${modelUnitCount} единиц.`,
-        `O‘zgarishlar saqlandi. Model ma’lumotlari ${modelUnitCount} ta birlikda yangilandi.`,
-      ))
-    } catch {
-      setEditError(tr('Не удалось сохранить изменения. Данные не изменены.', 'O‘zgarishlarni saqlab bo‘lmadi. Ma’lumotlar o‘zgarmadi.'))
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  return (
-    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Карточка оборудования', 'Uskuna kartasi')} onMouseDown={onClose}>
-      <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="drawer__header">
-          <div>
-            <p className="eyebrow">{equipmentCode(item.id)}</p>
-            <h2>{item.brand} {item.model}</h2>
-          </div>
-          <div className="drawer__header-actions">
-            {!isEditing && <button className="button button--secondary" onClick={() => { setIsEditing(true); setEditSuccess('') }}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>}
-            <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
-          </div>
-        </div>
-        <span className={`badge badge--${status.tone}`}><i />{status.label}</span>
-        <EquipmentVisual item={isEditing ? { brand, model, type, subtype } : item} size="large" alt={`${brand} ${model}`} />
-        {editSuccess && <p className="form-success"><Save size={15} /> {editSuccess}</p>}
-        {isEditing ? (
-          <div className="equipment-edit-panel">
-            <section className="equipment-edit-section">
-              <div className="equipment-edit-section__heading">
-                <div><h3>{tr('Данные модели', 'Model ma’lumotlari')}</h3><p>{tr('Изменятся у всех экземпляров с тем же брендом и моделью.', 'Xuddi shu brend va modeldagi barcha nusxalarda o‘zgaradi.')}</p></div>
-                <span className="read-only-label">{modelUnitCount} {tr('единиц', 'birlik')}</span>
-              </div>
-              <div className="equipment-edit-grid">
-                <label className="field"><span>{tr('Бренд', 'Brend')} *</span><input value={brand} onChange={(event) => setBrand(event.target.value)} /></label>
-                <label className="field"><span>{tr('Модель', 'Model')} *</span><input value={model} onChange={(event) => setModel(event.target.value)} /></label>
-                <label className="field"><span>{tr('Категория', 'Toifa')} *</span><input value={type} onChange={(event) => setType(event.target.value)} /></label>
-                <label className="field"><span>{tr('Подкатегория', 'Quyi toifa')} *</span><input value={subtype} onChange={(event) => setSubtype(event.target.value)} /></label>
-                <label className="field"><span>{tr('Длина, м', 'Uzunlik, m')}</span><input value={length} onChange={(event) => setLength(event.target.value)} placeholder={tr('Только если применимо', 'Faqat tegishli bo‘lsa')} /></label>
-                <label className="field field--wide"><span>{tr('Технические характеристики', 'Texnik xususiyatlar')}</span><textarea value={specification} onChange={(event) => setSpecification(event.target.value)} rows={3} /></label>
-                <label className="field field--wide"><span>{tr('Описание', 'Tavsif')}</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} /></label>
-              </div>
-            </section>
-            <section className="equipment-edit-section">
-              <div className="equipment-edit-section__heading">
-                <div><h3>{tr('Конкретная единица', 'Muayyan birlik')}</h3><p>{tr('Статус и локация изменятся только у этой записи. Серийный номер останется прежним.', 'Holat va joylashuv faqat shu yozuvda o‘zgaradi. Seriya raqami o‘zgarmaydi.')}</p></div>
-              </div>
-              <div className="equipment-edit-grid">
-                <div className="field"><span>{tr('Статус', 'Holat')}</span><AppSelect value={availability} onChange={setAvailability} ariaLabel={tr('Статус оборудования', 'Uskuna holati')} options={[
-                  { value: 'available', label: tr('В наличии', 'Mavjud') },
-                  { value: 'unavailable', label: tr('Нет на складе', 'Omborda yo‘q') },
-                  { value: 'diagnostics', label: tr('Диагностика', 'Diagnostika') },
-                  { value: 'issued', label: tr('Выдано', 'Berilgan') },
-                ]} /></div>
-                <label className="field"><span>{tr('Локация', 'Joylashuv')}</span><input value={location} onChange={(event) => setLocation(event.target.value)} /></label>
-                <label className="field"><span>{item.tracking_mode === 'quantity' ? tr('Внутренний код', 'Ichki kod') : tr('Серийный номер', 'Seriya raqami')}</span><input value={equipmentIdentifier(item, tr)} readOnly /></label>
-                <label className="field"><span>{tr('Количество', 'Miqdor')}</span><input type="number" min="0" max="9999" value={item.tracking_mode === 'serialized' ? 1 : count} onChange={(event) => setCount(Number(event.target.value))} disabled={item.tracking_mode === 'serialized'} /></label>
-              </div>
-            </section>
-            {editError && <p className="form-error"><CircleAlert size={15} /> {editError}</p>}
-            <div className="equipment-edit-actions">
-              <button className="button button--secondary" type="button" onClick={cancelEditing} disabled={isSaving}>{tr('Отмена', 'Bekor qilish')}</button>
-              <button className="button button--primary" type="button" onClick={() => void saveChanges()} disabled={!canSave || isSaving}><Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить изменения', 'O‘zgarishlarni saqlash')}</button>
-            </div>
-          </div>
-        ) : <><dl className="detail-list">
-          <div><dt>{tr('Категория', 'Toifa')}</dt><dd>{translateEquipmentTaxonomy(item.type, language)}</dd></div>
-          <div><dt>{tr('Подкатегория', 'Quyi toifa')}</dt><dd>{translateEquipmentTaxonomy(item.subtype, language)}</dd></div>
-          <div><dt>{tr('Способ учёта', 'Hisob turi')}</dt><dd>{item.tracking_mode === 'quantity' ? tr('По количеству', 'Miqdor bo‘yicha') : tr('По серийному номеру', 'Seriya raqami bo‘yicha')}</dd></div>
-          <div><dt>{item.tracking_mode === 'quantity' ? tr('Внутренний код', 'Ichki kod') : tr('Серийный номер', 'Seriya raqami')}</dt><dd className="mono">{equipmentIdentifier(item, tr)}</dd></div>
-          <div><dt>{tr('Количество', 'Miqdor')}</dt><dd>{item.count} {tr('шт.', 'dona')}</dd></div>
-          <div><dt>{tr('Локация', 'Joylashuv')}</dt><dd>{item.location || '—'}</dd></div>
-          {item.lengthinmeters && item.lengthinmeters !== 'N/A' && <div><dt>{tr('Длина', 'Uzunlik')}</dt><dd>{item.lengthinmeters}</dd></div>}
-          <div className="detail-list__wide"><dt>{tr('Характеристики', 'Xususiyatlar')}</dt><dd>{item.technicalspecification || tr('Не указаны', 'Ko‘rsatilmagan')}</dd></div>
-          <div className="detail-list__wide"><dt>{tr('Описание', 'Tavsif')}</dt><dd>{item.description || tr('Нет описания', 'Tavsif yo‘q')}</dd></div>
-        </dl>
-        <section className="history-section">
-          <div className="panel-heading"><div><h3>{tr('История движения', 'Harakat tarixi')}</h3><p>{tr('Количество, статус, выдачи и возвраты', 'Miqdor, holat, berish va qaytarish')}</p></div></div>
-          <div className="timeline">
-            {movements.map((movement) => (
-              <div className="timeline__item" key={movement.id}>
-                <i />
-                <div>
-                  <strong>{movementLabel(movement, tr)}</strong>
-                  <span>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(movement.changed_at))}</span>
-                  {(movement.quantity_before !== movement.quantity_after) && <p>{movement.quantity_before ?? '—'} → {movement.quantity_after ?? '—'} {tr('шт.', 'dona')} ({movement.quantity_delta > 0 ? '+' : ''}{movement.quantity_delta})</p>}
-                  {movement.note && <p>{movement.note}</p>}
-                </div>
-              </div>
-            ))}
-            {!historyError && movements.length === 0 && <p className="muted">{tr('История пока пуста. После подключения журнала здесь появятся изменения количества, выдачи и возвраты.', 'Tarix hozircha bo‘sh. Jurnal ulangach, bu yerda miqdor o‘zgarishi, berish va qaytarishlar ko‘rinadi.')}</p>}
-            {historyError && <p className="form-error">{historyError}</p>}
-          </div>
-        </section></>}
-      </aside>
-    </div>
-  )
-}
-
-function movementLabel(movement: EquipmentMovement, tr: (ru: string, uz: string) => string) {
-  switch (movement.movement_type) {
-    case 'created': return tr('Добавлено на склад', 'Omborga qo‘shildi')
-    case 'issued': return tr('Выдано по списку', 'Ro‘yxat bo‘yicha berildi')
-    case 'returned': return tr('Возвращено на склад', 'Omborga qaytarildi')
-    case 'status_normalized': return tr('Старый статус нормализован', 'Eski holat me’yorlashtirildi')
-    case 'quantity_changed': return tr('Изменено количество', 'Miqdor o‘zgartirildi')
-    case 'status_changed': return tr('Изменён статус', 'Holat o‘zgartirildi')
-    case 'quantity_and_status_changed': return tr('Изменены количество и статус', 'Miqdor va holat o‘zgartirildi')
-  }
 }

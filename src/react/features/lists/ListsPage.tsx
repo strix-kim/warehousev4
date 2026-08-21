@@ -16,32 +16,58 @@ import {
   TriangleAlert,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
+import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
-import { cachedQuery, readCachedQuery } from '../../lib/persistentCache'
 import { useModalLayer } from '../../lib/useModalLayer'
-import { fetchEquipmentByIds } from '../equipment/api'
 import {
+  buildSavedListComposition,
   deleteEquipmentList,
-  fetchEquipmentList,
   fetchEquipmentLists,
   fetchReservationHistory,
   fetchReservationShortages,
+  prefetchSavedListDetails,
+  preferredListsPageSize,
   readCachedReservationHistory,
   readCachedReservationShortages,
   readCachedEquipmentLists,
+  readCachedSavedListComposition,
   transitionEquipmentList,
   type EquipmentList,
   type ReservationHistory,
   type ReservationShortage,
   type ReservationStatus,
+  type SavedListComposition,
 } from './api'
 import { useLanguage } from '../../lib/i18n'
-import { downloadEquipmentListXlsx, type ExportListRow } from './xlsxExport'
+import { downloadEquipmentListXlsx } from './xlsxExport'
 
 type Tr = (ru: string, uz: string) => string
+
+// Причина отказа в деталях списка. Код, а не готовая строка: строка потянула бы
+// tr в зависимости эффекта загрузки, и смена языка перезапрашивала бы состав,
+// историю и дефицит.
+type DrawerErrorCode = '' | 'composition' | 'issue-shortage' | 'transition' | 'delete'
+
+const emptyComposition: SavedListComposition = { rows: [], missingUnits: 0 }
+
+function getDrawerErrorMessage(code: DrawerErrorCode, tr: Tr) {
+  switch (code) {
+    case 'composition': return tr(
+      'Не удалось загрузить состав списка. Закройте детали и попробуйте открыть их ещё раз.',
+      'Ro‘yxat tarkibini yuklab bo‘lmadi. Tafsilotlarni yoping va yana ochib ko‘ring.',
+    )
+    case 'issue-shortage': return tr(
+      'Фактического оборудования уже недостаточно для выдачи. Резерв сохранён — скорректируйте комплект или остаток.',
+      'Berish uchun haqiqiy uskuna yetarli emas. Bandlov saqlandi — jamlanma yoki qoldiqni tuzating.',
+    )
+    case 'transition': return tr('Не удалось изменить этап. Данные не были изменены.', 'Bosqichni o‘zgartirib bo‘lmadi. Ma’lumotlar o‘zgartirilmadi.')
+    case 'delete': return tr('Не удалось удалить список. Попробуйте ещё раз.', 'Ro‘yxatni o‘chirib bo‘lmadi. Qayta urinib ko‘ring.')
+    default: return ''
+  }
+}
 
 function getStatusView(tr: Tr): Record<ReservationStatus, { label: string; tone: string }> {
   return {
@@ -60,135 +86,101 @@ function getTransitionCopy(tr: Tr): Partial<Record<ReservationStatus, { target: 
   }
 }
 
-function preferredPageSize() {
-  return window.matchMedia('(max-width: 820px)').matches ? 6 : 12
-}
-
+// equipment_ids и equipment_items не пересекаются: RPC кладёт серийные позиции в первый
+// массив, все остальные — во второй. Поэтому размер списка — их сумма при любом list_mode.
 function listSize(list: EquipmentList) {
   const quantity = list.equipment_items?.reduce((sum, item) => sum + (Number(item.count) || 0), 0) ?? 0
-  return list.list_mode === 'abstract'
-    ? quantity
-    : (list.equipment_ids?.length ?? 0) + quantity
+  return (list.equipment_ids?.length ?? 0) + quantity
 }
 
 function formatDate(value: string | null, locale: string, tr: Tr) {
   return value ? new Intl.DateTimeFormat(locale).format(new Date(`${value}T12:00:00`)) : tr('дата не указана', 'sana ko‘rsatilmagan')
 }
 
-function savedListRowsCacheKey(listId: string) {
-  return `equipment-lists:composition:${listId}`
-}
-
-function readCachedSavedListRows(listId: string) {
-  return readCachedQuery<ExportListRow[]>(savedListRowsCacheKey(listId))
-}
-
-async function loadSavedListRows(list: EquipmentList) {
-  const serialized = await fetchEquipmentByIds(list.equipment_ids ?? [])
-  const grouped = new Map<string, ExportListRow>()
-  const addRow = (row: ExportListRow) => {
-    const key = `${row.category}::${row.equipment}::${row.subtype}`.toLocaleLowerCase('ru')
-    const current = grouped.get(key)
-    if (current) {
-      current.count += row.count
-      current.serialNumbers.push(...row.serialNumbers)
-    } else grouped.set(key, { ...row, serialNumbers: [...row.serialNumbers] })
-  }
-  for (const item of serialized) addRow({
-    category: item.type,
-    equipment: `${item.brand} ${item.model}`.trim(),
-    subtype: item.subtype,
-    count: 1,
-    serialNumbers: item.serialnumber ? [item.serialnumber] : [],
-  })
-  for (const item of list.equipment_items ?? []) addRow({
-    category: item.type,
-    equipment: `${item.brand} ${item.model}`.trim(),
-    subtype: item.subtype,
-    count: item.count,
-    serialNumbers: [],
-  })
-  return [...grouped.values()]
-}
-
-function buildSavedListRows(list: EquipmentList, { bypassCache = false } = {}) {
-  return cachedQuery(savedListRowsCacheKey(list.id), 10 * 60 * 1000, () => loadSavedListRows(list), { bypass: bypassCache })
-}
-
-function prefetchSavedListDetails(list: EquipmentList) {
-  return Promise.allSettled([
-    buildSavedListRows(list),
-    fetchEquipmentList(list.id),
-    list.advanced_features ? fetchReservationHistory(list.id) : Promise.resolve([]),
-    list.advanced_features && list.reservation_start && list.reservation_end ? fetchReservationShortages(list.id) : Promise.resolve([]),
-  ])
-}
-
 export function ListsPage() {
   const navigate = useNavigate()
   const { tr, locale, language } = useLanguage()
   const statusView = getStatusView(tr)
-  const [initialResult] = useState(readCachedEquipmentLists)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(preferredListsPageSize)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState<'all' | ReservationStatus>('all')
+  const [initialResult] = useState(() => readCachedEquipmentLists({ page: 1, search: '', status: 'all', pageSize }))
   const [rows, setRows] = useState<EquipmentList[]>(() => initialResult?.rows ?? [])
   const [total, setTotal] = useState(() => initialResult?.total ?? 0)
   const [isLoading, setIsLoading] = useState(() => !initialResult)
-  const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState<'all' | ReservationStatus>('all')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(preferredPageSize)
+  // Только флаг: текст ошибки собирается на рендере. Строка в стейте потянула бы
+  // tr в зависимости эффекта загрузки, и смена языка перезапрашивала бы списки.
+  const [hasLoadError, setHasLoadError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [selected, setSelected] = useState<EquipmentList | null>(null)
   const [exporting, setExporting] = useState<{ id: string; mode: 'working' | 'approval' } | null>(null)
   const [exportError, setExportError] = useState('')
 
-  async function loadLists(bypassCache = false) {
-    const cached = readCachedEquipmentLists()
-    if (cached && !bypassCache) {
-      setRows(cached.rows)
-      setTotal(cached.total)
-    }
-    setIsLoading(!cached && rows.length === 0)
-    setError('')
-    try {
-      const result = await fetchEquipmentLists({ bypassCache: bypassCache || Boolean(cached) })
-      setRows(result.rows)
-      setTotal(result.total)
-      if (selected) setSelected(result.rows.find((item) => item.id === selected.id) ?? null)
-    } catch {
-      if (!cached && rows.length === 0) setError(tr('Не удалось загрузить сохранённые списки.', 'Saqlangan ro‘yxatlarni yuklab bo‘lmadi.'))
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  // Поиск и фильтр теперь считает база, поэтому total — это счётчик ТЕКУЩЕЙ
+  // выборки: без фильтров «всего», с фильтрами «найдено».
+  const isFiltered = Boolean(search) || status !== 'all'
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  // Номер страницы зажимается на рендере: удалили единственный список второй
+  // страницы — pageCount стал 1, а page остался 2, и панель показывала
+  // «Страница 2 из 1» без единой карточки. Зажатое значение и рисуется, и грузится.
+  const currentPage = Math.min(page, pageCount)
+  const visibleListIds = rows.map((list) => list.id).join(':')
 
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 820px)')
+    const media = window.matchMedia(MOBILE_MEDIA_QUERY)
     const handleChange = () => {
-      setPageSize(preferredPageSize())
+      setPageSize(preferredListsPageSize())
       setPage(1)
     }
     media.addEventListener('change', handleChange)
     return () => media.removeEventListener('change', handleChange)
   }, [])
 
-  useEffect(() => { void loadLists() }, [])
+  // Запрос уходит не на каждую букву: пауза 300 мс, и любая смена запроса
+  // возвращает на первую страницу — иначе «страница 3» осталась бы за пределами
+  // новой выборки.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      // Тримим здесь же: api всё равно обрежет строку перед ключом кэша, а
+      // пробел, набранный в поле, иначе включал бы подпись «Найдено списков».
+      setSearch(searchInput.trim())
+      setPage(1)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [searchInput])
 
-  const filteredRows = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase('ru')
-    return rows.filter((list) => {
-      const matchesSearch = !query || `${list.name} ${list.description ?? ''}`.toLocaleLowerCase('ru').includes(query)
-      return matchesSearch && (status === 'all' || list.reservation_status === status)
-    })
-  }, [rows, search, status])
-  const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize))
-  const visibleRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
-  const visibleListIds = visibleRows.map((list) => list.id).join(':')
+  useEffect(() => setPage(1), [status])
 
-  useEffect(() => setPage(1), [search, status])
+  useEffect(() => {
+    let isCurrent = true
+    const cached = readCachedEquipmentLists({ page: currentPage, search, status, pageSize })
+    if (cached) {
+      setRows(cached.rows)
+      setTotal(cached.total)
+    }
+    setIsLoading(!cached)
+    setHasLoadError(false)
+
+    fetchEquipmentLists({ page: currentPage, search, status, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
+      .then((result) => {
+        if (!isCurrent) return
+        setRows(result.rows)
+        setTotal(result.total)
+        // Открытые детали переезжают на свежую строку: смена этапа и удаление
+        // возвращаются сюда через reloadKey.
+        setSelected((current) => current ? result.rows.find((item) => item.id === current.id) ?? null : null)
+      })
+      .catch(() => { if (isCurrent && !cached) setHasLoadError(true) })
+      .finally(() => { if (isCurrent) setIsLoading(false) })
+
+    return () => { isCurrent = false }
+  }, [currentPage, pageSize, reloadKey, search, status])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      visibleRows.slice(0, 6).forEach((list) => { void prefetchSavedListDetails(list) })
+      rows.slice(0, 6).forEach((list) => { void prefetchSavedListDetails(list) })
     }, 500)
     return () => window.clearTimeout(timer)
   }, [visibleListIds])
@@ -197,7 +189,7 @@ export function ListsPage() {
     setExporting({ id: list.id, mode: documentMode })
     setExportError('')
     try {
-      const rows = await buildSavedListRows(list)
+      const composition = await buildSavedListComposition(list)
       downloadEquipmentListXlsx({
         name: list.name,
         clientName: list.client_name ?? '',
@@ -207,7 +199,7 @@ export function ListsPage() {
         locale,
         language,
         documentMode,
-        rows,
+        rows: composition.rows,
       })
     } catch {
       setExportError(tr('Не удалось подготовить Excel для сохранённого списка.', 'Saqlangan ro‘yxat uchun Excelni tayyorlab bo‘lmadi.'))
@@ -230,20 +222,20 @@ export function ListsPage() {
       </header>
 
       <section className="metric-strip">
-        <div className="metric"><span className="metric__label">{tr('Всего списков', 'Jami ro‘yxatlar')}</span><strong>{total}</strong></div>
+        <div className="metric"><span className="metric__label">{isFiltered ? tr('Найдено списков', 'Topilgan ro‘yxatlar') : tr('Всего списков', 'Jami ro‘yxatlar')}</span><strong>{total}</strong></div>
         <div className="metric metric--notice"><CircleAlert size={17} /><span>{tr('Excel скачивается без сохранения; нехватка остаётся предупреждением и не блокирует работу', 'Excel saqlamasdan yuklanadi; yetishmovchilik ogohlantirish bo‘lib qoladi va ishni to‘xtatmaydi')}</span></div>
       </section>
 
       <section className="data-panel">
         <div className="panel-heading">
-          <div><h2>{tr('Сохранённые списки', 'Saqlangan ro‘yxatlar')}</h2><p>{tr('Необязательный архив: до 50 последних списков из базы.', 'Ixtiyoriy arxiv: bazadagi so‘nggi 50 tagacha ro‘yxat.')}</p></div>
+          <div><h2>{tr('Сохранённые списки', 'Saqlangan ro‘yxatlar')}</h2><p>{tr('Необязательный архив: поиск, фильтр и страницы считает база — по всему архиву.', 'Ixtiyoriy arxiv: qidiruv, filtr va sahifalarni baza hisoblaydi — butun arxiv bo‘yicha.')}</p></div>
           <span className="read-only-label">{tr('Расширенный учёт', 'Kengaytirilgan hisob')}</span>
         </div>
 
         <div className="toolbar">
           <label className="search-field">
             <Search size={18} />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tr('Название или описание…', 'Nomi yoki tavsifi…')} aria-label={tr('Поиск списков', 'Ro‘yxatlarni qidirish')} />
+            <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder={tr('Название списка…', 'Ro‘yxat nomi…')} aria-label={tr('Поиск списков', 'Ro‘yxatlarni qidirish')} />
           </label>
           <AppSelect
             value={status}
@@ -262,16 +254,16 @@ export function ListsPage() {
 
         {exportError && <p className="form-error list-export-error"><CircleAlert size={14} /> {exportError}</p>}
 
-        {error ? (
-          <div className="state-block state-block--error"><CircleAlert size={25} /><strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong><span>{error}</span><button className="button button--secondary" onClick={() => void loadLists(true)}>{tr('Повторить', 'Qayta urinish')}</button></div>
+        {hasLoadError ? (
+          <div className="state-block state-block--error"><CircleAlert size={25} /><strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong><span>{tr('Не удалось загрузить сохранённые списки.', 'Saqlangan ro‘yxatlarni yuklab bo‘lmadi.')}</span><button className="button button--secondary" onClick={() => setReloadKey((current) => current + 1)}>{tr('Повторить', 'Qayta urinish')}</button></div>
         ) : (
           <div className="list-grid">
             {isLoading && rows.length === 0
               ? Array.from({ length: 6 }, (_, index) => <div className="list-card list-card--loading" key={index} />)
-              : visibleRows.map((list, index) => {
+              : rows.map((list, index) => {
                   const lifecycle = list.advanced_features ? statusView[list.reservation_status] : { label: tr('Сохранён', 'Saqlangan'), tone: 'neutral' }
                   const isExporting = exporting?.id === list.id
-                  const listNumber = (page - 1) * pageSize + index + 1
+                  const listNumber = (currentPage - 1) * pageSize + index + 1
                   return (
                     <article
                       className="list-card"
@@ -291,7 +283,8 @@ export function ListsPage() {
                       <div className="reservation-window"><CalendarRange size={15} /><span>{formatDate(list.reservation_start, locale, tr)} — {formatDate(list.reservation_end, locale, tr)}</span></div>
                       <div className="list-card__meta">
                         <span><strong>{listSize(list)}</strong> {tr('единиц', 'birlik')}</span>
-                        <span>{new Intl.DateTimeFormat(locale).format(new Date(list.created_at))}</span>
+                        {/* created_at в схеме nullable; поведение прежнее: пустое значение даёт эпоху */}
+                        <span>{new Intl.DateTimeFormat(locale).format(new Date(list.created_at ?? 0))}</span>
                       </div>
                       <div className="list-card__actions">
                         <button className="button button--secondary list-card__details" onClick={() => setSelected(list)}><Clock3 size={16} /> {tr('Открыть детали списка', 'Ro‘yxat tafsilotlarini ochish')}</button>
@@ -303,8 +296,8 @@ export function ListsPage() {
                 })}
           </div>
         )}
-        {!isLoading && !error && filteredRows.length === 0 && (
-          total === 0 && !search && status === 'all' ? (
+        {!isLoading && !hasLoadError && rows.length === 0 && (
+          total === 0 && !isFiltered ? (
             <div className="state-block state-block--illustrated state-block--roomy">
               <img src="/illustrations/equipment-kit.webp" alt="" aria-hidden="true" />
               <strong>{tr('Сохранённых списков пока нет', 'Saqlangan ro‘yxatlar hozircha yo‘q')}</strong>
@@ -315,24 +308,24 @@ export function ListsPage() {
             <div className="state-block"><Search size={25} /><strong>{tr('Списки не найдены', 'Ro‘yxatlar topilmadi')}</strong><span>{tr('Измените запрос или фильтр.', 'So‘rov yoki filtrni o‘zgartiring.')}</span></div>
           )
         )}
-        {!isLoading && !error && filteredRows.length > 0 && (
+        {!isLoading && !hasLoadError && rows.length > 0 && (
           <footer className="pagination">
-            <span>{tr('Показано', 'Ko‘rsatildi')} {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredRows.length)} {tr('из', 'dan')} {filteredRows.length}</span>
+            <span>{tr('Показано', 'Ko‘rsatildi')} {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, total)} {tr('из', 'dan')} {total}</span>
             <div className="pagination__controls">
-              <button className="icon-button icon-button--bordered" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} aria-label={tr('Предыдущая страница списков', 'Ro‘yxatlarning oldingi sahifasi')}><ChevronLeft size={18} /></button>
-              <span>{tr('Страница', 'Sahifa')} <strong>{page}</strong> {tr('из', 'dan')} {pageCount}</span>
-              <button className="icon-button icon-button--bordered" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)} aria-label={tr('Следующая страница списков', 'Ro‘yxatlarning keyingi sahifasi')}><ChevronRight size={18} /></button>
+              <button className="icon-button icon-button--bordered" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)} aria-label={tr('Предыдущая страница списков', 'Ro‘yxatlarning oldingi sahifasi')}><ChevronLeft size={18} /></button>
+              <span>{tr('Страница', 'Sahifa')} <strong>{currentPage}</strong> {tr('из', 'dan')} {pageCount}</span>
+              <button className="icon-button icon-button--bordered" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)} aria-label={tr('Следующая страница списков', 'Ro‘yxatlarning keyingi sahifasi')}><ChevronRight size={18} /></button>
             </div>
           </footer>
         )}
       </section>
 
-      {selected && <ReservationDrawer list={selected} onClose={() => setSelected(null)} onChanged={() => loadLists(true)} />}
+      {selected && <ReservationDrawer list={selected} onClose={() => setSelected(null)} onChanged={() => setReloadKey((current) => current + 1)} />}
     </>
   )
 }
 
-function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; onClose: () => void; onChanged: () => Promise<void> }) {
+function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; onClose: () => void; onChanged: () => void }) {
   const navigate = useNavigate()
   const { tr, locale, language } = useLanguage()
   useModalLayer(onClose)
@@ -340,9 +333,9 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   const transitionCopy = getTransitionCopy(tr)
   const [shortages, setShortages] = useState<ReservationShortage[]>(() => readCachedReservationShortages(list.id) ?? [])
   const [history, setHistory] = useState<ReservationHistory[]>(() => readCachedReservationHistory(list.id) ?? [])
-  const [composition, setComposition] = useState<ExportListRow[]>(() => readCachedSavedListRows(list.id) ?? [])
+  const [composition, setComposition] = useState<SavedListComposition>(() => readCachedSavedListComposition(list.id) ?? emptyComposition)
   const [note, setNote] = useState('')
-  const [isLoading, setIsLoading] = useState(() => readCachedSavedListRows(list.id) === null)
+  const [isLoading, setIsLoading] = useState(() => readCachedSavedListComposition(list.id) === null)
   const [isTrackingLoading, setIsTrackingLoading] = useState(() => {
     if (!list.advanced_features) return false
     const hasHistory = readCachedReservationHistory(list.id) !== null
@@ -352,15 +345,15 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [error, setError] = useState('')
-  const [trackingWarning, setTrackingWarning] = useState('')
+  const [error, setError] = useState<DrawerErrorCode>('')
+  const [hasTrackingWarning, setHasTrackingWarning] = useState(false)
   const action = list.advanced_features ? transitionCopy[list.reservation_status] : undefined
   const lifecycle = statusView[list.reservation_status]
   const cannotIssuePlan = list.reservation_status === 'confirmed' && list.list_mode === 'abstract'
   const missingLegacyDates = list.reservation_status === 'draft' && (!list.reservation_start || !list.reservation_end)
 
   async function loadDetails() {
-    const cachedComposition = readCachedSavedListRows(list.id)
+    const cachedComposition = readCachedSavedListComposition(list.id)
     const cachedHistory = list.advanced_features ? readCachedReservationHistory(list.id) : []
     const needsShortages = Boolean(list.advanced_features && list.reservation_start && list.reservation_end)
     const cachedShortages = needsShortages ? readCachedReservationShortages(list.id) : []
@@ -370,20 +363,17 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
     setIsLoading(cachedComposition === null)
     setIsTrackingLoading(cachedHistory === null || cachedShortages === null)
     setError('')
-    setTrackingWarning('')
+    setHasTrackingWarning(false)
     const trackingRequest = Promise.allSettled([
       list.advanced_features ? fetchReservationHistory(list.id, { bypassCache: cachedHistory !== null }) : Promise.resolve([]),
       needsShortages ? fetchReservationShortages(list.id, { bypassCache: cachedShortages !== null }) : Promise.resolve([]),
     ])
 
     try {
-      setComposition(await buildSavedListRows(list, { bypassCache: cachedComposition !== null }))
+      setComposition(await buildSavedListComposition(list, { bypassCache: cachedComposition !== null }))
     } catch {
-      if (cachedComposition === null) setComposition([])
-      setError(tr(
-        'Не удалось загрузить состав списка. Закройте детали и попробуйте открыть их ещё раз.',
-        'Ro‘yxat tarkibini yuklab bo‘lmadi. Tafsilotlarni yoping va yana ochib ko‘ring.',
-      ))
+      if (cachedComposition === null) setComposition(emptyComposition)
+      setError('composition')
     } finally {
       setIsLoading(false)
     }
@@ -397,16 +387,13 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
     else setShortages([])
 
     if (historyResult.status === 'rejected' || shortagesResult.status === 'rejected') {
-      setTrackingWarning(tr(
-        'Дополнительный складской учёт временно не обновился. Состав списка и Excel доступны как обычно.',
-        'Qo‘shimcha ombor hisobi vaqtincha yangilanmadi. Ro‘yxat tarkibi va Excel odatdagidek mavjud.',
-      ))
+      setHasTrackingWarning(true)
     }
 
     setIsTrackingLoading(false)
   }
 
-  useEffect(() => { void loadDetails() }, [list.id, list.reservation_status, tr])
+  useEffect(() => { void loadDetails() }, [list.id, list.reservation_status])
 
   async function runTransition() {
     if (!action || cannotIssuePlan || missingLegacyDates) return
@@ -414,12 +401,10 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
     setError('')
     try {
       await transitionEquipmentList(list.id, action.target, note)
-      await onChanged()
+      onChanged()
     } catch (transitionError) {
       const message = transitionError instanceof Error ? transitionError.message : ''
-      setError(message.includes('physically available') || message.includes('shortage')
-        ? tr('Фактического оборудования уже недостаточно для выдачи. Резерв сохранён — скорректируйте комплект или остаток.', 'Berish uchun haqiqiy uskuna yetarli emas. Bandlov saqlandi — jamlanma yoki qoldiqni tuzating.')
-        : tr('Не удалось изменить этап. Данные не были изменены.', 'Bosqichni o‘zgartirib bo‘lmadi. Ma’lumotlar o‘zgartirilmadi.'))
+      setError(message.includes('physically available') || message.includes('shortage') ? 'issue-shortage' : 'transition')
     } finally {
       setIsTransitioning(false)
     }
@@ -430,13 +415,10 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
     setError('')
     try {
       await deleteEquipmentList(list.id)
-      await onChanged()
+      onChanged()
       onClose()
     } catch {
-      setError(tr(
-        'Не удалось удалить список. Попробуйте ещё раз.',
-        'Ro‘yxatni o‘chirib bo‘lmadi. Qayta urinib ko‘ring.',
-      ))
+      setError('delete')
     } finally {
       setIsDeleting(false)
     }
@@ -460,8 +442,17 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
         <div className="reservation-drawer__body">
           <section className="saved-list-contents">
             <div className="saved-list-contents__heading"><div><h3>{tr('Оборудование в списке', 'Ro‘yxatdagi uskunalar')}</h3><p>{tr('Полный сохранённый состав документа', 'Hujjatning to‘liq saqlangan tarkibi')}</p></div><strong>{listSize(list)}</strong></div>
-            {isLoading ? <div className="detail-skeleton" /> : composition.length > 0 ? (
-              <div className="saved-list-items">{composition.map((item, index) => (
+            {/* Счётчик в шапке считает по equipment_ids, состав — по строкам склада.
+                Расхождение объясняем прямо здесь, иначе «12 единиц» над 11 строками
+                выглядит ошибкой интерфейса. */}
+            {composition.missingUnits > 0 && (
+              <p className="availability-warning"><CircleAlert size={16} />{tr(
+                `${composition.missingUnits} единиц из состава не найдены на складе — возможно, удалены`,
+                `Tarkibdagi ${composition.missingUnits} birlik omborda topilmadi — o‘chirilgan bo‘lishi mumkin`,
+              )}</p>
+            )}
+            {isLoading ? <div className="detail-skeleton" /> : composition.rows.length > 0 ? (
+              <div className="saved-list-items">{composition.rows.map((item, index) => (
                 <div className="saved-list-item" key={`${item.category}-${item.equipment}-${item.subtype}`}>
                   <span className="equipment-row-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                   <span className="saved-list-item__copy"><strong>{item.equipment}</strong><small>{translateEquipmentTaxonomy(item.category, language)} · {translateEquipmentTaxonomy(item.subtype, language)}{item.serialNumbers.length > 0 ? ` · S/N ${item.serialNumbers.join(', ')}` : ''}</small></span>
@@ -470,7 +461,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
               ))}</div>
             ) : <p className="muted">{tr('В этом списке нет оборудования.', 'Bu ro‘yxatda uskuna yo‘q.')}</p>}
           </section>
-          {error && <p className="form-error"><CircleAlert size={15} /> {error}</p>}
+          {error && <p className="form-error"><CircleAlert size={15} /> {getDrawerErrorMessage(error, tr)}</p>}
         </div>
 
         <div className="reservation-drawer__footer">
@@ -486,7 +477,10 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
             <div className="tracking-details__body">
               <div className="optional-tracking-note"><CircleAlert size={18} /><span><strong>{tr('Что это такое', 'Bu nima')}</strong><small>{tr('Здесь можно подтвердить комплект, отметить его выдачу и возврат. Для обычного списка и скачивания Excel этот раздел не нужен.', 'Bu yerda jamlanmani tasdiqlash, berish va qaytarishni belgilash mumkin. Oddiy ro‘yxat va Excel yuklash uchun bu bo‘lim kerak emas.')}</small></span></div>
 
-              {trackingWarning && <p className="availability-warning"><CircleAlert size={16} />{trackingWarning}</p>}
+              {hasTrackingWarning && <p className="availability-warning"><CircleAlert size={16} />{tr(
+                'Дополнительный складской учёт временно не обновился. Состав списка и Excel доступны как обычно.',
+                'Qo‘shimcha ombor hisobi vaqtincha yangilanmadi. Ro‘yxat tarkibi va Excel odatdagidek mavjud.',
+              )}</p>}
 
               {isTrackingLoading ? <div className="detail-skeleton" /> : shortages.length > 0 ? (
                 <section className="shortage-panel">

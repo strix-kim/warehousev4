@@ -12,93 +12,77 @@ import {
   Minus,
   Plus,
   Save,
-  Search,
   Trash2,
-  X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AppDatePicker } from '../../components/AppDatePicker'
 import { AppSelect } from '../../components/AppSelect'
+import { preloadEquipmentImages } from '../../components/EquipmentVisual'
+import { todayDateValue } from '../../lib/date'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
-import { useModalLayer } from '../../lib/useModalLayer'
 import { fetchAllEquipment, readCachedAllEquipment } from '../equipment/api'
-import { EquipmentVisual, preloadEquipmentImages } from '../equipment/EquipmentVisual'
 import type { Equipment } from '../equipment/types'
-import { createEquipmentList, fetchEquipmentList, readCachedEquipmentList, updateEquipmentList, type EquipmentList, type EquipmentListItem } from './api'
+import {
+  clearListDraft,
+  createEquipmentList,
+  fetchEquipmentList,
+  readCachedEquipmentList,
+  readListDraft,
+  updateEquipmentList,
+  type EquipmentList,
+  type EquipmentListItem,
+} from './api'
+import { buildCatalogGroups, groupKey, type CatalogGroup } from './catalogGroups'
+import { listDocumentDefaults } from './documentDefaults'
+import { CatalogPanel, CatalogPreviewDrawer } from './ListEditorCatalog'
+import { useListDraftAutosave } from './useListDraftAutosave'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
-type CatalogGroup = {
-  key: string
-  brand: string
-  model: string
-  type: string
-  subtype: string
-  allItems: Equipment[]
-  serializedItems: Equipment[]
-  quantityItems: Equipment[]
-  quantityAvailable: number
-  availableCount: number
-  totalCount: number
-}
+// Подпись позиции — минимальный снимок группы. Нужен ровно в одном случае:
+// группы больше нет в свежем каталоге, и строку нечем было бы нарисовать.
+type SelectionLabel = Pick<CatalogGroup, 'brand' | 'model' | 'type' | 'subtype'>
 
+// Выборка хранит КЛЮЧ группы, а не саму группу: сам объект берётся из актуальной
+// Map на рендере. Иначе остатки, серийники и payload считались бы по каталогу
+// на момент клика — обновление склада до выборки не доезжало.
 type SelectedGroup = {
-  group: CatalogGroup
+  key: string
+  label: SelectionLabel
   count: number
   serialIds: string[]
   serialPickerOpen: boolean
 }
 
-const listDefaults = {
-  ru: {
-    name: 'Техническое обеспечение мероприятия',
-    clientName: 'Заказчик не указан',
-    venue: 'Площадка мероприятия',
-  },
-  uz: {
-    name: 'Tadbirni texnik ta’minlash',
-    clientName: 'Buyurtmachi ko‘rsatilmagan',
-    venue: 'Tadbir maydoni',
-  },
-} as const
-
-function todayDateValue() {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+// Причина отказа при открытии сохранённого списка. Держим кодом, а не готовой
+// строкой: строка потянула бы tr в зависимости эффекта, и смена языка
+// перезапрашивала бы список из базы.
+type OpenErrorCode = '' | 'not-draft' | 'failed'
 
 function selectDefaultInputValue(input: HTMLInputElement, defaultValue: string) {
   if (input.value === defaultValue) input.select()
 }
 
-function groupKey(item: Pick<Equipment, 'brand' | 'model' | 'type' | 'subtype'>) {
-  return [item.brand, item.model, item.type, item.subtype].map((value) => value.trim().toLocaleLowerCase('ru')).join('::')
-}
-
-function isAvailable(item: Equipment) {
-  const status = item.availability.toLocaleLowerCase('ru')
-  if (status.startsWith('не ') || status.includes('диагност') || status === 'issued' || status === 'unavailable') return false
-  return status === 'available' || status.startsWith('в н')
+function selectionLabel(group: CatalogGroup): SelectionLabel {
+  return { brand: group.brand, model: group.model, type: group.type, subtype: group.subtype }
 }
 
 export function ListEditorPage() {
   const navigate = useNavigate()
   const { listId } = useParams<{ listId: string }>()
   const { tr, language, locale } = useLanguage()
-  const defaults = listDefaults[language]
-  const [name, setName] = useState<string>(() => listDefaults[language].name)
-  const [clientName, setClientName] = useState<string>(() => listDefaults[language].clientName)
-  const [venue, setVenue] = useState<string>(() => listDefaults[language].venue)
-  const [description, setDescription] = useState('')
-  const [documentMode, setDocumentMode] = useState<'working' | 'approval'>('working')
-  const [eventDate, setEventDate] = useState(todayDateValue)
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('')
-  const [subcategory, setSubcategory] = useState('')
+  const defaults = listDocumentDefaults[language]
+  // Черновик восстанавливается ТОЛЬКО в режиме создания: у открытого списка
+  // источник правды — строка в базе. Шапка документа поднимается прямо в
+  // начальном стейте, поэтому эффект языковых дефолтов её уже не перетирает.
+  const [restoredDraft] = useState(() => listId ? null : readListDraft())
+  const [name, setName] = useState<string>(() => restoredDraft?.name ?? listDocumentDefaults[language].name)
+  const [clientName, setClientName] = useState<string>(() => restoredDraft?.clientName ?? listDocumentDefaults[language].clientName)
+  const [venue, setVenue] = useState<string>(() => restoredDraft?.venue ?? listDocumentDefaults[language].venue)
+  const [description, setDescription] = useState(() => restoredDraft?.description ?? '')
+  const [documentMode, setDocumentMode] = useState<'working' | 'approval'>(() => restoredDraft?.documentMode ?? 'working')
+  const [eventDate, setEventDate] = useState(() => restoredDraft?.eventDate ?? todayDateValue())
   const [cachedEquipment] = useState(readCachedAllEquipment)
   const [cachedList] = useState(() => listId ? readCachedEquipmentList(listId) : null)
   const [equipment, setEquipment] = useState<Equipment[]>(() => cachedEquipment ?? [])
@@ -106,34 +90,42 @@ export function ListEditorPage() {
   const [isLoading, setIsLoading] = useState(() => !cachedEquipment)
   const [isSaving, setIsSaving] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
-  const [loadError, setLoadError] = useState('')
-  const [openError, setOpenError] = useState('')
+  // Каталог: тоже только флаг — текст ошибки собирается на рендере.
+  const [hasLoadError, setHasLoadError] = useState(false)
+  const [openError, setOpenError] = useState<OpenErrorCode>('')
   const [isOpening, setIsOpening] = useState(Boolean(listId && !cachedList))
   const [listToEdit, setListToEdit] = useState<EquipmentList | null>(() => cachedList?.reservation_status === 'draft' ? cachedList : null)
   const [saveError, setSaveError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
-  const [savedId, setSavedId] = useState('')
   const [previewGroup, setPreviewGroup] = useState<CatalogGroup | null>(null)
   const [mobilePanel, setMobilePanel] = useState<'catalog' | 'selection'>('catalog')
-  const [catalogLimit, setCatalogLimit] = useState(60)
   const catalogRef = useRef<HTMLElement>(null)
   const selectionRef = useRef<HTMLElement>(null)
-  const hydratedListRef = useRef('')
+  // Сколько позиций черновика не нашлось в живом каталоге. null — плашки нет.
+  const [draftNotice, setDraftNotice] = useState<{ missingGroups: number } | null>(null)
+  // Гидратация разведена на две: шапка документа заполняется сразу из строки
+  // списка, состав — только когда приехал каталог.
+  const hydratedMetaRef = useRef('')
+  const hydratedSelectionRef = useRef('')
+  // Автосейв заблокирован, пока восстановление не закончилось: стартовый пустой
+  // стейт затёр бы сохранённый черновик раньше, чем тот успеет подняться.
+  // Восстанавливать нечего — снят сразу.
+  const draftRestoredRef = useRef(!restoredDraft)
 
   useEffect(() => {
     let current = true
     setIsLoading(!cachedEquipment)
-    setLoadError('')
+    setHasLoadError(false)
     fetchAllEquipment({ bypassCache: Boolean(cachedEquipment) })
       .then((result) => {
         if (!current) return
         setEquipment(result)
         preloadEquipmentImages(result, 32)
       })
-      .catch(() => { if (current && !cachedEquipment) setLoadError(tr('Не удалось загрузить каталог.', 'Katalogni yuklab bo‘lmadi.')) })
+      .catch(() => { if (current && !cachedEquipment) setHasLoadError(true) })
       .finally(() => { if (current) setIsLoading(false) })
     return () => { current = false }
-  }, [tr])
+  }, [])
 
   useEffect(() => {
     if (!listId) {
@@ -157,84 +149,49 @@ export function ListEditorPage() {
         if (!current) return
         if (error instanceof Error && error.message === 'not-draft') {
           setListToEdit(null)
-          setOpenError(tr('Изменять можно только черновики. Подтверждённый или выданный список доступен в режиме просмотра.', 'Faqat qoralamalarni o‘zgartirish mumkin. Tasdiqlangan yoki berilgan ro‘yxat faqat ko‘rish rejimida mavjud.'))
+          setOpenError('not-draft')
           return
         }
         if (cached?.reservation_status === 'draft') return
-        setOpenError(error instanceof Error && error.message === 'not-draft'
-          ? tr('Изменять можно только черновики. Подтверждённый или выданный список доступен в режиме просмотра.', 'Faqat qoralamalarni o‘zgartirish mumkin. Tasdiqlangan yoki berilgan ro‘yxat faqat ko‘rish rejimida mavjud.')
-          : tr('Не удалось открыть сохранённый список.', 'Saqlangan ro‘yxatni ochib bo‘lmadi.'))
+        setOpenError('failed')
       })
       .finally(() => { if (current) setIsOpening(false) })
     return () => { current = false }
-  }, [listId, tr])
+  }, [listId])
+
+  // Шапка документа заполняется, как только приехала САМА строка списка, и не
+  // ждёт каталог. Раньше и шапка, и состав гидратировались одним эффектом по
+  // приходу каталога — на холодном старте с медленной сетью приехавшие данные
+  // затирали название, которое пользователь успел набрать за эти секунды.
+  useEffect(() => {
+    if (!listToEdit || hydratedMetaRef.current === listToEdit.id) return
+    setName(listToEdit.name)
+    setClientName(listToEdit.client_name ?? defaults.clientName)
+    setVenue(listToEdit.venue ?? defaults.venue)
+    setDescription(listToEdit.description ?? '')
+    setEventDate(listToEdit.reservation_start ?? todayDateValue())
+    hydratedMetaRef.current = listToEdit.id
+  }, [defaults.clientName, defaults.venue, listToEdit])
 
   useEffect(() => {
-    const allDefaults = Object.values(listDefaults)
+    const allDefaults = Object.values(listDocumentDefaults)
     setName((current) => allDefaults.some((item) => item.name === current) ? defaults.name : current)
     setClientName((current) => allDefaults.some((item) => item.clientName === current) ? defaults.clientName : current)
     setVenue((current) => allDefaults.some((item) => item.venue === current) ? defaults.venue : current)
   }, [defaults])
 
-  const groups = useMemo(() => {
-    const map = new Map<string, CatalogGroup>()
-    for (const item of equipment) {
-      const key = groupKey(item)
-      const group = map.get(key) ?? {
-        key,
-        brand: item.brand,
-        model: item.model,
-        type: item.type,
-        subtype: item.subtype,
-        allItems: [],
-        serializedItems: [],
-        quantityItems: [],
-        quantityAvailable: 0,
-        availableCount: 0,
-        totalCount: 0,
-      }
-      const units = item.tracking_mode === 'serialized' ? 1 : Math.max(0, item.count)
-      group.allItems.push(item)
-      group.totalCount += units
-      if (isAvailable(item)) {
-        if (item.tracking_mode === 'serialized') group.serializedItems.push(item)
-        else {
-          group.quantityItems.push(item)
-          group.quantityAvailable += units
-        }
-        group.availableCount += units
-      }
-      map.set(key, group)
-    }
-    return [...map.values()]
-      .map((group) => ({ ...group, serializedItems: group.serializedItems.sort((a, b) => (a.serialnumber ?? '').localeCompare(b.serialnumber ?? '')) }))
-      .sort((a, b) => `${a.type} ${a.brand} ${a.model}`.localeCompare(`${b.type} ${b.brand} ${b.model}`, 'ru'))
-  }, [equipment])
+  const groups = useMemo(() => buildCatalogGroups(equipment), [equipment])
 
-  const categories = useMemo(() => [...new Set(groups.map((group) => group.type))]
-    .sort((a, b) => translateEquipmentTaxonomy(a, language).localeCompare(translateEquipmentTaxonomy(b, language), locale)), [groups, language, locale])
-  const subcategories = useMemo(() => category
-    ? [...new Set(groups.filter((group) => group.type === category).map((group) => group.subtype))]
-      .sort((a, b) => translateEquipmentTaxonomy(a, language).localeCompare(translateEquipmentTaxonomy(b, language), locale))
-    : [], [category, groups, language, locale])
-  const filteredGroups = useMemo(() => {
-    const terms = search.trim().toLocaleLowerCase(locale).split(/\s+/).filter(Boolean)
-    return groups.filter((group) => {
-      if (category && group.type !== category) return false
-      if (subcategory && group.subtype !== subcategory) return false
-      const haystack = `${group.brand} ${group.model} ${group.type} ${group.subtype} ${translateEquipmentTaxonomy(group.type, language)} ${translateEquipmentTaxonomy(group.subtype, language)}`.toLocaleLowerCase(locale)
-      return terms.every((term) => haystack.includes(term))
-    })
-  }, [category, groups, language, locale, search, subcategory])
-  const visibleGroups = filteredGroups.slice(0, catalogLimit)
+  // Единственный источник группы по ключу: и восстановление, и рендер выборки,
+  // и payload читают каталог отсюда, а не из снимков в стейте.
+  const groupsByKey = useMemo(() => new Map(groups.map((group) => [group.key, group])), [groups])
 
   useEffect(() => {
-    if (!listToEdit || groups.length === 0 || hydratedListRef.current === listToEdit.id) return
-    const groupsByKey = new Map(groups.map((group) => [group.key, group]))
+    if (!listToEdit || groups.length === 0 || hydratedSelectionRef.current === listToEdit.id) return
     const equipmentById = new Map(equipment.map((item) => [item.id, item]))
     const restored = new Map<string, SelectedGroup>()
     const addRestored = (group: CatalogGroup, count: number, serialId?: string) => {
-      const current = restored.get(group.key) ?? { group, count: 0, serialIds: [], serialPickerOpen: false }
+      const current = restored.get(group.key) ?? { key: group.key, label: selectionLabel(group), count: 0, serialIds: [], serialPickerOpen: false }
       current.count += count
       if (serialId && group.serializedItems.some((item) => item.id === serialId)) current.serialIds.push(serialId)
       restored.set(group.key, current)
@@ -250,22 +207,66 @@ export function ListEditorPage() {
       if (group) addRestored(group, Math.max(1, Number(item.count) || 1), item.tracking_mode === 'serialized' ? item.equipment_id : undefined)
     }
 
-    setName(listToEdit.name)
-    setClientName(listToEdit.client_name ?? defaults.clientName)
-    setVenue(listToEdit.venue ?? defaults.venue)
-    setDescription(listToEdit.description ?? '')
-    setEventDate(listToEdit.reservation_start ?? todayDateValue())
     setSelected([...restored.values()])
-    setSavedId(listToEdit.id)
-    hydratedListRef.current = listToEdit.id
-  }, [defaults.clientName, defaults.venue, equipment, groups, listToEdit])
+    hydratedSelectionRef.current = listToEdit.id
+  }, [equipment, groups, groupsByKey, listToEdit])
 
-  useEffect(() => { setSubcategory(''); setCatalogLimit(60) }, [category])
-  useEffect(() => setCatalogLimit(60), [search, subcategory])
+  // Выборка черновика поднимается только по живому каталогу: позицию ищем по
+  // ключу группы, серийники оставляем те, что ещё существуют. Пока каталог
+  // грузится или не загрузился вовсе, восстановление не запускается — иначе
+  // «ничего не нашлось» стёрло бы черновик вместо того, чтобы его вернуть.
+  useEffect(() => {
+    if (!restoredDraft || draftRestoredRef.current || isLoading || hasLoadError) return
+    const restored: SelectedGroup[] = []
+    let missingGroups = 0
+
+    for (const item of restoredDraft.items) {
+      const group = groupsByKey.get(item.key)
+      if (!group) {
+        missingGroups += 1
+        continue
+      }
+      const serialIds = item.serialIds.filter((id) => group.serializedItems.some((unit) => unit.id === id))
+      restored.push({ key: group.key, label: selectionLabel(group), count: Math.max(1, item.count), serialIds, serialPickerOpen: false })
+    }
+
+    setSelected(restored)
+    setDraftNotice({ missingGroups })
+    draftRestoredRef.current = true
+  }, [groupsByKey, hasLoadError, isLoading, restoredDraft])
+
+  const draftItems = useMemo(() => selected.map((item) => ({
+    key: item.key,
+    count: item.count,
+    serialIds: item.serialIds,
+  })), [selected])
+
+  useListDraftAutosave({ listId, restoredRef: draftRestoredRef, name, clientName, venue, description, eventDate, documentMode, items: draftItems })
+
+  // «Начать заново»: черновик стирается, форма возвращается к дефолтам.
+  function discardDraft() {
+    clearListDraft()
+    setDraftNotice(null)
+    setSelected([])
+    setName(defaults.name)
+    setClientName(defaults.clientName)
+    setVenue(defaults.venue)
+    setDescription('')
+    setEventDate(todayDateValue())
+    setDocumentMode('working')
+    setSuccessMessage('')
+  }
 
   const selectedCount = selected.reduce((sum, item) => sum + item.count, 0)
-  const selectedKeys = useMemo(() => new Set(selected.map((item) => item.group.key)), [selected])
-  const selectedByKey = useMemo(() => new Map(selected.map((item) => [item.group.key, item])), [selected])
+  const selectedKeys = useMemo(() => new Set(selected.map((item) => item.key)), [selected])
+  const selectedByKey = useMemo(() => new Map(selected.map((item) => [item.key, item])), [selected])
+  // Выборка, склеенная со свежим каталогом. group === null означает, что модели
+  // в каталоге больше нет: позицию не выбрасываем, рисуем по снимку подписи.
+  const resolvedSelection = useMemo(() => selected.map((item) => ({
+    item,
+    group: groupsByKey.get(item.key) ?? null,
+    label: groupsByKey.get(item.key) ?? item.label,
+  })), [groupsByKey, selected])
   const canSubmit = selectedCount > 0 && !isOpening && !openError
 
   function moveToMobilePanel(panel: 'catalog' | 'selection') {
@@ -277,20 +278,18 @@ export function ListEditorPage() {
   }
 
   function addGroup(group: CatalogGroup) {
-    setSavedId('')
     setSuccessMessage('')
     setSelected((current) => {
-      const existing = current.find((item) => item.group.key === group.key)
-      if (existing) return current.map((item) => item.group.key === group.key ? { ...item, count: item.count + 1 } : item)
-      return [...current, { group, count: 1, serialIds: [], serialPickerOpen: false }]
+      const existing = current.find((item) => item.key === group.key)
+      if (existing) return current.map((item) => item.key === group.key ? { ...item, count: item.count + 1 } : item)
+      return [...current, { key: group.key, label: selectionLabel(group), count: 1, serialIds: [], serialPickerOpen: false }]
     })
   }
 
   function changeCount(key: string, delta: number) {
-    setSavedId('')
     setSelected((current) => current
       .map((item) => {
-        if (item.group.key !== key) return item
+        if (item.key !== key) return item
         const count = Math.max(0, item.count + delta)
         return { ...item, count, serialIds: item.serialIds.slice(0, count) }
       })
@@ -298,13 +297,12 @@ export function ListEditorPage() {
   }
 
   function toggleSerialPicker(key: string) {
-    setSelected((current) => current.map((item) => item.group.key === key ? { ...item, serialPickerOpen: !item.serialPickerOpen } : item))
+    setSelected((current) => current.map((item) => item.key === key ? { ...item, serialPickerOpen: !item.serialPickerOpen } : item))
   }
 
   function toggleSerial(key: string, equipmentId: string) {
-    setSavedId('')
     setSelected((current) => current.map((item) => {
-      if (item.group.key !== key) return item
+      if (item.key !== key) return item
       const exists = item.serialIds.includes(equipmentId)
       const serialIds = exists ? item.serialIds.filter((id) => id !== equipmentId) : [...item.serialIds, equipmentId]
       return { ...item, serialIds, count: Math.max(item.count, serialIds.length) }
@@ -312,15 +310,17 @@ export function ListEditorPage() {
   }
 
   function clearSelection() {
-    setSavedId('')
     setSuccessMessage('')
     setSelected([])
   }
 
+  // Состав документа собирается по АКТУАЛЬНОМУ каталогу: конкретные единицы
+  // берутся только из живой группы. Группы уже нет — вся позиция уходит
+  // планируемой строкой по снимку подписи, как и раньше.
   function buildItems(): EquipmentListItem[] {
-    return selected.flatMap((selectedItem) => {
+    return resolvedSelection.flatMap(({ item: selectedItem, group, label }) => {
       const concrete = selectedItem.serialIds.flatMap((id) => {
-        const item = selectedItem.group.serializedItems.find((candidate) => candidate.id === id)
+        const item = group?.serializedItems.find((candidate) => candidate.id === id)
         return item ? [{
           equipment_id: item.id,
           brand: item.brand,
@@ -333,7 +333,7 @@ export function ListEditorPage() {
       })
       let remaining = selectedItem.count - concrete.length
       const quantityItems: EquipmentListItem[] = []
-      for (const item of selectedItem.group.quantityItems) {
+      for (const item of group?.quantityItems ?? []) {
         if (remaining <= 0) break
         const allocated = Math.min(remaining, Math.max(0, item.count))
         if (allocated <= 0) continue
@@ -349,10 +349,10 @@ export function ListEditorPage() {
         remaining -= allocated
       }
       const planned: EquipmentListItem[] = remaining > 0 ? [{
-        brand: selectedItem.group.brand,
-        model: selectedItem.group.model,
-        type: selectedItem.group.type,
-        subtype: selectedItem.group.subtype,
+        brand: label.brand,
+        model: label.model,
+        type: label.type,
+        subtype: label.subtype,
         count: remaining,
         tracking_mode: 'planned',
       }] : []
@@ -361,7 +361,6 @@ export function ListEditorPage() {
   }
 
   async function persistList() {
-    if (savedId) return savedId
     const items = buildItems()
     const listMode: 'specific' | 'abstract' = items.every((item) => item.tracking_mode !== 'planned') ? 'specific' : 'abstract'
     const input = {
@@ -374,19 +373,25 @@ export function ListEditorPage() {
       reservationEnd: eventDate || null,
       equipmentItems: items,
     }
-    const id = listId ? await updateEquipmentList(listId, input) : await createEquipmentList(input)
-    setSavedId(id)
-    return id
+    return listId ? await updateEquipmentList(listId, input) : await createEquipmentList(input)
   }
 
   async function saveList() {
     if (!canSubmit) return
+    const isCreating = !listId
     setIsSaving(true)
     setSaveError('')
     setSuccessMessage('')
     try {
-      await persistList()
-      setSuccessMessage(listId ? tr('Изменения сохранены.', 'O‘zgarishlar saqlandi.') : tr('Список сохранён в системе.', 'Ro‘yxat tizimda saqlandi.'))
+      const id = await persistList()
+      setSuccessMessage(isCreating ? tr('Список сохранён в системе.', 'Ro‘yxat tizimda saqlandi.') : tr('Изменения сохранены.', 'O‘zgarishlar saqlandi.'))
+      // После создания источник правды — listId из URL: следующее «Сохранить» обновит эту же запись, а не заведёт вторую.
+      if (isCreating) {
+        // Черновик своё отработал: дальше запись живёт в базе.
+        clearListDraft()
+        setDraftNotice(null)
+        navigate(`/lists/${id}/edit`, { replace: true })
+      }
     } catch {
       setSaveError(tr('Не удалось сохранить список. Файл всё ещё можно скачать.', 'Ro‘yxatni saqlab bo‘lmadi. Faylni baribir yuklab olish mumkin.'))
     } finally {
@@ -409,13 +414,13 @@ export function ListEditorPage() {
         locale,
         language,
         documentMode,
-        rows: selected.map((item) => ({
-          category: item.group.type,
-          equipment: `${item.group.brand} ${item.group.model}`.trim(),
-          subtype: item.group.subtype,
+        rows: resolvedSelection.map(({ item, group, label }) => ({
+          category: label.type,
+          equipment: `${label.brand} ${label.model}`.trim(),
+          subtype: label.subtype,
           count: item.count,
           serialNumbers: item.serialIds.flatMap((id) => {
-            const equipmentItem = item.group.serializedItems.find((candidate) => candidate.id === id)
+            const equipmentItem = group?.serializedItems.find((candidate) => candidate.id === id)
             return equipmentItem?.serialnumber ? [equipmentItem.serialnumber] : []
           }),
         })),
@@ -440,7 +445,7 @@ export function ListEditorPage() {
         </div>
         <div className="editor-header__actions">
           <button className="button button--secondary" onClick={() => void saveList()} disabled={!canSubmit || isSaving || isExporting}>
-            <Save size={17} /> {savedId ? tr('Сохранено', 'Saqlandi') : isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить', 'Saqlash')}
+            <Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить', 'Saqlash')}
           </button>
           <button className="button button--primary" onClick={() => void exportList()} disabled={!canSubmit || isSaving || isExporting}>
             <FileSpreadsheet size={18} /> {isExporting ? tr('Готовим Excel…', 'Excel tayyorlanmoqda…') : tr('Скачать Excel', 'Excel yuklash')}
@@ -448,7 +453,23 @@ export function ListEditorPage() {
         </div>
       </header>
 
-      {openError && <div className="state-block state-block--error editor-open-error"><CircleAlert size={23} /><strong>{tr('Список не открыт', 'Ro‘yxat ochilmadi')}</strong><span>{openError}</span><button className="button button--secondary" onClick={() => navigate('/lists')}>{tr('Вернуться к спискам', 'Ro‘yxatlarga qaytish')}</button></div>}
+      {openError && <div className="state-block state-block--error editor-open-error"><CircleAlert size={23} /><strong>{tr('Список не открыт', 'Ro‘yxat ochilmadi')}</strong><span>{openError === 'not-draft'
+        ? tr('Изменять можно только черновики. Подтверждённый или выданный список доступен в режиме просмотра.', 'Faqat qoralamalarni o‘zgartirish mumkin. Tasdiqlangan yoki berilgan ro‘yxat faqat ko‘rish rejimida mavjud.')
+        : tr('Не удалось открыть сохранённый список.', 'Saqlangan ro‘yxatni ochib bo‘lmadi.')}</span><button className="button button--secondary" onClick={() => navigate('/lists')}>{tr('Вернуться к спискам', 'Ro‘yxatlarga qaytish')}</button></div>}
+
+      {draftNotice && (
+        <div className="editor-draft-notice">
+          <Info size={18} />
+          <span>
+            <strong>{tr('Черновик восстановлен', 'Qoralama tiklandi')}</strong>
+            {draftNotice.missingGroups > 0 && <small>{tr(
+              `позиций больше нет в каталоге: ${draftNotice.missingGroups}`,
+              `katalogda qolmagan pozitsiyalar: ${draftNotice.missingGroups}`,
+            )}</small>}
+          </span>
+          <button className="button button--secondary" type="button" onClick={discardDraft}>{tr('Начать заново', 'Yangidan boshlash')}</button>
+        </div>
+      )}
 
       <section className="quick-list-meta data-panel">
         <label className="field quick-list-meta__name">
@@ -465,9 +486,8 @@ export function ListEditorPage() {
             onBlur={(event) => {
               if (event.currentTarget.value.trim()) return
               setName(defaults.name)
-              setSavedId('')
             }}
-            onChange={(event) => { setName(event.target.value); setSavedId('') }}
+            onChange={(event) => setName(event.target.value)}
             placeholder={tr('Например, Форум в Hyatt', 'Masalan, Hyatt forumi')}
           />
         </label>
@@ -475,7 +495,7 @@ export function ListEditorPage() {
           <span><CalendarDays size={13} /> {tr('Дата', 'Sana')} <small>{tr('сегодня по умолчанию', 'standart — bugun')}</small></span>
           <AppDatePicker
             value={eventDate}
-            onChange={(value) => { setEventDate(value); setSavedId('') }}
+            onChange={setEventDate}
             locale={locale}
             placeholder={tr('Выберите дату', 'Sanani tanlang')}
             ariaLabel={tr('Дата мероприятия', 'Tadbir sanasi')}
@@ -499,9 +519,8 @@ export function ListEditorPage() {
             onBlur={(event) => {
               if (event.currentTarget.value.trim()) return
               setClientName(defaults.clientName)
-              setSavedId('')
             }}
-            onChange={(event) => { setClientName(event.target.value); setSavedId('') }}
+            onChange={(event) => setClientName(event.target.value)}
             placeholder={tr('Например, ARGO Media', 'Masalan, ARGO Media')}
           />
         </label>
@@ -519,15 +538,14 @@ export function ListEditorPage() {
             onBlur={(event) => {
               if (event.currentTarget.value.trim()) return
               setVenue(defaults.venue)
-              setSavedId('')
             }}
-            onChange={(event) => { setVenue(event.target.value); setSavedId('') }}
+            onChange={(event) => setVenue(event.target.value)}
             placeholder={tr('Например, Hyatt Regency', 'Masalan, Hyatt Regency')}
           />
         </label>
         <label className="field quick-list-meta__notes">
           <span>{tr('Комментарий к документу', 'Hujjatga izoh')}</span>
-          <input value={description} onChange={(event) => { setDescription(event.target.value); setSavedId('') }} placeholder={tr('Необязательно: зал, время, особенности комплекта', 'Ixtiyoriy: zal, vaqt, jamlanma xususiyatlari')} />
+          <input value={description} onChange={(event) => setDescription(event.target.value)} placeholder={tr('Необязательно: зал, время, особенности комплекта', 'Ixtiyoriy: zal, vaqt, jamlanma xususiyatlari')} />
         </label>
         <div className="field quick-list-meta__document">
           <span>{tr('Формат Excel', 'Excel formati')}</span>
@@ -555,68 +573,18 @@ export function ListEditorPage() {
       </div>
 
       <div className="editor-grid editor-grid--quick">
-        <section ref={catalogRef} className={`data-panel catalog-picker ${mobilePanel === 'catalog' ? 'mobile-active' : ''}`}>
-          <div className="panel-heading">
-            <div><h2>{tr('Каталог по моделям', 'Modellar katalogi')}</h2><p>{tr('Одна модель — одна строка, независимо от количества серийных единиц.', 'Seriyali birliklar sonidan qat’i nazar, bir model — bir qator.')}</p></div>
-            <span className="read-only-label">{isLoading && groups.length === 0 ? tr('Загружаем каталог…', 'Katalog yuklanmoqda…') : `${groups.length} ${tr('моделей', 'model')}`}</span>
-          </div>
-          <div className="quick-catalog-toolbar">
-            <label className="search-field">
-              <Search size={18} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tr('Модель, бренд или категория…', 'Model, brend yoki toifa…')} aria-label={tr('Поиск оборудования', 'Uskunalarni qidirish')} />
-            </label>
-            <AppSelect
-              value={category}
-              options={[{ value: '', label: tr('Все категории', 'Barcha toifalar') }, ...categories.map((value) => ({ value, label: translateEquipmentTaxonomy(value, language) }))]}
-              onChange={setCategory}
-              ariaLabel={tr('Категория', 'Toifa')}
-            />
-            {category && subcategories.length > 1 && (
-              <AppSelect
-                value={subcategory}
-                options={[{ value: '', label: tr('Все подкатегории', 'Barcha quyi toifalar') }, ...subcategories.map((value) => ({ value, label: translateEquipmentTaxonomy(value, language) }))]}
-                onChange={setSubcategory}
-                ariaLabel={tr('Подкатегория', 'Quyi toifa')}
-              />
-            )}
-          </div>
-          <div className="picker-results">
-            {loadError && <div className="state-block state-block--error"><CircleAlert size={23} /><span>{loadError}</span></div>}
-            {isLoading && equipment.length === 0 && Array.from({ length: 8 }, (_, index) => <div className="picker-skeleton" key={index} />)}
-            {!loadError && visibleGroups.map((group) => {
-              const selectedAlready = selectedKeys.has(group.key)
-              const selectedItem = selectedByKey.get(group.key)
-              const serialCount = group.serializedItems.length
-              const tracking = serialCount && group.quantityAvailable
-                ? tr('смешанный учёт', 'aralash hisob')
-                : serialCount ? tr('есть S/N', 'S/N mavjud') : tr('без S/N', 'S/N siz')
-              return (
-                <div className={`picker-item picker-item--grouped ${selectedAlready ? 'picker-item--selected' : ''}`} key={group.key}>
-                  <button className="picker-item__preview" type="button" onClick={() => setPreviewGroup(group)} aria-label={tr(`Открыть описание ${group.brand} ${group.model}`, `${group.brand} ${group.model} tavsifini ochish`)}>
-                    <EquipmentVisual item={group} />
-                    <span className="picker-item__copy">
-                      <strong>{group.brand} {group.model}</strong>
-                      <small>{translateEquipmentTaxonomy(group.subtype, language)} · {tracking}</small>
-                    </span>
-                    <span className={`picker-item__count ${group.availableCount === 0 ? 'picker-item__count--empty' : ''}`}>{group.availableCount > 0 ? `${tr('доступно', 'mavjud')} ${group.availableCount}` : tr('нет на складе', 'omborda yo‘q')}</span>
-                  </button>
-                  <button className="picker-item__action" type="button" onClick={() => addGroup(group)} aria-label={tr(`Добавить ещё ${group.brand} ${group.model}`, `${group.brand} ${group.model} yana qo‘shish`)}>
-                    <Plus size={17} />
-                    {selectedItem && <span>{selectedItem.count}</span>}
-                  </button>
-                </div>
-              )
-            })}
-            {!loadError && filteredGroups.length > visibleGroups.length && (
-              <div className="picker-load-more">
-                <button className="button button--secondary" type="button" onClick={() => setCatalogLimit((current) => current + 60)}>
-                  {tr('Показать ещё', 'Yana ko‘rsatish')} · {filteredGroups.length - visibleGroups.length}
-                </button>
-              </div>
-            )}
-            {!isLoading && !loadError && filteredGroups.length === 0 && <div className="state-block"><Search size={25} /><strong>{tr('Ничего не найдено', 'Hech narsa topilmadi')}</strong><span>{tr('Измените поиск или категорию.', 'Qidiruv yoki toifani o‘zgartiring.')}</span></div>}
-          </div>
-        </section>
+        <CatalogPanel
+          panelRef={catalogRef}
+          isMobileActive={mobilePanel === 'catalog'}
+          groups={groups}
+          equipmentCount={equipment.length}
+          isLoading={isLoading}
+          hasLoadError={hasLoadError}
+          selectedKeys={selectedKeys}
+          selectedByKey={selectedByKey}
+          onPreview={setPreviewGroup}
+          onAdd={addGroup}
+        />
 
         <section ref={selectionRef} className={`data-panel selection-panel ${mobilePanel === 'selection' ? 'mobile-active' : ''}`}>
           <div className="panel-heading">
@@ -632,25 +600,28 @@ export function ListEditorPage() {
                 <span>{tr('Нажмите на нужную модель в каталоге.', 'Katalogdagi kerakli modelni bosing.')}</span>
               </div>
             )}
-            {selected.map((item, index) => (
-              <article className="quick-selection-item" key={item.group.key}>
+            {resolvedSelection.map(({ item, group, label }, index) => (
+              <article className="quick-selection-item" key={item.key}>
                 <div className="quick-selection-item__main">
                   <span className="equipment-row-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                   <div className="quick-selection-item__copy">
-                    <strong>{item.group.brand} {item.group.model}</strong>
-                    <small>{translateEquipmentTaxonomy(item.group.subtype, language)} · {tr('на складе', 'omborda')} {item.group.availableCount}</small>
+                    <strong>{label.brand} {label.model}</strong>
+                    <small>{translateEquipmentTaxonomy(label.subtype, language)} · {group
+                      ? `${tr('на складе', 'omborda')} ${group.availableCount}`
+                      : tr('нет в каталоге', 'katalogda yo‘q')}</small>
                   </div>
                   <div className="quantity-stepper">
-                    <button onClick={() => changeCount(item.group.key, -1)} aria-label={tr('Уменьшить', 'Kamaytirish')}><Minus size={14} /></button>
+                    <button onClick={() => changeCount(item.key, -1)} aria-label={tr('Уменьшить', 'Kamaytirish')}><Minus size={14} /></button>
                     <strong>{item.count}</strong>
-                    <button onClick={() => changeCount(item.group.key, 1)} aria-label={tr('Увеличить', 'Ko‘paytirish')}><Plus size={14} /></button>
+                    <button onClick={() => changeCount(item.key, 1)} aria-label={tr('Увеличить', 'Ko‘paytirish')}><Plus size={14} /></button>
                   </div>
-                  <button className="icon-button" onClick={() => changeCount(item.group.key, -item.count)} aria-label={tr('Удалить модель', 'Modelni o‘chirish')}><Trash2 size={16} /></button>
+                  <button className="icon-button" onClick={() => changeCount(item.key, -item.count)} aria-label={tr('Удалить модель', 'Modelni o‘chirish')}><Trash2 size={16} /></button>
                 </div>
-                {item.count > item.group.availableCount && <p className="quick-inline-warning"><CircleAlert size={13} /> {tr('Больше текущего остатка — в Excel попадёт указанное количество.', 'Joriy qoldiqdan ko‘p — Excelga ko‘rsatilgan miqdor tushadi.')}</p>}
-                {item.group.serializedItems.length > 0 && (
+                {group && item.count > group.availableCount && <p className="quick-inline-warning"><CircleAlert size={13} /> {tr('Больше текущего остатка — в Excel попадёт указанное количество.', 'Joriy qoldiqdan ko‘p — Excelga ko‘rsatilgan miqdor tushadi.')}</p>}
+                {!group && <p className="quick-inline-warning"><CircleAlert size={13} /> {tr('Модели больше нет в каталоге — позиция уйдёт в документ как планируемая.', 'Model katalogda yo‘q — pozitsiya hujjatga rejalashtirilgan sifatida tushadi.')}</p>}
+                {group && group.serializedItems.length > 0 && (
                   <>
-                    <button className="serial-toggle" onClick={() => toggleSerialPicker(item.group.key)} type="button">
+                    <button className="serial-toggle" onClick={() => toggleSerialPicker(item.key)} type="button">
                       <span>{item.serialIds.length
                         ? tr(`Выбрано S/N: ${item.serialIds.length} из ${item.count}`, `S/N tanlandi: ${item.serialIds.length} / ${item.count}`)
                         : tr('Серийные номера не указывать', 'Seriya raqamlarini ko‘rsatmaslik')}</span>
@@ -659,9 +630,9 @@ export function ListEditorPage() {
                     {item.serialPickerOpen && (
                       <div className="serial-picker">
                         <p>{tr('Отметьте только те номера, которые точно поедут на мероприятие.', 'Tadbirga aniq olib boriladigan raqamlarni belgilang.')}</p>
-                        <div>{item.group.serializedItems.map((equipmentItem) => {
+                        <div>{group.serializedItems.map((equipmentItem) => {
                           const active = item.serialIds.includes(equipmentItem.id)
-                          return <button className={active ? 'active' : ''} onClick={() => toggleSerial(item.group.key, equipmentItem.id)} key={equipmentItem.id} type="button"><span>{active && <Check size={13} />}</span>{equipmentItem.serialnumber || tr('Без номера', 'Raqamsiz')}</button>
+                          return <button className={active ? 'active' : ''} onClick={() => toggleSerial(item.key, equipmentItem.id)} key={equipmentItem.id} type="button"><span>{active && <Check size={13} />}</span>{equipmentItem.serialnumber || tr('Без номера', 'Raqamsiz')}</button>
                         })}</div>
                       </div>
                     )}
@@ -675,7 +646,7 @@ export function ListEditorPage() {
             <div><span>{tr('Всего единиц', 'Jami birliklar')}</span><strong>{selectedCount}</strong></div>
             {selected.length > 0 && <button className="clear-selection" onClick={clearSelection} type="button"><Trash2 size={14} /> {tr('Очистить список', 'Ro‘yxatni tozalash')}</button>}
             <div className="quick-list-actions">
-              <button className="button button--secondary" onClick={() => void saveList()} disabled={!canSubmit || isSaving || isExporting}><Save size={16} /> {savedId ? tr('Сохранено', 'Saqlandi') : tr('Сохранить', 'Saqlash')}</button>
+              <button className="button button--secondary" onClick={() => void saveList()} disabled={!canSubmit || isSaving || isExporting}><Save size={16} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить', 'Saqlash')}</button>
               <button className="button button--primary" onClick={() => void exportList()} disabled={!canSubmit || isSaving || isExporting}><FileSpreadsheet size={17} /> {isExporting ? tr('Готовим…', 'Tayyorlanmoqda…') : tr('Скачать Excel', 'Excel yuklash')}</button>
             </div>
             {successMessage && <p className="form-success"><Check size={14} /> {successMessage}</p>}
@@ -693,39 +664,5 @@ export function ListEditorPage() {
 
       {previewGroup && <CatalogPreviewDrawer group={previewGroup} onClose={() => setPreviewGroup(null)} onAdd={() => { addGroup(previewGroup); setPreviewGroup(null) }} />}
     </>
-  )
-}
-
-function CatalogPreviewDrawer({ group, onClose, onAdd }: { group: CatalogGroup; onClose: () => void; onAdd: () => void }) {
-  const { tr, language } = useLanguage()
-  useModalLayer(onClose)
-  const representative = group.allItems[0]
-  const hasSerialized = group.allItems.some((item) => item.tracking_mode === 'serialized')
-  const hasQuantity = group.allItems.some((item) => item.tracking_mode === 'quantity')
-  const tracking = hasSerialized && hasQuantity
-    ? tr('Смешанный учёт', 'Aralash hisob')
-    : hasSerialized ? tr('По серийным номерам', 'Seriya raqamlari bo‘yicha') : tr('По количеству', 'Miqdor bo‘yicha')
-
-  return (
-    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Описание модели', 'Model tavsifi')} onMouseDown={onClose}>
-      <aside className="drawer catalog-preview-drawer" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="drawer__header">
-          <div><p className="eyebrow">{translateEquipmentTaxonomy(group.type, language)}</p><h2>{group.brand} {group.model}</h2></div>
-          <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
-        </div>
-        <span className={`badge badge--${group.availableCount > 0 ? 'success' : 'neutral'}`}><i />{group.availableCount > 0 ? tr(`На складе: ${group.availableCount}`, `Omborda: ${group.availableCount}`) : tr('Сейчас нет на складе', 'Hozir omborda yo‘q')}</span>
-        <EquipmentVisual item={group} size="large" alt={`${group.brand} ${group.model}`} />
-        <dl className="detail-list">
-          <div><dt>{tr('Категория', 'Toifa')}</dt><dd>{translateEquipmentTaxonomy(group.type, language)}</dd></div>
-          <div><dt>{tr('Подкатегория', 'Quyi toifa')}</dt><dd>{translateEquipmentTaxonomy(group.subtype, language)}</dd></div>
-          <div><dt>{tr('Способ учёта', 'Hisob turi')}</dt><dd>{tracking}</dd></div>
-          <div><dt>{tr('Всего заведено', 'Jami kiritilgan')}</dt><dd>{group.totalCount} {tr('шт.', 'dona')}</dd></div>
-          <div className="detail-list__wide"><dt>{tr('Характеристики', 'Xususiyatlar')}</dt><dd>{representative?.technicalspecification || tr('Не указаны', 'Ko‘rsatilmagan')}</dd></div>
-          <div className="detail-list__wide"><dt>{tr('Описание', 'Tavsif')}</dt><dd>{representative?.description || tr('Описание пока не заполнено', 'Tavsif hali kiritilmagan')}</dd></div>
-        </dl>
-        {group.availableCount === 0 && <p className="availability-warning"><Info size={15} />{tr('Модель можно добавить в документ: нехватка будет отмечена предупреждением.', 'Modelni hujjatga qo‘shish mumkin: yetishmovchilik ogohlantirish bilan ko‘rsatiladi.')}</p>}
-        <button className="button button--primary catalog-preview-drawer__add" onClick={onAdd}><Plus size={17} /> {tr('Добавить в список', 'Ro‘yxatga qo‘shish')}</button>
-      </aside>
-    </div>
   )
 }

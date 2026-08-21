@@ -14,7 +14,10 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { equipmentImages } from '../../generated/equipmentImages'
+// normalize и equipmentImageKey приходят из сгенерированного модуля: их исходник
+// эмитит scripts/fetch-equipment-images.mjs тем же кодом, которым именует файлы
+// в манифесте. Своей копии контракта у компонента больше нет.
+import { equipmentImageKey, equipmentImages, normalize } from '../generated/equipmentImages'
 
 export type EquipmentVisualData = {
   brand: string
@@ -23,25 +26,12 @@ export type EquipmentVisualData = {
   subtype?: string | null
 }
 
-function normalize(value: string) {
-  return value
-    .toLocaleLowerCase('ru')
-    .normalize('NFKD')
-    .replace(/[^a-zа-яё0-9]+/gi, ' ')
-    .trim()
-    .replace(/\s+/g, ' ')
-}
-
-function imageKey(item: EquipmentVisualData) {
-  return `${normalize(item.brand)}::${normalize(item.model)}`
-}
-
 const loadedImageSources = new Set<string>()
 const pendingImageSources = new Map<string, Promise<void>>()
 const imageRatios = new Map<string, number>()
 
 export function getEquipmentImageSrc(item: EquipmentVisualData) {
-  return equipmentImages[imageKey(item)]
+  return equipmentImages[equipmentImageKey(item.brand, item.model)]
 }
 
 export function preloadEquipmentImages(items: EquipmentVisualData[], limit = 24) {
