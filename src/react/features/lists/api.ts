@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase'
-import { cachedQuery, invalidateCachePrefix, primeCachedQuery, readCachedQuery } from '../../lib/persistentCache'
+import { cachedQuery, invalidateCachePrefix, primeCachedQuery, readCachedQuery, readCachedQueryMeta } from '../../lib/persistentCache'
 import type { Json, Tables } from '../../lib/database.types'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { escapeLikePattern } from '../../lib/postgrest'
@@ -204,6 +204,11 @@ function equipmentListsCacheKey(query: NormalizedListsQuery) {
 
 export function readCachedEquipmentLists(query: Omit<EquipmentListsQuery, 'bypassCache'> = {}) {
   return readCachedQuery<EquipmentListsPage>(equipmentListsCacheKey(normalizeListsQuery(query)))
+}
+
+// Возраст той же страницы списков: ключ собирают те же две функции, что и выше.
+export function readCachedEquipmentListsMeta(query: Omit<EquipmentListsQuery, 'bypassCache'> = {}) {
+  return readCachedQueryMeta(equipmentListsCacheKey(normalizeListsQuery(query)))
 }
 
 export async function fetchEquipmentLists(query: EquipmentListsQuery = {}): Promise<EquipmentListsPage> {

@@ -11,12 +11,14 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
+import { DataAge } from '../../components/DataAge'
 import { EquipmentVisual, preloadEquipmentImages } from '../../components/EquipmentVisual'
 import {
   fetchEquipment,
   MOBILE_EQUIPMENT_PAGE_SIZE,
   preferredEquipmentPageSize,
   readCachedEquipment,
+  readCachedEquipmentMeta,
 } from './api'
 import { equipmentAvailabilityOptions, equipmentAvailabilityView } from './availability'
 import { EquipmentDrawer } from './EquipmentDrawer'
@@ -47,6 +49,9 @@ export function EquipmentPage() {
   // Только флаг: текст ошибки собирается на рендере. Строка в стейте потянула бы
   // tr в зависимости эффекта загрузки, и смена языка перезагружала бы каталог.
   const [hasLoadError, setHasLoadError] = useState(false)
+  // Момент записи показанной страницы каталога. Ничего производного не храним:
+  // значение принадлежит persistentCache, страница только перечитывает его.
+  const [dataAt, setDataAt] = useState<number | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
@@ -76,6 +81,10 @@ export function EquipmentPage() {
   useEffect(() => {
     let isCurrent = true
     const cached = readCachedEquipment({ page: currentPage, search, availability, pageSize })
+    // Возраст спрашиваем у кэша, а не считаем от момента ответа: запись обновляется
+    // только на УСПЕШНОМ ответе, поэтому после сбоя сети здесь остаётся старая метка —
+    // ровно то, что бейдж и должен показать.
+    const readAge = () => readCachedEquipmentMeta({ page: currentPage, search, availability, pageSize })?.touchedAt ?? null
     if (cached) {
       setRows(cached.rows)
       setTotal(cached.total)
@@ -83,12 +92,14 @@ export function EquipmentPage() {
     }
     setIsLoading(!cached)
     setHasLoadError(false)
+    setDataAt(readAge())
 
     fetchEquipment({ page: currentPage, search, availability, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
       .then((result) => {
         if (!isCurrent) return
         setRows(result.rows)
         setTotal(result.total)
+        setDataAt(readAge())
         preloadEquipmentImages(result.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 24)
         const nextPage = currentPage + 1
         if (nextPage <= Math.ceil(result.total / pageSize)) {
@@ -99,7 +110,9 @@ export function EquipmentPage() {
       })
       .catch((error: unknown) => {
         reportAppError(error, { scope: 'loader', route: '/equipment', detail: { servedFromCache: Boolean(cached) } })
-        if (isCurrent && !cached) setHasLoadError(true)
+        if (!isCurrent) return
+        setDataAt(readAge())
+        if (!cached) setHasLoadError(true)
       })
       .finally(() => {
         if (isCurrent) setIsLoading(false)
@@ -171,6 +184,7 @@ export function EquipmentPage() {
             }}
             ariaLabel={tr('Фильтр по статусу', 'Holat bo‘yicha filtr')}
           />
+          <DataAge touchedAt={dataAt} isRefreshing={isLoading} onRefresh={() => setReloadKey((value) => value + 1)} />
         </div>
 
         {hasLoadError ? (

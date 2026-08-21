@@ -19,6 +19,7 @@ import {
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
+import { DataAge } from '../../components/DataAge'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useModalLayer } from '../../lib/useModalLayer'
@@ -33,6 +34,7 @@ import {
   readCachedReservationHistory,
   readCachedReservationShortages,
   readCachedEquipmentLists,
+  readCachedEquipmentListsMeta,
   readCachedSavedListComposition,
   transitionEquipmentList,
   type EquipmentList,
@@ -114,6 +116,9 @@ export function ListsPage() {
   // Только флаг: текст ошибки собирается на рендере. Строка в стейте потянула бы
   // tr в зависимости эффекта загрузки, и смена языка перезапрашивала бы списки.
   const [hasLoadError, setHasLoadError] = useState(false)
+  // Момент записи показанной страницы списков. Значение принадлежит
+  // persistentCache — здесь только перечитывается, ничего производного не храним.
+  const [dataAt, setDataAt] = useState<number | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [selected, setSelected] = useState<EquipmentList | null>(null)
   const [exporting, setExporting] = useState<{ id: string; mode: 'working' | 'approval' } | null>(null)
@@ -157,25 +162,33 @@ export function ListsPage() {
   useEffect(() => {
     let isCurrent = true
     const cached = readCachedEquipmentLists({ page: currentPage, search, status, pageSize })
+    // Возраст спрашиваем у кэша, а не считаем от момента ответа: запись обновляется
+    // только на УСПЕШНОМ ответе, поэтому после сбоя сети здесь остаётся старая метка —
+    // ровно то, что бейдж и должен показать.
+    const readAge = () => readCachedEquipmentListsMeta({ page: currentPage, search, status, pageSize })?.touchedAt ?? null
     if (cached) {
       setRows(cached.rows)
       setTotal(cached.total)
     }
     setIsLoading(!cached)
     setHasLoadError(false)
+    setDataAt(readAge())
 
     fetchEquipmentLists({ page: currentPage, search, status, pageSize, bypassCache: reloadKey > 0 || Boolean(cached) })
       .then((result) => {
         if (!isCurrent) return
         setRows(result.rows)
         setTotal(result.total)
+        setDataAt(readAge())
         // Открытые детали переезжают на свежую строку: смена этапа и удаление
         // возвращаются сюда через reloadKey.
         setSelected((current) => current ? result.rows.find((item) => item.id === current.id) ?? null : null)
       })
       .catch((error: unknown) => {
         reportAppError(error, { scope: 'loader', route: '/lists', detail: { servedFromCache: Boolean(cached) } })
-        if (isCurrent && !cached) setHasLoadError(true)
+        if (!isCurrent) return
+        setDataAt(readAge())
+        if (!cached) setHasLoadError(true)
       })
       .finally(() => { if (isCurrent) setIsLoading(false) })
 
@@ -254,6 +267,7 @@ export function ListsPage() {
               { value: 'returned', label: tr('Возвращённые', 'Qaytarilganlar') },
             ]}
           />
+          <DataAge touchedAt={dataAt} isRefreshing={isLoading} onRefresh={() => setReloadKey((current) => current + 1)} />
         </div>
 
         {exportError && <p className="form-error list-export-error"><CircleAlert size={14} /> {exportError}</p>}
