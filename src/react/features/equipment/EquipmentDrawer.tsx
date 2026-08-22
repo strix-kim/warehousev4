@@ -1,5 +1,6 @@
-import { CircleAlert, Pencil, Save, X } from 'lucide-react'
+import { CircleAlert, ClipboardList, Pencil, Save, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
 import {
@@ -10,12 +11,22 @@ import {
   updateEquipmentModelAndUnit,
   type EquipmentMovement,
 } from './api'
+import { fetchUnitLists, readCachedUnitLists, type UnitListUsage } from '../lists/unitUsage'
+import { formatEventDate, parseDateValue } from '../../lib/date'
 import { equipmentAvailabilityOptions, equipmentAvailabilityView } from './availability'
 import { equipmentCode, equipmentIdentifier, formatUnitCount } from './format'
 import type { Equipment } from './types'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
 import { useModalLayer } from '../../lib/useModalLayer'
+
+// parseDateValue отдаёт null на мусоре в колонке: дата мероприятия nullable и
+// приходит строкой из базы, а не из нашего пикера.
+function eventDateLabel(value: string | null, locale: string) {
+  if (!value) return null
+  const date = parseDateValue(value)
+  return date ? formatEventDate(date, locale) : null
+}
 
 // 40001 (serialization_failure) серверная RPC поднимает, когда карточку изменили
 // после того, как её открыли: правка не применена ни в одном поле.
@@ -63,6 +74,10 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
   // Флаг вместо текста: иначе tr попадает в зависимости эффекта и смена языка
   // перезапрашивает историю движения.
   const [hasHistoryError, setHasHistoryError] = useState(false)
+  // Списки, в которых стоит эта единица. Флаг ошибки, а не текст — по той же
+  // причине, что и у истории.
+  const [unitLists, setUnitLists] = useState<UnitListUsage[]>(() => readCachedUnitLists(item.id) ?? [])
+  const [hasUnitListsError, setHasUnitListsError] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [editError, setEditError] = useState('')
@@ -132,6 +147,29 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
       .catch(() => { if (current) setModelUnitCount(null) })
     return () => { current = false }
   }, [item.brand, item.model])
+
+  useEffect(() => {
+    let current = true
+    const cached = readCachedUnitLists(item.id)
+    if (cached) {
+      setUnitLists(cached)
+      setHasUnitListsError(false)
+    } else {
+      setUnitLists([])
+    }
+    fetchUnitLists(item.id)
+      .then((rows) => {
+        if (!current) return
+        setUnitLists(rows)
+        setHasUnitListsError(false)
+      })
+      .catch(() => {
+        // Пустой раздел и отказ — разные вещи: «ни в одном списке» это ответ,
+        // а молчание после сбоя выдало бы отказ за ответ.
+        if (current && !cached) setHasUnitListsError(true)
+      })
+    return () => { current = false }
+  }, [item.id])
 
   useEffect(() => {
     let current = true
@@ -296,6 +334,30 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
           <div className="detail-list__wide"><dt>{tr('Характеристики', 'Xususiyatlar')}</dt><dd>{item.technicalspecification || tr('Не указаны', 'Ko‘rsatilmagan')}</dd></div>
           <div className="detail-list__wide"><dt>{tr('Описание', 'Tavsif')}</dt><dd>{item.description || tr('Нет описания', 'Tavsif yo‘q')}</dd></div>
         </dl>
+        {/* «Где единица сейчас» — вопрос настоящего, поэтому стоит ПЕРЕД журналом:
+            тот отвечает про прошлое. Раздел скрыт целиком, когда единица ни в
+            одном списке и запрос при этом прошёл: пустой блок «ни в одном» —
+            шум на каждой из 1 481 карточки. */}
+        {(unitLists.length > 0 || hasUnitListsError) && (
+          <section className="unit-lists">
+            <div className="panel-heading"><div><h3>{tr('Сейчас в списках', 'Hozir ro‘yxatlarda')}</h3><p>{tr('Сохранённые документы, куда включена эта единица', 'Ushbu birlik kiritilgan saqlangan hujjatlar')}</p></div></div>
+            {hasUnitListsError
+              ? <p className="form-error">{tr('Не удалось проверить, в каких списках стоит единица.', 'Birlik qaysi ro‘yxatlarda turganini tekshirib bo‘lmadi.')}</p>
+              : <ul className="unit-lists__items">
+                {unitLists.map((list) => (
+                  <li key={list.id}>
+                    <Link to={`/lists/${list.id}/edit`}>
+                      <ClipboardList size={16} />
+                      <span>
+                        <strong>{list.name}</strong>
+                        <small>{eventDateLabel(list.reservation_start, locale) ?? tr('Дата не указана', 'Sana ko‘rsatilmagan')}</small>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>}
+          </section>
+        )}
         <section className="history-section">
           <div className="panel-heading"><div><h3>{tr('История движения', 'Harakat tarixi')}</h3><p>{tr('Количество, статус, выдачи и возвраты', 'Miqdor, holat, berish va qaytarish')}</p></div></div>
           <div className="timeline">

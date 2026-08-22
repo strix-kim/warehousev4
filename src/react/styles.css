@@ -293,6 +293,16 @@ h2 { letter-spacing: -0.025em; }
    блока видно прокручивающийся текст. */
 .equipment-edit-footer { position: sticky; bottom: -30px; z-index: 1; display: flex; flex-direction: column; gap: 10px; margin: 0 -30px -30px; padding: 14px 30px 30px; border-top: 1px solid var(--line); background: rgba(255,255,255,.98); box-shadow: 0 -10px 28px rgba(15,22,28,.07); }
 .equipment-edit-footer .form-error { margin: 0; }
+/* «Сейчас в списках» в карточке оборудования. Раздел появляется только когда
+   единица где-то стоит, поэтому пустого состояния у него нет. */
+.unit-lists { margin: 26px 0 0; }
+.unit-lists__items { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.unit-lists__items a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface-soft); text-decoration: none; transition: border-color .16s ease, background .16s ease; }
+.unit-lists__items a:hover { border-color: var(--line-strong); background: #fff; }
+.unit-lists__items a > svg { flex: 0 0 auto; color: var(--ink-faint); }
+.unit-lists__items span { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.unit-lists__items strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.unit-lists__items small { color: var(--ink-faint); font-size: 12px; }
 .equipment-edit-actions { display: grid; grid-template-columns: .8fr 1.2fr; gap: 8px; }
 .equipment-edit-actions .button { width: 100%; }
 @media (max-width: 520px) {
