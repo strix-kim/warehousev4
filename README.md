@@ -94,11 +94,8 @@ docs/                 документация проекта
 |---|---|
 | [`docs/project/current-state.md`](docs/project/current-state.md) | состояние на сегодня и очередь целей |
 | [`docs/project/01-product.md`](docs/project/01-product.md) | что за продукт и что в него НЕ входит |
-| [`docs/project/02-features.md`](docs/project/02-features.md) | функции: что решает база, что показывает клиент |
+| [`docs/project/02-decisions.md`](docs/project/02-decisions.md) | решения и грабли, которые не выводятся из кода |
 | [`docs/project/03-data-model.md`](docs/project/03-data-model.md) | таблицы, RLS, миграции |
-| [`docs/project/04-architecture.md`](docs/project/04-architecture.md) | структура кода, маршруты, слой данных, сборка |
-| [`docs/project/05-roadmap.md`](docs/project/05-roadmap.md) | что дальше и в каком порядке |
-| [`docs/project/06-design-system.md`](docs/project/06-design-system.md) | токены, палитра, брейкпоинты |
 | [`docs/project/backlog.md`](docs/project/backlog.md) | известные долги и замеченные баги |
 
 Как ведётся работа над проектом — [`docs/system/workflow.md`](docs/system/workflow.md).
