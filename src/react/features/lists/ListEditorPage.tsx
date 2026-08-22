@@ -28,7 +28,6 @@ import {
   fetchEquipmentList,
   readCachedEquipmentList,
   readListDraft,
-  readListDraftMeta,
   updateEquipmentList,
   type EquipmentList,
   type EquipmentListItem,
@@ -37,24 +36,13 @@ import { buildCatalogGroups, groupKey, type CatalogGroup } from './catalogGroups
 import { CatalogPanel, CatalogPreviewDrawer } from './ListEditorCatalog'
 import { ListEditorMeta, type ListMetaField, type RequisiteField } from './ListEditorMeta'
 import { useEditorChrome } from './useEditorChrome'
+import { selectionLabel, type SelectedGroup } from './listSelection'
 import { useListDraftAutosave } from './useListDraftAutosave'
+import { useListDraftRestore } from './useListDraftRestore'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
 // Подпись позиции — минимальный снимок группы. Нужен ровно в одном случае:
 // группы больше нет в свежем каталоге, и строку нечем было бы нарисовать.
-type SelectionLabel = Pick<CatalogGroup, 'brand' | 'model' | 'type' | 'subtype'>
-
-// Выборка хранит КЛЮЧ группы, а не саму группу: сам объект берётся из актуальной
-// Map на рендере. Иначе остатки, серийники и payload считались бы по каталогу
-// на момент клика — обновление склада до выборки не доезжало.
-type SelectedGroup = {
-  key: string
-  label: SelectionLabel
-  count: number
-  serialIds: string[]
-  serialPickerOpen: boolean
-}
-
 // Причина отказа при открытии сохранённого списка. Держим кодом, а не готовой
 // строкой: строка потянула бы tr в зависимости эффекта, и смена языка
 // перезапрашивала бы список из базы.
@@ -90,22 +78,19 @@ function serializeDocument(input: {
   })
 }
 
-function selectionLabel(group: CatalogGroup): SelectionLabel {
-  return { brand: group.brand, model: group.model, type: group.type, subtype: group.subtype }
-}
-
 export function ListEditorPage() {
   const navigate = useNavigate()
   const { listId } = useParams<{ listId: string }>()
   const { tr, language, locale } = useLanguage()
-  // Черновик восстанавливается ТОЛЬКО в режиме создания: у открытого списка
-  // источник правды — строка в базе. Реквизиты стартуют пустыми: подставленный
-  // текст пользователь принимал за свой и увозил в документ и в базу.
-  const [restoredDraft] = useState(() => listId ? null : readListDraft())
-  // Момент последней записи черновика — «изменён 21.08, 18:40» в плашке. Спрашиваем
-  // только про живой черновик: у меты нет гейта по TTL, и для протухшей записи она
-  // отдала бы время суточной давности.
-  const [restoredDraftAt] = useState(() => restoredDraft ? readListDraftMeta()?.touchedAt ?? null : null)
+  // Реквизиты стартуют пустыми: подставленный текст пользователь принимал за свой
+  // и увозил в документ и в базу.
+  //
+  // Черновик читается ЗДЕСЬ и второй раз внутри useListDraftRestore, и это не
+  // недосмотр: инициализаторы полей ниже выполняются до того, как появится
+  // groupsByKey, без которого хук вызвать нечем. Оба чтения бьют в один ключ кэша
+  // и возвращают одно значение — «починка» через проброс сверху вниз потребовала
+  // бы поднять хук выше каталога, куда он не встанет.
+  const restoredDraft = useState(() => listId ? null : readListDraft())[0]
   const [name, setName] = useState<string>(() => restoredDraft?.name ?? '')
   const [clientName, setClientName] = useState<string>(() => restoredDraft?.clientName ?? '')
   const [venue, setVenue] = useState<string>(() => restoredDraft?.venue ?? '')
@@ -152,7 +137,6 @@ export function ListEditorPage() {
   const savedSnapshotRef = useRef('')
   // Что именно восстановилось: сколько единиц вернулось и сколько позиций не
   // нашлось в живом каталоге. null — плашки нет.
-  const [draftNotice, setDraftNotice] = useState<{ missingGroups: number; units: number } | null>(null)
   // Гидратация разведена на две: шапка документа заполняется сразу из строки
   // списка, состав — только когда приехал каталог.
   const hydratedMetaRef = useRef('')
@@ -160,7 +144,6 @@ export function ListEditorPage() {
   // Автосейв заблокирован, пока восстановление не закончилось: стартовый пустой
   // стейт затёр бы сохранённый черновик раньше, чем тот успеет подняться.
   // Восстанавливать нечего — снят сразу.
-  const draftRestoredRef = useRef(!restoredDraft)
   // Оба действия необратимы и стоят рядом с обычными кнопками, поэтому спрашивают
   // подтверждение вторым нажатием. Экземпляры независимые: взведённая «Очистить»
   // не должна взводить «Начать заново».
@@ -268,31 +251,9 @@ export function ListEditorPage() {
     hydratedSelectionRef.current = listToEdit.id
   }, [equipment, groups, groupsByKey, listToEdit])
 
-  // Выборка черновика поднимается только по живому каталогу: позицию ищем по
-  // ключу группы, серийники оставляем те, что ещё существуют. Пока каталог
-  // грузится или не загрузился вовсе, восстановление не запускается — иначе
-  // «ничего не нашлось» стёрло бы черновик вместо того, чтобы его вернуть.
-  useEffect(() => {
-    if (!restoredDraft || draftRestoredRef.current || isLoading || hasLoadError) return
-    const restored: SelectedGroup[] = []
-    let missingGroups = 0
-
-    for (const item of restoredDraft.items) {
-      const group = groupsByKey.get(item.key)
-      if (!group) {
-        missingGroups += 1
-        continue
-      }
-      const serialIds = item.serialIds.filter((id) => group.serializedItems.some((unit) => unit.id === id))
-      restored.push({ key: group.key, label: selectionLabel(group), count: Math.max(1, item.count), serialIds, serialPickerOpen: false })
-    }
-
-    setSelected(restored)
-    // Единицы, а не строки: то же число, что и «Всего единиц» в подвале выборки, —
-    // иначе плашка и подвал спорят друг с другом на одном экране.
-    setDraftNotice({ missingGroups, units: restored.reduce((sum, item) => sum + item.count, 0) })
-    draftRestoredRef.current = true
-  }, [groupsByKey, hasLoadError, isLoading, restoredDraft])
+  const { restoredDraftAt, draftNotice, setDraftNotice, draftRestoredRef } = useListDraftRestore({
+    listId, isLoading, hasLoadError, groupsByKey, setSelected,
+  })
 
   const draftItems = useMemo(() => selected.map((item) => ({
     key: item.key,
