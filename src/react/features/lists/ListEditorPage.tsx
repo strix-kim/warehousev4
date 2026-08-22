@@ -13,7 +13,7 @@ import {
   ScanBarcode,
   Trash2,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { preloadEquipmentImages } from '../../components/EquipmentVisual'
 import { formatDateTime, formatTime, parseDateValue, todayDateValue } from '../../lib/date'
@@ -39,6 +39,7 @@ import { useEditorChrome } from './useEditorChrome'
 import { selectionLabel, type SelectedGroup } from './listSelection'
 import { useListDraftAutosave } from './useListDraftAutosave'
 import { useListDraftRestore } from './useListDraftRestore'
+import type { ListDraft } from './api'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
 // Подпись позиции — минимальный снимок группы. Нужен ровно в одном случае:
@@ -141,6 +142,10 @@ export function ListEditorPage() {
   // списка, состав — только когда приехал каталог.
   const hydratedMetaRef = useRef('')
   const hydratedSelectionRef = useRef('')
+  // Ref гасит повторный вход в эффект, но не вызывает рендер — а хук
+  // восстановления должен УЗНАТЬ, что гидратация из базы закончилась. Отсюда
+  // пара: ref для гварда, состояние для уведомления.
+  const [hydratedListId, setHydratedListId] = useState<string | null>(null)
   // Автосейв заблокирован, пока восстановление не закончилось: стартовый пустой
   // стейт затёр бы сохранённый черновик раньше, чем тот успеет подняться.
   // Восстанавливать нечего — снят сразу.
@@ -249,10 +254,21 @@ export function ListEditorPage() {
       items: restoredItems,
     })
     hydratedSelectionRef.current = listToEdit.id
+    setHydratedListId(listToEdit.id)
   }, [equipment, groups, groupsByKey, listToEdit])
 
-  const { restoredDraftAt, draftNotice, setDraftNotice, draftRestoredRef } = useListDraftRestore({
-    listId, isLoading, hasLoadError, groupsByKey, setSelected,
+  // Шапка документа из черновика открытого списка. Отдельным колбэком, чтобы не
+  // тащить в хук шесть сеттеров формы.
+  const applyDocument = useCallback((draft: ListDraft) => {
+    setName(draft.name)
+    setClientName(draft.clientName)
+    setVenue(draft.venue)
+    setDescription(draft.description)
+    setEventDate(draft.eventDate)
+  }, [])
+
+  const { draftNotice, setDraftNotice, draftRestoredRef } = useListDraftRestore({
+    listId, isLoading, hasLoadError, hydratedListId, groupsByKey, setSelected, applyDocument,
   })
 
   const draftItems = useMemo(() => selected.map((item) => ({
@@ -261,13 +277,16 @@ export function ListEditorPage() {
     serialIds: item.serialIds,
   })), [selected])
 
-  useListDraftAutosave({ listId, restoredRef: draftRestoredRef, name, clientName, venue, description, eventDate, items: draftItems })
-
-  // Правки сохранённого списка не автосохраняются, поэтому закрытие вкладки
-  // спрашивает подтверждение. На /lists/new предупреждения нет — там черновик
-  // лежит в localStorage. Текст диалога свой у каждого браузера, задать его нельзя.
+  // Расхождение с последним сохранённым состоянием. Считается ДО автосейва: он
+  // же по нему и решает, писать черновик открытого списка или стирать.
   const isDirty = savedSnapshotRef.current !== ''
     && savedSnapshotRef.current !== serializeDocument({ name, clientName, venue, description, eventDate, items: draftItems })
+
+  useListDraftAutosave({ listId, restoredRef: draftRestoredRef, isDirty, name, clientName, venue, description, eventDate, items: draftItems })
+
+  // Закрытие вкладки всё равно спрашивает подтверждение: черновик переживает
+  // уход, но человек об этом не знает, а «правки пропали» дороже лишнего диалога.
+  // Текст диалога свой у каждого браузера, задать его нельзя.
 
   useEffect(() => {
     if (!listId || !isDirty) return
@@ -282,18 +301,32 @@ export function ListEditorPage() {
     return () => window.removeEventListener('beforeunload', warnOnUnload)
   }, [isDirty, listId])
 
-  // «Начать заново»: черновик стирается, форма пустеет.
+  // Сброс несохранённой работы. У /lists/new это «Начать заново» — форма пустеет.
+  // У открытого списка пустеть нечему: откатываем к строке из базы, для чего
+  // снимаем гвард гидратации и даём эффекту отработать заново.
   function discardDraft() {
-    clearListDraft()
+    clearListDraft(listId)
     setDraftNotice(null)
+    setSuccessMessage('')
+    setRequisiteErrors(new Set())
+
+    if (listId && listToEdit) {
+      setName(listToEdit.name)
+      setClientName(listToEdit.client_name ?? '')
+      setVenue(listToEdit.venue ?? '')
+      setDescription(listToEdit.description ?? '')
+      setEventDate(listToEdit.reservation_start ?? todayDateValue())
+      hydratedSelectionRef.current = ''
+      setHydratedListId(null)
+      return
+    }
+
     setSelected([])
     setName('')
     setClientName('')
     setVenue('')
     setDescription('')
     setEventDate(todayDateValue())
-    setSuccessMessage('')
-    setRequisiteErrors(new Set())
   }
 
   function clearRequisiteError(field: RequisiteField) {
@@ -495,11 +528,13 @@ export function ListEditorPage() {
       if (!name.trim()) setName(saved.name)
       setSuccessMessage(isCreating ? tr('Список сохранён в системе.', 'Ro‘yxat tizimda saqlandi.') : tr('Изменения сохранены.', 'O‘zgarishlar saqlandi.'))
       setLastSavedAt(Date.now())
+      // Черновик своё отработал в любом режиме: состояние уехало в базу, и
+      // расхождения больше нет. Автосейв стёр бы его сам следующим тиком, но
+      // тогда плашка успела бы мигнуть на перезагрузке в этот интервал.
+      clearListDraft(listId)
+      setDraftNotice(null)
       // После создания источник правды — listId из URL: следующее «Сохранить» обновит эту же запись, а не заведёт вторую.
       if (isCreating) {
-        // Черновик своё отработал: дальше запись живёт в базе.
-        clearListDraft()
-        setDraftNotice(null)
         navigate(`/lists/${saved.id}/edit`, { replace: true })
       }
     } catch {
@@ -619,15 +654,19 @@ export function ListEditorPage() {
         <div className="editor-draft-notice">
           <Info size={18} />
           <span>
-            <strong>{tr('Черновик восстановлен', 'Qoralama tiklandi')}</strong>
+            {/* У открытого списка формулировка другая: «Черновик восстановлен»
+                читалось бы как «список не сохранён», а он в базе есть. */}
+            <strong>{draftNotice.kind === 'edits'
+              ? tr('Восстановлены несохранённые правки', 'Saqlanmagan o‘zgarishlar tiklandi')
+              : tr('Черновик восстановлен', 'Qoralama tiklandi')}</strong>
             {/* Что именно вернулось и когда: состав лежит на другой вкладке, и без
                 этих двух чисел «восстановлен» относится непонятно к чему, а решение
                 нажать «Начать заново» принимается вслепую. */}
-            <small>{restoredDraftAt === null
+            <small>{draftNotice.touchedAt === null
               ? tr(`единиц: ${draftNotice.units}`, `birliklar: ${draftNotice.units}`)
               : tr(
-                `единиц: ${draftNotice.units} · изменён ${formatDateTime(restoredDraftAt, locale)}`,
-                `birliklar: ${draftNotice.units} · ${formatDateTime(restoredDraftAt, locale)} da o‘zgartirilgan`,
+                `единиц: ${draftNotice.units} · изменён ${formatDateTime(draftNotice.touchedAt, locale)}`,
+                `birliklar: ${draftNotice.units} · ${formatDateTime(draftNotice.touchedAt, locale)} da o‘zgartirilgan`,
               )}</small>
             {draftNotice.missingGroups > 0 && <small>{tr(
               `позиций больше нет в каталоге: ${draftNotice.missingGroups}`,
@@ -635,7 +674,9 @@ export function ListEditorPage() {
             )}</small>}
           </span>
           <button className="button button--secondary" type="button" onClick={() => restartArmed.fire(discardDraft)} onBlur={restartArmed.disarm}>
-            {restartArmed.armed ? tr('Да, начать заново', 'Ha, yangidan boshlansin') : tr('Начать заново', 'Yangidan boshlash')}
+            {draftNotice.kind === 'edits'
+              ? (restartArmed.armed ? tr('Да, отбросить правки', 'Ha, o‘zgarishlar tashlansin') : tr('Отбросить правки', 'O‘zgarishlarni tashlash'))
+              : (restartArmed.armed ? tr('Да, начать заново', 'Ha, yangidan boshlansin') : tr('Начать заново', 'Yangidan boshlash'))}
           </button>
         </div>
       )}

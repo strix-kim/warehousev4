@@ -27,3 +27,12 @@ export function invalidateListCompositionCache() {
 // протухает сама.
 export const LIST_DRAFT_CACHE_KEY = 'list-draft:new'
 export const LIST_DRAFT_TTL_MS = 24 * 60 * 60 * 1000
+
+// Несохранённые правки ОТКРЫТОГО списка (с13, U3-M) лежат отдельным ключом на
+// каждый список. Тот же префикс `list-draft:` и тот же срок: это ровно такая же
+// «работа, которую ещё не сохранили», просто у неё уже есть строка в базе.
+// Ключ БЕЗ id остаётся за /lists/new — карточка черновика в реестре спрашивает
+// именно его и не должна показывать правки уже сохранённых списков.
+export function listDraftCacheKey(listId?: string) {
+  return listId ? `list-draft:${listId}` : LIST_DRAFT_CACHE_KEY
+}

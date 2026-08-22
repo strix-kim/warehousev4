@@ -6,7 +6,7 @@ import { escapeLikePattern, quoteFilterValue } from '../../lib/postgrest'
 import { reportAppError } from '../../lib/reportAppError'
 import { fetchEquipmentByIds } from '../equipment/api'
 import type { Equipment } from '../equipment/types'
-import { LIST_DRAFT_CACHE_KEY, LIST_DRAFT_TTL_MS, listCompositionCacheKey } from './cacheKeys'
+import { LIST_DRAFT_TTL_MS, listCompositionCacheKey, listDraftCacheKey } from './cacheKeys'
 import type { ExportListRow } from './xlsxExport'
 
 export type EquipmentListItem = Pick<Equipment, 'brand' | 'model' | 'type' | 'subtype'> & {
@@ -356,29 +356,31 @@ export type ListDraft = {
   items: ListDraftItem[]
 }
 
-export function readListDraft() {
-  return readCachedQuery<ListDraft>(LIST_DRAFT_CACHE_KEY)
+// Без listId — черновик /lists/new; с listId — несохранённые правки открытого
+// списка. Одна машинерия на оба случая: разница только в ключе.
+export function readListDraft(listId?: string) {
+  return readCachedQuery<ListDraft>(listDraftCacheKey(listId))
 }
 
-export function saveListDraft(draft: ListDraft) {
-  primeCachedQuery(LIST_DRAFT_CACHE_KEY, LIST_DRAFT_TTL_MS, draft)
+export function saveListDraft(draft: ListDraft, listId?: string) {
+  primeCachedQuery(listDraftCacheKey(listId), LIST_DRAFT_TTL_MS, draft)
 }
 
 // Момент последней записи черновика — «Не сохранён · изменён 21.08, 18:40» на
 // карточке реестра и в плашке восстановления. Спрашивать эту метку можно ТОЛЬКО
 // про черновик, который вернул readListDraft: гейта по TTL у меты нет, и для
 // протухшей записи она честно отдала бы время суточной давности.
-export function readListDraftMeta() {
-  return readCachedQueryMeta(LIST_DRAFT_CACHE_KEY)
+export function readListDraftMeta(listId?: string) {
+  return readCachedQueryMeta(listDraftCacheKey(listId))
 }
 
 // Точечного удаления одного ключа у persistentCache нет, поэтому стираем
 // префиксом. Пустой вызов гасим сразу: invalidateCachePrefix поднимает поколение
 // кэша, а это отменяет запись ВСЕХ ответов, летящих прямо сейчас, — и обычный
 // заход на /lists/new без черновика выбрасывал бы прогрев каталога.
-export function clearListDraft() {
-  if (readListDraft() === null) return
-  invalidateCachePrefix(LIST_DRAFT_CACHE_KEY)
+export function clearListDraft(listId?: string) {
+  if (readListDraft(listId) === null) return
+  invalidateCachePrefix(listDraftCacheKey(listId))
 }
 
 export type EquipmentListDocumentInput = {
