@@ -494,6 +494,11 @@ h2 { letter-spacing: -0.025em; }
 .editor-grid--quick { --editor-chrome: 244px; height: clamp(420px, calc(100dvh - var(--editor-chrome)), 900px); }
 .catalog-picker, .selection-panel { min-height: 0; height: 100%; display: flex; flex-direction: column; }
 .catalog-picker .panel-heading, .selection-panel .panel-heading { flex: 0 0 auto; }
+/* Тело каталожной панели: до 1800 — только результаты, с 1800 слева встаёт рельс
+   категорий. Прокручиваются они по отдельности, иначе длинный список моделей
+   уносил бы категории за верх. */
+.catalog-picker__body { min-height: 0; flex: 1 1 auto; display: flex; }
+.catalog-picker__body > .picker-results { flex: 1 1 auto; }
 .picker-results, .selection-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .picker-results { max-height: none; }
 .picker-item { width: 100%; min-height: 72px; display: grid; grid-template-columns: minmax(0, 1fr) 38px; align-items: center; gap: 10px; padding: 0 14px 0 0; border-bottom: 1px solid var(--line); color: inherit; background: #fff; }
@@ -757,6 +762,19 @@ h2 { letter-spacing: -0.025em; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* U44: на 1920 строка каталога несла ~700 px пустоты, а категорию выбирали через
+   попап селекта. Пара к WIDE_EDITOR_BREAKPOINT в lib/breakpoints.ts — правится
+   руками синхронно. Селект категории при этом убирается ИЗ РАЗМЕТКИ, а не
+   стилями: тулбар считает колонки через :has(.app-select + .app-select). */
+@media (min-width: 1800px) {
+  .catalog-rail { flex: 0 0 210px; display: flex; flex-direction: column; gap: 2px; min-height: 0; padding: 10px; overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--line); }
+  .catalog-rail button { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; padding: 0 10px; border: 0; border-radius: 8px; color: var(--ink-soft); background: transparent; font-size: 13px; font-weight: 600; text-align: left; }
+  .catalog-rail button:hover { color: var(--ink); background: var(--surface-soft); }
+  .catalog-rail button.active { color: var(--ink); background: rgba(239,18,54,.08); box-shadow: inset 2px 0 var(--accent); }
+  .catalog-rail button > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .catalog-rail button > small { flex: 0 0 auto; color: var(--ink-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
 }
 
 @media (max-width: 1500px) {

@@ -2,6 +2,7 @@ import { CircleAlert, Info, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type RefObject } from 'react'
 import { AppSelect } from '../../components/AppSelect'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
+import { WIDE_EDITOR_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
 import { useModalLayer } from '../../lib/useModalLayer'
@@ -33,6 +34,9 @@ export function CatalogPanel({ panelRef, isMobileActive, groups, equipmentCount,
   const [category, setCategory] = useState('')
   const [subcategory, setSubcategory] = useState('')
   const [catalogLimit, setCatalogLimit] = useState(60)
+  // Рельс категорий вместо селекта: на 1920 в строке каталога оставалось ~700 px
+  // пустоты, а выбор категории стоил открытия попапа.
+  const [isWide, setWide] = useState(() => window.matchMedia(WIDE_EDITOR_MEDIA_QUERY).matches)
 
   const categories = useMemo(() => [...new Set(groups.map((group) => group.type))]
     .sort((a, b) => translateEquipmentTaxonomy(a, language).localeCompare(translateEquipmentTaxonomy(b, language), locale)), [groups, language, locale])
@@ -42,6 +46,12 @@ export function CatalogPanel({ panelRef, isMobileActive, groups, equipmentCount,
     .filter((group) => !category || group.type === category)
     .map((group) => group.subtype))]
     .sort((a, b) => translateEquipmentTaxonomy(a, language).localeCompare(translateEquipmentTaxonomy(b, language), locale)), [category, groups, language, locale])
+  // Счётчик рядом с категорией отвечает на «есть ли там вообще что-то» до клика.
+  const countByCategory = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const group of groups) counts.set(group.type, (counts.get(group.type) ?? 0) + 1)
+    return counts
+  }, [groups])
   const filteredGroups = useMemo(() => {
     const terms = search.trim().toLocaleLowerCase(locale).split(/\s+/).filter(Boolean)
     return groups.filter((group) => {
@@ -52,6 +62,13 @@ export function CatalogPanel({ panelRef, isMobileActive, groups, equipmentCount,
     })
   }, [category, groups, language, locale, search, subcategory])
   const visibleGroups = filteredGroups.slice(0, catalogLimit)
+
+  useEffect(() => {
+    const media = window.matchMedia(WIDE_EDITOR_MEDIA_QUERY)
+    const sync = (event: MediaQueryListEvent) => setWide(event.matches)
+    media.addEventListener('change', sync)
+    return () => media.removeEventListener('change', sync)
+  }, [])
 
   useEffect(() => { setSubcategory(''); setCatalogLimit(60) }, [category])
   useEffect(() => setCatalogLimit(60), [search, subcategory])
@@ -67,12 +84,14 @@ export function CatalogPanel({ panelRef, isMobileActive, groups, equipmentCount,
           <Search size={18} />
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tr('Модель, бренд или категория…', 'Model, brend yoki toifa…')} aria-label={tr('Поиск оборудования', 'Uskunalarni qidirish')} />
         </label>
-        <AppSelect
-          value={category}
-          options={[{ value: '', label: tr('Все категории', 'Barcha toifalar') }, ...categories.map((value) => ({ value, label: translateEquipmentTaxonomy(value, language) }))]}
-          onChange={setCategory}
-          ariaLabel={tr('Категория', 'Toifa')}
-        />
+        {!isWide && (
+          <AppSelect
+            value={category}
+            options={[{ value: '', label: tr('Все категории', 'Barcha toifalar') }, ...categories.map((value) => ({ value, label: translateEquipmentTaxonomy(value, language) }))]}
+            onChange={setCategory}
+            ariaLabel={tr('Категория', 'Toifa')}
+          />
+        )}
         {subcategories.length > 1 && (
           <AppSelect
             value={subcategory}
@@ -82,6 +101,19 @@ export function CatalogPanel({ panelRef, isMobileActive, groups, equipmentCount,
           />
         )}
       </div>
+      <div className="catalog-picker__body">
+      {isWide && (
+        <nav className="catalog-rail" aria-label={tr('Категории', 'Toifalar')}>
+          <button type="button" className={category === '' ? 'active' : ''} onClick={() => setCategory('')}>
+            <span>{tr('Все категории', 'Barcha toifalar')}</span><small>{groups.length}</small>
+          </button>
+          {categories.map((value) => (
+            <button key={value} type="button" className={category === value ? 'active' : ''} onClick={() => setCategory(value)}>
+              <span>{translateEquipmentTaxonomy(value, language)}</span><small>{countByCategory.get(value) ?? 0}</small>
+            </button>
+          ))}
+        </nav>
+      )}
       <div className="picker-results">
         {hasLoadError && <div className="state-block state-block--error"><CircleAlert size={23} /><span>{tr('Не удалось загрузить каталог.', 'Katalogni yuklab bo‘lmadi.')}</span></div>}
         {isLoading && equipmentCount === 0 && Array.from({ length: 8 }, (_, index) => <div className="picker-skeleton" key={index} />)}
@@ -117,6 +149,7 @@ export function CatalogPanel({ panelRef, isMobileActive, groups, equipmentCount,
           </div>
         )}
         {!isLoading && !hasLoadError && filteredGroups.length === 0 && <div className="state-block"><Search size={25} /><strong>{tr('Ничего не найдено', 'Hech narsa topilmadi')}</strong><span>{tr('Измените поиск или категорию.', 'Qidiruv yoki toifani o‘zgartiring.')}</span></div>}
+      </div>
       </div>
     </section>
   )

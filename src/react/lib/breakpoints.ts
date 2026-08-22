@@ -13,3 +13,14 @@
 export const MOBILE_BREAKPOINT = 820
 
 export const MOBILE_MEDIA_QUERY = `(max-width: ${MOBILE_BREAKPOINT}px)`
+
+// Широкий экран редактора: с этой ширины каталог получает третью колонку —
+// рельс категорий вместо селекта в тулбаре. Пара в CSS — медиазапрос `1800px`
+// в `styles.css`, правится руками синхронно, как и 820.
+//
+// Почему выбор делается в разметке, а не `display: none`: тулбар считает свои
+// колонки селектором `:has(.app-select + .app-select)`, и спрятанный стилями
+// селект остался бы для него существующим — раскладка поехала бы.
+export const WIDE_EDITOR_BREAKPOINT = 1800
+
+export const WIDE_EDITOR_MEDIA_QUERY = `(min-width: ${WIDE_EDITOR_BREAKPOINT}px)`
