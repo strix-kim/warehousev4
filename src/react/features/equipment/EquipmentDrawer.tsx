@@ -77,6 +77,9 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
   // Ответ, пришедший после закрытия, игнорируем: onRefreshed поднимает запись
   // наверх и заново открыл бы уже закрытый drawer.
   const isOpenRef = useRef(true)
+  // Дровер — сам себе скролл-контейнер (.drawer overflow-y: auto), поэтому
+  // прокрутка к подтверждению идёт по нему, а не по window.
+  const drawerRef = useRef<HTMLElement>(null)
   const { brand, model, type, subtype, specification, length, description, availability, location, count } = draft
   const canSave = Boolean(brand.trim() && model.trim() && type.trim() && subtype.trim() && count >= 0)
 
@@ -187,6 +190,10 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
       })
       onUpdated(updated)
       setIsEditing(false)
+      // Панель правки схлопывается, и подтверждение оказывается выше текущей
+      // прокрутки: на телефоне человек остался бы у пустого низа, не увидев,
+      // сохранилось ли что-нибудь.
+      drawerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
       setEditSuccess(updatedModelUnits === null
         ? tr('Изменения сохранены.', 'O‘zgarishlar saqlandi.')
         : tr(
@@ -212,7 +219,7 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
 
   return (
     <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Карточка оборудования', 'Uskuna kartasi')} onMouseDown={onClose}>
-      <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
+      <aside className="drawer" ref={drawerRef} onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
           <div>
             <p className="eyebrow">{equipmentCode(item.id)}</p>
@@ -267,10 +274,15 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
                 )}
               </div>
             </section>
+            {/* Ошибка и кнопки — один липкий блок: порознь сообщение о конфликте
+                версий уезжало вверх за экран, а решение по нему принимают прямо
+                у кнопки «Сохранить». */}
+            <div className="equipment-edit-footer">
             {editError && <p className="form-error"><CircleAlert size={15} /> {editError}</p>}
             <div className="equipment-edit-actions">
               <button className="button button--secondary" type="button" onClick={cancelEditing} disabled={isSaving}>{tr('Отмена', 'Bekor qilish')}</button>
               <button className="button button--primary" type="button" onClick={() => void saveChanges()} disabled={!canSave || isSaving}><Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить изменения', 'O‘zgarishlarni saqlash')}</button>
+            </div>
             </div>
           </div>
         ) : <><dl className="detail-list">
