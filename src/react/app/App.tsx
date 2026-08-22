@@ -1,4 +1,4 @@
-import { ArrowUpRight, Boxes, ClipboardList, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Warehouse } from 'lucide-react'
+import { ArrowUpRight, Boxes, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Warehouse, X } from 'lucide-react'
 import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AppErrorBoundary } from '../components/AppErrorBoundary'
@@ -6,6 +6,7 @@ import { useAuth } from '../features/auth/AuthProvider'
 import { LanguageSwitcher, useLanguage } from '../lib/i18n'
 import { lazyWithReload } from '../lib/lazyWithReload'
 import { reportAppError } from '../lib/reportAppError'
+import { useModalLayer } from '../lib/useModalLayer'
 
 const loadLoginPage = () => import('../features/auth/LoginPage').then((module) => ({ default: module.LoginPage }))
 const loadEquipmentPage = () => import('../features/equipment/EquipmentPage').then((module) => ({ default: module.EquipmentPage }))
@@ -64,6 +65,13 @@ function AppShell() {
   const { tr } = useLanguage()
   const email = session?.user.email ?? tr('Сотрудник ARGO', 'ARGO xodimi')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('argo:sidebar-collapsed') === 'true')
+  const [isMoreOpen, setMoreOpen] = useState(false)
+  const { pathname } = useLocation()
+
+  // Лист закрывается на любую смену маршрута, а не только по своей ссылке:
+  // жест «назад» увёл бы страницу из-под открытого листа, и он остался бы
+  // висеть поверх чужого экрана.
+  useEffect(() => { setMoreOpen(false) }, [pathname])
 
   useEffect(() => {
     window.localStorage.setItem('argo:sidebar-collapsed', String(sidebarCollapsed))
@@ -153,6 +161,18 @@ function AppShell() {
           <NavLink to="/" end><House size={19} /><span>{tr('Главная', 'Bosh sahifa')}</span></NavLink>
           <NavLink to="/equipment"><Boxes size={19} /><span>{tr('Оборудование', 'Uskunalar')}</span></NavLink>
           <NavLink to="/lists"><ClipboardList size={19} /><span>{tr('Списки', 'Ro‘yxatlar')}</span></NavLink>
+          {/* Четвёртый слот нижней панели, на десктопе скрыт: язык, аккаунт и
+              быстрый переход в новый список живут в сайдбаре, которого на
+              телефоне нет. Раньше этот слот занимал постоянный RU/UZ. */}
+          <button
+            type="button"
+            className={`sidebar__more ${isMoreOpen ? 'active' : ''}`}
+            onClick={() => setMoreOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={isMoreOpen}
+          >
+            <Ellipsis size={19} /><span>{tr('Ещё', 'Yana')}</span>
+          </button>
         </nav>
 
         <div className="sidebar__utility">
@@ -181,15 +201,44 @@ function AppShell() {
       </aside>
 
       <main className="app-content">
-        {/* Минимум U5: на телефоне и планшете sidebar__footer скрыт, и выйти из аккаунта
-            негде. Полоса видна только до 820 px и уйдёт, когда в нижнюю навигацию
-            добавится пункт «Ещё». */}
-        <div className="mobile-account">
-          <span>{email}</span>
-          <button className="button button--secondary mobile-account__signout" onClick={() => void signOut()}><LogOut size={16} />{tr('Выйти', 'Chiqish')}</button>
-        </div>
         <Outlet />
       </main>
+
+      {isMoreOpen && <MobileMoreSheet email={email} onSignOut={() => void signOut()} onClose={() => setMoreOpen(false)} />}
+    </div>
+  )
+}
+
+// Нижний лист телефона: то, что на десктопе висит в сайдбаре постоянно.
+// Отдельный слой, а не выпадашка: панель навигации фиксирована у нижнего края,
+// и попап пришлось бы позиционировать вручную поверх safe-area.
+function MobileMoreSheet({ email, onSignOut, onClose }: { email: string; onSignOut: () => void; onClose: () => void }) {
+  const { tr } = useLanguage()
+  useModalLayer(onClose)
+
+  return (
+    <div className="sheet-layer" role="dialog" aria-modal="true" aria-label={tr('Ещё', 'Yana')} onMouseDown={onClose}>
+      <div className="sheet" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="sheet__header">
+          <strong>{tr('Ещё', 'Yana')}</strong>
+          <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+        </div>
+        {/* Тот же путь, что у быстрого действия сайдбара: на телефоне сайдбар
+            скрыт, и одношаговый вход в сборку комплекта пропадал. */}
+        <Link className="sheet__action" to="/lists/new" onClick={onClose}>
+          <span><ListPlus size={19} /></span>
+          <div><strong>{tr('Новый список', 'Yangi ro‘yxat')}</strong><small>{tr('Собрать комплект', 'Jamlanma tuzish')}</small></div>
+          <ArrowUpRight size={16} />
+        </Link>
+        <div className="sheet__row">
+          <span>{tr('Язык интерфейса', 'Interfeys tili')}</span>
+          <LanguageSwitcher />
+        </div>
+        <div className="sheet__account">
+          <span>{email}</span>
+          <button className="button button--secondary" onClick={onSignOut}><LogOut size={16} />{tr('Выйти', 'Chiqish')}</button>
+        </div>
+      </div>
     </div>
   )
 }
