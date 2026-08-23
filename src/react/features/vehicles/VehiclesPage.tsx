@@ -1,11 +1,16 @@
-import { CarFront, CircleAlert, Plus, Search } from 'lucide-react'
+import { CarFront, CircleAlert, FileSpreadsheet, Plus, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchVehiclePhotoPaths, fetchVehicles, getSignedUrls } from './api'
+import { downloadVehicleEventXlsx } from './eventExport'
 import { VehicleDrawer } from './VehicleDrawer'
+import { VehicleEventExportDrawer } from './VehicleEventExportDrawer'
 import { driverShortName, plateForSearch, vehicleTitle, type VehicleWithDrivers } from './types'
+import { fetchEmployees } from '../employees/api'
+import type { Employee } from '../employees/types'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import type { EventDocumentMeta } from '../../lib/xlsx/eventDocument'
 
 export function VehiclesPage() {
   const navigate = useNavigate()
@@ -19,6 +24,10 @@ export function VehiclesPage() {
   // Поиск здесь клиентский и в адрес не едет: выдача полная, фильтр мгновенный,
   // а запоминать его в истории незачем — в отличие от открытой карточки.
   const [search, setSearch] = useState('')
+  // Состав будущего документа — черновик действия, а не состояние экрана:
+  // ни в адресе, ни в хранилище его нет, уход со страницы сбрасывает выбор.
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [isExportOpen, setIsExportOpen] = useState(false)
   // Подписанные ссылки на первое фото каждой машины — только память страницы:
   // URL живёт час, и в persistentCache ему не место.
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map())
@@ -89,10 +98,49 @@ export function VehiclesPage() {
     setParams(next, { replace: true })
   }
 
+  function toggleSelected(id: string) {
+    setSelected((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // «Показанные» — это результат поиска, а не вся база: галка в тулбаре обещает
+  // ровно то, что человек видит перед собой.
+  const allShownSelected = visible.length > 0 && visible.every((vehicle) => selected.has(vehicle.id))
+
+  function toggleAllShown() {
+    setSelected((current) => {
+      const next = new Set(current)
+      for (const vehicle of visible) {
+        if (allShownSelected) next.delete(vehicle.id)
+        else next.add(vehicle.id)
+      }
+      return next
+    })
+  }
+
   // Выдача полная (машин десятки), поэтому карточку из адреса ищем в ней же —
   // отдельного запроса по id не нужно. Ищем по ПОЛНОМУ списку, а не по
   // отфильтрованному: набранный поиск не должен закрывать открытую карточку.
-  const selected = vehicleId ? vehicles.find((vehicle) => vehicle.id === vehicleId) ?? null : null
+  const openCard = vehicleId ? vehicles.find((vehicle) => vehicle.id === vehicleId) ?? null : null
+  const chosen = vehicles.filter((vehicle) => selected.has(vehicle.id))
+
+  // Сборка документа: паспорт, адрес и дата рождения водителя лежат в его ПОЛНОЙ
+  // карточке, а во встроенном в машину водителе этих колонок нет — тянем
+  // сотрудников одним запросом и раскладываем по id. Отменённый прогон файл НЕ
+  // отдаёт: человек уже закрыл дровер, и загрузка «сама собой» его бы озадачила.
+  async function exportEventList(meta: EventDocumentMeta, options: { signal: AbortSignal }) {
+    const rows = await fetchEmployees()
+    const driverIds = new Set(chosen.flatMap((vehicle) => vehicle.drivers.map((driver) => driver.id)))
+    const employeesById = new Map<string, Employee>()
+    for (const row of rows) {
+      if (driverIds.has(row.id)) employeesById.set(row.id, row)
+    }
+    if (!options.signal.aborted) downloadVehicleEventXlsx({ vehicles: chosen, employeesById, meta })
+  }
 
   return (
     <>
@@ -118,6 +166,10 @@ export function VehiclesPage() {
               aria-label={tr('Поиск машин', 'Mashinalarni qidirish')}
             />
           </label>
+          <label className="select-all">
+            <input type="checkbox" checked={allShownSelected} disabled={visible.length === 0} onChange={toggleAllShown} />
+            <span>{tr('Выбрать всех показанных', 'Ko‘rsatilganlarning barchasini tanlash')} ({visible.length.toLocaleString(locale)})</span>
+          </label>
           <span className="toolbar__count">{tr('Машин', 'Mashinalar')}: {visible.length.toLocaleString(locale)}</span>
         </div>
 
@@ -130,9 +182,10 @@ export function VehiclesPage() {
           </div>
         ) : (
           <div className="table-scroll" aria-busy={isLoading}>
-            <table className="data-table">
+            <table className="data-table data-table--selectable">
               <thead>
                 <tr>
+                  <th className="select-cell" aria-label={tr('Выбор', 'Tanlash')} />
                   <th>{tr('Машина', 'Mashina')}</th>
                   <th>{tr('Госномер', 'Davlat raqami')}</th>
                   <th>{tr('Водители', 'Haydovchilar')}</th>
@@ -142,7 +195,7 @@ export function VehiclesPage() {
                 {isLoading && vehicles.length === 0
                   ? Array.from({ length: 6 }, (_, index) => (
                       <tr key={index} className="skeleton-row">
-                        <td colSpan={3}><span /></td>
+                        <td colSpan={4}><span /></td>
                       </tr>
                     ))
                   : visible.map((vehicle) => {
@@ -150,6 +203,7 @@ export function VehiclesPage() {
                       return (
                         <tr
                           key={vehicle.id}
+                          className={selected.has(vehicle.id) ? 'is-selected' : undefined}
                           onClick={() => openVehicle(vehicle)}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
@@ -159,6 +213,16 @@ export function VehiclesPage() {
                           }}
                           tabIndex={0}
                         >
+                          {/* Ячейка выбора гасит всплытие: иначе галка заодно
+                              открывала бы карточку. Остальная строка — открывает. */}
+                          <td className="select-cell" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={selected.has(vehicle.id)}
+                              onChange={() => toggleSelected(vehicle.id)}
+                              aria-label={vehicleTitle(vehicle.brand, vehicle.model)}
+                            />
+                          </td>
                           <td>
                             <div className="equipment-cell">
                               <span className="employee-avatar">
@@ -205,7 +269,18 @@ export function VehiclesPage() {
         )}
       </section>
 
-      {selected && <VehicleDrawer vehicle={selected} onClose={closeVehicle} />}
+      {selected.size > 0 && (
+        <div className="bulk-bar">
+          <span>{tr('Выбрано', 'Tanlangan')}: <strong>{selected.size.toLocaleString(locale)}</strong></span>
+          <button className="button button--secondary" onClick={() => setSelected(new Set())}>{tr('Снять выбор', 'Tanlovni bekor qilish')}</button>
+          <button className="button button--primary" onClick={() => setIsExportOpen(true)}>
+            <FileSpreadsheet size={17} /> {tr('Список на мероприятие', 'Tadbir uchun ro‘yxat')}
+          </button>
+        </div>
+      )}
+
+      {openCard && <VehicleDrawer vehicle={openCard} onClose={closeVehicle} />}
+      {isExportOpen && <VehicleEventExportDrawer vehicles={chosen} onClose={() => setIsExportOpen(false)} onExport={exportEventList} />}
     </>
   )
 }

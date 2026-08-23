@@ -9,10 +9,9 @@
 import { compressPhoto } from '../../lib/compressPhoto'
 import { reportAppError } from '../../lib/reportAppError'
 import { supabase } from '../../lib/supabase'
-import { numberCell, textCell, xml } from '../../lib/xlsx/cells'
-import { companyDetails } from '../../lib/xlsx/documentDefaults'
 import { downloadBlob, safeFileName } from '../../lib/xlsx/download'
 import { docText, eventDocumentTitle, formatDocumentDate, type EventDocumentMeta } from '../../lib/xlsx/eventDocument'
+import { buildEventSheet, DATA_START_ROW, type EventSheetCell, type EventSheetColumn } from '../../lib/xlsx/eventSheet'
 import { columnWidthToPx, drawingXml, EMU_PER_PX, fitImage, oneCellAnchor, rowHeightToEmu } from '../../lib/xlsx/images'
 import { buildWorkbookPackage } from '../../lib/xlsx/package'
 import { BUCKET } from './api'
@@ -94,7 +93,18 @@ export async function loadEventPhotos(
 const PHOTO_COLUMN_WIDTH = 20
 // Индекс колонки G в нумерации DrawingML (A = 0).
 const PHOTO_COLUMN_INDEX = 6
-const COLUMN_WIDTHS = [5, 30, 13, 22, 16, 17, PHOTO_COLUMN_WIDTH, 22]
+// Ширина и выравнивание одной парой на колонку: ФИО и должность текстом слева,
+// остальное по центру.
+const COLUMN_LAYOUT: Array<{ width: number; align: EventSheetColumn['align'] }> = [
+  { width: 5, align: 'center' },                    // A №
+  { width: 30, align: 'left' },                     // B ФИО
+  { width: 13, align: 'center' },                   // C дата рождения
+  { width: 22, align: 'centerWrap' },               // D место рождения
+  { width: 16, align: 'centerWrap' },               // E паспорт
+  { width: 17, align: 'center' },                   // F ПИНФЛ
+  { width: PHOTO_COLUMN_WIDTH, align: 'center' },   // G фото
+  { width: 22, align: 'left' },                     // H должность
+]
 
 // Ровная сетка под фото: высота одна на все строки данных, иначе якорь каждой
 // картинки пришлось бы считать по накопленной высоте предыдущих.
@@ -102,8 +112,8 @@ const DATA_ROW_HEIGHT_PT = 128
 // Рамка под портрет внутри ячейки — с полями до её границ.
 const PHOTO_BOX = { widthPx: 120, heightPx: 160 }
 
-const HEADER_ROW = 6
-const DATA_START_ROW = 7
+// Шапка таблицы — 30 пунктов: восемь широких колонок, заголовки в две строки.
+const HEADER_HEIGHT_PT = 30
 
 function sheetTexts(language: 'ru' | 'uz') {
   return {
@@ -117,7 +127,6 @@ function sheetTexts(language: 'ru' | 'uz') {
     photo: docText(language, 'Фото', 'Фотосурати'),
     position: docText(language, 'Должность', 'Лавозими'),
     total: docText(language, 'Всего', 'Жами'),
-    page: docText(language, 'Страница', 'Саҳифа'),
   }
 }
 
@@ -138,10 +147,8 @@ export type EmployeeEventSheet = {
 
 export function buildEmployeeEventSheet(rows: Employee[], meta: EventDocumentMeta, photos: Map<string, EventPhoto>): EmployeeEventSheet {
   const t = sheetTexts(meta.language)
-  const title = eventDocumentTitle('staff', meta)
-  const totalRow = DATA_START_ROW + rows.length
-  const cells: string[] = []
-  const merges: string[] = ['B1:H1', 'A3:H3', 'A4:H4']
+  const headers = [t.number, t.fullName, t.birthDate, t.birthPlace, t.passport, t.pinfl, t.photo, t.position]
+  const columns: EventSheetColumn[] = COLUMN_LAYOUT.map((column, index) => ({ ...column, header: headers[index] ?? '' }))
   const anchors: string[] = []
   const images: Uint8Array[] = []
 
@@ -149,100 +156,66 @@ export function buildEmployeeEventSheet(rows: Employee[], meta: EventDocumentMet
   const cellWidthEmu = columnWidthToPx(PHOTO_COLUMN_WIDTH) * EMU_PER_PX
   const cellHeightEmu = rowHeightToEmu(DATA_ROW_HEIGHT_PT)
 
-  cells.push(
-    // Плашка как у оборудования: красный квадрат с «A» в первой колонке и тёмная
-    // полоса на всю остальную ширину.
-    `<row r="1" ht="46" customHeight="1">${textCell('A1', 'A', 12)}${textCell('B1', `ARGO MEDIA · ${t.plaque}`, 13)}</row>`,
-    '<row r="2" ht="9" customHeight="1"/>',
-    `<row r="3" ht="58" customHeight="1">${textCell('A3', title, 20)}</row>`,
-    `<row r="4" ht="32" customHeight="1">${textCell('A4', companyDetails, 19)}</row>`,
-    '<row r="5" ht="9" customHeight="1"/>',
-    `<row r="${HEADER_ROW}" ht="30" customHeight="1">${[t.number, t.fullName, t.birthDate, t.birthPlace, t.passport, t.pinfl, t.photo, t.position]
-      .map((label, index) => textCell(`${columnLetter(index)}${HEADER_ROW}`, label, 3))
-      .join('')}</row>`,
-  )
-
-  rows.forEach((employee, index) => {
-    const rowNumber = DATA_START_ROW + index
-    const alternating = index % 2 === 1
-    const text = alternating ? 16 : 6
-    const center = alternating ? 17 : 7
-    const centerWrap = alternating ? 18 : 8
+  const sheetRows: EventSheetCell[][] = rows.map((employee, index) => {
     const photo = photos.get(employee.id)
-
-    cells.push(`<row r="${rowNumber}" ht="${DATA_ROW_HEIGHT_PT}" customHeight="1">`
-      + numberCell(`A${rowNumber}`, index + 1, center)
-      + textCell(`B${rowNumber}`, employeeFullName(employee), text)
-      + textCell(`C${rowNumber}`, employee.birth_date ? formatDocumentDate(employee.birth_date) : DASH, center)
-      + textCell(`D${rowNumber}`, employee.birth_place || DASH, centerWrap)
-      + textCell(`E${rowNumber}`, passportText(employee), centerWrap)
-      + textCell(`F${rowNumber}`, employee.pinfl || DASH, center)
+    const row: EventSheetCell[] = [
+      index + 1,
+      employeeFullName(employee),
+      employee.birth_date ? formatDocumentDate(employee.birth_date) : DASH,
+      employee.birth_place || DASH,
+      passportText(employee),
+      employee.pinfl || DASH,
       // Ячейка под фото остаётся текстовой и при наличии снимка: она даёт рамку и
       // заливку, а сама картинка лежит слоем поверх листа, а не «в» ячейке.
-      + textCell(`G${rowNumber}`, photo ? '' : DASH, center)
-      + textCell(`H${rowNumber}`, employee.position || DASH, text)
-      + '</row>')
+      photo ? '' : DASH,
+      employee.position || DASH,
+    ]
 
-    if (!photo) return
-    // Потолок масштаба 1 задаётся боксом: снимок мельче рамки становится боксом
-    // сам себе, и fitImage его не растягивает — апскейл дал бы мыло на бумаге.
-    const { cx, cy } = fitImage(photo, {
-      widthPx: Math.min(PHOTO_BOX.widthPx, photo.width),
-      heightPx: Math.min(PHOTO_BOX.heightPx, photo.height),
-    })
-    images.push(photo.bytes)
-    anchors.push(oneCellAnchor({
-      // id фигуры начинается с 2: единицу занимает сам лист.
-      id: images.length + 1,
-      name: `photo-${images.length}`,
-      descr: employeeFullName(employee),
-      col: PHOTO_COLUMN_INDEX,
-      row: rowNumber - 1,
-      colOffEmu: Math.max(0, Math.round((cellWidthEmu - cx) / 2)),
-      rowOffEmu: Math.max(0, Math.round((cellHeightEmu - cy) / 2)),
-      cx,
-      cy,
-      rId: images.length,
-    }))
+    if (photo) {
+      // Потолок масштаба 1 задаётся боксом: снимок мельче рамки становится боксом
+      // сам себе, и fitImage его не растягивает — апскейл дал бы мыло на бумаге.
+      const { cx, cy } = fitImage(photo, {
+        widthPx: Math.min(PHOTO_BOX.widthPx, photo.width),
+        heightPx: Math.min(PHOTO_BOX.heightPx, photo.height),
+      })
+      images.push(photo.bytes)
+      anchors.push(oneCellAnchor({
+        // id фигуры начинается с 2: единицу занимает сам лист.
+        id: images.length + 1,
+        name: `photo-${images.length}`,
+        descr: employeeFullName(employee),
+        col: PHOTO_COLUMN_INDEX,
+        row: DATA_START_ROW + index - 1,
+        colOffEmu: Math.max(0, Math.round((cellWidthEmu - cx) / 2)),
+        rowOffEmu: Math.max(0, Math.round((cellHeightEmu - cy) / 2)),
+        cx,
+        cy,
+        rId: images.length,
+      }))
+    }
+
+    return row
   })
 
-  cells.push(`<row r="${totalRow}" ht="32" customHeight="1">`
-    + textCell(`A${totalRow}`, '', 9)
-    + textCell(`B${totalRow}`, `${t.total}: ${rows.length}`, 9)
-    + ['C', 'D', 'E', 'F', 'G', 'H'].map((letter) => textCell(`${letter}${totalRow}`, '', 9)).join('')
-    + '</row>')
-
-  const period = formatDocumentDate(meta.dateFrom)
-  // xmlns:r объявлен всегда, а сам <drawing> появляется только с картинками:
-  // по схеме CT_Worksheet он идёт ПОСЛЕ headerFooter, иначе Excel зовёт файл
-  // повреждённым и предлагает «восстановить».
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
-  <dimension ref="A1:H${totalRow}"/>
-  <sheetViews><sheetView workbookViewId="0" showGridLines="0" zoomScale="90"/></sheetViews>
-  <sheetFormatPr defaultRowHeight="20"/>
-  <cols>${COLUMN_WIDTHS.map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join('')}</cols>
-  <sheetData>${cells.join('')}</sheetData>
-  <mergeCells count="${merges.length}">${merges.map((reference) => `<mergeCell ref="${reference}"/>`).join('')}</mergeCells>
-  <printOptions horizontalCentered="1"/>
-  <pageMargins left="0.35" right="0.35" top="0.55" bottom="0.55" header="0.25" footer="0.25"/>
-  <pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0" paperSize="9" pageOrder="downThenOver"/>
-  <headerFooter differentOddEven="1"><oddHeader>&amp;LARGO MEDIA&amp;R${xml(meta.name)}</oddHeader><evenHeader>&amp;LARGO MEDIA&amp;R${xml(meta.name)}</evenHeader><oddFooter>&amp;LARGO MEDIA&amp;C${t.page} &amp;P / &amp;N&amp;R${period}</oddFooter><evenFooter>&amp;LARGO MEDIA&amp;C${t.page} &amp;P / &amp;N&amp;R${period}</evenFooter></headerFooter>
-  ${anchors.length ? '<drawing r:id="rId1"/>' : ''}
-</worksheet>`
+  const sheet = buildEventSheet({
+    kind: 'staff',
+    meta,
+    plaque: t.plaque,
+    columns,
+    rows: sheetRows,
+    totalLabel: `${t.total}: ${rows.length}`,
+    orientation: 'landscape',
+    headerHeightPt: HEADER_HEIGHT_PT,
+    rowHeight: { pt: DATA_ROW_HEIGHT_PT },
+    hasDrawing: anchors.length > 0,
+  })
 
   return {
-    sheetXml,
+    sheetXml: sheet.sheetXml,
     drawing: anchors.length ? { xml: drawingXml(anchors), images } : undefined,
-    printArea: `$A$1:$H$${totalRow}`,
-    printTitles: `$${HEADER_ROW}:$${HEADER_ROW}`,
+    printArea: sheet.printArea,
+    printTitles: sheet.printTitles,
   }
-}
-
-// Буква колонки по индексу: лист не шире H, поэтому одной буквы хватает.
-function columnLetter(index: number) {
-  return String.fromCharCode(65 + index)
 }
 
 // Порядок в документе — по фамилии и имени, а не тот, в котором галки ставили:
