@@ -327,7 +327,11 @@ export function EquipmentPage() {
           <h1>{tr('Оборудование', 'Uskunalar')}</h1>
           <p className="page-description">{tr('Единый каталог техники, комплектующих и расходных материалов.', 'Texnika, butlovchi qismlar va sarf materiallarining yagona katalogi.')}</p>
         </div>
-        <button className="button button--primary" onClick={() => navigate('/equipment/new')}>
+        {/* Адрес каталога уезжает в state перехода: экран заведения возвращает
+            человека ровно в ту выборку, из которой он ушёл. Через state, а не
+            navigate(-1) на той стороне: по прямой ссылке на /equipment/new
+            истории нет, и шаг назад увёл бы из приложения. */}
+        <button className="button button--primary" onClick={() => navigate('/equipment/new', { state: { catalogSearch: params.toString() } })}>
           <Plus size={18} /> {tr('Добавить оборудование', 'Uskuna qo‘shish')}
         </button>
       </header>

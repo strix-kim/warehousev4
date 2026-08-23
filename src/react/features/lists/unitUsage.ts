@@ -60,7 +60,12 @@ export async function fetchUnitLists(equipmentId: string): Promise<UnitListUsage
     const columns = 'id,name,reservation_start'
     const [serialized, quantity] = await Promise.all([
       client.from('equipment_lists').select(columns).contains('equipment_ids', [equipmentId]),
-      client.from('equipment_lists').select(columns).contains('equipment_items', [{ equipment_id: equipmentId }]),
+      // JSON.stringify обязателен, и это не украшение. postgrest-js смотрит на тип
+      // значения: массив он сериализует как МАССИВ POSTGRES через join(','), и
+      // массив объектов превращается в cs.{[object Object]} — PostgREST отвечает
+      // 400 «invalid input syntax for type json» ещё до проверки прав. Строка
+      // уходит как есть и даёт корректное cs.[{"equipment_id":"…"}].
+      client.from('equipment_lists').select(columns).contains('equipment_items', JSON.stringify([{ equipment_id: equipmentId }])),
     ])
     if (serialized.error) throw serialized.error
     if (quantity.error) throw quantity.error

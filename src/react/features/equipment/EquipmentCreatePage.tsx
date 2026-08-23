@@ -1,6 +1,6 @@
 import { ArrowLeft, Boxes, CheckCircle2, CircleAlert, PackagePlus, Save, ShieldCheck } from 'lucide-react'
 import { FormEvent, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
 import {
@@ -35,6 +35,12 @@ const newEquipmentAvailabilityCodes: EquipmentAvailability[] = ['available', 'un
 
 export function EquipmentCreatePage() {
   const navigate = useNavigate()
+  // Выборка каталога, из которой сюда пришли. Пусто, если открыли по прямой
+  // ссылке — тогда «Назад» ведёт на каталог без фильтров, и это честно.
+  // routeLocation, а не location: имя location в этом файле занято полем формы
+  // «локация оборудования».
+  const routeLocation = useLocation()
+  const catalogSearch = (routeLocation.state as { catalogSearch?: string } | null)?.catalogSearch ?? ''
   const { tr, language } = useLanguage()
   const [kind, setKind] = useState<RecordKind>('serialized')
   const [brand, setBrand] = useState('')
@@ -202,7 +208,11 @@ export function EquipmentCreatePage() {
   return (
     <form onSubmit={handleSubmit}>
       <header className="editor-header">
-        <button type="button" className="icon-button icon-button--bordered" onClick={() => navigate('/equipment')} aria-label={tr('Назад к каталогу', 'Katalogga qaytish')}>
+        {/* «Назад» = «я передумал»: возвращаем в ту же выборку каталога, включая
+            фильтры и страницу. Кнопка «Открыть каталог» на экране успеха ведёт
+            на ЧИСТЫЙ каталог намеренно — под старым фильтром только что заведённая
+            позиция могла бы не показаться, и человек решил бы, что не сохранилось. */}
+        <button type="button" className="icon-button icon-button--bordered" onClick={() => navigate({ pathname: '/equipment', search: catalogSearch })} aria-label={tr('Назад к каталогу', 'Katalogga qaytish')}>
           <ArrowLeft size={18} />
         </button>
         <div>

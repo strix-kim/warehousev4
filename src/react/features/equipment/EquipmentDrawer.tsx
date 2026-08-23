@@ -28,11 +28,17 @@ function eventDateLabel(value: string | null, locale: string) {
   return date ? formatEventDate(date, locale) : null
 }
 
-// 40001 (serialization_failure) серверная RPC поднимает, когда карточку изменили
-// после того, как её открыли: правка не применена ни в одном поле.
+// Конфликт версий приходит ДВУМЯ кодами, и оба обязаны распознаваться.
+// PT409 — актуальный: PostgREST маппит PTxyz прямо в HTTP-статус, здесь 409 Conflict.
+// 40001 — прежний, и он был ошибкой выбора: это serialization_failure, то есть
+// «повтори транзакцию», и PostgREST повторял её бесконечно, потому что условие
+// детерминированное. Запрос не возвращался никогда, кнопка сохранения гасла
+// навсегда, а база писала по сотне тысяч исключений на один клик. Проверку 40001
+// оставляем: пока миграция не доехала, старая RPC отвечает именно так.
 function isStaleCardError(error: unknown) {
-  return typeof error === 'object' && error !== null && 'code' in error
-    && (error as { code?: unknown }).code === '40001'
+  if (typeof error !== 'object' || error === null || !('code' in error)) return false
+  const code = (error as { code?: unknown }).code
+  return code === 'PT409' || code === '40001'
 }
 
 // Черновик формы в drawer'е: одним объектом, чтобы сброс к записи был одной
@@ -192,6 +198,15 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
     return () => { current = false }
   }, [item.id])
 
+  // Прокрутка к подтверждению — ПОСЛЕ коммита, а не в обработчике сохранения.
+  // Панель правки схлопывается тем же обновлением состояния, и высота контента
+  // резко падает уже после старта анимации: smooth-прокрутка, запущенная по
+  // старому DOM, обрывалась на середине пути. Здесь DOM уже финальный.
+  useEffect(() => {
+    if (!editSuccess) return
+    drawerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [editSuccess])
+
   function cancelEditing() {
     setDraft(toEditDraft(item))
     setEditError('')
@@ -228,10 +243,6 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
       })
       onUpdated(updated)
       setIsEditing(false)
-      // Панель правки схлопывается, и подтверждение оказывается выше текущей
-      // прокрутки: на телефоне человек остался бы у пустого низа, не увидев,
-      // сохранилось ли что-нибудь.
-      drawerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
       setEditSuccess(updatedModelUnits === null
         ? tr('Изменения сохранены.', 'O‘zgarishlar saqlandi.')
         : tr(
