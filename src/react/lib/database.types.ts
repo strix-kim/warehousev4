@@ -61,6 +61,7 @@ export type Database = {
           clearance_expires_at: string | null
           created_at: string
           created_by: string | null
+          document_photo_id: string | null
           first_name: string
           id: string
           last_name: string
@@ -83,6 +84,7 @@ export type Database = {
           clearance_expires_at?: string | null
           created_at?: string
           created_by?: string | null
+          document_photo_id?: string | null
           first_name: string
           id?: string
           last_name: string
@@ -105,6 +107,7 @@ export type Database = {
           clearance_expires_at?: string | null
           created_at?: string
           created_by?: string | null
+          document_photo_id?: string | null
           first_name?: string
           id?: string
           last_name?: string
@@ -121,7 +124,15 @@ export type Database = {
           t_shirt_size?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "employees_document_photo_fkey"
+            columns: ["id", "document_photo_id"]
+            isOneToOne: false
+            referencedRelation: "employee_files"
+            referencedColumns: ["employee_id", "id"]
+          },
+        ]
       }
       equipment: {
         Row: {
