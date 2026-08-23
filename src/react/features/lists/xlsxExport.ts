@@ -1,5 +1,9 @@
 import { toDateValue } from '../../lib/date'
-import { companyDetails, companyLegalName } from './documentDefaults'
+import { textCell, numberCell, formulaCell, xml } from '../../lib/xlsx/cells'
+import { companyDetails, companyLegalName } from '../../lib/xlsx/documentDefaults'
+import { downloadBlob, safeFileName } from '../../lib/xlsx/download'
+import { workbookStyles } from '../../lib/xlsx/styles'
+import { zip } from '../../lib/xlsx/zip'
 
 export type ExportListRow = {
   category: string
@@ -20,29 +24,6 @@ export type ExportListInput = {
   locale: 'ru-RU' | 'uz-UZ'
   language: 'ru' | 'uz'
   documentMode?: 'working' | 'approval'
-}
-
-const encoder = new TextEncoder()
-
-function xml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;')
-}
-
-function textCell(reference: string, value: string, style: number) {
-  return `<c r="${reference}" t="inlineStr" s="${style}"><is><t xml:space="preserve">${xml(value)}</t></is></c>`
-}
-
-function numberCell(reference: string, value: number, style: number) {
-  return `<c r="${reference}" s="${style}"><v>${value}</v></c>`
-}
-
-function formulaCell(reference: string, formula: string, cachedValue: number, style: number) {
-  return `<c r="${reference}" s="${style}"><f>${xml(formula)}</f><v>${cachedValue}</v></c>`
 }
 
 function sheetTexts(language: 'ru' | 'uz') {
@@ -157,107 +138,6 @@ function buildSheet(input: ExportListInput) {
 </worksheet>`
 }
 
-const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <fonts count="7">
-    <font><color rgb="FF22282C"/><sz val="10"/><name val="Arial"/><family val="2"/></font>
-    <font><b/><color rgb="FFFFFFFF"/><sz val="16"/><name val="Arial"/><family val="2"/></font>
-    <font><b/><color rgb="FF22282C"/><sz val="9"/><name val="Arial"/><family val="2"/></font>
-    <font><b/><color rgb="FFFFFFFF"/><sz val="10"/><name val="Arial"/><family val="2"/></font>
-    <font><b/><color rgb="FF22282C"/><sz val="13"/><name val="Arial"/><family val="2"/></font>
-    <font><b/><color rgb="FFFFFFFF"/><sz val="18"/><name val="Arial"/><family val="2"/></font>
-    <font><color rgb="FF687178"/><sz val="9"/><name val="Arial"/><family val="2"/></font>
-  </fonts>
-  <fills count="8">
-    <fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
-    <fill><patternFill patternType="solid"><fgColor rgb="FFEF1236"/><bgColor indexed="64"/></patternFill></fill>
-    <fill><patternFill patternType="solid"><fgColor rgb="FFF2F4F1"/><bgColor indexed="64"/></patternFill></fill>
-    <fill><patternFill patternType="solid"><fgColor rgb="FF171C20"/><bgColor indexed="64"/></patternFill></fill>
-    <fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/><bgColor indexed="64"/></patternFill></fill>
-    <fill><patternFill patternType="solid"><fgColor rgb="FFFAFBF9"/><bgColor indexed="64"/></patternFill></fill>
-    <fill><patternFill patternType="solid"><fgColor rgb="FFFFF1F4"/><bgColor indexed="64"/></patternFill></fill>
-  </fills>
-  <borders count="3">
-    <border><left/><right/><top/><bottom/><diagonal/></border>
-    <border><left/><right/><top/><bottom style="thin"><color rgb="FFDDE2DD"/></bottom><diagonal/></border>
-    <border><left/><right/><top style="medium"><color rgb="FFEF1236"/></top><bottom/><diagonal/></border>
-  </borders>
-  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-  <cellXfs count="20">
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-    <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>
-    <xf numFmtId="0" fontId="3" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
-    <xf numFmtId="0" fontId="2" fillId="3" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
-    <xf numFmtId="0" fontId="4" fillId="7" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1"/></xf>
-    <xf numFmtId="0" fontId="5" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="1" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" indent="1"/></xf>
-    <xf numFmtId="0" fontId="2" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>
-    <xf numFmtId="0" fontId="2" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
-  </cellXfs>
-  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
-</styleSheet>`
-
-function crc32(data: Uint8Array) {
-  let crc = 0xffffffff
-  for (const byte of data) {
-    crc ^= byte
-    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1))
-  }
-  return (crc ^ 0xffffffff) >>> 0
-}
-
-function write16(view: DataView, offset: number, value: number) { view.setUint16(offset, value, true) }
-function write32(view: DataView, offset: number, value: number) { view.setUint32(offset, value, true) }
-
-function zip(files: Array<{ name: string; content: string }>) {
-  const chunks: Uint8Array[] = []
-  const central: Uint8Array[] = []
-  let offset = 0
-  for (const file of files) {
-    const name = encoder.encode(file.name)
-    const data = encoder.encode(file.content)
-    const crc = crc32(data)
-    const local = new Uint8Array(30 + name.length + data.length)
-    const localView = new DataView(local.buffer)
-    write32(localView, 0, 0x04034b50); write16(localView, 4, 20); write16(localView, 6, 0x0800); write16(localView, 8, 0)
-    write32(localView, 14, crc); write32(localView, 18, data.length); write32(localView, 22, data.length); write16(localView, 26, name.length)
-    local.set(name, 30); local.set(data, 30 + name.length); chunks.push(local)
-
-    const directory = new Uint8Array(46 + name.length)
-    const directoryView = new DataView(directory.buffer)
-    write32(directoryView, 0, 0x02014b50); write16(directoryView, 4, 20); write16(directoryView, 6, 20); write16(directoryView, 8, 0x0800); write16(directoryView, 10, 0)
-    write32(directoryView, 16, crc); write32(directoryView, 20, data.length); write32(directoryView, 24, data.length); write16(directoryView, 28, name.length); write32(directoryView, 42, offset)
-    directory.set(name, 46); central.push(directory); offset += local.length
-  }
-  const centralSize = central.reduce((sum, item) => sum + item.length, 0)
-  const end = new Uint8Array(22)
-  const endView = new DataView(end.buffer)
-  write32(endView, 0, 0x06054b50); write16(endView, 8, files.length); write16(endView, 10, files.length); write32(endView, 12, centralSize); write32(endView, 16, offset)
-  const parts = [...chunks, ...central, end]
-  const archive = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0))
-  let archiveOffset = 0
-  for (const part of parts) {
-    archive.set(part, archiveOffset)
-    archiveOffset += part.length
-  }
-  return new Blob([archive.buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-}
-
-function safeFileName(value: string) {
-  return value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').slice(0, 80) || 'equipment-list'
-}
-
 // Имя файла: дата мероприятия, название и режим документа. До этого оба режима
 // давали одно и то же имя — второй файл ложился в загрузки как «… (1)», и понять,
 // где рабочий список, а где документ с реквизитами, можно было только открыв оба.
@@ -280,20 +160,12 @@ function createEquipmentListXlsxBlob(input: ExportListInput) {
     { name: 'docProps/core.xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xml(input.name)}</dc:title><dc:creator>ARGO Warehouse</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created></cp:coreProperties>` },
     { name: 'xl/workbook.xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${sheetName}" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">&apos;${sheetName}&apos;!$A$1:$E$${totalRow}</definedName><definedName name="_xlnm.Print_Titles" localSheetId="0">&apos;${sheetName}&apos;!$${headerRow}:$${headerRow}</definedName></definedNames><calcPr fullCalcOnLoad="1" forceFullCalc="1"/></workbook>` },
     { name: 'xl/_rels/workbook.xml.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
-    { name: 'xl/styles.xml', content: styles },
+    { name: 'xl/styles.xml', content: workbookStyles },
     { name: 'xl/worksheets/sheet1.xml', content: buildSheet(input) },
   ]
   return zip(files)
 }
 
 export function downloadEquipmentListXlsx(input: ExportListInput) {
-  const blob = createEquipmentListXlsxBlob(input)
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = exportFileName(input)
-  document.body.append(anchor)
-  anchor.click()
-  anchor.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  downloadBlob(createEquipmentListXlsxBlob(input), exportFileName(input))
 }
