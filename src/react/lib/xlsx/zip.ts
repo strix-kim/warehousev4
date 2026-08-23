@@ -15,13 +15,15 @@ export function crc32(data: Uint8Array) {
 export function write16(view: DataView, offset: number, value: number) { view.setUint16(offset, value, true) }
 export function write32(view: DataView, offset: number, value: number) { view.setUint32(offset, value, true) }
 
-export function zip(files: Array<{ name: string; content: string }>) {
+// Текстовые части кодируются в UTF-8, бинарные (картинки) кладутся байтами
+// как есть — иначе JPEG прошёл бы через TextEncoder и приехал испорченным.
+export function zip(files: Array<{ name: string; content: string | Uint8Array }>) {
   const chunks: Uint8Array[] = []
   const central: Uint8Array[] = []
   let offset = 0
   for (const file of files) {
     const name = encoder.encode(file.name)
-    const data = encoder.encode(file.content)
+    const data = typeof file.content === 'string' ? encoder.encode(file.content) : file.content
     const crc = crc32(data)
     const local = new Uint8Array(30 + name.length + data.length)
     const localView = new DataView(local.buffer)
