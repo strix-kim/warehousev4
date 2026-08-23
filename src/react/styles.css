@@ -928,10 +928,9 @@ h2 { letter-spacing: -0.025em; }
   .home-destination__art { right: -12%; bottom: -2%; width: 76%; max-height: 72%; opacity: .34; }
   .home-destination__art--equipment { width: 82%; opacity: .45; }
   .home-destination__art--lists { bottom: -8%; width: 80%; opacity: .36; }
-  /* Нерабочая плитка «Скоро» ужимается до текста: на 390 она занимала треть страницы */
-  .home-destination--employees { min-height: auto; grid-column: auto; }
+  .home-destination--employees { grid-column: auto; }
   .home-destination--employees strong, .home-destination--employees p, .home-destination--employees .home-destination__action { max-width: 76%; }
-  .home-destination__art--employees { display: none; }
+  .home-destination__art--employees { right: -12%; bottom: -4%; width: 80%; max-height: 74%; opacity: .32; }
   .list-card, .list-card--loading { min-height: 195px; gap: 14px; padding: 16px; }
   /* Кнопок теперь две вместо трёх — они помещаются в ряд и не съедают
      150 px высоты карточки, как столбик до волны 2 */
