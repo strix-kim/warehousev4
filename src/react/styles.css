@@ -784,6 +784,13 @@ h2 { letter-spacing: -0.025em; }
 .employee-photos a, .employee-photos__missing { width: 92px; height: 116px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; color: var(--ink-faint); background: var(--surface-soft); }
 .employee-photos img { width: 100%; height: 100%; display: block; object-fit: cover; }
 
+/* Автомобили (с18). Госномер — опознавательный знак машины, поэтому он набран
+   моноширинным и посажен на подложку: цифры и буквы читаются как на жестянке,
+   а колонка таблицы не пляшет по ширине. Класс .mono не годится — он прибивает
+   размер 13px через !important, а в шапке дровера номер стоит крупно. */
+.plate-badge { display: inline-block; padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-soft); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
+.plate-badge--lg { padding: 5px 11px; font-size: 21px; }
+
 .app-loader { min-height: 100vh; display: grid; place-content: center; gap: 18px; background: #f3f4f2; }
 .route-loader { min-height: min(520px, calc(100vh - 96px)); display: grid; align-content: start; gap: 16px; padding-top: 4px; }
 .route-loader__title, .route-loader__panel { overflow: hidden; border-radius: 10px; background: linear-gradient(90deg, #ecefeb 25%, #f7f8f6 50%, #ecefeb 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }

@@ -482,6 +482,116 @@ export type Database = {
         }
         Relationships: []
       }
+      // Правка руками (с18): vehicles + vehicle_drivers + vehicle_files, миграция
+      // 20260823150000. Генератор типов не запускался — при перегенерации блок
+      // обязан пересобраться сам.
+      vehicle_drivers: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          vehicle_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          vehicle_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_drivers_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_drivers_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_files: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          original_name: string | null
+          storage_path: string
+          vehicle_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: string
+          original_name?: string | null
+          storage_path: string
+          vehicle_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          original_name?: string | null
+          storage_path?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_files_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicles: {
+        Row: {
+          brand: string
+          color: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          model: string | null
+          plate_number: string
+          updated_at: string
+        }
+        Insert: {
+          brand: string
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          model?: string | null
+          plate_number: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          model?: string | null
+          plate_number?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
