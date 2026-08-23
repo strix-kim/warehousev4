@@ -296,6 +296,8 @@ h2 { letter-spacing: -0.025em; }
 /* «Сейчас в списках» в карточке оборудования. Раздел появляется только когда
    единица где-то стоит, поэтому пустого состояния у него нет. */
 .unit-lists { margin: 26px 0 0; }
+/* Сводка дровера модели: два бейджа под заголовком. */
+.model-drawer-stats { display: flex; flex-wrap: wrap; gap: 8px; }
 .unit-lists > .button, .unit-lists > .form-success, .unit-lists > .form-error, .unit-lists > .muted { margin-top: 10px; }
 .unit-lists > .button { width: 100%; }
 .unit-lists__items { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }

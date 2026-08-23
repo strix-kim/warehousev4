@@ -393,6 +393,19 @@ export type Database = {
         Args: { p_brand: string; p_model: string }
         Returns: number
       }
+      // ПРАВКА РУКАМИ: функция заведена миграцией 20260823110000, типы дописаны
+      // вслед за ней — генератор с прода не перезапускался.
+      fetch_equipment_models: {
+        Args: {
+          p_availability: string
+          p_limit: number
+          p_offset: number
+          p_search: string
+          p_subtype: string
+          p_type: string
+        }
+        Returns: Json
+      }
       // ПРАВКА РУКАМИ: функция заведена миграцией 20260823100000, типы дописаны
       // вслед за ней — генератор с прода не перезапускался.
       create_equipment_batch: {

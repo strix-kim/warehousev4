@@ -92,7 +92,8 @@ function AppShell() {
         import('../features/equipment/api'),
         import('../features/lists/api'),
       ]).then(([equipmentApi, listsApi]) => Promise.allSettled([
-        equipmentApi.fetchEquipment({
+        // Каталог модельный с U29 — греем агрегат, а не построчную выдачу.
+        equipmentApi.fetchEquipmentModels({
           page: 1,
           search: '',
           availability: '',

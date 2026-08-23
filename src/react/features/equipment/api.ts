@@ -5,7 +5,6 @@ import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 // Только листовой cacheKeys, не lists/api: обратное ребро замкнуло бы цикл фич.
 import { invalidateListCompositionCache } from '../lists/cacheKeys'
 import type { EquipmentAvailability } from './availability'
-import type { EquipmentPageResult } from './types'
 import type { Equipment, EquipmentRow } from './types'
 
 export const EQUIPMENT_PAGE_SIZE = 50
@@ -69,60 +68,94 @@ function safeSearch(value: string) {
   return value.trim().replace(/[,%()]/g, ' ').replace(/\s+/g, ' ')
 }
 
-function equipmentPageCacheKey({ page, search, availability, type = '', subtype = '', pageSize = EQUIPMENT_PAGE_SIZE }: Omit<EquipmentQuery, 'bypassCache'>) {
-  return `equipment:${JSON.stringify({ page, search: safeSearch(search), availability, type, subtype, pageSize })}`
-}
-
-export function readCachedEquipment(query: Omit<EquipmentQuery, 'bypassCache'>) {
-  return readCachedQuery<EquipmentPageResult>(equipmentPageCacheKey(query))
-}
-
-// Возраст той же записи каталога. Ключ собирает та же приватная функция: второй
-// сборки ключа не заводим — разъехались бы молча.
-export function readCachedEquipmentMeta(query: Omit<EquipmentQuery, 'bypassCache'>) {
-  return readCachedQueryMeta(equipmentPageCacheKey(query))
-}
-
 export function readCachedAllEquipment() {
   return readCachedQuery<Equipment[]>('equipment:all')
 }
 
-export async function fetchEquipment({ page, search, availability, type = '', subtype = '', pageSize = EQUIPMENT_PAGE_SIZE, bypassCache = false }: EquipmentQuery): Promise<EquipmentPageResult> {
+// U29: строка каталога — модель, а не единица. Агрегат считает RPC
+// fetch_equipment_models (миграция 20260823110000); клиентская группировка
+// потребовала бы тянуть весь каталог, от чего U29 и лечит.
+export type EquipmentModelSummary = {
+  brand: string
+  model: string
+  type: string
+  subtype: string
+  rowsTotal: number
+  unitsTotal: number
+  unitsAvailable: number
+}
+
+export type EquipmentModelsPage = {
+  rows: EquipmentModelSummary[]
+  totalModels: number
+  totalUnits: number
+}
+
+// Ключ живёт под префиксом equipment: — вся существующая инвалидация
+// («создал», «поправил», «партия») сбрасывает агрегат без своей ветки.
+function equipmentModelsCacheKey({ page, search, availability, type = '', subtype = '', pageSize = EQUIPMENT_PAGE_SIZE }: Omit<EquipmentQuery, 'bypassCache'>) {
+  return `equipment:models:${JSON.stringify({ page, search: safeSearch(search), availability, type, subtype, pageSize })}`
+}
+
+export function readCachedEquipmentModels(query: Omit<EquipmentQuery, 'bypassCache'>) {
+  return readCachedQuery<EquipmentModelsPage>(equipmentModelsCacheKey(query))
+}
+
+export function readCachedEquipmentModelsMeta(query: Omit<EquipmentQuery, 'bypassCache'>) {
+  return readCachedQueryMeta(equipmentModelsCacheKey(query))
+}
+
+export async function fetchEquipmentModels({ page, search, availability, type = '', subtype = '', pageSize = EQUIPMENT_PAGE_SIZE, bypassCache = false }: EquipmentQuery): Promise<EquipmentModelsPage> {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
 
-  const cacheKey = equipmentPageCacheKey({ page, search, availability, type, subtype, pageSize })
+  const cacheKey = equipmentModelsCacheKey({ page, search, availability, type, subtype, pageSize })
   return cachedQuery(cacheKey, 10 * 60 * 1000, async () => {
-    const from = (page - 1) * pageSize
-    const to = from + pageSize - 1
-    let query = client
-      .from('equipment')
-      .select('*', { count: 'exact' })
-      .order('type', { ascending: true })
-      .order('brand', { ascending: true })
-      .order('model', { ascending: true })
-      .order('id', { ascending: true })
-      .range(from, to)
-
-    const normalizedSearch = safeSearch(search)
-    if (normalizedSearch) {
-      const searchTerms = normalizedSearch.split(/\s+/).slice(0, 6)
-      for (const term of searchTerms) {
-        const pattern = `%${term}%`
-        query = query.or(
-          `model.ilike.${pattern},brand.ilike.${pattern},serialnumber.ilike.${pattern},type.ilike.${pattern},subtype.ilike.${pattern}`,
-        )
-      }
-    }
-
-    if (availability) query = query.eq('availability', availability)
-    if (type) query = query.eq('type', type)
-    if (subtype) query = query.eq('subtype', subtype)
-
-    const { data, count, error } = await query
+    const { data, error } = await client.rpc('fetch_equipment_models', {
+      p_search: safeSearch(search),
+      p_type: type,
+      p_subtype: subtype,
+      p_availability: availability,
+      p_limit: pageSize,
+      p_offset: (page - 1) * pageSize,
+    })
     if (error) throw error
+    const payload = (data ?? {}) as { total_models?: unknown; total_units?: unknown; rows?: unknown }
+    const rows = Array.isArray(payload.rows) ? payload.rows as Record<string, unknown>[] : []
+    return {
+      totalModels: typeof payload.total_models === 'number' ? payload.total_models : 0,
+      totalUnits: typeof payload.total_units === 'number' ? payload.total_units : 0,
+      rows: rows.map((row) => ({
+        brand: String(row.brand ?? ''),
+        model: String(row.model ?? ''),
+        type: String(row.type ?? ''),
+        subtype: String(row.subtype ?? ''),
+        rowsTotal: typeof row.rows_total === 'number' ? row.rows_total : 0,
+        unitsTotal: typeof row.units_total === 'number' ? row.units_total : 0,
+        unitsAvailable: typeof row.units_available === 'number' ? row.units_available : 0,
+      })),
+    }
+  }, { bypass: bypassCache })
+}
 
-    return { rows: (data ?? []).map((row) => normalizeEquipment(row)), total: count ?? 0 }
+/**
+ * Единицы одной модели для дровера каталога. Самая крупная модель прода — 596
+ * строк, лимита PostgREST (1000) хватает с запасом; появится модель крупнее —
+ * появится и пагинация внутри дровера.
+ */
+export async function fetchEquipmentUnitsByModel(brand: string, model: string, { bypassCache = false } = {}): Promise<Equipment[]> {
+  if (!supabase) throw new Error('Supabase не настроен')
+  const client = supabase
+  return cachedQuery(`equipment:model-units:${JSON.stringify([brand, model])}`, 10 * 60 * 1000, async () => {
+    const { data, error } = await client
+      .from('equipment')
+      .select('*')
+      .eq('brand', brand)
+      .eq('model', model)
+      .order('serialnumber', { ascending: true })
+      .order('id', { ascending: true })
+    if (error) throw error
+    return (data ?? []).map((row) => normalizeEquipment(row))
   }, { bypass: bypassCache })
 }
 

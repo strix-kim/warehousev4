@@ -15,17 +15,19 @@ import { DataAge } from '../../components/DataAge'
 import { EquipmentVisual, preloadEquipmentImages } from '../../components/EquipmentVisual'
 import {
   emptyEquipmentTaxonomy,
-  fetchEquipment,
   fetchEquipmentByIds,
+  fetchEquipmentModels,
   fetchEquipmentTaxonomy,
+  fetchEquipmentUnitsByModel,
   MOBILE_EQUIPMENT_PAGE_SIZE,
   preferredEquipmentPageSize,
-  readCachedEquipment,
-  readCachedEquipmentMeta,
+  readCachedEquipmentModels,
+  readCachedEquipmentModelsMeta,
+  type EquipmentModelSummary,
 } from './api'
-import { equipmentAvailabilityOptions, equipmentAvailabilityView, toEquipmentAvailability } from './availability'
+import { equipmentAvailabilityOptions, toEquipmentAvailability } from './availability'
 import { EquipmentDrawer } from './EquipmentDrawer'
-import { equipmentIdentifier } from './format'
+import { EquipmentModelDrawer } from './EquipmentModelDrawer'
 import type { Equipment } from './types'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
@@ -49,6 +51,10 @@ export function EquipmentPage() {
   const subtype = params.get('subtype') ?? ''
   const availability = params.get('status') ?? ''
   const itemId = params.get('item') ?? ''
+  // Открытая модель — два параметра, а не один со склейкой: бренд и модель —
+  // данные, и разделитель пришлось бы экранировать от них самих.
+  const modelBrand = params.get('mbrand') ?? ''
+  const modelName = params.get('mmodel') ?? ''
   const pageParam = Math.max(1, Number(params.get('page')) || 1)
   const [pageSize, setPageSize] = useState(preferredEquipmentPageSize)
   // Мобильная раскладка нужна не только стилям: на телефоне таблица становится
@@ -61,10 +67,13 @@ export function EquipmentPage() {
   // из кэша БЕЗ фильтра — первый экран отвечал бы не на тот вопрос, который задан
   // в адресе. Под фильтром честнее скелет.
   const [initialResult] = useState(() => pageParam === 1 && !search && !availability && !type && !subtype
-    ? readCachedEquipment({ page: 1, search: '', availability: '', pageSize })
+    ? readCachedEquipmentModels({ page: 1, search: '', availability: '', pageSize })
     : null)
-  const [rows, setRows] = useState<Equipment[]>(() => initialResult?.rows ?? [])
-  const [total, setTotal] = useState(() => initialResult?.total ?? 0)
+  // Строка каталога — МОДЕЛЬ (U29): ~218 строк вместо 1 481 единицы. Единицы
+  // человек смотрит дровером модели, карточка единицы открывается из него.
+  const [rows, setRows] = useState<EquipmentModelSummary[]>(() => initialResult?.rows ?? [])
+  const [total, setTotal] = useState(() => initialResult?.totalModels ?? 0)
+  const [totalUnits, setTotalUnits] = useState(() => initialResult?.totalUnits ?? 0)
   // Поле ввода остаётся локальным: в адрес запрос уезжает через паузу, иначе
   // каждая буква оставляла бы запись в истории браузера.
   const [searchInput, setSearchInput] = useState(search)
@@ -74,6 +83,7 @@ export function EquipmentPage() {
   const pushedSearchRef = useRef(search)
   const [taxonomy, setTaxonomy] = useState(emptyEquipmentTaxonomy)
   const [selected, setSelected] = useState<Equipment | null>(null)
+  const [selectedModel, setSelectedModel] = useState<EquipmentModelSummary | null>(null)
   const [isLoading, setIsLoading] = useState(() => !initialResult)
   // Только флаг: текст ошибки собирается на рендере. Строка в стейте потянула бы
   // tr в зависимости эффекта загрузки, и смена языка перезагружала бы каталог.
@@ -128,6 +138,25 @@ export function EquipmentPage() {
     setSelected(null)
     const next = new URLSearchParams(params)
     next.delete('item')
+    setParams(next, { replace: true })
+  }
+
+  // Модель — тот же контракт адреса, что и карточка: открытие пушит запись,
+  // закрытие заменяет. Карточка единицы, открытая ИЗ модели, пушит поверх —
+  // «назад» шагает карточка → модель → каталог.
+  function openModel(model: EquipmentModelSummary) {
+    setSelectedModel(model)
+    const next = new URLSearchParams(params)
+    next.set('mbrand', model.brand)
+    next.set('mmodel', model.model)
+    setParams(next)
+  }
+
+  function closeModel() {
+    setSelectedModel(null)
+    const next = new URLSearchParams(params)
+    next.delete('mbrand')
+    next.delete('mmodel')
     setParams(next, { replace: true })
   }
 
@@ -210,16 +239,20 @@ export function EquipmentPage() {
     // Первый кадр рисуется из кэша целиком или не рисуется вовсе: на телефоне
     // накоплено N страниц, и склейка «две из кэша, третья пусто» показала бы
     // обрезанный список как полный.
-    const cachedPages = pagesToLoad.map((pageNumber) => readCachedEquipment({ page: pageNumber, search, availability, type, subtype, pageSize }))
+    const cachedPages = pagesToLoad.map((pageNumber) => readCachedEquipmentModels({ page: pageNumber, search, availability, type, subtype, pageSize }))
     const cached = cachedPages.every(Boolean)
-      ? { rows: cachedPages.flatMap((entry) => entry?.rows ?? []), total: cachedPages[cachedPages.length - 1]?.total ?? 0 }
+      ? {
+        rows: cachedPages.flatMap((entry) => entry?.rows ?? []),
+        totalModels: cachedPages[cachedPages.length - 1]?.totalModels ?? 0,
+        totalUnits: cachedPages[cachedPages.length - 1]?.totalUnits ?? 0,
+      }
       : null
     // Возраст спрашиваем у кэша, а не считаем от момента ответа: запись обновляется
     // только на УСПЕШНОМ ответе, поэтому после сбоя сети здесь остаётся старая метка —
     // ровно то, что бейдж и должен показать.
     // Возраст — по ПОСЛЕДНЕЙ запрошенной странице: бейдж отвечает на «когда пришло
     // то, что видно», а накопленный хвост телефона моложе своего начала не бывает.
-    const readAge = () => readCachedEquipmentMeta({ page: currentPage, search, availability, type, subtype, pageSize })?.touchedAt ?? null
+    const readAge = () => readCachedEquipmentModelsMeta({ page: currentPage, search, availability, type, subtype, pageSize })?.touchedAt ?? null
     // Метка ДО запроса. Отказ сети не всегда доходит до .catch: при живой записи
     // в кэше cachedQuery подменяет провал последним значением и промис
     // РЕЗОЛВИТСЯ. Единственный честный признак «ответа с сервера не было» —
@@ -227,7 +260,8 @@ export function EquipmentPage() {
     const ageBefore = readAge()
     if (cached) {
       setRows(cached.rows)
-      setTotal(cached.total)
+      setTotal(cached.totalModels)
+      setTotalUnits(cached.totalUnits)
       preloadEquipmentImages(cached.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 24)
     }
     setIsLoading(!cached)
@@ -241,7 +275,7 @@ export function EquipmentPage() {
     // Перепроверять у сервера имеет смысл только последнюю страницу — накопленные
     // ранее уже проверялись на своём заходе. «Обновить» (reloadKey) обходит кэш
     // у всех: человек нажал её именно потому, что не верит показанному.
-    Promise.all(pagesToLoad.map((pageNumber) => fetchEquipment({
+    Promise.all(pagesToLoad.map((pageNumber) => fetchEquipmentModels({
       page: pageNumber,
       search,
       availability,
@@ -252,18 +286,23 @@ export function EquipmentPage() {
     })))
       .then((results) => {
         if (!isCurrent) return
-        // total одинаков у всех страниц выборки — берём у последней пришедшей.
-        const result = { rows: results.flatMap((entry) => entry.rows), total: results.at(-1)?.total ?? 0 }
+        // Счётчики одинаковы у всех страниц выборки — берём у последней пришедшей.
+        const result = {
+          rows: results.flatMap((entry) => entry.rows),
+          totalModels: results.at(-1)?.totalModels ?? 0,
+          totalUnits: results.at(-1)?.totalUnits ?? 0,
+        }
         setIsFetching(false)
         setRows(result.rows)
-        setTotal(result.total)
+        setTotal(result.totalModels)
+        setTotalUnits(result.totalUnits)
         const freshAge = readAge()
         setLastFetchFailed(freshAge !== null && freshAge === ageBefore)
         setDataAt(freshAge)
         preloadEquipmentImages(result.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 24)
         const nextPage = currentPage + 1
-        if (nextPage <= Math.ceil(result.total / pageSize)) {
-          void fetchEquipment({ page: nextPage, search, availability, type, subtype, pageSize })
+        if (nextPage <= Math.ceil(result.totalModels / pageSize)) {
+          void fetchEquipmentModels({ page: nextPage, search, availability, type, subtype, pageSize })
             .then((nextResult) => preloadEquipmentImages(nextResult.rows, pageSize <= MOBILE_EQUIPMENT_PAGE_SIZE ? pageSize : 16))
             .catch((error: unknown) => reportAppError(error, { scope: 'prefetch', route: '/equipment', detail: { page: nextPage } }))
         }
@@ -287,8 +326,8 @@ export function EquipmentPage() {
     }
   }, [availability, currentPage, pageSize, pagesToLoad, reloadKey, search, subtype, type])
 
-  // Карточка, названная в адресе. Строку берём из уже загруженной выдачи; для
-  // ссылки, открытой напрямую, дотягиваем по id — иначе `?item=…` из закладки
+  // Карточка, названная в адресе. Выдача теперь модельная, строк-единиц в ней
+  // нет — карточка всегда дотягивается по id, иначе `?item=…` из закладки
   // открывал бы каталог с пустым дровером.
   useEffect(() => {
     if (!itemId) {
@@ -296,11 +335,6 @@ export function EquipmentPage() {
       return
     }
     if (selected?.id === itemId) return
-    const known = rows.find((row) => row.id === itemId)
-    if (known) {
-      setSelected(known)
-      return
-    }
     let isCurrent = true
     fetchEquipmentByIds([itemId])
       .then((found) => {
@@ -308,7 +342,41 @@ export function EquipmentPage() {
       })
       .catch((error: unknown) => reportAppError(error, { scope: 'loader', route: '/equipment', detail: { item: itemId } }))
     return () => { isCurrent = false }
-  }, [itemId, rows, selected])
+  }, [itemId, selected])
+
+  // Модель, названная в адресе. Сводку берём из загруженной выдачи; для прямой
+  // ссылки собираем её из единиц — те же числа, что посчитал бы агрегат.
+  useEffect(() => {
+    if (!modelBrand || !modelName) {
+      setSelectedModel(null)
+      return
+    }
+    if (selectedModel && selectedModel.brand === modelBrand && selectedModel.model === modelName) return
+    const known = rows.find((row) => row.brand === modelBrand && row.model === modelName)
+    if (known) {
+      setSelectedModel(known)
+      return
+    }
+    let isCurrent = true
+    fetchEquipmentUnitsByModel(modelBrand, modelName)
+      .then((units) => {
+        const first = units[0]
+        if (!isCurrent || !first) return
+        const unitsTotal = units.reduce((sum, unit) => sum + Math.max(0, unit.count), 0)
+        const unitsAvailable = units.reduce((sum, unit) => sum + (toEquipmentAvailability(unit.availability) === 'available' ? Math.max(0, unit.count) : 0), 0)
+        setSelectedModel({
+          brand: modelBrand,
+          model: modelName,
+          type: first.type,
+          subtype: first.subtype,
+          rowsTotal: units.length,
+          unitsTotal,
+          unitsAvailable,
+        })
+      })
+      .catch((error: unknown) => reportAppError(error, { scope: 'loader', route: '/equipment', detail: { model: `${modelBrand} ${modelName}` } }))
+    return () => { isCurrent = false }
+  }, [modelBrand, modelName, rows, selectedModel])
 
   // На телефоне показанное — это накопленное с начала выдачи, а не окно страницы.
   const range = useMemo(() => {
@@ -375,7 +443,9 @@ export function EquipmentPage() {
             onChange={(value) => updateParams({ status: value })}
             ariaLabel={tr('Фильтр по статусу', 'Holat bo‘yicha filtr')}
           />
-          <span className="toolbar__count">{isFiltered ? tr('Найдено', 'Topildi') : tr('Позиций в базе', 'Bazadagi pozitsiyalar')}: {total.toLocaleString(locale)}</span>
+          {/* Счётчик — модели И штуки разом: «218 моделей» без «1 877 штук»
+              снова спрятал бы физический объём склада за строками выдачи. */}
+          <span className="toolbar__count">{isFiltered ? tr('Найдено моделей', 'Topilgan modellar') : tr('Моделей', 'Modellar')}: {total.toLocaleString(locale)} · {tr('штук', 'dona')}: {totalUnits.toLocaleString(locale)}</span>
           {/* Рядом с блоком «Ошибка загрузки» бейдж не рисуем: на экране оказались бы
               два разных предложения обновиться и «Обновлено 25 минут назад» под
               заголовком о том, что данных нет. */}
@@ -396,35 +466,31 @@ export function EquipmentPage() {
                 <tr>
                   <th>{tr('Оборудование', 'Uskuna')}</th>
                   <th>{tr('Категория', 'Toifa')}</th>
-                  <th>{tr('Номер / учёт', 'Raqam / hisob')}</th>
-                  <th>{tr('Кол-во', 'Soni')}</th>
-                  <th>{tr('Статус', 'Holat')}</th>
+                  <th>{tr('Штук', 'Dona')}</th>
+                  <th>{tr('Доступно', 'Mavjud')}</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading && rows.length === 0
                   ? Array.from({ length: 8 }, (_, index) => (
                       <tr key={index} className="skeleton-row">
-                        <td colSpan={5}><span /></td>
+                        <td colSpan={4}><span /></td>
                       </tr>
                     ))
                   : rows.map((item) => {
-                      const status = equipmentAvailabilityView(item.availability, tr)
-                      // Ячейка, одинаковая почти у всех карточек подряд, на телефоне
-                      // только съедает экран: количество равно 1 у 1 446 строк из
-                      // 1 481, «На складе» — у 1 475. Отличающееся значение остаётся
-                      // видимым — информация именно в нём. Статус сверяем
-                      // нормализатором: в старых записях лежит русский текст.
-                      const showCount = !isMobile || item.count !== 1
-                      const showStatus = !isMobile || toEquipmentAvailability(item.availability) !== 'available'
+                      // Ячейка-константа на телефоне съедает экран (правило U33):
+                      // «1 шт.» у модели-одиночки и «доступно = всего» не различают
+                      // карточки — из DOM их убираем, а не прячем стилями.
+                      const showCount = !isMobile || item.unitsTotal !== 1
+                      const showAvailable = !isMobile || item.unitsAvailable !== item.unitsTotal
                       return (
                         <tr
-                          key={item.id}
-                          onClick={() => openItem(item)}
+                          key={`${item.brand}::${item.model}`}
+                          onClick={() => openModel(item)}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
                               event.preventDefault()
-                              openItem(item)
+                              openModel(item)
                             }
                           }}
                           tabIndex={0}
@@ -434,16 +500,17 @@ export function EquipmentPage() {
                               <EquipmentVisual item={item} />
                               <span>
                                 <strong>{item.brand} {item.model}</strong>
-                                {/* Код EQ-… ушёл: он не написан на технике и не ищется
-                                    поиском. В карточке единицы он остаётся. */}
                                 <small>{translateEquipmentTaxonomy(item.subtype, language)}</small>
                               </span>
                             </div>
                           </td>
                           <td data-label={tr('Категория', 'Toifa')}>{translateEquipmentTaxonomy(item.type, language)}</td>
-                          <td data-label={item.tracking_mode === 'quantity' ? tr('Количественный учёт', 'Miqdor bo‘yicha hisob') : tr('Серийный номер', 'Seriya raqami')} className="mono">{equipmentIdentifier(item, tr)}</td>
-                          {showCount && <td data-label={tr('Количество', 'Miqdor')}><strong>{item.count}</strong> {tr('шт.', 'dona')}</td>}
-                          {showStatus && <td data-label={tr('Статус', 'Holat')}><span className={`badge badge--${status.tone}`}><i />{status.label}</span></td>}
+                          {showCount && <td data-label={tr('Штук', 'Dona')}><strong>{item.unitsTotal}</strong> {tr('шт.', 'dona')}</td>}
+                          {showAvailable && (
+                            <td data-label={tr('Доступно', 'Mavjud')}>
+                              <span className={`badge badge--${item.unitsAvailable > 0 ? 'success' : 'danger'}`}><i />{item.unitsAvailable} {tr('шт.', 'dona')}</span>
+                            </td>
+                          )}
                         </tr>
                       )
                     })}
@@ -492,23 +559,30 @@ export function EquipmentPage() {
         </footer>
       </section>
 
-      {selected && (
+      {/* В каждый момент рисуется ОДИН дровер: карточка единицы поверх модели
+          дала бы два модальных слоя с двумя обработчиками Esc. Возврат из
+          карточки в модель делает адрес: закрытие item оставляет mbrand/mmodel. */}
+      {selected ? (
         <EquipmentDrawer
           item={selected}
           onClose={closeItem}
-          onRefreshed={(fresh) => {
-            // Перечитанная карточка обновляет только саму запись и её строку в
-            // таблице: гонять весь каталог заново из-за открытия drawer'а незачем.
-            setSelected(fresh)
-            setRows((current) => current.map((row) => row.id === fresh.id ? fresh : row))
-          }}
+          // Строк-единиц в выдаче больше нет — обновлять нечего, кроме самой карточки.
+          onRefreshed={(fresh) => setSelected(fresh)}
           onUpdated={(updated) => {
             setSelected(updated)
-            setRows((current) => current.map((row) => row.id === updated.id ? updated : row))
+            // Правка могла сменить статус или данные модели — счётчики и название
+            // строки пересчитывает загрузка, кэш уже инвалидирован самой правкой.
             setReloadKey((value) => value + 1)
           }}
         />
-      )}
+      ) : selectedModel ? (
+        <EquipmentModelDrawer
+          summary={selectedModel}
+          reloadKey={reloadKey}
+          onClose={closeModel}
+          onOpenUnit={openItem}
+        />
+      ) : null}
     </>
   )
 }

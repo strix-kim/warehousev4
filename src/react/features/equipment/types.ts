@@ -16,8 +16,3 @@ export type Equipment = Omit<EquipmentRow, 'serialnumber' | 'availability' | 'co
   tracking_mode: 'serialized' | 'quantity'
   inventory_code: string | null
 }
-
-export type EquipmentPageResult = {
-  rows: Equipment[]
-  total: number
-}
