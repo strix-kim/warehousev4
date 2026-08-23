@@ -54,7 +54,21 @@ export async function fetchEmployeePhotoPaths(): Promise<Map<string, string>> {
   return firstByEmployee
 }
 
-export type CreateEmployeeInput = {
+// Одна карточка прямо по id: прямая ссылка на /employees/:id/edit обязана
+// открываться без загруженного списка. null — строки нет (или её не видно
+// политикой), и это НЕ отказ запроса: отказ прилетает исключением.
+export async function fetchEmployeeById(id: string): Promise<Employee | null> {
+  if (!supabase) throw new Error('Supabase не настроен')
+  const { data, error } = await supabase
+    .from('employees')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw error
+  return data ?? null
+}
+
+export type EmployeeInput = {
   last_name: string
   first_name: string
   middle_name: string
@@ -81,28 +95,51 @@ function orNull(value: string) {
   return trimmed ? trimmed : null
 }
 
-export async function createEmployee(fields: CreateEmployeeInput): Promise<Employee> {
+// Раскладка формы в строку таблицы. Одна на вставку и на правку: разъедься они,
+// новая колонка попала бы в создание и потерялась при редактировании.
+function employeeRow(fields: EmployeeInput) {
+  return {
+    last_name: fields.last_name.trim(),
+    first_name: fields.first_name.trim(),
+    middle_name: orNull(fields.middle_name),
+    position: orNull(fields.position),
+    phone: orNull(fields.phone),
+    passport_series: orNull(fields.passport_series),
+    passport_number: orNull(fields.passport_number),
+    pinfl: orNull(fields.pinfl),
+    birth_date: orNull(fields.birth_date),
+    birth_place: orNull(fields.birth_place),
+    passport_issued_by: orNull(fields.passport_issued_by),
+    passport_issued_at: orNull(fields.passport_issued_at),
+    passport_expires_at: orNull(fields.passport_expires_at),
+    residence_address: orNull(fields.residence_address),
+    clearance_expires_at: orNull(fields.clearance_expires_at),
+    t_shirt_size: orNull(fields.t_shirt_size),
+  }
+}
+
+export async function createEmployee(fields: EmployeeInput): Promise<Employee> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase
     .from('employees')
-    .insert({
-      last_name: fields.last_name.trim(),
-      first_name: fields.first_name.trim(),
-      middle_name: orNull(fields.middle_name),
-      position: orNull(fields.position),
-      phone: orNull(fields.phone),
-      passport_series: orNull(fields.passport_series),
-      passport_number: orNull(fields.passport_number),
-      pinfl: orNull(fields.pinfl),
-      birth_date: orNull(fields.birth_date),
-      birth_place: orNull(fields.birth_place),
-      passport_issued_by: orNull(fields.passport_issued_by),
-      passport_issued_at: orNull(fields.passport_issued_at),
-      passport_expires_at: orNull(fields.passport_expires_at),
-      residence_address: orNull(fields.residence_address),
-      clearance_expires_at: orNull(fields.clearance_expires_at),
-      t_shirt_size: orNull(fields.t_shirt_size),
-    })
+    .insert(employeeRow(fields))
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+// Правка карточки целиком, без оптимистичной блокировки: сотрудников правят
+// редко и по одному человеку за раз, поэтому версию строки не сверяем — при
+// гонке двух вкладок выигрывает последняя запись (last-write-wins). Уникальность
+// по ПИНФЛ и паспорту держат те же индексы, что и на вставке, так что отказ сюда
+// приходит тем же кодом и разбирается employeeSaveErrorText.
+export async function updateEmployee(id: string, fields: EmployeeInput): Promise<Employee> {
+  if (!supabase) throw new Error('Supabase не настроен')
+  const { data, error } = await supabase
+    .from('employees')
+    .update(employeeRow(fields))
+    .eq('id', id)
     .select()
     .single()
   if (error) throw error
@@ -115,7 +152,10 @@ export type EmployeeNamesake = Pick<Employee, 'id' | 'last_name' | 'first_name' 
 // уникальность база держит по документам (ПИНФЛ, паспорт), а не по ФИО.
 // ilike без подстановочных знаков — это точное совпадение без учёта регистра;
 // escapeLikePattern гасит `%` и `_`, если они попали в само имя.
-export async function findNamesakes(lastName: string, firstName: string, birthDate: string): Promise<EmployeeNamesake[]> {
+// excludeId — карточка, которую сейчас правят: без него человек, сохраняя
+// собственную запись, каждый раз получал бы предупреждение «такой уже есть»
+// про самого себя.
+export async function findNamesakes(lastName: string, firstName: string, birthDate: string, excludeId?: string): Promise<EmployeeNamesake[]> {
   if (!supabase) throw new Error('Supabase не настроен')
   const last = lastName.trim()
   const first = firstName.trim()
@@ -127,6 +167,7 @@ export async function findNamesakes(lastName: string, firstName: string, birthDa
     .ilike('last_name', escapeLikePattern(last))
     .ilike('first_name', escapeLikePattern(first))
   if (birthDate) query = query.eq('birth_date', birthDate)
+  if (excludeId) query = query.neq('id', excludeId)
 
   const { data, error } = await query.order('last_name').order('first_name').order('id').limit(10)
   if (error) throw error

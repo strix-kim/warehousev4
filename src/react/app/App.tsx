@@ -14,7 +14,7 @@ const loadEquipmentCreatePage = () => import('../features/equipment/EquipmentCre
 const loadListsPage = () => import('../features/lists/ListsPage').then((module) => ({ default: module.ListsPage }))
 const loadListEditorPage = () => import('../features/lists/ListEditorPage').then((module) => ({ default: module.ListEditorPage }))
 const loadEmployeesPage = () => import('../features/employees/EmployeesPage').then((module) => ({ default: module.EmployeesPage }))
-const loadEmployeeCreatePage = () => import('../features/employees/EmployeeCreatePage').then((module) => ({ default: module.EmployeeCreatePage }))
+const loadEmployeeFormPage = () => import('../features/employees/EmployeeFormPage').then((module) => ({ default: module.EmployeeFormPage }))
 const loadHomePage = () => import('../features/home/HomePage').then((module) => ({ default: module.HomePage }))
 
 const LoginPage = lazyWithReload(loadLoginPage)
@@ -23,7 +23,7 @@ const EquipmentCreatePage = lazyWithReload(loadEquipmentCreatePage)
 const ListsPage = lazyWithReload(loadListsPage)
 const ListEditorPage = lazyWithReload(loadListEditorPage)
 const EmployeesPage = lazyWithReload(loadEmployeesPage)
-const EmployeeCreatePage = lazyWithReload(loadEmployeeCreatePage)
+const EmployeeFormPage = lazyWithReload(loadEmployeeFormPage)
 const HomePage = lazyWithReload(loadHomePage)
 
 export function App() {
@@ -48,7 +48,8 @@ export function App() {
         <Route path="/lists/new" element={<RouteBoundary><ListEditorPage /></RouteBoundary>} />
         <Route path="/lists/:listId/edit" element={<RouteBoundary><ListEditorPage /></RouteBoundary>} />
         <Route path="/employees" element={<RouteBoundary><EmployeesPage /></RouteBoundary>} />
-        <Route path="/employees/new" element={<RouteBoundary><EmployeeCreatePage /></RouteBoundary>} />
+        <Route path="/employees/new" element={<RouteBoundary><EmployeeFormPage /></RouteBoundary>} />
+        <Route path="/employees/:employeeId/edit" element={<RouteBoundary><EmployeeFormPage /></RouteBoundary>} />
       </Route>
       <Route path="*" element={<Navigate to={session ? '/' : '/login'} replace />} />
     </Routes>
@@ -92,7 +93,7 @@ function AppShell() {
         loadListsPage(),
         loadListEditorPage(),
         loadEmployeesPage(),
-        loadEmployeeCreatePage(),
+        loadEmployeeFormPage(),
       ])
     }, 0)
     const primaryDataTimer = window.setTimeout(() => {

@@ -1,7 +1,9 @@
-import { CircleAlert, FileText, X } from 'lucide-react'
+import { CircleAlert, Pencil, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { fetchEmployeeFiles, getSignedUrls } from './api'
-import { employeeFileKindLabel, employeeFullName, type Employee, type EmployeeFile, type Tr } from './types'
+import { EmployeeFilesList } from './EmployeeFilesList'
+import { employeeFullName, type Employee, type EmployeeFile, type Tr } from './types'
 import { formatEventDate, parseDateValue } from '../../lib/date'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
@@ -39,6 +41,7 @@ function detailRows(employee: Employee, tr: Tr, locale: string): DetailRow[] {
 
 export function EmployeeDrawer({ employee, onClose }: { employee: Employee; onClose: () => void }) {
   const { tr, locale } = useLanguage()
+  const navigate = useNavigate()
   useModalLayer(onClose)
   const [files, setFiles] = useState<EmployeeFile[]>([])
   // Подписанные ссылки живут час и в персистентный кэш не кладутся — только
@@ -74,8 +77,6 @@ export function EmployeeDrawer({ employee, onClose }: { employee: Employee; onCl
   }, [employee.id])
 
   const rows = detailRows(employee, tr, locale)
-  const photos = files.filter((file) => file.kind === 'photo')
-  const documents = files.filter((file) => file.kind !== 'photo')
 
   return (
     <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Карточка сотрудника', 'Xodim kartasi')} onMouseDown={onClose}>
@@ -86,6 +87,7 @@ export function EmployeeDrawer({ employee, onClose }: { employee: Employee; onCl
             <h2>{employeeFullName(employee)}</h2>
           </div>
           <div className="drawer__header-actions">
+            <button className="button button--secondary" onClick={() => navigate(`/employees/${employee.id}/edit`)}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>
             <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
           </div>
         </div>
@@ -108,46 +110,7 @@ export function EmployeeDrawer({ employee, onClose }: { employee: Employee; onCl
               ? <p className="muted">{tr('Загружаем файлы…', 'Fayllar yuklanmoqda…')}</p>
               : files.length === 0
                 ? <p className="muted">{tr('Файлов пока нет.', 'Hozircha fayllar yo‘q.')}</p>
-                : <>
-                  {photos.length > 0 && (
-                    <div className="employee-photos">
-                      {photos.map((photo) => {
-                        const url = urls.get(photo.storage_path)
-                        return url
-                          ? <a key={photo.id} href={url} target="_blank" rel="noreferrer">
-                            <img src={url} alt={photo.original_name ?? employeeFullName(employee)} loading="lazy" decoding="async" />
-                          </a>
-                          : <span key={photo.id} className="employee-photos__missing" title={tr('Ссылка не получена', 'Havola olinmadi')}><FileText size={18} /></span>
-                      })}
-                    </div>
-                  )}
-                  {documents.length > 0 && (
-                    <ul className="unit-lists__items">
-                      {documents.map((file) => {
-                        const url = urls.get(file.storage_path)
-                        return (
-                          <li key={file.id}>
-                            {url
-                              ? <a href={url} target="_blank" rel="noreferrer">
-                                <FileText size={17} />
-                                <span>
-                                  <strong>{employeeFileKindLabel(file.kind, tr)}</strong>
-                                  <small>{file.original_name ?? tr('Открыть', 'Ochish')}</small>
-                                </span>
-                              </a>
-                              : <button type="button" disabled>
-                                <FileText size={17} />
-                                <span>
-                                  <strong>{employeeFileKindLabel(file.kind, tr)}</strong>
-                                  <small>{tr('Ссылка не получена', 'Havola olinmadi')}</small>
-                                </span>
-                              </button>}
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  )}
-                </>}
+                : <EmployeeFilesList files={files} urls={urls} photoAlt={employeeFullName(employee)} />}
         </section>
       </aside>
     </div>
