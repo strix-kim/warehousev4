@@ -1,12 +1,26 @@
 import { FileSpreadsheet, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { pickDocumentPhoto, type EmployeePhotoRef } from './api'
 import { employeeFullName, type Employee } from './types'
 import { EventDocumentFields } from '../../components/EventDocumentFields'
 import { todayDateValue } from '../../lib/date'
 import { useLanguage } from '../../lib/i18n'
+import { reportAppError } from '../../lib/reportAppError'
 import { useModalLayer } from '../../lib/useModalLayer'
 import type { EventDocumentMeta } from '../../lib/xlsx/eventDocument'
+
+// Фаза одной сборки. Союзом, а не тремя флагами: «готовим» без счётчика и
+// «готово» без числа непрочитанных фото — состояния, которых не бывает.
+type ExportPhase =
+  | { kind: 'idle' }
+  | { kind: 'preparing'; done: number; total: number }
+  | { kind: 'done'; failed: number }
+  | { kind: 'error' }
+
+export type EmployeeEventExportRun = (meta: EventDocumentMeta, options: {
+  onProgress: (done: number, total: number) => void
+  signal: AbortSignal
+}) => Promise<{ failed: number }>
 
 // «Список сотрудников на мероприятие»: реквизиты документа поверх выбранного на
 // странице состава. Выбор остаётся на странице — дровер его не копирует и при
@@ -18,7 +32,7 @@ export function EmployeeEventExportDrawer({ employees, photos, photosKnown, onCl
   // было бы не сводкой, а выдумкой (gotchas §11).
   photosKnown: boolean
   onClose: () => void
-  onExport?: (meta: EventDocumentMeta) => Promise<void>
+  onExport?: EmployeeEventExportRun
 }) {
   const { tr, locale } = useLanguage()
   useModalLayer(onClose)
@@ -28,7 +42,11 @@ export function EmployeeEventExportDrawer({ employees, photos, photosKnown, onCl
   // Пустое название подсвечиваем не сразу: красное поле на только что открытом
   // дровере читается как отказ, а человек ещё ничего не сделал.
   const [nameTouched, setNameTouched] = useState(false)
-  const [isExporting, setIsExporting] = useState(false)
+  const [phase, setPhase] = useState<ExportPhase>({ kind: 'idle' })
+  // Закрытие дровера обязано гасить очередь загрузок: без этого человек, закрыв
+  // документ на тридцати портретах, продолжал бы качать их в фоне.
+  const abortRef = useRef<AbortController | null>(null)
+  useEffect(() => () => abortRef.current?.abort(), [])
 
   const nameEmpty = !meta.name.trim()
   // Даты — строки YYYY-MM-DD, поэтому сравниваются как есть, без разбора в Date.
@@ -41,11 +59,24 @@ export function EmployeeEventExportDrawer({ employees, photos, photosKnown, onCl
 
   async function runExport() {
     if (!onExport || !canExport) return
-    setIsExporting(true)
+    const controller = new AbortController()
+    abortRef.current = controller
+    // Знаменатель известен заранее — по той же сводке «без фото», что выше:
+    // иначе первая секунда показывала бы «0 из 0».
+    setPhase({ kind: 'preparing', done: 0, total: employees.length - withoutPhoto.length })
     try {
-      await onExport(meta)
-    } finally {
-      setIsExporting(false)
+      const result = await onExport(meta, {
+        signal: controller.signal,
+        onProgress: (done, total) => {
+          if (!controller.signal.aborted) setPhase({ kind: 'preparing', done, total })
+        },
+      })
+      if (!controller.signal.aborted) setPhase({ kind: 'done', failed: result.failed })
+    } catch (error) {
+      // Отмена — не отказ: дровер уже закрыт, показывать некому и незачем.
+      if (controller.signal.aborted) return
+      reportAppError(error, { scope: 'loader', route: '/employees', detail: { source: 'event-export' } })
+      setPhase({ kind: 'error' })
     }
   }
 
@@ -81,12 +112,25 @@ export function EmployeeEventExportDrawer({ employees, photos, photosKnown, onCl
         </div>
 
         <div className="event-export-actions">
-          <button className="button button--primary button--wide" disabled={!onExport || !canExport || isExporting} onClick={() => void runExport()}>
+          <button className="button button--primary button--wide" disabled={!onExport || !canExport || phase.kind === 'preparing'} onClick={() => void runExport()}>
             <FileSpreadsheet size={17} /> {tr('Скачать Excel', 'Excel yuklab olish')}
           </button>
-          {/* Временная подпись: генератор приходит следующим шагом, и без неё
-              выключенная кнопка читается как поломка. */}
-          {!onExport && <small className="field-hint">{tr('Появится следующим шагом', 'Keyingi qadamda paydo bo‘ladi')}</small>}
+          {phase.kind === 'preparing' && (
+            <small className="field-hint">
+              {tr(`Готовим фото ${phase.done} из ${phase.total}…`, `Suratlar tayyorlanmoqda: ${phase.done} / ${phase.total}…`)}
+            </small>
+          )}
+          {phase.kind === 'done' && (
+            <small className="field-hint">
+              {tr('Файл скачан', 'Fayl yuklab olindi')}
+              {phase.failed > 0 && ` · ${tr(`Не удалось получить фото: ${phase.failed} — в документе прочерк`, `Suratlarni olib bo‘lmadi: ${phase.failed} — hujjatda chiziqcha`)}`}
+            </small>
+          )}
+          {phase.kind === 'error' && (
+            <small className="field-hint field-hint--error">
+              {tr('Не удалось собрать файл. Повторите попытку.', 'Faylni yig‘ib bo‘lmadi. Qayta urinib ko‘ring.')}
+            </small>
+          )}
         </div>
       </aside>
     </div>

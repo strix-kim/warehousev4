@@ -4,9 +4,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchEmployeePhotos, fetchEmployees, getSignedUrls, pickDocumentPhoto, type EmployeePhotoRef } from './api'
 import { EmployeeDrawer } from './EmployeeDrawer'
 import { EmployeeEventExportDrawer } from './EmployeeEventExportDrawer'
+import { downloadEmployeeEventXlsx, loadEventPhotos } from './eventExport'
 import { employeeFullName, type Employee } from './types'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import type { EventDocumentMeta } from '../../lib/xlsx/eventDocument'
 
 // Строка поиска и поле карточки приводятся к одному виду: регистр не важен,
 // подряд идущие пробелы схлопнуты — «иванов  азиз» находит «Иванов Азиз».
@@ -156,6 +158,19 @@ export function EmployeesPage() {
   const openCard = employeeId ? employees.find((employee) => employee.id === employeeId) ?? null : null
   const chosen = employees.filter((employee) => selected.has(employee.id))
 
+  // Сборка документа: качаем фото (те же, что показывает список — pickDocumentPhoto
+  // тут единственный судья), потом собираем файл. Отменённый прогон файл НЕ отдаёт:
+  // человек уже закрыл дровер, и загрузка «сама собой» его бы озадачила.
+  async function exportEventList(meta: EventDocumentMeta, options: { onProgress: (done: number, total: number) => void; signal: AbortSignal }) {
+    const refs = chosen
+      .map((employee) => ({ employeeId: employee.id, photo: pickDocumentPhoto(employee, photos.get(employee.id)) }))
+      .filter((item): item is { employeeId: string; photo: EmployeePhotoRef } => Boolean(item.photo))
+      .map((item) => ({ employeeId: item.employeeId, storage_path: item.photo.storage_path }))
+    const { photos: loaded, failed } = await loadEventPhotos(refs, options)
+    if (!options.signal.aborted) downloadEmployeeEventXlsx({ employees: chosen, meta, photos: loaded })
+    return { failed }
+  }
+
   return (
     <>
       <header className="page-header">
@@ -298,7 +313,7 @@ export function EmployeesPage() {
       )}
 
       {openCard && <EmployeeDrawer employee={openCard} onClose={closeEmployee} onDocumentPhotoChange={(fileId) => applyDocumentPhoto(openCard.id, fileId)} />}
-      {isExportOpen && <EmployeeEventExportDrawer employees={chosen} photos={photos} photosKnown={photosKnown} onClose={() => setIsExportOpen(false)} />}
+      {isExportOpen && <EmployeeEventExportDrawer employees={chosen} photos={photos} photosKnown={photosKnown} onClose={() => setIsExportOpen(false)} onExport={exportEventList} />}
     </>
   )
 }

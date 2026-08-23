@@ -3,8 +3,9 @@ import { escapeLikePattern } from '../../lib/postgrest'
 import { createSignedUrlCache } from '../../lib/signedUrlCache'
 import type { Employee, EmployeeFile, EmployeeFileKind, Tr } from './types'
 
-// Приватный бакет: наружу файл уходит только по подписанной ссылке.
-const BUCKET = 'employee-files'
+// Приватный бакет: наружу файл уходит только по подписанной ссылке. Экспортируется
+// ради генератора документа: он качает фото байтами, а не подписанной ссылкой.
+export const BUCKET = 'employee-files'
 
 // Сотрудников ~200 — выдача целиком, без страниц. Порядок с ПОЛНЫМ ключом
 // (…, id): без него однофамильцы-тёзки меняются местами между запросами.
