@@ -1,4 +1,4 @@
-import { CircleAlert, ClipboardList, Pencil, Save, X } from 'lucide-react'
+import { CircleAlert, ClipboardList, Pencil, Plus, Save, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
@@ -12,6 +12,7 @@ import {
   type EquipmentMovement,
 } from './api'
 import { fetchUnitLists, readCachedUnitLists, type UnitListUsage } from '../lists/unitUsage'
+import { appendEquipmentToList, fetchAppendTargets, readCachedAppendTargets, type AppendResult, type AppendTarget } from '../lists/listAppend'
 import { formatEventDate, parseDateValue } from '../../lib/date'
 import { equipmentAvailabilityOptions, equipmentAvailabilityView } from './availability'
 import { equipmentCode, equipmentIdentifier, formatUnitCount } from './format'
@@ -84,6 +85,16 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
   // причине, что и у истории.
   const [unitLists, setUnitLists] = useState<UnitListUsage[]>(() => readCachedUnitLists(item.id) ?? [])
   const [hasUnitListsError, setHasUnitListsError] = useState(false)
+  // Кнопка «В список» (U35-б). Результат хранит имя и id списка, а не готовый
+  // текст — по той же причине, что и флаги ошибок: смена языка не должна
+  // оставлять сообщение на прежнем языке.
+  const [isAppendOpen, setIsAppendOpen] = useState(false)
+  const [appendTargets, setAppendTargets] = useState<AppendTarget[]>([])
+  const [isLoadingTargets, setIsLoadingTargets] = useState(false)
+  const [hasTargetsError, setHasTargetsError] = useState(false)
+  const [appendBusyId, setAppendBusyId] = useState<string | null>(null)
+  const [hasAppendError, setHasAppendError] = useState(false)
+  const [appendResult, setAppendResult] = useState<{ listId: string; name: string; status: AppendResult } | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [editError, setEditError] = useState('')
@@ -103,6 +114,8 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
   const drawerRef = useRef<HTMLElement>(null)
   const { brand, model, type, subtype, specification, length, description, availability, location, count } = draft
   const canSave = Boolean(brand.trim() && model.trim() && type.trim() && subtype.trim() && count >= 0)
+  // Серийная единица в этих списках уже стоит — пикер блокирует их строки.
+  const unitListIds = new Set(unitLists.map((list) => list.id))
 
   function changeDraft<K extends keyof EquipmentEditDraft>(field: K, value: EquipmentEditDraft[K]) {
     setDraft((current) => ({ ...current, [field]: value }))
@@ -153,6 +166,14 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
       .catch(() => { if (current) setModelUnitCount(null) })
     return () => { current = false }
   }, [item.brand, item.model])
+
+  // Смена карточки — чужой результат добавления не имеет права остаться на экране.
+  useEffect(() => {
+    setIsAppendOpen(false)
+    setAppendResult(null)
+    setHasAppendError(false)
+    setAppendBusyId(null)
+  }, [item.id])
 
   useEffect(() => {
     let current = true
@@ -211,6 +232,56 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
     setDraft(toEditDraft(item))
     setEditError('')
     setIsEditing(false)
+  }
+
+  function toggleAppendPicker() {
+    setAppendResult(null)
+    setHasAppendError(false)
+    if (isAppendOpen) {
+      setIsAppendOpen(false)
+      return
+    }
+    setIsAppendOpen(true)
+    const cached = readCachedAppendTargets()
+    if (cached) setAppendTargets(cached)
+    setIsLoadingTargets(!cached)
+    setHasTargetsError(false)
+    fetchAppendTargets()
+      .then((rows) => {
+        if (!isOpenRef.current) return
+        setAppendTargets(rows)
+        setIsLoadingTargets(false)
+      })
+      .catch(() => {
+        if (!isOpenRef.current) return
+        setIsLoadingTargets(false)
+        // Кэш — ответ, пусть и вчерашний; отказ показываем только без него.
+        if (!cached) setHasTargetsError(true)
+      })
+  }
+
+  async function appendToList(target: AppendTarget) {
+    setAppendBusyId(target.id)
+    setHasAppendError(false)
+    try {
+      const status = await appendEquipmentToList(target.id, item.id, item.tracking_mode)
+      if (!isOpenRef.current) return
+      setAppendResult({ listId: target.id, name: target.name, status })
+      setIsAppendOpen(false)
+      // «Сейчас в списках» обязан отразить добавление сразу: кэш префикса уже
+      // сброшен самим appendEquipmentToList, запрос уйдёт в базу.
+      fetchUnitLists(item.id)
+        .then((rows) => {
+          if (!isOpenRef.current) return
+          setUnitLists(rows)
+          setHasUnitListsError(false)
+        })
+        .catch(() => {})
+    } catch {
+      if (isOpenRef.current) setHasAppendError(true)
+    } finally {
+      if (isOpenRef.current) setAppendBusyId(null)
+    }
   }
 
   async function saveChanges() {
@@ -345,6 +416,56 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
           <div className="detail-list__wide"><dt>{tr('Характеристики', 'Xususiyatlar')}</dt><dd>{item.technicalspecification || tr('Не указаны', 'Ko‘rsatilmagan')}</dd></div>
           <div className="detail-list__wide"><dt>{tr('Описание', 'Tavsif')}</dt><dd>{item.description || tr('Нет описания', 'Tavsif yo‘q')}</dd></div>
         </dl>
+        {/* U35-б: путь «нашёл в каталоге → добавил в список». Секция стоит перед
+            «Сейчас в списках»: действие — над справкой о его результате. */}
+        <section className="unit-lists">
+          <div className="panel-heading"><div><h3>{tr('В список', 'Ro‘yxatga')}</h3><p>{tr('Добавить эту единицу в сохранённый список', 'Bu birlikni saqlangan ro‘yxatga qo‘shish')}</p></div></div>
+          {appendResult && (
+            <p className="form-success">
+              <ClipboardList size={15} />
+              <span>
+                {appendResult.status === 'added'
+                  ? tr(`Добавлено в «${appendResult.name}».`, `«${appendResult.name}» ro‘yxatiga qo‘shildi.`)
+                  : tr(`Эта единица уже в списке «${appendResult.name}».`, `Bu birlik «${appendResult.name}» ro‘yxatida allaqachon bor.`)}
+                {' '}<Link to={`/lists/${appendResult.listId}/edit`}>{tr('Открыть', 'Ochish')}</Link>
+              </span>
+            </p>
+          )}
+          {hasAppendError && <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось добавить в список. Список не изменён.', 'Ro‘yxatga qo‘shib bo‘lmadi. Ro‘yxat o‘zgarmadi.')}</p>}
+          <button className="button button--secondary" type="button" onClick={toggleAppendPicker}>
+            <Plus size={16} /> {tr('Добавить в список', 'Ro‘yxatga qo‘shish')}
+          </button>
+          {isAppendOpen && (
+            hasTargetsError
+              ? <p className="form-error">{tr('Не удалось загрузить списки.', 'Ro‘yxatlarni yuklab bo‘lmadi.')}</p>
+              : isLoadingTargets && appendTargets.length === 0
+                ? <p className="muted">{tr('Загружаем списки…', 'Ro‘yxatlar yuklanmoqda…')}</p>
+                : appendTargets.length === 0
+                  ? <p className="muted">{tr('Сохранённых списков пока нет.', 'Saqlangan ro‘yxatlar hali yo‘q.')} <Link to="/lists/new">{tr('Создать список', 'Ro‘yxat yaratish')}</Link></p>
+                  : <ul className="unit-lists__items">
+                    {appendTargets.map((target) => {
+                      // Дубль серийной единицы сервер отвергнет и сам ('already'),
+                      // но заблокированная строка честнее кнопки-обманки.
+                      const alreadyIn = item.tracking_mode === 'serialized' && unitListIds.has(target.id)
+                      return (
+                        <li key={target.id}>
+                          <button type="button" onClick={() => void appendToList(target)} disabled={alreadyIn || appendBusyId !== null}>
+                            <ClipboardList size={16} />
+                            <span>
+                              <strong>{target.name}</strong>
+                              <small>{alreadyIn
+                                ? tr('Уже в этом списке', 'Bu ro‘yxatda allaqachon bor')
+                                : appendBusyId === target.id
+                                  ? tr('Добавляем…', 'Qo‘shilmoqda…')
+                                  : eventDateLabel(target.reservation_start, locale) ?? tr('Дата не указана', 'Sana ko‘rsatilmagan')}</small>
+                            </span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+          )}
+        </section>
         {/* «Где единица сейчас» — вопрос настоящего, поэтому стоит ПЕРЕД журналом:
             тот отвечает про прошлое. Раздел скрыт целиком, когда единица ни в
             одном списке и запрос при этом прошёл: пустой блок «ни в одном» —

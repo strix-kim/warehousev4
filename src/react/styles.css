@@ -296,10 +296,17 @@ h2 { letter-spacing: -0.025em; }
 /* «Сейчас в списках» в карточке оборудования. Раздел появляется только когда
    единица где-то стоит, поэтому пустого состояния у него нет. */
 .unit-lists { margin: 26px 0 0; }
+.unit-lists > .button, .unit-lists > .form-success, .unit-lists > .form-error, .unit-lists > .muted { margin-top: 10px; }
+.unit-lists > .button { width: 100%; }
 .unit-lists__items { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.unit-lists__items a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface-soft); text-decoration: none; transition: border-color .16s ease, background .16s ease; }
-.unit-lists__items a:hover { border-color: var(--line-strong); background: #fff; }
-.unit-lists__items a > svg { flex: 0 0 auto; color: var(--ink-faint); }
+/* Отступ — только у пикера под кнопкой; принятый вид «Сейчас в списках» не трогаем. */
+.unit-lists > .button + .unit-lists__items { margin-top: 10px; }
+/* Строка пикера «Добавить в список» — кнопка, но выглядит как ссылка раздела
+   «Сейчас в списках»: один список, одна форма строки. */
+.unit-lists__items a, .unit-lists__items button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface-soft); font: inherit; text-align: left; text-decoration: none; cursor: pointer; transition: border-color .16s ease, background .16s ease; }
+.unit-lists__items a:hover, .unit-lists__items button:hover:not(:disabled) { border-color: var(--line-strong); background: #fff; }
+.unit-lists__items button:disabled { cursor: default; opacity: .55; }
+.unit-lists__items a > svg, .unit-lists__items button > svg { flex: 0 0 auto; color: var(--ink-faint); }
 .unit-lists__items span { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .unit-lists__items strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .unit-lists__items small { color: var(--ink-faint); font-size: 12px; }

@@ -378,6 +378,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      // ПРАВКА РУКАМИ: функция заведена миграцией 20260823080000, типы дописаны
+      // вслед за ней — генератор с прода не перезапускался.
+      append_equipment_to_list: {
+        Args: {
+          p_equipment_id: string
+          p_list_id: string
+          p_tracking_mode: string
+        }
+        Returns: string
+      }
       count_equipment_model_units: {
         Args: { p_brand: string; p_model: string }
         Returns: number
