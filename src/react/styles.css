@@ -453,7 +453,6 @@ h2 { letter-spacing: -0.025em; }
 .home-destination--equipment .home-destination__icon { color: #fff; background: rgba(255,255,255,.1); }
 .home-destination--employees .home-destination__icon { color: var(--accent); background: rgba(239,18,54,.09); }
 .home-destination__arrow { position: absolute; top: 28px; right: 28px; width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--ink-soft); }
-.home-destination__status { position: absolute; z-index: 2; top: 30px; right: 28px; padding: 7px 10px; border: 1px solid rgba(239,18,54,.16); border-radius: 999px; color: #a50d27; background: rgba(255,255,255,.72); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .home-destination--lists .home-destination__arrow { color: #fff; border-color: rgba(255,255,255,.28); }
 .home-destination--equipment .home-destination__arrow { color: #fff; border-color: rgba(255,255,255,.18); }
 .home-destination .eyebrow { margin-top: 42px; }
@@ -476,14 +475,9 @@ h2 { letter-spacing: -0.025em; }
 .home-destination__art--lists { right: -6%; bottom: -10%; width: 68%; opacity: .58; }
 .home-destination__art--employees { right: -13%; bottom: -7%; width: 82%; opacity: .62; mask-image: linear-gradient(to right, transparent 0%, #000 20%, #000 100%); }
 .home-destination:hover .home-destination__art { transform: translateY(-5px) scale(1.025); }
-.home-destination .eyebrow, .home-destination strong, .home-destination p, .home-destination__action, .home-destination__icon, .home-destination__arrow, .home-destination__status { position: relative; z-index: 2; }
+.home-destination .eyebrow, .home-destination strong, .home-destination p, .home-destination__action, .home-destination__icon, .home-destination__arrow { position: relative; z-index: 2; }
 .home-destination__arrow { position: absolute; }
-.home-destination__status { position: absolute; }
 .home-destination strong, .home-destination p, .home-destination__action { max-width: 58%; }
-.home-destination--coming-soon { cursor: default; }
-.home-destination--coming-soon:hover { transform: none; border-color: #d8ddd8; box-shadow: var(--shadow); }
-.home-destination--coming-soon:hover::after { transform: none; }
-.home-destination--coming-soon:hover .home-destination__art { transform: none; }
 
 .editor-header { display: grid; grid-template-columns: 42px 1fr auto; align-items: start; gap: 16px; margin-bottom: 22px; }
 /* Средняя колонка обязана уметь сжиматься (min-width: 0): иначе её min-content —

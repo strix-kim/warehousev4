@@ -1,4 +1,4 @@
-import { ArrowUpRight, Boxes, ClipboardList, Clock3, Plus, UsersRound } from 'lucide-react'
+import { ArrowUpRight, Boxes, ClipboardList, Plus, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../../lib/i18n'
 
@@ -41,14 +41,16 @@ export function HomePage() {
           <Link className="home-destination__action" to="/lists/new"><Plus size={16} /> {tr('Создать список', 'Ro‘yxat yaratish')}</Link>
         </article>
 
-        <article className="home-destination home-destination--employees home-destination--coming-soon" aria-label={tr('Сотрудники — раздел готовится', 'Xodimlar — bo‘lim tayyorlanmoqda')}>
+        <article className="home-destination home-destination--employees">
           <img className="home-destination__art home-destination__art--employees" src="/illustrations/av-team.webp" alt="" aria-hidden="true" loading="eager" decoding="async" fetchPriority="high" />
-          <span className="home-destination__icon"><UsersRound size={34} /></span>
-          <span className="home-destination__status">{tr('Скоро', 'Tez orada')}</span>
-          <span className="eyebrow">{tr('Команда на площадке', 'Maydondagi jamoa')}</span>
-          <strong>{tr('Сотрудники', 'Xodimlar')}</strong>
-          <p>{tr('Составлять списки сотрудников и назначать специалистов на точки монтажа.', 'Xodimlar ro‘yxatini tuzish va mutaxassislarni montaj nuqtalariga biriktirish.')}</p>
-          <span className="home-destination__action"><Clock3 size={16} /> {tr('Раздел готовится', 'Bo‘lim tayyorlanmoqda')}</span>
+          <Link className="home-destination__link" to="/employees">
+            <span className="home-destination__icon"><UsersRound size={34} /></span>
+            <span className="home-destination__arrow"><ArrowUpRight size={24} /></span>
+            <span className="eyebrow">{tr('Команда на площадке', 'Maydondagi jamoa')}</span>
+            <strong>{tr('Сотрудники', 'Xodimlar')}</strong>
+            <p>{tr('Карточки сотрудников: контакты, документы, фото и сканы.', 'Xodimlar kartalari: kontaktlar, hujjatlar, foto va nusxalar.')}</p>
+          </Link>
+          <Link className="home-destination__action" to="/employees/new"><Plus size={16} /> {tr('Добавить сотрудника', 'Xodim qo‘shish')}</Link>
         </article>
       </div>
     </section>
