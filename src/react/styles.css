@@ -686,7 +686,9 @@ h2 { letter-spacing: -0.025em; }
 .form-section__heading > span { width: 30px; height: 30px; display: grid; flex: 0 0 auto; place-items: center; border-radius: 7px; color: var(--accent); background: rgba(239,18,54,.08); font-family: inherit; font-size: 12px; font-weight: 700; }
 .form-section__heading h2 { margin: 0 0 4px; font-size: 18px; }
 .form-section__heading p { margin: 0; color: var(--ink-faint); font-size: 12px; }
-.record-kind-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* auto-fit вместо 1fr 1fr: карточек стало три (U34-L), на узкой колонке они
+   складываются в столбик, на широкой встают в ряд. */
+.record-kind-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
 .record-kind-grid > button { min-height: 86px; display: grid; grid-template-columns: 26px 1fr 22px; align-items: start; gap: 10px; padding: 15px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink-soft); background: var(--surface-soft); text-align: left; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
 .record-kind-grid > button:hover { transform: translateY(-1px); border-color: var(--line-strong); }
 .record-kind-grid > button.active { border-color: rgba(239,18,54,.45); color: var(--ink); background: rgba(239,18,54,.035); box-shadow: 0 0 0 3px rgba(239,18,54,.05); }

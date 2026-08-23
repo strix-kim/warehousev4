@@ -393,6 +393,23 @@ export type Database = {
         Args: { p_brand: string; p_model: string }
         Returns: number
       }
+      // ПРАВКА РУКАМИ: функция заведена миграцией 20260823100000, типы дописаны
+      // вслед за ней — генератор с прода не перезапускался.
+      create_equipment_batch: {
+        Args: {
+          p_availability: string
+          p_brand: string
+          p_description: string
+          p_lengthinmeters: string
+          p_location: string
+          p_model: string
+          p_serialnumbers: string[]
+          p_subtype: string
+          p_technicalspecification: string
+          p_type: string
+        }
+        Returns: Json
+      }
       create_equipment_list_document: {
         Args: {
           p_client_name: string

@@ -286,6 +286,49 @@ export async function createEquipment(input: CreateEquipmentInput) {
   return data.id as string
 }
 
+export type CreateEquipmentBatchInput = Omit<CreateEquipmentInput, 'trackingMode' | 'serialnumber' | 'inventoryCode' | 'count'> & {
+  serialNumbers: string[]
+}
+
+// 'duplicates' — не ошибка, а ответ: ничего не вставлено, serials — номера,
+// которые повторяются в партии или уже есть в каталоге.
+export type CreateEquipmentBatchResult =
+  | { status: 'created'; count: number }
+  | { status: 'duplicates'; serials: string[] }
+
+/**
+ * Партия серийных единиц одной транзакцией — RPC create_equipment_batch
+ * (миграция 20260823100000). Дубли проверяет СЕРВЕР, под advisory-локом по
+ * нормализованному номеру: это единственный путь заведения, где гонка двух
+ * вкладок с одним серийником закрыта (UNIQUE-индекса в базе нет, бэклог).
+ */
+export async function createEquipmentBatch(input: CreateEquipmentBatchInput): Promise<CreateEquipmentBatchResult> {
+  if (!supabase) throw new Error('Supabase не настроен')
+
+  const { data, error } = await supabase.rpc('create_equipment_batch', {
+    p_brand: input.brand.trim(),
+    p_model: input.model.trim(),
+    p_type: input.type.trim(),
+    p_subtype: input.subtype.trim(),
+    p_availability: input.availability,
+    p_location: input.location.trim(),
+    p_lengthinmeters: input.lengthinmeters?.trim() ?? '',
+    p_technicalspecification: input.technicalspecification?.trim() ?? '',
+    p_description: input.description?.trim() ?? '',
+    p_serialnumbers: input.serialNumbers,
+  })
+
+  if (error) throw error
+  const result = (data ?? {}) as { status?: unknown; count?: unknown; serials?: unknown }
+  if (result.status === 'duplicates') {
+    const serials = Array.isArray(result.serials) ? result.serials.filter((value): value is string => typeof value === 'string') : []
+    return { status: 'duplicates', serials }
+  }
+  invalidateCachePrefix('equipment:')
+  invalidateCachePrefix('equipment-taxonomy')
+  return { status: 'created', count: typeof result.count === 'number' ? result.count : input.serialNumbers.length }
+}
+
 // В шаблоне LIKE/ILIKE `%` и `_` — подстановочные знаки, а `\` — знак
 // экранирования. Без экранирования серийник `AB_1234` совпадал с `AB-1234`
 // и давал ложный дубль. Обратная косая идёт первой, иначе она экранировала бы
