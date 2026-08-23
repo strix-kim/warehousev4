@@ -2,10 +2,11 @@ import { ArrowLeft, CheckCircle2, CircleAlert, Save, TriangleAlert, UserRound } 
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createEmployee, employeeSaveErrorText, fetchEmployeeById, fetchEmployeeFiles, findNamesakes, getSignedUrls, updateEmployee, uploadEmployeeFile, type EmployeeInput, type EmployeeNamesake } from './api'
-import { compressPhoto } from './compressPhoto'
 import { EmployeeFileFields, emptyFileSelection, selectedFiles, type EmployeeFileSelection } from './EmployeeFileFields'
 import { EmployeeFilesList } from './EmployeeFilesList'
 import { employeeFileKindLabel, employeeFullName, type Employee, type EmployeeFile, type EmployeeFileKind } from './types'
+import { UploadQueue, type UploadItem } from '../../components/UploadQueue'
+import { compressPhoto } from '../../lib/compressPhoto'
 import { parseDateValue } from '../../lib/date'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
@@ -54,15 +55,8 @@ function draftFromEmployee(employee: Employee): EmployeeInput {
   }
 }
 
-// Строка очереди загрузки. 'unsupported' — файл не декодировался (HEIC на
-// десктопе): повторять нечего, нужен другой файл, поэтому это отдельный исход,
-// а не разновидность 'failed'.
-type UploadItem = {
-  id: string
-  kind: EmployeeFileKind
-  file: File
-  status: 'pending' | 'running' | 'done' | 'failed' | 'unsupported'
-}
+// Очередь загрузки — общий компонент; у сотрудника в ней свой набор видов файлов.
+type EmployeeUpload = UploadItem<EmployeeFileKind>
 
 const shirtSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
 
@@ -84,7 +78,7 @@ export function EmployeeFormPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [createdId, setCreatedId] = useState('')
-  const [uploads, setUploads] = useState<UploadItem[]>([])
+  const [uploads, setUploads] = useState<EmployeeUpload[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const lastNameRef = useRef<HTMLInputElement>(null)
 
@@ -172,9 +166,9 @@ export function EmployeeFormPage() {
   // загрузки её не отменяет — иначе человек терял бы заполненную форму из-за
   // одного тяжёлого скана. Итог возвращаем массивом: setUploads применится не
   // сразу, а решение «уходить ли в карточку» нужно принять здесь же.
-  async function runUploads(targetId: string, queue: UploadItem[]): Promise<UploadItem[]> {
+  async function runUploads(targetId: string, queue: EmployeeUpload[]): Promise<EmployeeUpload[]> {
     setIsUploading(true)
-    const results: UploadItem[] = []
+    const results: EmployeeUpload[] = []
     for (const item of queue) {
       setUploads((current) => current.map((row) => row.id === item.id ? { ...row, status: 'running' } : row))
       try {
@@ -201,7 +195,7 @@ export function EmployeeFormPage() {
     return results
   }
 
-  function buildQueue(): UploadItem[] {
+  function buildQueue(): EmployeeUpload[] {
     return selectedFiles(files).map((entry, index) => ({
       id: `${index}:${entry.kind}:${entry.file.name}`,
       kind: entry.kind,
@@ -317,7 +311,7 @@ export function EmployeeFormPage() {
         <h1>{tr('Сотрудник добавлен', 'Xodim qo‘shildi')}</h1>
         <p>{employeeFullName(draft)} — {tr('карточка сохранена. Данные можно добивать позже.', 'karta saqlandi. Ma’lumotlarni keyinroq to‘ldirish mumkin.')}</p>
 
-        {uploads.length > 0 && <UploadQueue uploads={uploads} />}
+        {uploads.length > 0 && <UploadQueue uploads={uploads} label={(kind) => employeeFileKindLabel(kind, tr)} />}
 
         <div>
           {failed.length > 0 && (
@@ -411,7 +405,7 @@ export function EmployeeFormPage() {
               карточку само. */}
           {isEditing && uploads.length > 0 && (
             <>
-              <UploadQueue uploads={uploads} />
+              <UploadQueue uploads={uploads} label={(kind) => employeeFileKindLabel(kind, tr)} />
               {failedUploads.length > 0 && !isUploading && (
                 <div className="employee-form-actions">
                   <button type="button" className="button button--secondary" onClick={() => void retryUploads()}>{tr('Повторить загрузку', 'Yuklashni takrorlash')}</button>
@@ -465,31 +459,5 @@ export function EmployeeFormPage() {
         </div>
       </section>
     </form>
-  )
-}
-
-// Очередь загрузки одним списком: один и тот же вид на экране успеха создания и
-// в форме правки.
-function UploadQueue({ uploads }: { uploads: UploadItem[] }) {
-  const { tr } = useLanguage()
-  return (
-    <ul className="employee-upload-list">
-      {uploads.map((item) => (
-        <li key={item.id}>
-          <span>{employeeFileKindLabel(item.kind, tr)} · {item.file.name}</span>
-          <span className={`badge badge--${item.status === 'done' ? 'success' : item.status === 'pending' || item.status === 'running' ? 'neutral' : 'danger'}`}>
-            <i />{item.status === 'done'
-              ? tr('Загружен', 'Yuklandi')
-              : item.status === 'running'
-                ? tr('Загружаем…', 'Yuklanmoqda…')
-                : item.status === 'pending'
-                  ? tr('В очереди', 'Navbatda')
-                  : item.status === 'unsupported'
-                    ? tr('Формат не поддерживается — нужен JPG или PNG', 'Format qo‘llab-quvvatlanmaydi — JPG yoki PNG kerak')
-                    : tr('Не загрузился', 'Yuklanmadi')}
-          </span>
-        </li>
-      ))}
-    </ul>
   )
 }

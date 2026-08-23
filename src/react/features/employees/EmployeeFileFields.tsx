@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import { PhotoPickField } from '../../components/PhotoPickField'
 import { useLanguage } from '../../lib/i18n'
 import { employeeFileKindLabel, type EmployeeFileKind } from './types'
 
@@ -43,36 +44,7 @@ export function EmployeeFileFields({ selection, onChange, disabled }: {
 
   return (
     <div className="form-grid">
-      <label className="field form-grid__wide">
-        <span>{tr('Фотографии', 'Fotosuratlar')}</span>
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          disabled={disabled}
-          onChange={(event) => {
-            const picked = [...(event.target.files ?? [])]
-            // Список копится: пачку фотографий выбирают в несколько заходов, а
-            // native-инпут при каждом выборе заменяет свой FileList целиком.
-            onChange({ ...selection, photos: [...selection.photos, ...picked] })
-            // Сброс значения — чтобы повторный выбор того же файла снова дал change.
-            event.target.value = ''
-          }}
-        />
-        <small className="field-hint">{tr('Перед загрузкой ужимаются до 1600 px по длинной стороне.', 'Yuklashdan oldin uzun tomoni bo‘yicha 1600 px gacha kichraytiriladi.')}</small>
-        {selection.photos.length > 0 && (
-          <ul className="employee-file-picks">
-            {selection.photos.map((file, index) => (
-              <li key={`${file.name}:${file.size}:${index}`}>
-                <span>{file.name}</span>
-                <button type="button" className="icon-button" disabled={disabled} onClick={() => onChange({ ...selection, photos: selection.photos.filter((_, position) => position !== index) })} aria-label={tr('Убрать файл', 'Faylni olib tashlash')}>
-                  <X size={15} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </label>
+      <PhotoPickField files={selection.photos} onChange={(photos) => onChange({ ...selection, photos })} disabled={disabled} />
 
       {scanKinds.map((kind) => {
         const file = selection[kind]

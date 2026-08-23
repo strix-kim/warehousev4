@@ -1,10 +1,10 @@
 import { supabase } from '../../lib/supabase'
 import { escapeLikePattern } from '../../lib/postgrest'
+import { createSignedUrlCache } from '../../lib/signedUrlCache'
 import type { Employee, EmployeeFile, EmployeeFileKind, Tr } from './types'
 
 // Приватный бакет: наружу файл уходит только по подписанной ссылке.
 const BUCKET = 'employee-files'
-const SIGNED_URL_TTL_SECONDS = 3600
 
 // Сотрудников ~200 — выдача целиком, без страниц. Порядок с ПОЛНЫМ ключом
 // (…, id): без него однофамильцы-тёзки меняются местами между запросами.
@@ -206,47 +206,9 @@ export async function uploadEmployeeFile(employeeId: string, kind: EmployeeFileK
   return data
 }
 
-// Подписанные ссылки живут час и в persistentCache им не место: пережившая
-// выкатку запись отдала бы протухший URL как факт. Память — только на сессию
-// вкладки, с запасом в пять минут до истечения.
-const signedUrls = new Map<string, { url: string; expiresAt: number }>()
-const SIGNED_URL_KEEP_MS = (SIGNED_URL_TTL_SECONDS - 300) * 1000
-
-export async function getSignedUrl(path: string): Promise<string> {
-  if (!supabase) throw new Error('Supabase не настроен')
-  const cached = signedUrls.get(path)
-  if (cached && cached.expiresAt > Date.now()) return cached.url
-
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_TTL_SECONDS)
-  if (error) throw error
-  if (!data?.signedUrl) throw new Error('Подписанная ссылка не получена')
-  signedUrls.set(path, { url: data.signedUrl, expiresAt: Date.now() + SIGNED_URL_KEEP_MS })
-  return data.signedUrl
-}
-
-// Пачкой — для миниатюр списка: по ссылке на каждого сотрудника вышло бы 200
-// запросов. Отказ по отдельному пути не роняет остальные: у такого файла
-// миниатюры просто не будет.
-export async function getSignedUrls(paths: string[]): Promise<Map<string, string>> {
-  if (!supabase) throw new Error('Supabase не настроен')
-  const result = new Map<string, string>()
-  const missing: string[] = []
-  for (const path of paths) {
-    const cached = signedUrls.get(path)
-    if (cached && cached.expiresAt > Date.now()) result.set(path, cached.url)
-    else missing.push(path)
-  }
-  if (missing.length === 0) return result
-
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(missing, SIGNED_URL_TTL_SECONDS)
-  if (error) throw error
-  for (const entry of data ?? []) {
-    if (!entry.path || entry.error || !entry.signedUrl) continue
-    signedUrls.set(entry.path, { url: entry.signedUrl, expiresAt: Date.now() + SIGNED_URL_KEEP_MS })
-    result.set(entry.path, entry.signedUrl)
-  }
-  return result
-}
+// Подписанные ссылки на файлы сотрудников. Кэш общий на бакет и живёт только
+// в памяти вкладки — устройство памяти в lib/signedUrlCache.
+export const { getSignedUrl, getSignedUrls } = createSignedUrlCache(BUCKET)
 
 // Перевод отказа базы в человеческую фразу. Разбираем ИМЕНЕМ ограничения, а не
 // одним кодом: под 23514 у employees три разных CHECK, и «ПИНФЛ — 14 цифр»
