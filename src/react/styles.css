@@ -475,6 +475,12 @@ h2 { letter-spacing: -0.025em; }
 .home-destination__art--lists { right: -6%; bottom: -10%; width: 68%; opacity: .58; }
 .home-destination__art--employees { right: -13%; bottom: -7%; width: 82%; opacity: .62; mask-image: linear-gradient(to right, transparent 0%, #000 20%, #000 100%); }
 .home-destination:hover .home-destination__art { transform: translateY(-5px) scale(1.025); }
+/* Плитка автомобилей — слим-баннер на всю ширину сетки: три исходные плитки не
+   трогаем ни на одной ширине, а будущему арту достаётся правый край баннера. */
+.home-destination--vehicles { min-height: 220px; grid-column: 1 / -1; border-color: #d5dde2; background: linear-gradient(145deg, #f2f5f7 0%, #e6ecf0 100%); animation-delay: .17s; }
+.home-destination--vehicles::after { background: rgba(16,22,27,.05); }
+.home-destination--vehicles .home-destination__icon { color: var(--accent); background: rgba(239,18,54,.09); }
+.home-destination__art--vehicles { right: -5%; bottom: -14%; width: 44%; opacity: .6; mask-image: linear-gradient(to right, transparent 0%, #000 22%, #000 100%); }
 .home-destination .eyebrow, .home-destination strong, .home-destination p, .home-destination__action, .home-destination__icon, .home-destination__arrow { position: relative; z-index: 2; }
 .home-destination__arrow { position: absolute; }
 .home-destination strong, .home-destination p, .home-destination__action { max-width: 58%; }

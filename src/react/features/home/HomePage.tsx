@@ -1,4 +1,4 @@
-import { ArrowUpRight, Boxes, ClipboardList, Plus, UsersRound } from 'lucide-react'
+import { ArrowUpRight, Boxes, CarFront, ClipboardList, Plus, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../../lib/i18n'
 
@@ -51,6 +51,18 @@ export function HomePage() {
             <p>{tr('Карточки сотрудников: контакты, документы, фото и сканы.', 'Xodimlar kartalari: kontaktlar, hujjatlar, foto va nusxalar.')}</p>
           </Link>
           <Link className="home-destination__action" to="/employees/new"><Plus size={16} /> {tr('Добавить сотрудника', 'Xodim qo‘shish')}</Link>
+        </article>
+
+        <article className="home-destination home-destination--vehicles">
+          {/* Место под арт серии: сюда одной строкой встанет <img class="home-destination__art home-destination__art--vehicles" …>, когда прораб отдаст иллюстрацию */}
+          <Link className="home-destination__link" to="/vehicles">
+            <span className="home-destination__icon"><CarFront size={34} /></span>
+            <span className="home-destination__arrow"><ArrowUpRight size={24} /></span>
+            <span className="eyebrow">{tr('Транспорт на выезд', 'Safar transporti')}</span>
+            <strong>{tr('Автомобили', 'Avtomobillar')}</strong>
+            <p>{tr('База машин для пропусков на площадки: госномера, цвета и водители из базы сотрудников.', 'Maydonchalarga ruxsatnomalar uchun mashinalar bazasi: davlat raqamlari, ranglar va xodimlar bazasidagi haydovchilar.')}</p>
+          </Link>
+          <Link className="home-destination__action" to="/vehicles/new"><Plus size={16} /> {tr('Добавить машину', 'Mashina qo‘shish')}</Link>
         </article>
       </div>
     </section>
