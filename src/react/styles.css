@@ -790,6 +790,21 @@ h2 { letter-spacing: -0.025em; }
    размер 13px через !important, а в шапке дровера номер стоит крупно. */
 .plate-badge { display: inline-block; padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-soft); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
 .plate-badge--lg { padding: 5px 11px; font-size: 21px; }
+/* Форма машины — та же панель, что у сотрудника: overflow visible нужен ей ради
+   выпадающей выдачи водителей, которая выходит за край секции. */
+.vehicle-form { overflow: visible; }
+.driver-picker { position: relative; }
+.driver-picker .field { margin-bottom: 0; }
+.driver-picker__panel { position: absolute; z-index: 40; top: calc(100% + 5px); right: 0; left: 0; max-height: 300px; padding: 6px; overflow-y: auto; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.98); box-shadow: 0 18px 46px rgba(15,22,28,.18), 0 2px 8px rgba(15,22,28,.08); backdrop-filter: blur(16px); animation: popover-in .16s ease-out; }
+.driver-picker__panel > button { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px; border: 0; border-radius: 7px; color: var(--ink-soft); background: transparent; font-size: 13px; font-weight: 650; text-align: left; }
+.driver-picker__panel > button:hover { color: var(--ink); background: var(--surface-soft); }
+.driver-picker__panel > button small { color: var(--ink-faint); font-size: 11px; font-weight: 550; }
+.driver-picker__panel > .muted, .driver-picker__panel > div { padding: 8px 10px; font-size: 13px; }
+.driver-picker__footer { display: flex; align-items: center; gap: 6px; margin: 4px 0 0; padding: 9px 10px 3px; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: 12px; }
+/* Выбранные водители — чипами над полем поиска: добавленный виден сразу, панель
+   выдачи его не перекрывает. */
+.driver-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; padding: 0; list-style: none; }
+.driver-chips li { display: flex; align-items: center; gap: 3px; padding: 4px 4px 4px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-soft); font-size: 12px; font-weight: 600; }
 
 .app-loader { min-height: 100vh; display: grid; place-content: center; gap: 18px; background: #f3f4f2; }
 .route-loader { min-height: min(520px, calc(100vh - 96px)); display: grid; align-content: start; gap: 16px; padding-top: 4px; }
