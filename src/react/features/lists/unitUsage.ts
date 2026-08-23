@@ -9,10 +9,13 @@ import { cachedQuery, readCachedQuery } from '../../lib/persistentCache'
 
 // Ровно то, что рисует карточка: имя, дата мероприятия и id для ссылки. Полную
 // строку списка сюда тянуть нельзя — потребовался бы тип из lists/api.
+// count — сколько штук этой единицы стоит в списке; null у серийной позиции,
+// там всегда одна и число было бы шумом.
 export type UnitListUsage = {
   id: string
   name: string
   reservation_start: string | null
+  count: number | null
 }
 
 // Ключ живёт под префиксом equipment-lists:, а не equipment: — значение зависит
@@ -65,16 +68,24 @@ export async function fetchUnitLists(equipmentId: string): Promise<UnitListUsage
       // массив объектов превращается в cs.{[object Object]} — PostgREST отвечает
       // 400 «invalid input syntax for type json» ещё до проверки прав. Строка
       // уходит как есть и даёт корректное cs.[{"equipment_id":"…"}].
-      client.from('equipment_lists').select(columns).contains('equipment_items', JSON.stringify([{ equipment_id: equipmentId }])),
+      // equipment_items тянется целиком ради count: сколько штук стоит в списке.
+      client.from('equipment_lists').select(`${columns},equipment_items`).contains('equipment_items', JSON.stringify([{ equipment_id: equipmentId }])),
     ])
     if (serialized.error) throw serialized.error
     if (quantity.error) throw quantity.error
 
     // Единица может стоять в списке обеими формами сразу (серийная позиция плюс
-    // количественная того же id) — тогда список пришёл бы дважды.
+    // количественная того же id) — тогда список пришёл бы дважды. Количественная
+    // ветка идёт второй и перекрывает запись серийной своим count.
     const byId = new Map<string, UnitListUsage>()
-    for (const row of [...(serialized.data ?? []), ...(quantity.data ?? [])]) {
-      byId.set(row.id, { id: row.id, name: row.name, reservation_start: row.reservation_start })
+    for (const row of serialized.data ?? []) {
+      byId.set(row.id, { id: row.id, name: row.name, reservation_start: row.reservation_start, count: null })
+    }
+    for (const row of quantity.data ?? []) {
+      const items = (row.equipment_items ?? []) as { equipment_id?: string | null; count?: number }[]
+      const item = items.find((entry) => entry.equipment_id === equipmentId)
+      const count = typeof item?.count === 'number' && item.count > 0 ? item.count : null
+      byId.set(row.id, { id: row.id, name: row.name, reservation_start: row.reservation_start, count })
     }
     return sortByEventDate([...byId.values()])
   })

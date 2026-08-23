@@ -379,14 +379,15 @@ export type Database = {
     }
     Functions: {
       // ПРАВКА РУКАМИ: функция заведена миграцией 20260823080000, типы дописаны
-      // вслед за ней — генератор с прода не перезапускался.
+      // вслед за ней — генератор с прода не перезапускался. С 20260823090000
+      // возврат jsonb {status, count} — клиент разбирает и старую строку тоже.
       append_equipment_to_list: {
         Args: {
           p_equipment_id: string
           p_list_id: string
           p_tracking_mode: string
         }
-        Returns: string
+        Returns: Json
       }
       count_equipment_model_units: {
         Args: { p_brand: string; p_model: string }

@@ -7,10 +7,13 @@ import type { UnitListUsage } from './unitUsage'
 // Тянет только supabase, persistentCache и тип соседнего листового модуля.
 
 // Кнопке «В список» нужны те же три поля, что и разделу «Сейчас в списках»:
-// имя, дата мероприятия, id. Тип переиспользуем, а не копируем.
-export type AppendTarget = UnitListUsage
+// имя, дата мероприятия, id. Count пикеру не нужен — он про содержимое списка,
+// а не про его пригодность как цели.
+export type AppendTarget = Omit<UnitListUsage, 'count'>
 
-export type AppendResult = 'added' | 'already'
+// count приходит только у количественной позиции — итоговое число штук в
+// списке после добавления. У серийной его нет: там всегда одна.
+export type AppendResult = { status: 'added' | 'already'; count: number | null }
 
 // Ключ под префиксом equipment-lists:, как у unitUsage: список целей зависит от
 // состава списков и сбрасывается их создание/правкой/удалением автоматически.
@@ -62,5 +65,12 @@ export async function appendEquipmentToList(
   // Состав списка изменился — сбрасываем весь префикс, как это делают
   // create/update/delete в lists/api: под ним и реестр, и «Сейчас в списках».
   invalidateCachePrefix('equipment-lists:')
-  return data === 'already' ? 'already' : 'added'
+  // Два формата ответа — не подстраховка, а порядок выкатки: этот код уезжает
+  // в прод РАНЬШЕ миграции 20260823090000, пока RPC ещё отвечает строкой.
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const status = (data as { status?: unknown }).status === 'already' ? 'already' : 'added'
+    const count = (data as { count?: unknown }).count
+    return { status, count: typeof count === 'number' ? count : null }
+  }
+  return { status: data === 'already' ? 'already' : 'added', count: null }
 }

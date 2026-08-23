@@ -94,7 +94,7 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
   const [hasTargetsError, setHasTargetsError] = useState(false)
   const [appendBusyId, setAppendBusyId] = useState<string | null>(null)
   const [hasAppendError, setHasAppendError] = useState(false)
-  const [appendResult, setAppendResult] = useState<{ listId: string; name: string; status: AppendResult } | null>(null)
+  const [appendResult, setAppendResult] = useState<({ listId: string; name: string } & AppendResult) | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [editError, setEditError] = useState('')
@@ -264,9 +264,9 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
     setAppendBusyId(target.id)
     setHasAppendError(false)
     try {
-      const status = await appendEquipmentToList(target.id, item.id, item.tracking_mode)
+      const result = await appendEquipmentToList(target.id, item.id, item.tracking_mode)
       if (!isOpenRef.current) return
-      setAppendResult({ listId: target.id, name: target.name, status })
+      setAppendResult({ listId: target.id, name: target.name, ...result })
       setIsAppendOpen(false)
       // «Сейчас в списках» обязан отразить добавление сразу: кэш префикса уже
       // сброшен самим appendEquipmentToList, запрос уйдёт в базу.
@@ -424,9 +424,13 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
             <p className="form-success">
               <ClipboardList size={15} />
               <span>
-                {appendResult.status === 'added'
-                  ? tr(`Добавлено в «${appendResult.name}».`, `«${appendResult.name}» ro‘yxatiga qo‘shildi.`)
-                  : tr(`Эта единица уже в списке «${appendResult.name}».`, `Bu birlik «${appendResult.name}» ro‘yxatida allaqachon bor.`)}
+                {appendResult.status !== 'added'
+                  ? tr(`Эта единица уже в списке «${appendResult.name}».`, `Bu birlik «${appendResult.name}» ro‘yxatida allaqachon bor.`)
+                  // Число называем со второй штуки: «теперь 1 шт.» — шум,
+                  // а «теперь 3 шт.» — ответ на вопрос «сколько уже набрал».
+                  : appendResult.count !== null && appendResult.count > 1
+                    ? tr(`Добавлено в «${appendResult.name}» — теперь ${appendResult.count} шт.`, `«${appendResult.name}» ro‘yxatiga qo‘shildi — endi ${appendResult.count} dona.`)
+                    : tr(`Добавлено в «${appendResult.name}».`, `«${appendResult.name}» ro‘yxatiga qo‘shildi.`)}
                 {' '}<Link to={`/lists/${appendResult.listId}/edit`}>{tr('Открыть', 'Ochish')}</Link>
               </span>
             </p>
@@ -481,7 +485,8 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
                     <Link to={`/lists/${list.id}/edit`}>
                       <ClipboardList size={16} />
                       <span>
-                        <strong>{list.name}</strong>
+                        {/* «× 3» — со второй штуки: одна подразумевается самим фактом строки. */}
+                        <strong>{list.name}{list.count !== null && list.count > 1 ? ` × ${list.count}` : ''}</strong>
                         <small>{eventDateLabel(list.reservation_start, locale) ?? tr('Дата не указана', 'Sana ko‘rsatilmagan')}</small>
                       </span>
                     </Link>
