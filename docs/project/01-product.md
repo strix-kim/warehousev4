@@ -58,24 +58,26 @@ Excel собирается целиком в браузере, самописн�
 
 ## 4. Что входит в продукт
 
-Восемь страниц на десяти маршрутах, все ленивые, каждая под своей границей ошибок:
+Десять страниц на тринадцати маршрутах, все ленивые, каждая под своей границей ошибок:
 
 | Маршрут | Страница | Что делает |
 |---|---|---|
 | `/login` | `LoginPage` | Вход, переключатель RU/UZ |
-| `/` | `HomePage` | Три живые плитки: каталог, списки, сотрудники |
+| `/` | `HomePage` | Четыре живые плитки: каталог, списки, сотрудники, автомобили |
 | `/equipment` | `EquipmentPage` | Каталог: поиск, фильтры категории/подкатегории/статуса, пагинация, drawer-карточка, редактирование модели и единицы |
 | `/equipment/new` | `EquipmentCreatePage` | Заведение позиции: «серийная» / «по количеству» |
 | `/lists` | `ListsPage` | Реестр сохранённых документов, drawer с составом, повторный экспорт, удаление |
 | `/lists/new`, `/lists/:listId/edit` | `ListEditorPage` | Сборка комплекта, сохранение, выгрузка Excel |
 | `/employees` | `EmployeesPage` | Сотрудники (с17): список, drawer-карточка с фото и документами |
 | `/employees/new`, `/employees/:employeeId/edit` | `EmployeeFormPage` | Одна форма на заведение и правку; файлы — в приватный Storage-бакет |
+| `/vehicles` | `VehiclesPage` | Автомобили (с18): список с поиском по госномеру/марке/водителю, drawer-карточка |
+| `/vehicles/new`, `/vehicles/:vehicleId/edit` | `VehicleFormPage` | Одна форма; водители — чипами из базы сотрудников, фото — в `vehicle-files` |
 
-**Клиент обращается к пяти таблицам и восьми RPC:**
+**Клиент обращается к восьми таблицам и восьми RPC:**
 
 | Таблицы | RPC |
 |---|---|
-| `equipment`, `equipment_lists`, `equipment_movements`, `employees`, `employee_files` | `create_equipment_list_document`, `update_equipment_list_document`, `update_equipment_model_and_unit`, `count_equipment_model_units`, `append_equipment_to_list`, `create_equipment_batch`, `fetch_equipment_models`, `add_equipment_unit` |
+| `equipment`, `equipment_lists`, `equipment_movements`, `employees`, `employee_files`, `vehicles`, `vehicle_drivers`, `vehicle_files` | `create_equipment_list_document`, `update_equipment_list_document`, `update_equipment_model_and_unit`, `count_equipment_model_units`, `append_equipment_to_list`, `create_equipment_batch`, `fetch_equipment_models`, `add_equipment_unit` |
 
 Сквозные механики: двуязычие через `tr`; постоянный кэш в `localStorage`
 (`lib/persistentCache.ts`); прогрев чанков и первичных данных после входа; drawer'ы
@@ -106,17 +108,19 @@ Excel собирается целиком в браузере, самописн�
 Нет по факту кода: регистрации (в с17 закрыта и на стороне Auth), восстановления
 пароля, приглашений, профиля, MFA; управления ролями из интерфейса; печати, PDF,
 отправки по почте, интеграций; автотестов и CI; сборщика ошибок (есть только шов
-`setErrorSink` под него). **Роадмап с17** (бриф `features/empoyees/Context`): база
-автомобилей, экспорт списков «на мероприятие» (сотрудники, авто), распределение
-по залам с режимом большого ТВ — впереди; сотрудники сделаны в с17.
+`setErrorSink` под него). **Роадмап** (бриф `features/empoyees/Context`): сотрудники
+сделаны в с17, автомобили — в с18; впереди — экспорт списков «на мероприятие»
+(сотрудники, авто) и распределение по залам с режимом большого ТВ.
 
 ## 6. Масштаб данных
 
-**Прод на 2026-08-22** (сверено выборкой): `equipment` — **1 481 строка / 1 877 штук**,
+**Прод на 2026-08-23** (сверено выборкой): `equipment` — **1 481 строка / 1 877 штук**,
 218 моделей, 7 категорий и 56 подкатегорий, локация одна («Офис»);
 `equipment_movements` — 1 391 (все `status_normalized`, след импорта);
-`equipment_lists` — 6; `users` — **1, аккаунт ровно один**; `events` — 4,
-`mount_points` — 9 (обе таблицы клиентом не используются).
+`equipment_lists` — 6; `employees` — 12 (+12 фото в `employee-files`);
+`vehicles` — 6 с водителями-связками; `users` — **2** (рабочий аккаунт и
+`rls-test` для прогонов прав); `events` — 4, `mount_points` — 9 (обе таблицы
+клиентом не используются).
 
 Справочник картинок: 176 моделей с фотографией (`public/equipment-images/*.webp` и
 `generated/equipmentImages.ts` — 176 записей, числа сходятся), остальные показывают
