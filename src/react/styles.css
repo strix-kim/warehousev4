@@ -771,6 +771,24 @@ h2 { letter-spacing: -0.025em; }
 .form-error { margin: -2px 0 14px; padding: 10px 12px; border-radius: 7px; color: var(--danger); background: var(--danger-bg); font-size: 13px; }
 .login-help { margin: 14px 0 0; color: var(--ink-faint); font-size: 12px; line-height: 1.5; }
 
+/* Сотрудники (с17). Форма — та же панель, что у оборудования, но без колонки
+   предпросмотра; overflow visible нужен ей ради выпадающего datalist. */
+.employee-form { overflow: visible; }
+.employee-avatar { width: 36px; height: 36px; display: grid; flex: 0 0 auto; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 50%; color: var(--ink-faint); background: var(--surface-soft); }
+.employee-avatar img { width: 100%; height: 100%; display: block; object-fit: cover; }
+/* Выбранные, но ещё не отправленные файлы: список под полем выбора. */
+.employee-file-picks { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.employee-file-picks li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); font-size: 12px; font-weight: 500; }
+.employee-file-picks span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Очередь загрузки на экране успеха: карточка уже сохранена, файлы едут после неё. */
+.employee-upload-list { display: flex; flex-direction: column; gap: 8px; margin: 24px 0 0; padding: 0; list-style: none; text-align: left; }
+.employee-upload-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); font-size: 13px; }
+.employee-upload-list > li > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.employee-namesakes__actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 12px; }
+.employee-photos { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.employee-photos a, .employee-photos__missing { width: 92px; height: 116px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; color: var(--ink-faint); background: var(--surface-soft); }
+.employee-photos img { width: 100%; height: 100%; display: block; object-fit: cover; }
+
 .app-loader { min-height: 100vh; display: grid; place-content: center; gap: 18px; background: #f3f4f2; }
 .route-loader { min-height: min(520px, calc(100vh - 96px)); display: grid; align-content: start; gap: 16px; padding-top: 4px; }
 .route-loader__title, .route-loader__panel { overflow: hidden; border-radius: 10px; background: linear-gradient(90deg, #ecefeb 25%, #f7f8f6 50%, #ecefeb 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }

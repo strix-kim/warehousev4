@@ -14,6 +14,115 @@ export type Database = {
   }
   public: {
     Tables: {
+      // Правка руками (с17): employees + employee_files, миграция 20260823130000.
+      // Генератор типов не запускался — при перегенерации блок обязан пересобраться сам.
+      employee_files: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          id: string
+          kind: string
+          original_name: string | null
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          id?: string
+          kind: string
+          original_name?: string | null
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+          kind?: string
+          original_name?: string | null
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_files_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employees: {
+        Row: {
+          birth_date: string | null
+          birth_place: string | null
+          clearance_expires_at: string | null
+          created_at: string
+          created_by: string | null
+          first_name: string
+          id: string
+          last_name: string
+          middle_name: string | null
+          passport_expires_at: string | null
+          passport_issued_at: string | null
+          passport_issued_by: string | null
+          passport_number: string | null
+          passport_series: string | null
+          phone: string | null
+          pinfl: string | null
+          position: string | null
+          residence_address: string | null
+          t_shirt_size: string | null
+          updated_at: string
+        }
+        Insert: {
+          birth_date?: string | null
+          birth_place?: string | null
+          clearance_expires_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          first_name: string
+          id?: string
+          last_name: string
+          middle_name?: string | null
+          passport_expires_at?: string | null
+          passport_issued_at?: string | null
+          passport_issued_by?: string | null
+          passport_number?: string | null
+          passport_series?: string | null
+          phone?: string | null
+          pinfl?: string | null
+          position?: string | null
+          residence_address?: string | null
+          t_shirt_size?: string | null
+          updated_at?: string
+        }
+        Update: {
+          birth_date?: string | null
+          birth_place?: string | null
+          clearance_expires_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          middle_name?: string | null
+          passport_expires_at?: string | null
+          passport_issued_at?: string | null
+          passport_issued_by?: string | null
+          passport_number?: string | null
+          passport_series?: string | null
+          phone?: string | null
+          pinfl?: string | null
+          position?: string | null
+          residence_address?: string | null
+          t_shirt_size?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       equipment: {
         Row: {
           availability: string | null
