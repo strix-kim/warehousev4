@@ -20,38 +20,75 @@ export async function fetchEmployees(): Promise<Employee[]> {
   return data ?? []
 }
 
+// Новые файлы первыми: тем же порядком карточка и форма показывают фото, а
+// правило «фото для документов по умолчанию — последнее загруженное» читает
+// первый элемент списка, а не считает даты заново.
 export async function fetchEmployeeFiles(employeeId: string): Promise<EmployeeFile[]> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase
     .from('employee_files')
     .select('*')
     .eq('employee_id', employeeId)
-    .order('created_at')
-    .order('id')
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
   if (error) throw error
   return data ?? []
 }
 
-// Первое фото каждого сотрудника — для миниатюр списка. Отдельный запрос вместо
-// fetchEmployeeFiles по каждой строке: 200 карточек дали бы 200 запросов.
-export async function fetchEmployeePhotoPaths(): Promise<Map<string, string>> {
+// Ссылка на фото: id нужен, чтобы сверить его с employees.document_photo_id,
+// путь — чтобы подписать ссылку.
+export type EmployeePhotoRef = { id: string; storage_path: string }
+
+// Фото ВСЕХ сотрудников одним запросом — для миниатюр списка и для сводки
+// «без фото» в экспорте. Отдельный запрос вместо fetchEmployeeFiles по каждой
+// строке: 200 карточек дали бы 200 запросов.
+export async function fetchEmployeePhotos(): Promise<Map<string, EmployeePhotoRef[]>> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase
     .from('employee_files')
     .select('employee_id, storage_path, created_at, id')
     .eq('kind', 'photo')
-    .order('employee_id')
-    .order('created_at')
-    .order('id')
-    // Предел Data API — 1000 строк (gotchas §1). На ~200 сотрудниках с несколькими
-    // фото это с запасом; когда упрёмся, сюда придёт батчинг по .range().
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    // Предел Data API — 1000 строк (gotchas §1). Порядок теперь «новые первыми»,
+    // поэтому обрезка отъедает САМЫЙ СТАРЫЙ хвост загрузок, а не свежие фото:
+    // миниатюра и выбор по умолчанию берут именно новое. На ~200 сотрудниках с
+    // несколькими фото предел с запасом; когда упрёмся — батчинг по .range().
     .limit(1000)
   if (error) throw error
-  const firstByEmployee = new Map<string, string>()
+  const byEmployee = new Map<string, EmployeePhotoRef[]>()
   for (const row of data ?? []) {
-    if (!firstByEmployee.has(row.employee_id)) firstByEmployee.set(row.employee_id, row.storage_path)
+    const list = byEmployee.get(row.employee_id)
+    if (list) list.push({ id: row.id, storage_path: row.storage_path })
+    else byEmployee.set(row.employee_id, [{ id: row.id, storage_path: row.storage_path }])
   }
-  return firstByEmployee
+  return byEmployee
+}
+
+// ЕДИНСТВЕННОЕ место, где живёт правило «какое фото идёт в документ»: выбранное,
+// а если не выбрано — последнее загруженное. Миниатюры списка, сводка экспорта и
+// сам генератор зовут её, чтобы не разъехаться. Выбранное фото, не найденное в
+// списке (обрезано пределом выборки), не повод показать пустоту — падаем на
+// последнее загруженное.
+export function pickDocumentPhoto(employee: Pick<Employee, 'document_photo_id'>, photos: EmployeePhotoRef[] | undefined): EmployeePhotoRef | null {
+  if (!photos || photos.length === 0) return null
+  if (employee.document_photo_id) {
+    const chosen = photos.find((photo) => photo.id === employee.document_photo_id)
+    if (chosen) return chosen
+  }
+  return photos[0] ?? null
+}
+
+// Выбор фото для документов — отдельным запросом, а не через форму: карточку
+// правят редко, а фото выбирают прямо в дровере. Колонки нет в EmployeeInput,
+// поэтому «Сохранить изменения» в форме этот выбор не затирает.
+export async function setEmployeeDocumentPhoto(employeeId: string, fileId: string | null): Promise<void> {
+  if (!supabase) throw new Error('Supabase не настроен')
+  const { error } = await supabase
+    .from('employees')
+    .update({ document_photo_id: fileId })
+    .eq('id', employeeId)
+  if (error) throw error
 }
 
 // Одна карточка прямо по id: прямая ссылка на /employees/:id/edit обязана
@@ -207,8 +244,9 @@ export async function uploadEmployeeFile(employeeId: string, kind: EmployeeFileK
 }
 
 // Подписанные ссылки на файлы сотрудников. Кэш общий на бакет и живёт только
-// в памяти вкладки — устройство памяти в lib/signedUrlCache.
-export const { getSignedUrl, getSignedUrls } = createSignedUrlCache(BUCKET)
+// в памяти вкладки — устройство памяти в lib/signedUrlCache. Наружу отдаём
+// только пачечный вариант: по одному файлу здесь никто не подписывает.
+export const { getSignedUrls } = createSignedUrlCache(BUCKET)
 
 // Перевод отказа базы в человеческую фразу. Разбираем ИМЕНЕМ ограничения, а не
 // одним кодом: под 23514 у employees три разных CHECK, и «ПИНФЛ — 14 цифр»
@@ -231,4 +269,23 @@ export function employeeSaveErrorText(error: unknown, tr: Tr): string {
     return tr('ПИНФЛ — 14 цифр.', 'JSHSHIR — 14 ta raqam.')
   }
   return tr('Не удалось сохранить сотрудника. Проверьте поля и повторите попытку.', 'Xodimni saqlab bo‘lmadi. Maydonlarni tekshirib, qayta urinib ko‘ring.')
+}
+
+// Отказ выбора «фото для документов» — своей функцией, а не веткой в
+// employeeSaveErrorText: там под 23514 висит ПИНФЛ, а общий фолбэк говорит про
+// сохранение карточки, которого здесь не было. 23514 сюда приходит только от
+// триггера check_employee_document_photo и по имени ограничения не опознаётся:
+// текст исключения PostgREST отдаёт своим, без имени, поэтому разбираем кодом —
+// других CHECK эта запись не задевает, она меняет одну колонку.
+export function documentPhotoErrorText(error: unknown, tr: Tr): string {
+  const candidate = (typeof error === 'object' && error !== null ? error : {}) as { code?: unknown; message?: unknown }
+  const code = typeof candidate.code === 'string' ? candidate.code : ''
+
+  if (code === '23514') {
+    return tr('Для документов подходит только фотография.', 'Hujjatlar uchun faqat foto mos keladi.')
+  }
+  if (code === '23503') {
+    return tr('Это фото не из карточки сотрудника — обновите страницу.', 'Bu foto xodim kartasidan emas — sahifani yangilang.')
+  }
+  return tr('Не удалось выбрать фото для документов. Повторите попытку.', 'Hujjatlar uchun fotoni tanlab bo‘lmadi. Qayta urinib ko‘ring.')
 }

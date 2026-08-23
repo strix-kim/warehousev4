@@ -1,7 +1,7 @@
 import { CircleAlert, Pencil, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { fetchEmployeeFiles, getSignedUrls } from './api'
+import { fetchEmployeeFiles, getSignedUrls, setEmployeeDocumentPhoto } from './api'
 import { EmployeeFilesList } from './EmployeeFilesList'
 import { employeeFullName, type Employee, type EmployeeFile, type Tr } from './types'
 import { formatEventDate, parseDateValue } from '../../lib/date'
@@ -39,7 +39,13 @@ function detailRows(employee: Employee, tr: Tr, locale: string): DetailRow[] {
   ].filter((row) => Boolean(row.value))
 }
 
-export function EmployeeDrawer({ employee, onClose }: { employee: Employee; onClose: () => void }) {
+export function EmployeeDrawer({ employee, onClose, onDocumentPhotoChange }: {
+  employee: Employee
+  onClose: () => void
+  // Выбор фото уезжает наверх, на страницу: там же лежит строка сотрудника, из
+  // которой карточка получает employee, и там же — миниатюра списка.
+  onDocumentPhotoChange?: (fileId: string) => void
+}) {
   const { tr, locale } = useLanguage()
   const navigate = useNavigate()
   useModalLayer(onClose)
@@ -76,6 +82,19 @@ export function EmployeeDrawer({ employee, onClose }: { employee: Employee; onCl
     return () => { isCurrent = false }
   }, [employee.id])
 
+  // Запрос идёт отдельно от «Сохранить» карточки: колонки document_photo_id нет
+  // в EmployeeInput, и форма её не трогает. Ошибку пробрасываем в список файлов —
+  // он показывает её строкой рядом с фото.
+  async function chooseDocumentPhoto(fileId: string) {
+    try {
+      await setEmployeeDocumentPhoto(employee.id, fileId)
+      onDocumentPhotoChange?.(fileId)
+    } catch (saveError: unknown) {
+      reportAppError(saveError, { scope: 'loader', route: '/employees', detail: { employee: employee.id, source: 'document-photo' } })
+      throw saveError
+    }
+  }
+
   const rows = detailRows(employee, tr, locale)
 
   return (
@@ -110,7 +129,13 @@ export function EmployeeDrawer({ employee, onClose }: { employee: Employee; onCl
               ? <p className="muted">{tr('Загружаем файлы…', 'Fayllar yuklanmoqda…')}</p>
               : files.length === 0
                 ? <p className="muted">{tr('Файлов пока нет.', 'Hozircha fayllar yo‘q.')}</p>
-                : <EmployeeFilesList files={files} urls={urls} photoAlt={employeeFullName(employee)} />}
+                : <EmployeeFilesList
+                  files={files}
+                  urls={urls}
+                  photoAlt={employeeFullName(employee)}
+                  documentPhotoId={employee.document_photo_id}
+                  onChooseDocumentPhoto={chooseDocumentPhoto}
+                />}
         </section>
       </aside>
     </div>

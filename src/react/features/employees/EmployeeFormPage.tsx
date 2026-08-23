@@ -1,7 +1,7 @@
 import { ArrowLeft, CheckCircle2, CircleAlert, Save, TriangleAlert, UserRound } from 'lucide-react'
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { createEmployee, employeeSaveErrorText, fetchEmployeeById, fetchEmployeeFiles, findNamesakes, getSignedUrls, updateEmployee, uploadEmployeeFile, type EmployeeInput, type EmployeeNamesake } from './api'
+import { createEmployee, employeeSaveErrorText, fetchEmployeeById, fetchEmployeeFiles, findNamesakes, getSignedUrls, setEmployeeDocumentPhoto, updateEmployee, uploadEmployeeFile, type EmployeeInput, type EmployeeNamesake } from './api'
 import { EmployeeFileFields, emptyFileSelection, selectedFiles, type EmployeeFileSelection } from './EmployeeFileFields'
 import { EmployeeFilesList } from './EmployeeFilesList'
 import { employeeFileKindLabel, employeeFullName, type Employee, type EmployeeFile, type EmployeeFileKind } from './types'
@@ -89,6 +89,10 @@ export function EmployeeFormPage() {
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'missing' | 'failed'>(employeeId ? 'loading' : 'ready')
   const [reloadKey, setReloadKey] = useState(0)
   const [existingFiles, setExistingFiles] = useState<EmployeeFile[]>([])
+  // Фото для документов в черновике формы НЕ живёт: колонки нет в EmployeeInput,
+  // и «Сохранить изменения» её не переписывает. Выбор уходит в базу отдельным
+  // запросом, здесь лежит только то, что показывать бейджем.
+  const [documentPhotoId, setDocumentPhotoId] = useState<string | null>(null)
   const [fileUrls, setFileUrls] = useState<Map<string, string>>(new Map())
   const [filesState, setFilesState] = useState<'loading' | 'ready' | 'failed'>('loading')
 
@@ -104,6 +108,7 @@ export function EmployeeFormPage() {
           return
         }
         setDraft(draftFromEmployee(employee))
+        setDocumentPhotoId(employee.document_photo_id)
         setLoadState('ready')
       })
       .catch((loadError: unknown) => {
@@ -138,6 +143,18 @@ export function EmployeeFormPage() {
       })
     return () => { isCurrent = false }
   }, [employeeId, reloadKey])
+
+  // Тот же запрос, что и в карточке: правило одно, мест показа два.
+  async function chooseDocumentPhoto(fileId: string) {
+    if (!employeeId) return
+    try {
+      await setEmployeeDocumentPhoto(employeeId, fileId)
+      setDocumentPhotoId(fileId)
+    } catch (saveError: unknown) {
+      reportAppError(saveError, { scope: 'loader', route, detail: { employee: employeeId, source: 'document-photo' } })
+      throw saveError
+    }
+  }
 
   const canSave = Boolean(draft.last_name.trim() && draft.first_name.trim())
   const backTarget = employeeId ? `/employees?employee=${employeeId}` : '/employees'
@@ -394,7 +411,13 @@ export function EmployeeFormPage() {
                   ? <p className="muted">{tr('Загружаем файлы…', 'Fayllar yuklanmoqda…')}</p>
                   : existingFiles.length === 0
                     ? <p className="muted">{tr('Файлов пока нет.', 'Hozircha fayllar yo‘q.')}</p>
-                    : <EmployeeFilesList files={existingFiles} urls={fileUrls} photoAlt={employeeFullName(draft)} />}
+                    : <EmployeeFilesList
+                      files={existingFiles}
+                      urls={fileUrls}
+                      photoAlt={employeeFullName(draft)}
+                      documentPhotoId={documentPhotoId}
+                      onChooseDocumentPhoto={chooseDocumentPhoto}
+                    />}
             </div>
           )}
 
