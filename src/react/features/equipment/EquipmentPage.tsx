@@ -84,6 +84,13 @@ export function EquipmentPage() {
   const [taxonomy, setTaxonomy] = useState(emptyEquipmentTaxonomy)
   const [selected, setSelected] = useState<Equipment | null>(null)
   const [selectedModel, setSelectedModel] = useState<EquipmentModelSummary | null>(null)
+  // Была ли карточка единицы открыта в ПРЕДЫДУЩЕМ рендере. Эффект обновляет ref
+  // после коммита, поэтому в кадре, где карточка только что закрылась, здесь ещё
+  // true — дровер модели монтируется без анимации появления (слой не закрывался).
+  const wasUnitDrawerOpenRef = useRef(false)
+  useEffect(() => {
+    wasUnitDrawerOpenRef.current = Boolean(selected)
+  }, [selected])
   const [isLoading, setIsLoading] = useState(() => !initialResult)
   // Только флаг: текст ошибки собирается на рендере. Строка в стейте потянула бы
   // tr в зависимости эффекта загрузки, и смена языка перезагружала бы каталог.
@@ -566,6 +573,9 @@ export function EquipmentPage() {
         <EquipmentDrawer
           item={selected}
           onClose={closeItem}
+          // Карточка поверх открытой модели — смена содержимого слоя, а не
+          // появление окна: повторный slide-in читался как лишнее обновление.
+          instant={Boolean(selectedModel)}
           // Строк-единиц в выдаче больше нет — обновлять нечего, кроме самой карточки.
           onRefreshed={(fresh) => setSelected(fresh)}
           onUpdated={(updated) => {
@@ -581,6 +591,10 @@ export function EquipmentPage() {
           reloadKey={reloadKey}
           onClose={closeModel}
           onOpenUnit={openItem}
+          // Возврат из карточки в модель — тот же открытый слой: ремоунт без
+          // анимации. Ref отстаёт от selected ровно на кадр закрытия — это и
+          // есть признак «карточка была открыта только что».
+          instant={wasUnitDrawerOpenRef.current}
           // «+1 единица» меняет счётчики строки каталога — выдачу перечитывает
           // reloadKey, кэш уже инвалидирован самой RPC-обёрткой.
           onUnitsChanged={() => setReloadKey((value) => value + 1)}

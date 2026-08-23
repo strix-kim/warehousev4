@@ -20,7 +20,7 @@ import { useModalLayer } from '../../lib/useModalLayer'
  * карточку. Серийник — опциональный атрибут единицы, а не её заголовок:
  * количественные записи показываются как «N шт. без серийного номера».
  */
-export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, onUnitsChanged }: {
+export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, onUnitsChanged, instant = false }: {
   summary: EquipmentModelSummary
   // Ключ перезагрузки страницы: правка единицы в карточке инвалидирует кэш и
   // поднимает его — дровер обязан перечитать список мимо кэша.
@@ -30,9 +30,13 @@ export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, 
   // Добавление единицы меняет каталог: родитель поднимает reloadKey — выдача
   // перечитывается, а этот же ключ возвращается сюда и перечитывает единицы.
   onUnitsChanged: () => void
+  // true — слой уже был открыт (возврат из карточки): анимацию появления не играем.
+  instant?: boolean
 }) {
   const { tr, language } = useLanguage()
   useModalLayer(onClose)
+  // Замораживается на маунте — поздние ререндеры родителя анимацию не решают.
+  const [skipEnterAnimation] = useState(instant)
   const [units, setUnits] = useState<Equipment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
@@ -110,7 +114,7 @@ export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, 
   }
 
   return (
-    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Модель оборудования', 'Uskuna modeli')} onMouseDown={onClose}>
+    <div className={`drawer-layer${skipEnterAnimation ? ' drawer-layer--instant' : ''}`} role="dialog" aria-modal="true" aria-label={tr('Модель оборудования', 'Uskuna modeli')} onMouseDown={onClose}>
       <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
           <div>

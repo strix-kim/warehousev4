@@ -73,9 +73,12 @@ function toEditDraft(item: Equipment): EquipmentEditDraft {
   }
 }
 
-export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { item: Equipment; onClose: () => void; onRefreshed: (item: Equipment) => void; onUpdated: (item: Equipment) => void }) {
+export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant = false }: { item: Equipment; onClose: () => void; onRefreshed: (item: Equipment) => void; onUpdated: (item: Equipment) => void; instant?: boolean }) {
   const { tr, locale, language } = useLanguage()
   useModalLayer(onClose)
+  // Замораживается на маунте: анимацию появления решает то, был ли слой уже
+  // открыт В МОМЕНТ открытия карточки, а не поздние ререндеры родителя.
+  const [skipEnterAnimation] = useState(instant)
   const status = equipmentAvailabilityView(item.availability, tr)
   const [movements, setMovements] = useState<EquipmentMovement[]>(() => readCachedEquipmentMovements(item.id) ?? [])
   // Флаг вместо текста: иначе tr попадает в зависимости эффекта и смена языка
@@ -338,7 +341,7 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated }: { ite
   }
 
   return (
-    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Карточка оборудования', 'Uskuna kartasi')} onMouseDown={onClose}>
+    <div className={`drawer-layer${skipEnterAnimation ? ' drawer-layer--instant' : ''}`} role="dialog" aria-modal="true" aria-label={tr('Карточка оборудования', 'Uskuna kartasi')} onMouseDown={onClose}>
       <aside className="drawer" ref={drawerRef} onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
           <div>
