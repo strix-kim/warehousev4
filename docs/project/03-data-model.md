@@ -19,7 +19,7 @@ select table_name, grantee, privilege_type from information_schema.role_table_gr
 where table_schema = 'public' and grantee in ('anon','authenticated') order by 1,2;
 ```
 
-**Габариты схемы на 2026-08-22:** 7 таблиц, 25 политик, 9 триггеров, 13 функций
+**Габариты схемы на 2026-08-23 (с15):** 7 таблиц, 25 политик, 9 триггеров, 16 функций
 (`public` + `private`), 32 индекса. Baseline (`00000000000000_baseline_remote_schema.sql`)
 снят в с2 и описывает **стартовую точку**, а не сегодняшнее состояние: поверх него легли
 10 миграций. Переснимать его нужно только после большой ручной правки в дашборде.
@@ -134,7 +134,7 @@ RLS включён на всех семи таблицах. Все полити�
 3. **Политики `mount_points` и `reports` проверяют лишь существование события, а не право
    на него.** Само по себе это дыра, но нейтрализована отсутствием грантов.
 
-**EXECUTE на RPC** выдан `authenticated` для пяти публичных функций; у `anon` нет ни
+**EXECUTE на RPC** выдан `authenticated` для восьми публичных функций; у `anon` нет ни
 одной. Это состояние приходится **удерживать руками**: default privileges Supabase отдают
 `EXECUTE` каждой новой функции напрямую `anon`, и `revoke … from public` этого не снимает.
 Каждая миграция, заводящая функцию, содержит отдельный `revoke execute … from anon`.
@@ -217,6 +217,19 @@ RLS включён на всех семи таблицах. Все полити�
 | `update_equipment_list_document(uuid, …8)` → uuid | да |
 | `update_equipment_model_and_unit(uuid, 9×text, integer, timestamptz)` → jsonb | да |
 | `count_equipment_model_units(text, text)` → integer | да |
+| `append_equipment_to_list(uuid, uuid, text)` → jsonb | да |
+| `create_equipment_batch(9×text, text[])` → jsonb | да |
+| `fetch_equipment_models(4×text, 2×integer)` → jsonb | да |
+
+Три RPC с15 — три разных ответа на «клиенту не верим», их различие из кода не
+выводится. `append_equipment_to_list` — ЕДИНСТВЕННЫЙ путь записи состава, где
+brand/model берутся из `equipment`, а не из клиентского JSON (точечный append под
+`for update`; документ-RPC выше дыру §5.1-2 сохраняют). `create_equipment_batch` —
+ЕДИНСТВЕННЫЙ путь заведения, где дубль серийника проверяет база под
+`pg_advisory_xact_lock` (одиночный insert по-прежнему держит клиентский ilike).
+Дубль у неё — не исключение, а ответ `{status:'duplicates'}`: список занятых
+номеров переводит на язык клиент. `fetch_equipment_models` повторяет построчную
+семантику поиска старого каталога намеренно — чтобы серийник находил модель.
 
 ### 5.1 Что проверяет создание списка и что нет
 
