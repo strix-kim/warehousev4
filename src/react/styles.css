@@ -298,6 +298,12 @@ h2 { letter-spacing: -0.025em; }
 .unit-lists { margin: 26px 0 0; }
 /* Сводка дровера модели: два бейджа под заголовком. */
 .model-drawer-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Форма «+1 единица» в дровере модели: серийник широкий, количество узкое. */
+.model-add-unit { display: grid; gap: 10px; margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
+.model-add-unit__fields { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 8px; }
+.model-add-unit__actions { display: grid; grid-template-columns: .8fr 1.2fr; gap: 8px; }
+.model-add-unit__actions .button { width: 100%; }
+.model-add-unit .form-error { margin: 0; }
 .unit-lists > .button, .unit-lists > .form-success, .unit-lists > .form-error, .unit-lists > .muted { margin-top: 10px; }
 .unit-lists > .button { width: 100%; }
 .unit-lists__items { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }

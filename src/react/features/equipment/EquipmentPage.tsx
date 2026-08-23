@@ -581,6 +581,9 @@ export function EquipmentPage() {
           reloadKey={reloadKey}
           onClose={closeModel}
           onOpenUnit={openItem}
+          // «+1 единица» меняет счётчики строки каталога — выдачу перечитывает
+          // reloadKey, кэш уже инвалидирован самой RPC-обёрткой.
+          onUnitsChanged={() => setReloadKey((value) => value + 1)}
         />
       ) : null}
     </>

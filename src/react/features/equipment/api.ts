@@ -362,6 +362,50 @@ export async function createEquipmentBatch(input: CreateEquipmentBatchInput): Pr
   return { status: 'created', count: typeof result.count === 'number' ? result.count : input.serialNumbers.length }
 }
 
+export type AddEquipmentUnitInput = {
+  // Единица-образец: сервер копирует из неё бренд, модель, категорию, локацию
+  // и характеристики — клиент общие поля модели не передаёт вовсе.
+  sampleId: string
+  serialNumber?: string
+  count?: number
+}
+
+// Форма ответа — как у партии: дубль не исключение, а статус с номерами.
+export type AddEquipmentUnitResult =
+  | { status: 'created'; added: number; unitsTotal: number }
+  | { status: 'duplicates'; serials: string[] }
+
+/**
+ * «+1 единица к существующей модели» из дровера модели — RPC add_equipment_unit
+ * (миграция 20260823120000). Серийник опционален: с номером — новая серийная
+ * строка (дубль проверяет сервер под advisory-локом), без номера — count + N
+ * на количественной строке модели или новая QTY::AUTO-строка.
+ */
+export async function addEquipmentUnit(input: AddEquipmentUnitInput): Promise<AddEquipmentUnitResult> {
+  if (!supabase) throw new Error('Supabase не настроен')
+
+  const serial = input.serialNumber?.trim() ?? ''
+  const { data, error } = await supabase.rpc('add_equipment_unit', {
+    p_sample_id: input.sampleId,
+    p_serialnumber: serial || null,
+    p_count: serial ? 1 : Math.max(1, input.count ?? 1),
+  })
+
+  if (error) throw error
+  const result = (data ?? {}) as { status?: unknown; added?: unknown; units_total?: unknown; serials?: unknown }
+  if (result.status === 'duplicates') {
+    const serials = Array.isArray(result.serials) ? result.serials.filter((value): value is string => typeof value === 'string') : []
+    return { status: 'duplicates', serials }
+  }
+  // Модель существующая — таксономия не меняется, сбрасывается только каталог.
+  invalidateCachePrefix('equipment:')
+  return {
+    status: 'created',
+    added: typeof result.added === 'number' ? result.added : 1,
+    unitsTotal: typeof result.units_total === 'number' ? result.units_total : 0,
+  }
+}
+
 // В шаблоне LIKE/ILIKE `%` и `_` — подстановочные знаки, а `\` — знак
 // экранирования. Без экранирования серийник `AB_1234` совпадал с `AB-1234`
 // и давал ложный дубль. Обратная косая идёт первой, иначе она экранировала бы
