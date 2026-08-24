@@ -8,7 +8,7 @@ import { useHallPlanEditor, type HallPlanEditor } from './useHallPlanEditor'
 import { formatPlanPeriod } from './types'
 import { employeeDisplayName } from '../employees/types'
 import { formatTime } from '../../lib/date'
-import { useLanguage } from '../../lib/i18n'
+import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import './halls.css'
 
 // Редактор плана: матрица «позиции × залы» (с20, по образцу прораба). Кнопки
@@ -20,6 +20,14 @@ export function HallPlanPage() {
   const { planId } = useParams<{ planId: string }>()
   const editor = useHallPlanEditor(planId)
   const [isMetaOpen, setMetaOpen] = useState(false)
+
+  // Имя плана в заголовке вкладки. Это не украшение: из document.title браузер
+  // берёт колонтитул печатного листа и подставляет его в имя файла при
+  // «Сохранить как PDF» — без этого расстановка сохранялась как «Учёт
+  // оборудования» (с22).
+  useDocumentTitle(editor.plan
+    ? tr(`${editor.plan.name} — план залов`, `${editor.plan.name} — zallar rejasi`)
+    : '')
 
   // Сотрудников грузим сразу, а не по первому клику в клетку (с21): строка
   // «Свободны» стоит над матрицей и нужна ДО того, как открыли пикер. Повторов

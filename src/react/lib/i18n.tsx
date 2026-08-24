@@ -7,6 +7,10 @@ type LanguageContextValue = {
   locale: 'ru-RU' | 'uz-UZ'
   setLanguage: (language: Language) => void
   tr: (ru: string, uz: string) => string
+  // Заголовок страницы ставит не сама страница, а провайдер: document.title
+  // один на приложение, и владелец у него обязан быть один. Страница лишь
+  // называет себя — через useDocumentTitle.
+  setPageTitle: (title: string) => void
 }
 
 const STORAGE_KEY = 'argo:language'
@@ -25,18 +29,27 @@ export function readStoredLanguage(): Language {
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>(readStoredLanguage)
+  const [pageTitle, setPageTitle] = useState('')
 
+  // Заголовок собирается в одном месте по двум причинам. Первая: у страницы
+  // нет шанса выиграть спор с провайдером — эффекты детей выполняются РАНЬШЕ
+  // родительских, и переключение языка затирало бы имя страницы общим. Вторая:
+  // из document.title браузер берёт и колонтитул печатного листа, и имя файла
+  // при «Сохранить как PDF» — с общим названием план залов сохранялся файлом
+  // «Учёт оборудования» (с22).
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, language)
     document.documentElement.lang = language === 'uz' ? 'uz' : 'ru'
-    document.title = language === 'uz' ? 'ARGO · Uskunalar hisobi' : 'ARGO · Учёт оборудования'
-  }, [language])
+    const app = language === 'uz' ? 'ARGO · Uskunalar hisobi' : 'ARGO · Учёт оборудования'
+    document.title = pageTitle ? `${pageTitle} · ARGO` : app
+  }, [language, pageTitle])
 
   const value = useMemo<LanguageContextValue>(() => ({
     language,
     locale: language === 'uz' ? 'uz-UZ' : 'ru-RU',
     setLanguage,
     tr: (ru, uz) => language === 'uz' ? uz : ru,
+    setPageTitle,
   }), [language])
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>
@@ -46,6 +59,18 @@ export function useLanguage() {
   const value = useContext(LanguageContext)
   if (!value) throw new Error('useLanguage must be used inside LanguageProvider')
   return value
+}
+
+// Страница называет себя. Пустая строка возвращает общий заголовок приложения —
+// поэтому же имя снимается при уходе со страницы, иначе оно осталось бы висеть
+// на следующем экране и уехало бы в имя ЕГО печатного файла.
+export function useDocumentTitle(title: string) {
+  const { setPageTitle } = useLanguage()
+
+  useEffect(() => {
+    setPageTitle(title)
+    return () => setPageTitle('')
+  }, [title, setPageTitle])
 }
 
 export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
