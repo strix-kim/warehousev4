@@ -1,11 +1,31 @@
 import { formatEventDate, parseDateValue } from '../../lib/date'
 import type { Tables } from '../../lib/database.types'
+import type { EmployeeBrief } from '../employees/types'
 
-// Строки таблиц ровно в том виде, в каком их отдаёт база: имена залов и позиций
-// тримит триггер normalize_hall_name, updated_at плана двигает touch_hall_plan.
+// Строки таблиц ровно в том виде, в каком их отдаёт база: имена залов и строк
+// матрицы тримит триггер normalize_hall_name, updated_at плана двигает
+// touch_hall_plan.
 export type HallPlan = Tables<'hall_plans'>
 export type Hall = Tables<'halls'>
-export type HallPosition = Tables<'hall_positions'>
+
+// Матрица (с20, по образцу прораба): строка — позиция ВСЕГО мероприятия, а не
+// зала; ячейка на пересечении строки и зала — ОДИН человек, и второго туда не
+// пустит hall_assignments_cell_key. Трое операторов в зале — это три строки
+// матрицы, как три подстроки на бумаге (миграции 20260824110000, 20260824140000).
+export type PlanPosition = Tables<'plan_positions'>
+export type HallAssignment = Tables<'hall_assignments'>
+
+// Справочник позиций (с20, миграция 20260824120000) — общие имена строк на все
+// планы: готовую позицию берут чипом, вписанную руками справочник запоминает
+// сам. Связи со строками плана НЕТ: plan_positions хранит свою копию имени,
+// поэтому удаление из справочника старую расстановку не трогает.
+export type PositionCatalogEntry = Tables<'position_catalog'>
+
+// Ячейка со встроенным сотрудником — ровно то, что отдаёт fetchHallAssignments.
+// employee_id теперь NOT NULL, но employees всё равно бывает null: строку
+// сотрудника может не отдать политика чтения. Пустая клетка — это ОТСУТСТВИЕ
+// записи, а не запись без человека.
+export type AssignmentWithEmployee = HallAssignment & { employees: EmployeeBrief | null }
 
 export type Tr = (ru: string, uz: string) => string
 
@@ -79,9 +99,66 @@ export function formatPlanPeriod(plan: Pick<HallPlan, 'event_from' | 'event_to'>
 // уронить экран.
 export function roleLabel(role: string, tr: Tr): string {
   switch (role) {
-    case 'technician': return tr('Техник', 'Texnik')
+    case 'technician': return tr('Видеоинженер', 'Videoinjener')
     case 'operator': return tr('Оператор', 'Operator')
     case 'other': return tr('Другое', 'Boshqa')
     default: return role
+  }
+}
+
+// Порядок строк матрицы. Ключ полный по той же причине, что у залов:
+// sort_order без UNIQUE, и две строки, добавленные быстрым набором в одну
+// миллисекунду, обязаны стоять в стабильном порядке, а не меняться на F5.
+export function sortPositions<T extends { sort_order: number; created_at: string; id: string }>(positions: T[]): T[] {
+  return [...positions].sort((left, right) => left.sort_order - right.sort_order
+    || left.created_at.localeCompare(right.created_at)
+    || left.id.localeCompare(right.id))
+}
+
+// Следующая роль по кругу: техник → оператор → другое → техник. Клик по чипу
+// вместо выпадающего списка — ролей три, и перебор быстрее выбора. Неизвестное
+// значение (будущая роль из миграции) возвращается в начало круга, а не роняет
+// клик.
+export function nextRole(role: string): HallRole {
+  switch (role) {
+    case 'technician': return 'operator'
+    case 'operator': return 'other'
+    default: return 'technician'
+  }
+}
+
+// Счётчики плана. Люди считаются УНИКАЛЬНЫМИ, а не ячейками: страховка одного
+// человека на четыре зала — это один техник в бригаде, а не четыре. Роль берётся
+// от СТРОКИ, в которой человек стоит, — своей роли у ячейки нет; поэтому человек
+// разом в строке техников и в строке операторов законно попадает в оба счётчика,
+// и technicians + operators + others бывает больше totalPeople.
+//
+// «Свободно» здесь больше не считается: с одиночной ячейкой (миграция
+// 20260824140000) незанятое место — это ОТСУТСТВИЕ записи, и посчитать его
+// можно только по всей сетке «строки × залы», а не по списку ячеек.
+export function countPlan(
+  positions: Pick<PlanPosition, 'id' | 'role'>[],
+  assignments: Pick<HallAssignment, 'position_id' | 'employee_id'>[],
+) {
+  const roleOf = new Map(positions.map((position) => [position.id, position.role]))
+  const byRole = new Map<string, Set<string>>()
+  const everyone = new Set<string>()
+
+  for (const cell of assignments) {
+    everyone.add(cell.employee_id)
+    // Ячейка без своей строки в списке — гонка удаления, а не данные:
+    // каскад базы уже унёс её, локальная копия ещё нет. В счёт не идёт.
+    const role = roleOf.get(cell.position_id)
+    if (!role) continue
+    const bucket = byRole.get(role)
+    if (bucket) bucket.add(cell.employee_id)
+    else byRole.set(role, new Set([cell.employee_id]))
+  }
+
+  return {
+    technicians: byRole.get('technician')?.size ?? 0,
+    operators: byRole.get('operator')?.size ?? 0,
+    others: byRole.get('other')?.size ?? 0,
+    totalPeople: everyone.size,
   }
 }

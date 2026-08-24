@@ -38,3 +38,16 @@ export function employeeFileKindLabel(kind: string, tr: Tr): string {
 export function employeeFullName(employee: Pick<Employee, 'last_name' | 'first_name' | 'middle_name'>) {
   return [employee.last_name, employee.first_name, employee.middle_name].filter(Boolean).join(' ')
 }
+
+// «Каримов А. О.» — для мест, где полное ФИО не помещается: строка таблицы
+// машин, чип в ячейке матрицы залов. Фамилия без инициалов не различает
+// однофамильцев, поэтому они обязательны, если есть чем их набрать.
+// Живёт здесь, а не в vehicles: правило про СОТРУДНИКА, а водитель — частный
+// случай его показа (перенесено из vehicles/types в с20, вторым потребителем).
+export function employeeShortName(employee: Pick<Employee, 'last_name' | 'first_name' | 'middle_name'>) {
+  const initials = [employee.first_name, employee.middle_name]
+    .filter(Boolean)
+    .map((part) => `${part!.slice(0, 1).toUpperCase()}.`)
+    .join(' ')
+  return initials ? `${employee.last_name} ${initials}` : employee.last_name
+}

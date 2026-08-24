@@ -1,55 +1,33 @@
-import { ArrowLeft, CircleAlert, Presentation } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ArrowLeft, CircleAlert, LayoutGrid, Pencil, Presentation } from 'lucide-react'
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { fetchHallPlan, type HallPlanWithHalls } from './api'
-import { formatPlanPeriod, sortHalls } from './types'
+import { HallMatrix } from './HallMatrix'
+import { HallPlanMetaDrawer } from './HallPlanMetaDrawer'
+import { useHallPlanEditor } from './useHallPlanEditor'
+import { formatPlanPeriod } from './types'
+import { formatTime } from '../../lib/date'
 import { useLanguage } from '../../lib/i18n'
-import { reportAppError } from '../../lib/reportAppError'
 import './halls.css'
 
-// Редактор плана. Пока ЗАГЛУШКА: шапка и состояния загрузки есть, сама доска
-// залов приходит следующим шагом (Ш4) — маршрут заводится раньше неё, чтобы
-// создание плана уже вело в свой адрес, а не в никуда.
+// Редактор плана: матрица «позиции × залы» (с20, по образцу прораба). Кнопки
+// «Сохранить» здесь нет — каждое действие уходит в базу само
+// (useHallPlanEditor), а шапка показывает, чем это кончилось.
 export function HallPlanPage() {
   const navigate = useNavigate()
   const { tr, locale } = useLanguage()
   const { planId } = useParams<{ planId: string }>()
+  const editor = useHallPlanEditor(planId)
+  const [isMetaOpen, setMetaOpen] = useState(false)
 
-  const [plan, setPlan] = useState<HallPlanWithHalls | null>(null)
-  // 'missing' — строки нет (или её не видно политикой): честное состояние, а не
-  // пустая шапка, иначе прямая ссылка на удалённый план выглядела бы рабочей.
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'missing' | 'failed'>('loading')
-  const [reloadKey, setReloadKey] = useState(0)
-
-  useEffect(() => {
-    if (!planId) return
-    let isCurrent = true
-    setLoadState('loading')
-    fetchHallPlan(planId)
-      .then((row) => {
-        if (!isCurrent) return
-        if (!row) {
-          setLoadState('missing')
-          return
-        }
-        setPlan(row)
-        setLoadState('ready')
-      })
-      .catch((error: unknown) => {
-        if (!isCurrent) return
-        reportAppError(error, { scope: 'loader', route: '/halls/:planId', detail: { plan: planId } })
-        setLoadState('failed')
-      })
-    return () => { isCurrent = false }
-  }, [planId, reloadKey])
-
-  if (loadState !== 'ready' || !plan) {
+  if (editor.loadState !== 'ready' || !editor.plan) {
     return (
       <section className="data-panel">
-        {loadState === 'loading' && (
+        {editor.loadState === 'loading' && (
           <div className="state-block"><span>{tr('Загружаем план…', 'Reja yuklanmoqda…')}</span></div>
         )}
-        {loadState === 'missing' && (
+        {/* 'missing' — строки нет (или её не видно политикой): честное состояние,
+            а не пустая шапка, иначе ссылка на удалённый план выглядела бы рабочей. */}
+        {editor.loadState === 'missing' && (
           <div className="state-block">
             <Presentation size={27} />
             <strong>{tr('План не найден', 'Reja topilmadi')}</strong>
@@ -57,19 +35,19 @@ export function HallPlanPage() {
             <button className="button button--primary" onClick={() => navigate('/halls')}>{tr('К списку планов', 'Rejalar ro‘yxatiga')}</button>
           </div>
         )}
-        {loadState === 'failed' && (
+        {editor.loadState === 'failed' && (
           <div className="state-block state-block--error">
             <CircleAlert size={24} />
             <strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong>
             <span>{tr('Не удалось загрузить план залов.', 'Zallar rejasini yuklab bo‘lmadi.')}</span>
-            <button className="button button--secondary" onClick={() => setReloadKey((value) => value + 1)}>{tr('Повторить', 'Qayta urinish')}</button>
+            <button className="button button--secondary" onClick={editor.reload}>{tr('Повторить', 'Qayta urinish')}</button>
           </div>
         )}
       </section>
     )
   }
 
-  const halls = sortHalls(plan.halls)
+  const plan = editor.plan
 
   return (
     <>
@@ -84,15 +62,102 @@ export function HallPlanPage() {
           <p className="eyebrow">{tr('План залов', 'Zallar rejasi')} · {formatPlanPeriod(plan, locale, tr)}</p>
           <h1>{plan.name}</h1>
         </div>
+        <div className="editor-header__actions">
+          <SaveState
+            state={editor.saveState}
+            savedAt={editor.savedAt}
+            errorText={editor.errorText}
+            onRetry={editor.reload}
+          />
+          <button className="button button--secondary" onClick={() => setMetaOpen(true)}>
+            <Pencil size={16} /> {tr('Изменить', 'O‘zgartirish')}
+          </button>
+        </div>
       </header>
 
-      <section className="data-panel">
-        <div className="state-block">
-          <Presentation size={27} />
-          <strong>{tr('Редактор — следующим шагом', 'Muharrir — keyingi qadamda')}</strong>
-          <span>{tr(`Залов в плане: ${halls.length}. Расстановка по залам появится здесь.`, `Rejadagi zallar: ${halls.length}. Zallar bo‘yicha taqsimot shu yerda paydo bo‘ladi.`)}</span>
-        </div>
+      <PlanCounts counts={editor.counts} />
+
+      <section className="data-panel data-panel--halls">
+        {editor.positions.length === 0
+          ? (
+            // Пустая матрица без строк — не ошибка, а незаполненный план: залы
+            // уже стоят, ставить в них некого. Строки берут из справочника
+            // чипами под матрицей или вписывают свои.
+            <div className="state-block">
+              <LayoutGrid size={27} />
+              <strong>{tr('В плане нет позиций', 'Rejada lavozimlar yo‘q')}</strong>
+              <span>{tr(
+                'Выберите позицию из готовых под матрицей или впишите свою.',
+                'Matritsa ostidagi tayyor lavozimlardan tanlang yoki o‘zingiznikini kiriting.',
+              )}</span>
+            </div>
+          )
+          : null}
+        <HallMatrix editor={editor} />
       </section>
+
+      {isMetaOpen && (
+        <HallPlanMetaDrawer
+          plan={plan}
+          onClose={() => setMetaOpen(false)}
+          onSubmit={async (input) => {
+            // Отказ наверх не глотаем: его показывает сам дровер и оставляет
+            // форму открытой с набранными полями.
+            await editor.updateMeta(input)
+            setMetaOpen(false)
+          }}
+        />
+      )}
     </>
+  )
+}
+
+// Статус автосохранения. До первой правки времени ещё нет — вместо «Сохранено
+// —:—» человеку объясняют правило: сохранять руками ничего не нужно.
+function SaveState({ state, savedAt, errorText, onRetry }: {
+  state: 'saved' | 'saving' | 'failed'
+  savedAt: number
+  errorText: string
+  onRetry: () => void
+}) {
+  const { tr, locale } = useLanguage()
+
+  if (state === 'failed') {
+    return (
+      <p className="hall-save hall-save--failed" role="status" title={errorText}>
+        <CircleAlert size={14} />
+        {tr('Не сохранилось', 'Saqlanmadi')}
+        {/* «Повторить» — полная перезагрузка плана, а не повтор упавшего запроса:
+            после отказа локальная копия разошлась с базой, и вернуть их в одно
+            состояние может только чтение. */}
+        <button type="button" onClick={onRetry}>{tr('Повторить', 'Qayta urinish')}</button>
+      </p>
+    )
+  }
+
+  return (
+    <p className="hall-save" role="status">
+      {state === 'saving' && tr('Сохраняем…', 'Saqlanmoqda…')}
+      {state === 'saved' && (savedAt
+        ? tr(`Сохранено ${formatTime(savedAt, locale)}`, `${formatTime(savedAt, locale)} da saqlandi`)
+        : tr('Сохраняется автоматически', 'Avtomatik saqlanadi'))}
+    </p>
+  )
+}
+
+// Счётчики плана. Люди уникальные, а не ячейки: страховка одного человека на
+// четыре зала — один техник в бригаде (см. countPlan). «Свободно» отсюда ушло
+// вместе с вакансиями-записями (миграция 20260824140000): пустая клетка теперь
+// это отсутствие записи, и её видно в самой матрице прочерком.
+function PlanCounts({ counts }: { counts: { technicians: number; operators: number; others: number; totalPeople: number } }) {
+  const { tr, locale } = useLanguage()
+
+  return (
+    <div className="hall-counts">
+      <span><strong>{counts.totalPeople.toLocaleString(locale)}</strong> {tr('человек', 'kishi')}</span>
+      <span><strong>{counts.technicians.toLocaleString(locale)}</strong> {tr('видеоинженеров', 'videoinjener')}</span>
+      <span><strong>{counts.operators.toLocaleString(locale)}</strong> {tr('операторов', 'operator')}</span>
+      {counts.others > 0 && <span><strong>{counts.others.toLocaleString(locale)}</strong> {tr('прочих', 'boshqa')}</span>}
+    </div>
   )
 }

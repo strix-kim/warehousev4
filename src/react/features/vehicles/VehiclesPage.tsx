@@ -5,9 +5,9 @@ import { fetchVehiclePhotoPaths, fetchVehicles, getSignedUrls } from './api'
 import { downloadVehicleEventXlsx } from './eventExport'
 import { VehicleDrawer } from './VehicleDrawer'
 import { VehicleEventExportDrawer } from './VehicleEventExportDrawer'
-import { driverShortName, plateForSearch, vehicleTitle, type VehicleWithDrivers } from './types'
+import { plateForSearch, vehicleTitle, type VehicleWithDrivers } from './types'
 import { fetchEmployees } from '../employees/api'
-import type { Employee } from '../employees/types'
+import { employeeShortName, type Employee } from '../employees/types'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import type { EventDocumentMeta } from '../../lib/xlsx/eventDocument'
@@ -238,7 +238,7 @@ export function VehiclesPage() {
                           </td>
                           <td data-label={tr('Госномер', 'Davlat raqami')}><span className="plate-badge">{vehicle.plate_number}</span></td>
                           <td data-label={tr('Водители', 'Haydovchilar')}>
-                            {vehicle.drivers.length > 0 ? vehicle.drivers.map(driverShortName).join(', ') : '—'}
+                            {vehicle.drivers.length > 0 ? vehicle.drivers.map(employeeShortName).join(', ') : '—'}
                           </td>
                         </tr>
                       )

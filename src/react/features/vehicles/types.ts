@@ -32,15 +32,6 @@ export function plateForSearch(value: string) {
   return value.replace(/\s+/g, '').toUpperCase()
 }
 
-// «Каримов А. О.» — водители в строке таблицы. Полное ФИО там не помещается,
-// а фамилии без инициалов не различают однофамильцев.
-export function driverShortName(driver: Pick<VehicleDriver, 'last_name' | 'first_name' | 'middle_name'>) {
-  const initials = [driver.first_name, driver.middle_name]
-    .filter(Boolean)
-    .map((part) => `${part!.slice(0, 1).toUpperCase()}.`)
-    .join(' ')
-  return initials ? `${driver.last_name} ${initials}` : driver.last_name
-}
 
 // ФИО одной строкой — для дровера, где место есть.
 export function driverFullName(driver: Pick<VehicleDriver, 'last_name' | 'first_name' | 'middle_name'>) {

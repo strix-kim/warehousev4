@@ -58,3 +58,172 @@
   .hall-plan-card__date { font-size: 16px; }
   .hall-count-stepper { width: 100%; }
 }
+
+/* ─── Редактор плана: матрица «позиции × залы» ─────────────────────────────── */
+
+/* Статус автосохранения в шапке. Ширина не фиксирована, но текст не переносится:
+   «Сохраняем…» и «Сохранено 12:41» разной длины, а прыгать шапке нельзя. */
+.hall-save { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--ink-faint); font-size: 12.5px; font-weight: 650; white-space: nowrap; }
+.hall-save--failed { color: var(--danger); }
+.hall-save button { padding: 0; border: 0; color: inherit; background: none; font: inherit; font-weight: 800; text-decoration: underline; }
+
+/* Счётчики под шапкой — сводка бригады одной строкой. «Свободно» красным: это
+   единственное число здесь, которое требует действия. */
+.hall-counts { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 12px; color: var(--ink-soft); font-size: 13px; font-weight: 650; }
+.hall-counts strong { color: var(--ink); font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* Панель матрицы — единственное место, где .data-panel нужны внутренние поля:
+   сетка рисует свои линии и не должна упираться в её край. */
+.data-panel--halls { padding: 16px; }
+
+/* Прокручиваемый контейнер матрицы. Прокрутка ОБЕИХ осей живёт здесь, а не на
+   странице: залов бывает дюжина, и страница шире вьюпорта не становится ни при
+   каком их числе. Высота ограничена, иначе position: sticky у шапки не за что
+   зацепиться — липнуть можно только к границе прокручиваемого предка. */
+.hall-matrix-scroll { max-height: calc(100vh - 260px); min-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+
+/* Матрица и плитка «+ Зал» — одна полоса: кнопка стоит справа от последнего
+   зала и уезжает вместе с ним. min-width: 100% растягивает полосу на контейнер,
+   когда залов мало, а flex-basis сетки не даёт ей сжаться уже своих колонок. */
+.hall-matrix-inner { display: flex; align-items: stretch; min-width: 100%; }
+.hall-matrix { --hall-head-w: 208px; flex: 1 0 auto; display: grid; align-items: stretch; }
+
+/* Липкость: шапка держится за верх контейнера, первая колонка — за левый край.
+   Угол липнет к обоим, поэтому лежит выше остальных по z. */
+.hall-matrix__corner { position: sticky; top: 0; left: 0; z-index: 3; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 10px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface-soft); color: var(--ink-soft); font-size: 12px; font-weight: 800; }
+.hall-matrix__corner small { color: var(--ink-faint); font-size: 10.5px; font-weight: 600; line-height: 1.3; }
+
+/* Шапка колонки залита цветом зала; белый текст держит палитра — все восемь
+   цветов тёмные настолько, что контраст с белым проходит на любом из них. */
+.hall-matrix__colhead { position: sticky; top: 0; z-index: 2; min-width: 0; border-bottom: 1px solid var(--line); color: #fff; background: var(--hall-color, var(--ink)); }
+.hall-matrix__colhead-row { display: flex; align-items: center; gap: 6px; padding: 7px 8px; }
+/* Номер зала — индекс порядка, а не часть имени: имена правят руками. */
+.hall-matrix__number { flex: 0 0 auto; min-width: 22px; height: 22px; display: inline-grid; place-items: center; padding: 0 5px; border-radius: 6px; background: rgba(255,255,255,.22); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* Меню зала — только иконка: подпись и шеврон в цветной шапке лишние, а сам
+   .action-menu__trigger растянут на всю ширину общими стилями. */
+.hall-matrix__menu { flex: 0 0 auto; }
+.hall-matrix__menu .action-menu__trigger { width: 30px; height: 28px; min-height: 0; padding: 0; border-color: rgba(255,255,255,.34); color: #fff; background: rgba(255,255,255,.14); }
+.hall-matrix__menu .action-menu__trigger:hover:not(:disabled) { border-color: rgba(255,255,255,.55); color: #fff; background: rgba(255,255,255,.24); }
+.hall-matrix__menu .action-menu__trigger > span { display: none; }
+.hall-matrix__menu .action-menu__trigger > svg:last-child { display: none; }
+/* Взведённое удаление зала: подтверждение белой кнопкой поверх цвета — красным
+   на цветной шапке предупреждение бы утонуло. */
+.hall-matrix__confirm { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border: 0; border-radius: 7px; color: var(--danger); background: #fff; font-size: 11.5px; font-weight: 750; white-space: nowrap; }
+
+/* Полоса свотчей под шапкой. Кружки, а не пункты меню: восемь строк с подписями
+   цвета читались бы дольше, чем выбирается сам цвет. */
+.hall-colors { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 10px; background: var(--surface); }
+.hall-colors button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--hall-color); }
+.hall-colors button.is-current { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* Первая колонка: имя строки, чип роли, удаление. Липнет к левому краю, поэтому
+   у неё непрозрачный фон — под ней проезжают ячейки. */
+.hall-matrix__rowhead { position: sticky; left: 0; z-index: 1; display: flex; align-items: center; gap: 6px; min-width: 0; padding: 8px 6px 8px 10px; border-right: 1px solid var(--line); border-top: 1px solid var(--line); background: var(--surface-soft); }
+.hall-matrix__rowhead-main { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; flex: 1 1 auto; }
+.hall-matrix__row-delete { flex: 0 0 auto; width: 26px; height: 26px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: 6px; color: var(--ink-faint); background: none; }
+.hall-matrix__row-delete:hover { color: var(--danger); background: var(--danger-bg); }
+.hall-matrix__row-delete--armed { width: auto; height: auto; padding: 4px 8px; color: var(--danger); background: var(--danger-bg); font-size: 11px; font-weight: 750; line-height: 1.25; text-align: left; white-space: normal; }
+
+/* Клетка — один человек или пустота. Тонкая заливка цветом зала здесь НЕ
+   повторяется: восемь цветов в шахматном порядке превратили бы таблицу
+   в витраж. */
+.hall-matrix__cell { position: relative; display: flex; align-items: stretch; min-width: 0; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+
+/* Пустая клетка целиком кликабельна: она же и вакансия — прочерк с бумажного
+   образца. «+» проявляется под курсором, а в покое стоит только прочерк, иначе
+   пустая матрица выглядела бы полем плюсов. */
+.hall-matrix__empty { flex: 1 1 auto; min-height: 40px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; border: 0; color: var(--ink-faint); background: none; font-size: 13px; }
+.hall-matrix__empty:hover:not(:disabled) { color: var(--ink); background: var(--surface-soft); }
+.hall-matrix__empty:disabled { opacity: .5; }
+.hall-matrix__empty-hint { display: inline-grid; place-items: center; opacity: 0; }
+.hall-matrix__empty:hover:not(:disabled) .hall-matrix__empty-hint { opacity: 1; }
+.hall-matrix__empty-busy { font-size: 12px; font-weight: 650; }
+.hall-matrix__dash { font-weight: 700; }
+
+/* Занятая клетка: имя во всю ширину — клик по нему меняет человека. */
+.hall-matrix__person { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 5px; padding: 8px 2px 8px 9px; border: 0; color: var(--ink); background: none; font-size: 12.5px; font-weight: 650; text-align: left; }
+.hall-matrix__person:hover:not(:disabled) { background: var(--surface-soft); }
+.hall-matrix__person:disabled { opacity: .55; }
+.hall-matrix__person-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ×N — человек стоит в плане несколько раз (страховка на все залы). */
+.hall-matrix__badge { flex: 0 0 auto; padding: 0 5px; border-radius: 999px; color: var(--ink-soft); background: var(--surface-soft); font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+/* Скрепка — человек ведёт в ЭТОМ зале ещё и другие позиции: на бумаге это
+   объединённая ячейка. Отличается от ×N и смыслом (зал, а не план), и местом
+   (слева от имени, а не справа). */
+.hall-matrix__link { flex: 0 0 auto; display: inline-grid; place-items: center; color: var(--ink-soft); }
+.hall-matrix__cell.is-linked { background: var(--surface-soft); box-shadow: inset 2px 0 0 var(--line-strong); }
+.hall-matrix__cell.is-linked .hall-matrix__link { color: var(--ink); }
+.hall-matrix__cell.is-linked .hall-matrix__badge { background: #fff; }
+
+.hall-matrix__clear { flex: 0 0 auto; align-self: center; width: 22px; height: 22px; display: inline-grid; place-items: center; margin-right: 5px; padding: 0; border: 0; border-radius: 50%; color: var(--ink-faint); background: none; }
+.hall-matrix__clear:hover { color: var(--danger); background: var(--danger-bg); }
+/* Взведённый крестик красит всю клетку: следующий клик снимет человека. */
+.hall-matrix__cell.is-armed { background: var(--danger-bg); }
+.hall-matrix__cell.is-armed .hall-matrix__clear { color: var(--danger); }
+
+/* Плитка «+ Зал» — колонка справа от матрицы, той же высоты. */
+.hall-add-column { flex: 0 0 auto; width: 96px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 16px 10px; border: 0; border-left: 1px dashed var(--line-strong); color: var(--ink-soft); background: transparent; font-size: 13px; font-weight: 700; }
+.hall-add-column:hover:not(:disabled) { color: var(--ink); background: var(--surface-soft); }
+
+/* Ряд чипов справочника — над полем ввода. Подписи у ряда нет намеренно: «+»
+   слева от имени читается сам, а строка «Готовые позиции» отняла бы место у
+   того, ради чего ряд стоит. Имя ряда живёт в aria-label. */
+.position-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+/* Поле под чипами стоит ближе: они одна пара «выбери или впиши», а не два блока. */
+.position-suggestions + .hall-add-position { margin-top: 8px; }
+
+.position-chip { max-width: 100%; display: inline-flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 999px; background: #fff; }
+.position-chip__add { min-width: 0; display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 8px; border: 0; border-radius: 999px 0 0 999px; color: var(--ink-soft); background: none; font-size: 12px; font-weight: 650; }
+.position-chip__add:hover:not(:disabled) { color: var(--ink); }
+.position-chip__add:disabled { opacity: .55; }
+.position-chip__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Сколько таких строк уже в плане: чип не исчезает, а считает. */
+.position-chip__count { flex: 0 0 auto; color: var(--ink-faint); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.position-chip__drop { flex: 0 0 auto; height: 20px; display: inline-grid; place-items: center; padding: 0 4px; border: 0; border-radius: 999px; color: var(--ink-faint); background: none; font-size: 11px; font-weight: 750; white-space: nowrap; }
+.position-chip__drop:hover { color: var(--danger); background: var(--danger-bg); }
+/* Взведённый крестик красит весь чип: следующий клик уносит позицию из общего
+   справочника — у всех и во всех будущих планах. */
+.position-chip.is-armed { border-color: var(--danger); background: var(--danger-bg); }
+.position-chip.is-armed .position-chip__drop { padding: 0 8px; color: var(--danger); }
+
+/* Поле быстрого набора строк. Пунктир вместо сплошной рамки — это не поле
+   формы, а строка, которой ещё нет. */
+.hall-add-position { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--ink-faint); }
+.hall-add-position input { width: 100%; max-width: 420px; min-width: 0; padding: 7px 10px; border: 1px dashed var(--line-strong); border-radius: 8px; color: var(--ink); background: var(--surface); font-size: 13px; }
+.hall-add-position input::placeholder { color: var(--ink-faint); }
+.hall-add-position input:focus { border-style: solid; border-color: var(--ink-faint); background: #fff; }
+
+/* Пикер клетки — портал в body, поэтому координаты фиксированные: панель выдачи
+   внутри прокручиваемой матрицы обрезалась бы её краем. */
+/* z-index 70 — тот же слой, что у остальных порталов проекта (.app-select__popover,
+   .app-date-picker__popover): поповеры не должны перекрывать друг друга через раз.
+   Своя подложка нужна инпуту: он висит над матрицей, а не в форме. */
+.hall-cell-picker { position: fixed; z-index: 70; padding: 9px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.98); box-shadow: 0 18px 46px rgba(15,22,28,.18), 0 2px 8px rgba(15,22,28,.08); backdrop-filter: blur(16px); animation: popover-in .16s ease-out; }
+.hall-cell-picker .field { margin: 0; }
+
+/* Правка имени на месте: в покое — обычный текст, под курсором — намёк рамкой. */
+.inline-text { min-width: 0; max-width: 100%; overflow: hidden; padding: 3px 6px; border: 1px solid transparent; border-radius: 6px; color: inherit; background: none; font: inherit; font-size: 13px; font-weight: 650; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.inline-text:hover { border-color: var(--line-strong); background: #fff; }
+.inline-text--editing { width: 100%; border-color: var(--ink-faint); background: #fff; }
+/* В цветной шапке те же состояния, но светлые: серая рамка на синем не видна. */
+.inline-text--head { flex: 1 1 auto; font-size: 14px; font-weight: 800; }
+.inline-text--head:hover { border-color: rgba(255,255,255,.5); background: rgba(255,255,255,.16); }
+.inline-text--head.inline-text--editing { border-color: rgba(255,255,255,.7); color: var(--ink); background: #fff; }
+
+/* На телефоне матрица остаётся матрицей: в столбик она превращается в четыре
+   копии одного списка, а смысл образца — сравнивать залы между собой. Колонки
+   ужимаются, липкая первая остаётся, прокрутка горизонтальная. */
+@media (max-width: 820px) {
+  .data-panel--halls { padding: 10px; }
+  .hall-matrix { --hall-head-w: 150px; }
+  .hall-matrix-scroll { max-height: calc(100vh - 300px); }
+  .hall-matrix__corner small { display: none; }
+  .hall-add-column { width: 72px; }
+  .hall-save { display: none; }
+  .hall-counts { gap: 6px 14px; font-size: 12px; }
+  /* Чипы в одну строку с прокруткой: перенос на телефоне даёт три-четыре ряда
+     под матрицей, и поле ввода уезжает за нижний край. */
+  .position-suggestions { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .position-chip { flex: 0 0 auto; }
+}

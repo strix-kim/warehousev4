@@ -1,7 +1,7 @@
-import { CircleAlert, Ellipsis, PanelsTopLeft, Plus, Presentation, Search, Trash2 } from 'lucide-react'
+import { CircleAlert, Copy, Ellipsis, PanelsTopLeft, Plus, Presentation, Search, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createHallPlan, deleteHallPlan, fetchHallPlans, type HallPlanInput, type HallPlanWithHalls } from './api'
+import { createHallPlan, deleteHallPlan, duplicateHallPlan, fetchHallPlans, type HallPlanInput, type HallPlanWithHalls } from './api'
 import { HallPlanMetaDrawer } from './HallPlanMetaDrawer'
 import { formatPlanPeriod, sortHalls } from './types'
 import { ActionMenu } from '../../components/ActionMenu'
@@ -26,6 +26,10 @@ export function HallPlansPage() {
   const [isCreateOpen, setCreateOpen] = useState(false)
   const [deletingId, setDeletingId] = useState('')
   const [deleteFailed, setDeleteFailed] = useState(false)
+  // Копирование — один план за раз: id копируемого держит меню в состоянии
+  // «Копируем…», а отказ показывается той же полосой, что и отказ удаления.
+  const [copyingId, setCopyingId] = useState('')
+  const [copyFailed, setCopyFailed] = useState(false)
 
   useEffect(() => {
     let isCurrent = true
@@ -63,6 +67,22 @@ export function HallPlansPage() {
       reportAppError(hallsError, { scope: 'loader', route: '/halls', detail: { source: 'create-halls', plan: plan.id } })
     }
     navigate(`/halls/${plan.id}`)
+  }
+
+  // Копия открывается в редакторе сразу: копируют, чтобы править, а не чтобы
+  // любоваться карточкой в списке. Отказ оставляет человека здесь — половина
+  // копии, если она успела лечь, видна в списке после перезагрузки.
+  async function copyPlan(id: string) {
+    setCopyingId(id)
+    setCopyFailed(false)
+    try {
+      const copy = await duplicateHallPlan(id, tr)
+      navigate(`/halls/${copy.id}`)
+    } catch (error) {
+      setCopyFailed(true)
+      reportAppError(error, { scope: 'loader', route: '/halls', detail: { source: 'duplicate', plan: id } })
+      setCopyingId('')
+    }
   }
 
   async function deletePlan(id: string) {
@@ -113,6 +133,10 @@ export function HallPlansPage() {
           <p className="form-error hall-plans-error"><CircleAlert size={15} /> {tr('Не удалось удалить план. Повторите попытку.', 'Rejani o‘chirib bo‘lmadi. Qayta urinib ko‘ring.')}</p>
         )}
 
+        {copyFailed && (
+          <p className="form-error hall-plans-error"><CircleAlert size={15} /> {tr('Не удалось скопировать план. Повторите попытку.', 'Rejadan nusxa olib bo‘lmadi. Qayta urinib ko‘ring.')}</p>
+        )}
+
         {hasError ? (
           <div className="state-block state-block--error">
             <CircleAlert size={24} />
@@ -129,7 +153,9 @@ export function HallPlansPage() {
                   key={plan.id}
                   plan={plan}
                   isDeleting={deletingId === plan.id}
+                  isCopying={copyingId === plan.id}
                   onOpen={() => navigate(`/halls/${plan.id}`)}
+                  onCopy={() => { void copyPlan(plan.id) }}
                   onDelete={() => { void deletePlan(plan.id) }}
                 />
               ))}
@@ -165,10 +191,12 @@ export function HallPlansPage() {
 // Карточка плана. Отдельным компонентом ради взведённого удаления: useArmedAction
 // хранит состояние ОДНОЙ кнопки, и общий на весь список хук взвёл бы «Удалить»
 // сразу у всех карточек.
-function HallPlanCard({ plan, isDeleting, onOpen, onDelete }: {
+function HallPlanCard({ plan, isDeleting, isCopying, onOpen, onCopy, onDelete }: {
   plan: HallPlanWithHalls
   isDeleting: boolean
+  isCopying: boolean
   onOpen: () => void
+  onCopy: () => void
   onDelete: () => void
 }) {
   const { tr, locale } = useLanguage()
@@ -221,11 +249,18 @@ function HallPlanCard({ plan, isDeleting, onOpen, onDelete }: {
         ) : (
           <ActionMenu
             className="hall-plan-card__menu"
-            label={isDeleting ? tr('Удаляем…', 'O‘chirilmoqda…') : tr('Ещё', 'Yana')}
+            label={isDeleting ? tr('Удаляем…', 'O‘chirilmoqda…') : isCopying ? tr('Копируем…', 'Nusxa olinmoqda…') : tr('Ещё', 'Yana')}
             ariaLabel={tr('Действия с планом', 'Reja bilan amallar')}
             icon={<Ellipsis size={16} />}
-            disabled={isDeleting}
+            disabled={isDeleting || isCopying}
             items={[
+              {
+                id: 'copy',
+                label: tr('Сделать копию', 'Nusxa olish'),
+                hint: tr('Залы, позиции и расстановка', 'Zallar, lavozimlar va taqsimot'),
+                icon: <Copy size={16} />,
+                onSelect: onCopy,
+              },
               {
                 id: 'delete',
                 label: tr('Удалить план', 'Rejani o‘chirish'),

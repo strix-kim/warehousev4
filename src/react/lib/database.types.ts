@@ -380,9 +380,64 @@ export type Database = {
         }
         Relationships: []
       }
-      // Правка руками (с20): hall_plans + halls + hall_positions, миграция
-      // 20260824090000. Генератор типов не запускался — при перегенерации блок
-      // обязан пересобраться сам.
+      // Правка руками (с20): hall_plans + halls, миграция 20260824090000;
+      // hall_assignments + plan_positions вместо hall_positions — миграция
+      // 20260824110000. Генератор типов не запускался — при перегенерации блоки
+      // обязаны пересобраться сами.
+      // employee_id стал NOT NULL, sort_order снят — миграция 20260824140000
+      // («одна ячейка — один человек», вакансия теперь пустая клетка).
+      hall_assignments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          hall_id: string
+          id: string
+          plan_id: string
+          position_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          hall_id: string
+          id?: string
+          plan_id: string
+          position_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          hall_id?: string
+          id?: string
+          plan_id?: string
+          position_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hall_assignments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hall_assignments_hall_fkey"
+            columns: ["hall_id", "plan_id"]
+            isOneToOne: false
+            referencedRelation: "halls"
+            referencedColumns: ["id", "plan_id"]
+          },
+          {
+            foreignKeyName: "hall_assignments_position_fkey"
+            columns: ["position_id", "plan_id"]
+            isOneToOne: false
+            referencedRelation: "plan_positions"
+            referencedColumns: ["id", "plan_id"]
+          },
+        ]
+      }
       hall_plans: {
         Row: {
           created_at: string
@@ -412,57 +467,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      hall_positions: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          employee_id: string | null
-          hall_id: string
-          id: string
-          name: string
-          plan_id: string
-          role: string
-          sort_order: number
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          employee_id?: string | null
-          hall_id: string
-          id?: string
-          name: string
-          plan_id: string
-          role?: string
-          sort_order?: number
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          employee_id?: string | null
-          hall_id?: string
-          id?: string
-          name?: string
-          plan_id?: string
-          role?: string
-          sort_order?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hall_positions_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "hall_positions_hall_fkey"
-            columns: ["hall_id", "plan_id"]
-            isOneToOne: false
-            referencedRelation: "halls"
-            referencedColumns: ["id", "plan_id"]
-          },
-        ]
       }
       halls: {
         Row: {
@@ -558,6 +562,70 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      // Правка руками (с20, миграция 20260824110000): строки матрицы залов.
+      plan_positions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          plan_id: string
+          role: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          plan_id: string
+          role?: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          plan_id?: string
+          role?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_positions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "hall_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      // Правка руками (с20, миграция 20260824120000): справочник позиций.
+      position_catalog: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          role?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          role?: string
+        }
+        Relationships: []
       }
       reports: {
         Row: {

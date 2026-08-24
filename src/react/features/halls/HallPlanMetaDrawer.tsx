@@ -148,6 +148,7 @@ export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
           </div>
         )}
 
+
         {errorText && <p className="form-error"><CircleAlert size={15} /> {errorText}</p>}
 
         <button className="button button--primary button--wide" disabled={nameEmpty || isSaving} onClick={() => void save()}>
