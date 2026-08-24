@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { cachedQuery, invalidateCachePrefix } from '../../lib/persistentCache'
 import { escapeLikePattern } from '../../lib/postgrest'
 import { createSignedUrlCache } from '../../lib/signedUrlCache'
 import { EMPLOYEE_BRIEF_COLUMNS } from './types'
@@ -7,6 +8,14 @@ import type { Employee, EmployeeBrief, EmployeeFile, EmployeeFileKind, Tr } from
 // Приватный бакет: наружу файл уходит только по подписанной ссылке. Экспортируется
 // ради генератора документа: он качает фото байтами, а не подписанной ссылкой.
 export const BUCKET = 'employee-files'
+
+// Справочник сотрудников кэшируется под общим префиксом `employees:`: его читают
+// пикер водителей машины и пикер клетки залов, и оба открывались бы с сетевым
+// кругом за списком, который меняется раз в месяц. Сбрасывают его все три записи
+// в employees — одним префиксом, чтобы ключ и его сброс не разъезжались.
+const EMPLOYEES_CACHE_PREFIX = 'employees:'
+const EMPLOYEE_BRIEFS_CACHE_KEY = `${EMPLOYEES_CACHE_PREFIX}briefs`
+const EMPLOYEES_CACHE_TTL = 10 * 60 * 1000
 
 // Сотрудников ~200 — выдача целиком, без страниц. Порядок с ПОЛНЫМ ключом
 // (…, id): без него однофамильцы-тёзки меняются местами между запросами.
@@ -26,16 +35,18 @@ export async function fetchEmployees(): Promise<Employee[]> {
 // подстроке ФИО живёт на клиенте: выдача уже в памяти, и каждый набранный символ
 // не должен стоить запроса. Колонки те же, что у встроенного водителя машины, —
 // чип и строка выдачи показывают одно и то же.
-export async function fetchEmployeeBriefs(): Promise<EmployeeBrief[]> {
-  if (!supabase) throw new Error('Supabase не настроен')
-  const { data, error } = await supabase
-    .from('employees')
-    .select(EMPLOYEE_BRIEF_COLUMNS)
-    .order('last_name')
-    .order('first_name')
-    .order('id')
-  if (error) throw error
-  return data ?? []
+export function fetchEmployeeBriefs(): Promise<EmployeeBrief[]> {
+  return cachedQuery(EMPLOYEE_BRIEFS_CACHE_KEY, EMPLOYEES_CACHE_TTL, async () => {
+    if (!supabase) throw new Error('Supabase не настроен')
+    const { data, error } = await supabase
+      .from('employees')
+      .select(EMPLOYEE_BRIEF_COLUMNS)
+      .order('last_name')
+      .order('first_name')
+      .order('id')
+    if (error) throw error
+    return data ?? []
+  })
 }
 
 // Новые файлы первыми: тем же порядком карточка и форма показывают фото, а
@@ -107,6 +118,7 @@ export async function setEmployeeDocumentPhoto(employeeId: string, fileId: strin
     .update({ document_photo_id: fileId })
     .eq('id', employeeId)
   if (error) throw error
+  invalidateCachePrefix(EMPLOYEES_CACHE_PREFIX)
 }
 
 // Одна карточка прямо по id: прямая ссылка на /employees/:id/edit обязана
@@ -181,6 +193,7 @@ export async function createEmployee(fields: EmployeeInput): Promise<Employee> {
     .select()
     .single()
   if (error) throw error
+  invalidateCachePrefix(EMPLOYEES_CACHE_PREFIX)
   return data
 }
 
@@ -198,6 +211,7 @@ export async function updateEmployee(id: string, fields: EmployeeInput): Promise
     .select()
     .single()
   if (error) throw error
+  invalidateCachePrefix(EMPLOYEES_CACHE_PREFIX)
   return data
 }
 

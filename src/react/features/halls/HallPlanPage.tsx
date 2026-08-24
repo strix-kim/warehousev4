@@ -29,18 +29,6 @@ export function HallPlanPage() {
     ? tr(`${editor.plan.name} — план залов`, `${editor.plan.name} — zallar rejasi`)
     : '')
 
-  // Сотрудников грузим сразу, а не по первому клику в клетку (с21): строка
-  // «Свободны» стоит над матрицей и нужна ДО того, как открыли пикер. Повторов
-  // не боимся — loadCandidates держит свой ref (StrictMode монтирует эффект
-  // дважды, и состояние в обоих проходах ещё 'idle').
-  // В зависимостях только loadState: сама loadCandidates пересоздаётся каждым
-  // рендером редактора, и держать её в списке значило бы перезапускать эффект
-  // на каждый ввод буквы в имя зала. Замыкание при этом не устаревает — функция
-  // ходит в базу и пишет через setState, внешнего состояния не читает.
-  useEffect(() => {
-    if (editor.loadState === 'ready') editor.loadCandidates()
-  }, [editor.loadState])
-
   if (editor.loadState !== 'ready' || !editor.plan) {
     return (
       <section className="data-panel">

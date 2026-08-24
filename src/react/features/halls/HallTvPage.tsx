@@ -53,13 +53,6 @@ export function HallTvPage() {
   const refreshRef = useRef(editor.silentRefresh)
   refreshRef.current = editor.silentRefresh
 
-  // Сотрудников грузим сразу, как это делает редактор: на планёрке первый клик в
-  // клетку не должен упираться в загрузку списка. Повторов не боимся —
-  // loadCandidates держит свой ref (StrictMode монтирует эффект дважды).
-  useEffect(() => {
-    if (editor.loadState === 'ready') editor.loadCandidates()
-  }, [editor.loadState])
-
   // Точка отсчёта «обновлено» — первая удачная загрузка и каждая перезагрузка по
   // «Повторить»: loadState меняется на ready ровно раз за круг чтения.
   useEffect(() => {
