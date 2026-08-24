@@ -481,6 +481,13 @@ h2 { letter-spacing: -0.025em; }
 .home-destination--vehicles::after { background: rgba(16,22,27,.05); }
 .home-destination--vehicles .home-destination__icon { color: var(--accent); background: rgba(239,18,54,.09); }
 .home-destination__art--vehicles { right: -5%; bottom: -14%; width: 44%; opacity: .6; mask-image: linear-gradient(to right, transparent 0%, #000 22%, #000 100%); }
+/* Залы — второй слим-баннер той же ширины: раздел молодой, отдавать ему высокую
+   плитку рядом с оборудованием рано, а полоса под автомобилями читается как
+   продолжение ряда, а не как пятый равноправный вход. */
+.home-destination--halls { min-height: 220px; grid-column: 1 / -1; border-color: #dcd8e4; background: linear-gradient(145deg, #f5f3f8 0%, #eae6f1 100%); animation-delay: .21s; }
+.home-destination--halls::after { background: rgba(76,29,149,.05); }
+.home-destination--halls .home-destination__icon { color: var(--accent); background: rgba(239,18,54,.09); }
+.home-destination__art--halls { right: -5%; bottom: -14%; width: 44%; opacity: .6; mask-image: linear-gradient(to right, transparent 0%, #000 22%, #000 100%); }
 .home-destination .eyebrow, .home-destination strong, .home-destination p, .home-destination__action, .home-destination__icon, .home-destination__arrow { position: relative; z-index: 2; }
 .home-destination__arrow { position: absolute; }
 .home-destination strong, .home-destination p, .home-destination__action { max-width: 58%; }
@@ -939,6 +946,9 @@ h2 { letter-spacing: -0.025em; }
   /* RU/UZ уехал в лист «Ещё»: постоянный слот под два символа стоил четверти
      ширины панели, а язык переключают раз в жизни. */
   .sidebar__language { display: none; }
+  /* Разделы сверх пяти в нижнюю панель не помещаются — они живут в листе «Ещё»
+     (пара в разметке: NavLink с этим классом в App.tsx). */
+  .sidebar__nav-extra { display: none; }
   .sidebar__more { width: auto; min-width: 0; height: 50px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; margin: 0; padding: 0; border: 0; border-radius: 9px; color: #a9b1b7; background: transparent; font-size: 11px; font-weight: 600; }
   .sidebar__more.active { color: #fff; background: rgba(239,18,54,.14); }
   .sidebar__more.active svg { color: var(--accent); }

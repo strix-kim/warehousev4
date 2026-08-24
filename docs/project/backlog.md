@@ -537,3 +537,4 @@
 - **Snapshot-проверка xlsx** (с19): `snapshot.mjs` в scratchpad сессии (esbuild
   бандл + подмена `Date`, 4 фикстуры, `cmp`) — зародыш тест-харнесса вехи 5;
   в дерево не положен, рецепт в handoff с19.
+- Мёртвый CSS: `.quantity-stepper` в styles.css не используется ни одним tsx — удалить при ближайшем распиле styles.css (найдено в с20).

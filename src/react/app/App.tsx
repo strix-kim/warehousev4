@@ -1,4 +1,4 @@
-import { ArrowUpRight, Boxes, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Users, Warehouse, X } from 'lucide-react'
+import { ArrowUpRight, Boxes, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Presentation, Users, Warehouse, X } from 'lucide-react'
 import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AppErrorBoundary } from '../components/AppErrorBoundary'
@@ -17,6 +17,8 @@ const loadEmployeesPage = () => import('../features/employees/EmployeesPage').th
 const loadEmployeeFormPage = () => import('../features/employees/EmployeeFormPage').then((module) => ({ default: module.EmployeeFormPage }))
 const loadVehiclesPage = () => import('../features/vehicles/VehiclesPage').then((module) => ({ default: module.VehiclesPage }))
 const loadVehicleFormPage = () => import('../features/vehicles/VehicleFormPage').then((module) => ({ default: module.VehicleFormPage }))
+const loadHallPlansPage = () => import('../features/halls/HallPlansPage').then((module) => ({ default: module.HallPlansPage }))
+const loadHallPlanPage = () => import('../features/halls/HallPlanPage').then((module) => ({ default: module.HallPlanPage }))
 const loadHomePage = () => import('../features/home/HomePage').then((module) => ({ default: module.HomePage }))
 
 const LoginPage = lazyWithReload(loadLoginPage)
@@ -28,6 +30,8 @@ const EmployeesPage = lazyWithReload(loadEmployeesPage)
 const EmployeeFormPage = lazyWithReload(loadEmployeeFormPage)
 const VehiclesPage = lazyWithReload(loadVehiclesPage)
 const VehicleFormPage = lazyWithReload(loadVehicleFormPage)
+const HallPlansPage = lazyWithReload(loadHallPlansPage)
+const HallPlanPage = lazyWithReload(loadHallPlanPage)
 const HomePage = lazyWithReload(loadHomePage)
 
 export function App() {
@@ -57,6 +61,8 @@ export function App() {
         <Route path="/vehicles" element={<RouteBoundary><VehiclesPage /></RouteBoundary>} />
         <Route path="/vehicles/new" element={<RouteBoundary><VehicleFormPage /></RouteBoundary>} />
         <Route path="/vehicles/:vehicleId/edit" element={<RouteBoundary><VehicleFormPage /></RouteBoundary>} />
+        <Route path="/halls" element={<RouteBoundary><HallPlansPage /></RouteBoundary>} />
+        <Route path="/halls/:planId" element={<RouteBoundary><HallPlanPage /></RouteBoundary>} />
       </Route>
       <Route path="*" element={<Navigate to={session ? '/' : '/login'} replace />} />
     </Routes>
@@ -103,6 +109,8 @@ function AppShell() {
         loadEmployeeFormPage(),
         loadVehiclesPage(),
         loadVehicleFormPage(),
+        loadHallPlansPage(),
+        loadHallPlanPage(),
       ])
     }, 0)
     const primaryDataTimer = window.setTimeout(() => {
@@ -182,6 +190,10 @@ function AppShell() {
           <NavLink to="/lists"><ClipboardList size={19} /><span>{tr('Списки', 'Ro‘yxatlar')}</span></NavLink>
           <NavLink to="/employees"><Users size={19} /><span>{tr('Сотрудники', 'Xodimlar')}</span></NavLink>
           <NavLink to="/vehicles"><CarFront size={19} /><span>{tr('Автомобили', 'Avtomobillar')}</span></NavLink>
+          {/* Шестой раздел на телефоне в нижнюю панель не влезает: слотов там
+              пять плюс «Ещё», и седьмой ужал бы каждый до сорока пикселей.
+              Поэтому на ≤820 ссылка прячется, а «Залы» уходят в лист «Ещё». */}
+          <NavLink className="sidebar__nav-extra" to="/halls"><Presentation size={19} /><span>{tr('Залы', 'Zallar')}</span></NavLink>
           {/* Четвёртый слот нижней панели, на десктопе скрыт: язык, аккаунт и
               быстрый переход в новый список живут в сайдбаре, которого на
               телефоне нет. Раньше этот слот занимал постоянный RU/UZ. */}
@@ -249,6 +261,13 @@ function MobileMoreSheet({ email, onSignOut, onClose }: { email: string; onSignO
         <Link className="sheet__action" to="/lists/new" onClick={onClose}>
           <span><ListPlus size={19} /></span>
           <div><strong>{tr('Новый список', 'Yangi ro‘yxat')}</strong><small>{tr('Собрать комплект', 'Jamlanma tuzish')}</small></div>
+          <ArrowUpRight size={16} />
+        </Link>
+        {/* «Залы» показываются только здесь: в нижней панели телефона для них
+            нет слота (см. sidebar__nav-extra). */}
+        <Link className="sheet__action" to="/halls" onClick={onClose}>
+          <span><Presentation size={19} /></span>
+          <div><strong>{tr('Залы', 'Zallar')}</strong><small>{tr('Расстановка по залам', 'Zallar bo‘yicha taqsimot')}</small></div>
           <ArrowUpRight size={16} />
         </Link>
         <div className="sheet__row">
