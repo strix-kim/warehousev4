@@ -1,9 +1,11 @@
-import { ArrowLeft, CarFront, CheckCircle2, CircleAlert, Save, UserPlus, X } from 'lucide-react'
+import { ArrowLeft, CarFront, CheckCircle2, CircleAlert, Save, X } from 'lucide-react'
 import { FormEvent, useMemo, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { createVehicle, fetchDriverCandidates, fetchVehicleById, fetchVehicleFiles, getSignedUrls, saveVehicleDrivers, updateVehicle, uploadVehiclePhoto, vehicleSaveErrorText, type VehicleInput } from './api'
+import { useNavigate, useParams } from 'react-router-dom'
+import { createVehicle, fetchVehicleById, fetchVehicleFiles, getSignedUrls, saveVehicleDrivers, updateVehicle, uploadVehiclePhoto, vehicleSaveErrorText, type VehicleInput } from './api'
 import { VehicleFilesList } from './VehicleFilesList'
 import { driverFullName, vehicleTitle, type VehicleDriver, type VehicleFile } from './types'
+import { fetchEmployeeBriefs } from '../employees/api'
+import { EmployeePicker } from '../../components/EmployeePicker'
 import { PhotoPickField } from '../../components/PhotoPickField'
 import { UploadQueue, type UploadItem } from '../../components/UploadQueue'
 import { compressPhoto } from '../../lib/compressPhoto'
@@ -59,8 +61,6 @@ export function VehicleFormPage() {
   // сохранение считает разницу между этими двумя списками.
   const [drivers, setDrivers] = useState<VehicleDriver[]>([])
   const [savedDriverIds, setSavedDriverIds] = useState<string[]>([])
-  const [driverQuery, setDriverQuery] = useState('')
-  const [isPickerOpen, setIsPickerOpen] = useState(false)
   const [candidates, setCandidates] = useState<VehicleDriver[]>([])
   // 'idle' — за списком сотрудников ещё не ходили: он грузится по фокусу поля,
   // а не при открытии формы, где водителей могут и не трогать.
@@ -139,7 +139,7 @@ export function VehicleFormPage() {
   // иначе пустая выдача читалась бы как «сотрудников нет».
   function loadCandidates() {
     setCandidatesState('loading')
-    fetchDriverCandidates()
+    fetchEmployeeBriefs()
       .then((rows) => {
         setCandidates(rows)
         setCandidatesState('ready')
@@ -150,22 +150,12 @@ export function VehicleFormPage() {
       })
   }
 
-  function openPicker() {
-    setIsPickerOpen(true)
-    if (candidatesState === 'idle') loadCandidates()
-  }
-
-  // Уже выбранные из выдачи убраны: их место — в чипах над полем.
-  const driverOptions = useMemo(() => {
-    const chosen = new Set(drivers.map((driver) => driver.id))
-    const lowered = driverQuery.trim().toLowerCase()
-    return candidates.filter((candidate) => !chosen.has(candidate.id)
-      && (!lowered || driverFullName(candidate).toLowerCase().includes(lowered)))
-  }, [candidates, drivers, driverQuery])
+  // Набор id для пикера считается здесь, а не в нём: новый Set на каждый рендер
+  // сбрасывал бы его memo фильтра выдачи.
+  const chosenDriverIds = useMemo(() => new Set(drivers.map((driver) => driver.id)), [drivers])
 
   function addDriver(driver: VehicleDriver) {
     setDrivers((current) => current.some((row) => row.id === driver.id) ? current : [...current, driver])
-    setDriverQuery('')
   }
 
   function removeDriver(driverId: string) {
@@ -177,7 +167,6 @@ export function VehicleFormPage() {
     setPhotos([])
     setDrivers([])
     setSavedDriverIds([])
-    setDriverQuery('')
     setError('')
     setCreatedId('')
     setUploads([])
@@ -394,55 +383,15 @@ export function VehicleFormPage() {
             </ul>
           )}
 
-          {/* Выдача стоит в потоке под инпутом (position: absolute к обёртке), а не
-              в портале: форма не лежит в дровере, и фиксированные координаты
-              пришлось бы пересчитывать на каждой прокрутке. Закрытие — по уходу
-              фокуса из обёртки; mousedown внутри панели гасится, иначе Safari
-              снимал бы фокус ДО клика и выбор не доезжал. */}
-          <div className="driver-picker" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setIsPickerOpen(false) }}>
-            <label className="field">
-              <span>{tr('Добавить водителя', 'Haydovchi qo‘shish')}</span>
-              <input
-                value={driverQuery}
-                onChange={(event) => { setDriverQuery(event.target.value); openPicker() }}
-                onFocus={openPicker}
-                onKeyDown={(event) => { if (event.key === 'Escape') setIsPickerOpen(false) }}
-                placeholder={tr('Найти сотрудника…', 'Xodimni topish…')}
-                disabled={isSaving || isUploading}
-                aria-label={tr('Найти сотрудника', 'Xodimni topish')}
-              />
-            </label>
-
-            {isPickerOpen && (
-              <div className="driver-picker__panel" onMouseDown={(event) => event.preventDefault()}>
-                {candidatesState === 'failed'
-                  ? (
-                    // Обёрткой, а не двумя детьми: прямые кнопки панели — это
-                    // строки выдачи, и «Повторить» получила бы их вид.
-                    <div>
-                      <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить сотрудников.', 'Xodimlarni yuklab bo‘lmadi.')}</p>
-                      <button type="button" className="button button--secondary button--wide" onClick={loadCandidates}>{tr('Повторить', 'Qayta urinish')}</button>
-                    </div>
-                  )
-                  : candidatesState !== 'ready'
-                    ? <p className="muted">{tr('Загружаем сотрудников…', 'Xodimlar yuklanmoqda…')}</p>
-                    : driverOptions.length === 0
-                      ? <p className="muted">{tr('Никого не нашли.', 'Hech kim topilmadi.')}</p>
-                      : driverOptions.map((candidate) => (
-                        <button type="button" key={candidate.id} onClick={() => addDriver(candidate)}>
-                          <span>{driverFullName(candidate)}</span>
-                          <small>{candidate.position || tr('Должность не указана', 'Lavozim ko‘rsatilmagan')}</small>
-                        </button>
-                      ))}
-                <p className="driver-picker__footer">
-                  <UserPlus size={14} />
-                  {/* Новая вкладка — чтобы черновик машины не потерялся: человек
-                      заводит сотрудника рядом и возвращается к заполненной форме. */}
-                  <Link to="/employees/new" target="_blank" rel="noreferrer">{tr('Не нашли? Сначала заведите сотрудника', 'Topilmadimi? Avval xodimni kiriting')}</Link>
-                </p>
-              </div>
-            )}
-          </div>
+          <EmployeePicker
+            candidates={candidates}
+            candidatesState={candidatesState}
+            onLoad={loadCandidates}
+            exclude={chosenDriverIds}
+            onPick={addDriver}
+            label={tr('Добавить водителя', 'Haydovchi qo‘shish')}
+            disabled={isSaving || isUploading}
+          />
         </div>
 
         <div className="form-section">

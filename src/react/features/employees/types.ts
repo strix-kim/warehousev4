@@ -5,6 +5,15 @@ import type { Tables } from '../../lib/database.types'
 export type Employee = Tables<'employees'>
 export type EmployeeFile = Tables<'employee_files'>
 
+// Краткая карточка сотрудника — подмножество колонок для мест, где нужно только
+// «кого зовут и кому звонить»: чипы водителей у машины, выдача пикера. Полная
+// запись живёт в разделе «Сотрудники».
+export type EmployeeBrief = Pick<Tables<'employees'>, 'id' | 'last_name' | 'first_name' | 'middle_name' | 'phone' | 'position'>
+
+// Те же колонки строкой для select(): список полей обязан жить в одном месте
+// с типом EmployeeBrief, иначе они разъедутся на первой же новой колонке.
+export const EMPLOYEE_BRIEF_COLUMNS = 'id, last_name, first_name, middle_name, phone, position'
+
 // Виды файлов повторяют CHECK на employee_files.kind: список закрыт базой,
 // клиент только раскладывает его по секциям формы и карточки.
 export type EmployeeFileKind = 'photo' | 'passport_front' | 'passport_back' | 'intl_passport' | 'residence_reg'

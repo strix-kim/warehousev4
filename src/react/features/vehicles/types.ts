@@ -1,13 +1,15 @@
 import type { Tables } from '../../lib/database.types'
+import type { EmployeeBrief } from '../employees/types'
 
 // Строки таблиц ровно в том виде, в каком их отдаёт база: нормализацией марки,
 // модели, цвета и госномера занимается триггер normalize_vehicle_fields.
 export type Vehicle = Tables<'vehicles'>
 export type VehicleFile = Tables<'vehicle_files'>
 
-// Водитель в карточке машины — подмножество колонок сотрудника: здесь нужно
-// только «кому звонить», полная запись живёт в разделе «Сотрудники».
-export type VehicleDriver = Pick<Tables<'employees'>, 'id' | 'last_name' | 'first_name' | 'middle_name' | 'phone' | 'position'>
+// Водитель в карточке машины — та же краткая карточка сотрудника, что ходит
+// в пикере: здесь нужно только «кому звонить», полная запись живёт в разделе
+// «Сотрудники». Имя оставлено своё — в коде машин водитель называется водителем.
+export type VehicleDriver = EmployeeBrief
 
 // Машина со встроенными водителями — ровно то, что отдаёт fetchVehicles.
 // Связка vehicle_drivers в этот тип не попадает: у неё нет собственных полей,

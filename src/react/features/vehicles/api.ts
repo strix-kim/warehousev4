@@ -1,13 +1,10 @@
 import { supabase } from '../../lib/supabase'
 import { createSignedUrlCache } from '../../lib/signedUrlCache'
+import { EMPLOYEE_BRIEF_COLUMNS } from '../employees/types'
 import type { Tr, Vehicle, VehicleDriver, VehicleFile, VehicleWithDrivers } from './types'
 
 // Приватный бакет: наружу фото уходит только по подписанной ссылке.
 const BUCKET = 'vehicle-files'
-
-// Колонки водителя, встраиваемые в выдачу машин. Строка вынесена в константу,
-// чтобы список полей жил в одном месте с типом VehicleDriver.
-const DRIVER_COLUMNS = 'id, last_name, first_name, middle_name, phone, position'
 
 // Машин десятки — выдача целиком, и водители едут ОДНИМ запросом: встраивание
 // связки vehicle_drivers избавляет от второго обхода и от склейки по id на
@@ -35,7 +32,7 @@ export async function fetchVehicles(): Promise<VehicleWithDrivers[]> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase
     .from('vehicles')
-    .select(`*, vehicle_drivers(employee_id, employees(${DRIVER_COLUMNS}))`)
+    .select(`*, vehicle_drivers(employee_id, employees(${EMPLOYEE_BRIEF_COLUMNS}))`)
     .order('brand')
     .order('plate_number')
     .order('id')
@@ -52,27 +49,11 @@ export async function fetchVehicleById(id: string): Promise<VehicleWithDrivers |
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase
     .from('vehicles')
-    .select(`*, vehicle_drivers(employee_id, employees(${DRIVER_COLUMNS}))`)
+    .select(`*, vehicle_drivers(employee_id, employees(${EMPLOYEE_BRIEF_COLUMNS}))`)
     .eq('id', id)
     .maybeSingle()
   if (error) throw error
   return data ? withDrivers(data) : null
-}
-
-// Кандидаты в водители — сотрудники целиком (их ~200), фильтр по подстроке ФИО
-// живёт на клиенте: выдача уже в памяти, и каждый набранный символ не должен
-// стоить запроса. Колонки те же, что у встроенного водителя, — чип и строка
-// выдачи показывают одно и то же.
-export async function fetchDriverCandidates(): Promise<VehicleDriver[]> {
-  if (!supabase) throw new Error('Supabase не настроен')
-  const { data, error } = await supabase
-    .from('employees')
-    .select(DRIVER_COLUMNS)
-    .order('last_name')
-    .order('first_name')
-    .order('id')
-  if (error) throw error
-  return data ?? []
 }
 
 export async function fetchVehicleFiles(vehicleId: string): Promise<VehicleFile[]> {
