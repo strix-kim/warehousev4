@@ -69,12 +69,12 @@ Excel собирается целиком в браузере, самописн�
 
 ## 4. Что входит в продукт
 
-Десять страниц на тринадцати маршрутах, все ленивые, каждая под своей границей ошибок:
+Тринадцать страниц на шестнадцати маршрутах, все ленивые, каждая под своей границей ошибок:
 
 | Маршрут | Страница | Что делает |
 |---|---|---|
 | `/login` | `LoginPage` | Вход, переключатель RU/UZ |
-| `/` | `HomePage` | Четыре живые плитки: каталог, списки, сотрудники, автомобили |
+| `/` | `HomePage` | Пять живых плиток: каталог, списки, сотрудники, автомобили, залы |
 | `/equipment` | `EquipmentPage` | Каталог: поиск, фильтры категории/подкатегории/статуса, пагинация, drawer-карточка, редактирование модели и единицы |
 | `/equipment/new` | `EquipmentCreatePage` | Заведение позиции: «серийная» / «по количеству» |
 | `/lists` | `ListsPage` | Реестр сохранённых документов, drawer с составом, повторный экспорт, удаление |
@@ -83,12 +83,15 @@ Excel собирается целиком в браузере, самописн�
 | `/employees/new`, `/employees/:employeeId/edit` | `EmployeeFormPage` | Одна форма на заведение и правку; файлы — в приватный Storage-бакет |
 | `/vehicles` | `VehiclesPage` | Автомобили (с18): список с поиском по госномеру/марке/водителю, drawer-карточка; выбор состава и экспорт «на мероприятие» (с19) |
 | `/vehicles/new`, `/vehicles/:vehicleId/edit` | `VehicleFormPage` | Одна форма; водители — чипами из базы сотрудников, фото — в `vehicle-files` |
+| `/halls` | `HallPlansPage` | Планы залов (с20): карточки с датой, залами-точками, копированием и удалением |
+| `/halls/:planId` | `HallPlanPage` | Редактор-матрица «позиции × залы»: ячейка = человек или слот «Наём», справочник позиций чипами, счётчики бригады и найма, строка свободных |
+| `/halls/:planId/tv` | `HallTvPage` | ТВ-режим (с21): тёмный полноэкранный, вне AppShell, назначение кликом (инструмент планёрки), поллинг 30 с, структура не правится |
 
-**Клиент обращается к восьми таблицам и восьми RPC:**
+**Клиент обращается к тринадцати таблицам и восьми RPC:**
 
 | Таблицы | RPC |
 |---|---|
-| `equipment`, `equipment_lists`, `equipment_movements`, `employees`, `employee_files`, `vehicles`, `vehicle_drivers`, `vehicle_files` | `create_equipment_list_document`, `update_equipment_list_document`, `update_equipment_model_and_unit`, `count_equipment_model_units`, `append_equipment_to_list`, `create_equipment_batch`, `fetch_equipment_models`, `add_equipment_unit` |
+| `equipment`, `equipment_lists`, `equipment_movements`, `employees`, `employee_files`, `vehicles`, `vehicle_drivers`, `vehicle_files`, `hall_plans`, `halls`, `plan_positions`, `hall_assignments`, `position_catalog` | `create_equipment_list_document`, `update_equipment_list_document`, `update_equipment_model_and_unit`, `count_equipment_model_units`, `append_equipment_to_list`, `create_equipment_batch`, `fetch_equipment_models`, `add_equipment_unit` |
 
 Сквозные механики: двуязычие через `tr`; постоянный кэш в `localStorage`
 (`lib/persistentCache.ts`); прогрев чанков и первичных данных после входа; drawer'ы
