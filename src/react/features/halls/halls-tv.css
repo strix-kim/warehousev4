@@ -15,6 +15,10 @@
   --tv-ink: #f2f5f7;
   --tv-ink-soft: #98a3ac;
   --tv-ink-faint: #626c75;
+  /* Свои danger-тона: var(--danger) из :root подобран под белый фон и на тёмном
+     режет глаз — здесь тот же смысл, но в яркости витрины. */
+  --tv-danger: #ff6f61;
+  --tv-danger-bg: #3a1713;
   /* Сколько высоты забирают шапка и подвал — из этого остатка считается кегль. */
   --tv-chrome: 152px;
   position: fixed;
@@ -39,6 +43,13 @@
 /* Поллинг отказал — данные на экране остались, но они старые, и это надо
    назвать. Цвет тревожный, а не красный: сбой связи не портит расстановку. */
 .hall-tv__refreshed.is-stale { color: #e0a336; }
+
+/* Статус автосохранения (Ш3): в покое его нет вовсе — голос только у «идёт» и
+   «не прошло». Текст отказа обрезается, полный — в title. */
+.hall-tv__save { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--tv-ink-soft); font-size: 12.5px; font-weight: 650; white-space: nowrap; }
+.hall-tv__save.is-failed { color: var(--tv-danger); }
+.hall-tv__save-text { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.hall-tv__save button { padding: 0; border: 0; color: inherit; background: none; font: inherit; font-weight: 800; text-decoration: underline; }
 
 .hall-tv__button { display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; border: 1px solid var(--tv-line); border-radius: 9px; color: var(--tv-ink-soft); background: var(--tv-panel); font-size: 13px; font-weight: 700; white-space: nowrap; }
 .hall-tv__button:hover { border-color: var(--tv-ink-faint); color: var(--tv-ink); }
@@ -83,8 +94,35 @@
 
 /* Клетка тонирована цветом своего зала плотнее, чем в редакторе (16% против
    7%): на тёмном фоне слабая заливка исчезает вовсе, а колонка обязана читаться
-   полосой с другого конца зала. */
-.hall-tv__cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .04em; min-width: 0; padding: 4px 8px; overflow: hidden; background: color-mix(in srgb, var(--hall-color, transparent) 16%, var(--tv-panel)); text-align: center; }
+   полосой с другого конца зала.
+   С Ш3 клетка интерактивна: содержимое лежит в кнопке .hall-tv__pick/.__empty,
+   а сама клетка — только позиционный каркас (relative — под крестик снятия). */
+.hall-tv__cell { position: relative; display: flex; align-items: stretch; min-width: 0; overflow: hidden; background: color-mix(in srgb, var(--hall-color, transparent) 16%, var(--tv-panel)); }
+
+/* Кнопка-содержимое во всю клетку: и человек, и слот, и пустота открывают пикер
+   одним кликом — целиться в мелкую цель на большом экране некогда. Ховер — та
+   же тонировка плотнее: серый глушил бы принадлежность колонке. */
+.hall-tv__pick, .hall-tv__empty { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .04em; padding: 4px 8px; border: 0; color: inherit; background: none; font: inherit; text-align: center; }
+.hall-tv__pick:hover:not(:disabled), .hall-tv__empty:hover:not(:disabled) { background: color-mix(in srgb, var(--hall-color, var(--tv-ink)) 30%, var(--tv-panel)); }
+.hall-tv__pick:disabled, .hall-tv__empty:disabled { opacity: .55; }
+/* Сотрудника не отдала политика чтения: место занято, имени нет. */
+.hall-tv__pick.is-hidden-person { color: var(--tv-ink-faint); }
+
+.hall-tv__busy { color: var(--tv-ink-soft); font-size: .6em; font-weight: 650; }
+
+/* Имя и ×N в одну строку: бейдж стоит у имени, а не в углу клетки, — глаз
+   читает «Ахад ×3» как один факт. Фон полупрозрачный белый, как у номера зала. */
+.hall-tv__name-row { min-width: 0; max-width: 100%; display: inline-flex; align-items: center; gap: .3em; }
+.hall-tv__badge { flex: 0 0 auto; padding: 0 .35em; border-radius: 999px; color: var(--tv-ink); background: rgba(255,255,255,.16); font-size: .5em; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* Крестик снятия — только под курсором: на витрине в покое он висел бы мусором
+   поверх каждой фамилии. Фокус с клавиатуры тоже проявляет. */
+.hall-tv__clear { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: 50%; color: var(--tv-ink-soft); background: rgba(0, 0, 0, .38); opacity: 0; }
+.hall-tv__cell:hover .hall-tv__clear, .hall-tv__clear:focus-visible, .hall-tv__cell.is-armed .hall-tv__clear { opacity: 1; }
+.hall-tv__clear:hover { color: var(--tv-danger); }
+/* Взведённое снятие красит всю клетку: следующий клик по крестику необратим. */
+.hall-tv__cell.is-armed { background: var(--tv-danger-bg); }
+.hall-tv__cell.is-armed .hall-tv__clear { color: var(--tv-danger); background: rgba(255, 111, 97, .2); }
 
 /* Имя — первой строкой и в полный кегль, фамилия под ним мельче и приглушена. */
 .hall-tv__first { max-width: 100%; overflow: hidden; font-weight: 750; letter-spacing: -.01em; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
@@ -96,8 +134,6 @@
 
 /* Пустая клетка — тусклый прочерк, ровно как на бумажном образце. */
 .hall-tv__dash { color: var(--tv-ink-faint); font-size: .8em; font-weight: 700; opacity: .55; }
-/* Сотрудника не отдала политика чтения: место занято, имени нет. */
-.hall-tv__hidden { color: var(--tv-ink-faint); font-size: .66em; font-weight: 650; }
 
 .hall-tv__foot { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 26px; padding: 11px 20px; border-top: 1px solid var(--tv-line); color: var(--tv-ink-soft); font-size: clamp(13px, 1.15vw, 18px); font-weight: 650; }
 .hall-tv__foot strong { color: var(--tv-ink); font-weight: 800; font-variant-numeric: tabular-nums; }

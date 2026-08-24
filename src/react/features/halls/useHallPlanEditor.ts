@@ -39,6 +39,11 @@ import { reportAppError } from '../../lib/reportAppError'
 export type HallPlanLoadState = 'loading' | 'ready' | 'missing' | 'failed'
 export type HallPlanSaveState = 'saved' | 'saving' | 'failed'
 
+// Чем кончился тик тихого обновления (см. silentRefresh). Три исхода, а не
+// булево: «пропущено» — это НЕ отказ, и показывать по нему «Нет связи» было бы
+// враньём про сеть, которой никто не пользовался.
+export type SilentRefreshResult = 'ok' | 'skipped' | 'failed'
+
 // Клетка матрицы адресуется парой «строка × зал» — своего id у неё нет и быть не
 // может: клетка это пересечение, а не запись. В самой клетке с миграции
 // 20260824140000 стоит РОВНО ОДИН человек или никто.
@@ -155,6 +160,65 @@ export function useHallPlanEditor(planId: string | undefined) {
   function reload() {
     setErrorText('')
     setReloadKey((value) => value + 1)
+  }
+
+  // Жив ли компонент — для тихого обновления. Своего cleanup у него нет: зовут
+  // его из интервала СТРАНИЦЫ, а не из эффекта хука, и ответ, вернувшийся после
+  // ухода с экрана, писал бы в состояние уже отсоединённого дерева. Флаг
+  // поднимается при монтировании, а не только объявлением: в StrictMode эффект
+  // размонтируется и монтируется снова, и оставленный false убил бы обновление
+  // на всё время жизни экрана.
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false }
+  }, [])
+
+  // Полёт тихого обновления: на медленной сети тик интервала не должен
+  // становиться в очередь за предыдущим — экран от этого свежее не станет, а
+  // запросы сложатся стопкой.
+  const silentInFlight = useRef(false)
+
+  // Тихое обновление — то же чтение, что и reload, но БЕЗ loadState='loading'
+  // (витрина в зале не имеет права мигать каждые полминуты) и без сброса
+  // errorText: снимать красный статус имеет право только перезагрузка.
+  // Справочник позиций здесь не перечитывается — чипов на витрине нет, а
+  // редактор его и так не поллит.
+  //
+  // Отказ НЕ роняет loadState: на экране лежат старые, но НАСТОЯЩИЕ данные, и
+  // гасить их из-за одного провала сети хуже, чем оставить и честно сказать
+  // вызывающему, что связи нет.
+  async function silentRefresh(): Promise<SilentRefreshResult> {
+    // Правка в полёте — тик пропускаем целиком: ответ базы приехал бы БЕЗ ещё
+    // не сохранённого назначения и стёр бы его с экрана прямо под рукой.
+    if (!planId || pending > 0 || addingCell || silentInFlight.current) return 'skipped'
+    silentInFlight.current = true
+    try {
+      const [row, positionRows, assignmentRows] = await Promise.all([
+        fetchHallPlan(planId),
+        fetchPlanPositions(planId),
+        fetchHallAssignments(planId),
+      ])
+      if (!alive.current) return 'skipped'
+      // План исчез, пока экран висел: показывать расстановку удалённого плана
+      // нельзя — она уже ничья. Это единственное, что тихое обновление имеет
+      // право сделать с loadState.
+      if (!row) {
+        setLoadState('missing')
+        return 'ok'
+      }
+      const { halls: loadedHalls, ...planRow } = row
+      setPlan(planRow)
+      setHalls(sortHalls(loadedHalls))
+      setPositions(sortPositions(positionRows))
+      setAssignments(assignmentRows)
+      return 'ok'
+    } catch (error) {
+      reportAppError(error, { scope: 'loader', route: '/halls/:planId', detail: { source: 'silent-refresh', plan: planId } })
+      return 'failed'
+    } finally {
+      silentInFlight.current = false
+    }
   }
 
   // Отказ не гасим: у панели пикера своя кнопка повтора, иначе пустая выдача
@@ -493,6 +557,7 @@ export function useHallPlanEditor(planId: string | undefined) {
     addingPosition,
     addingCell,
     reload,
+    silentRefresh,
     renameHall,
     recolorHall,
     removeHall,
