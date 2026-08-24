@@ -380,6 +380,128 @@ export type Database = {
         }
         Relationships: []
       }
+      // Правка руками (с20): hall_plans + halls + hall_positions, миграция
+      // 20260824090000. Генератор типов не запускался — при перегенерации блок
+      // обязан пересобраться сам.
+      hall_plans: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          event_from: string | null
+          event_to: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          event_from?: string | null
+          event_to?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          event_from?: string | null
+          event_to?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hall_positions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string | null
+          hall_id: string
+          id: string
+          name: string
+          plan_id: string
+          role: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string | null
+          hall_id: string
+          id?: string
+          name: string
+          plan_id: string
+          role?: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string | null
+          hall_id?: string
+          id?: string
+          name?: string
+          plan_id?: string
+          role?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hall_positions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hall_positions_hall_fkey"
+            columns: ["hall_id", "plan_id"]
+            isOneToOne: false
+            referencedRelation: "halls"
+            referencedColumns: ["id", "plan_id"]
+          },
+        ]
+      }
+      halls: {
+        Row: {
+          color: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          plan_id: string
+          sort_order: number
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          plan_id: string
+          sort_order?: number
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          plan_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "halls_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "hall_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mount_points: {
         Row: {
           equipment_fact: string[]
