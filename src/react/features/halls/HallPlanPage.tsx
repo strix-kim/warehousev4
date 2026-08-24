@@ -1,8 +1,9 @@
-import { ArrowLeft, CircleAlert, LayoutGrid, MonitorPlay, Pencil, Presentation } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, Check, CircleAlert, Copy, LayoutGrid, MonitorPlay, Pencil, Presentation } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { HallMatrix } from './HallMatrix'
 import { HallPlanMetaDrawer } from './HallPlanMetaDrawer'
+import { buildPlanText, copyText } from './planText'
 import { useHallPlanEditor, type HallPlanEditor } from './useHallPlanEditor'
 import { formatPlanPeriod } from './types'
 import { employeeDisplayName } from '../employees/types'
@@ -82,6 +83,7 @@ export function HallPlanPage() {
             errorText={editor.errorText}
             onRetry={editor.reload}
           />
+          <CopyPlanButton editor={editor} />
           <button className="button button--secondary" onClick={() => setMetaOpen(true)}>
             <Pencil size={16} /> {tr('Изменить', 'O‘zgartirish')}
           </button>
@@ -129,6 +131,48 @@ export function HallPlanPage() {
         />
       )}
     </>
+  )
+}
+
+// Расстановка текстом в буфер — её вставляют в группу с сотрудниками (с22).
+// Кнопка не ведёт ни в какой экран и ничего не сохраняет, поэтому весь её
+// результат — подтверждение на самой кнопке: без него нажатие выглядит как
+// промах мимо кнопки.
+function CopyPlanButton({ editor }: { editor: HallPlanEditor }) {
+  const { tr, locale } = useLanguage()
+  const [state, setState] = useState<'idle' | 'done' | 'failed'>('idle')
+  // Таймер сбрасываем при размонтировании и перед новым нажатием: два клика
+  // подряд иначе гасили бы подтверждение по первому таймеру.
+  const timer = useRef(0)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  const copy = async () => {
+    if (!editor.plan) return
+    const ok = await copyText(buildPlanText({
+      plan: editor.plan,
+      halls: editor.halls,
+      positions: editor.positions,
+      cellMap: editor.cellMap,
+      counts: editor.counts,
+      locale,
+      tr,
+    }))
+    window.clearTimeout(timer.current)
+    setState(ok ? 'done' : 'failed')
+    timer.current = window.setTimeout(() => setState('idle'), 2000)
+  }
+
+  return (
+    <button
+      className="button button--secondary"
+      onClick={() => { void copy() }}
+      title={tr('Скопировать расстановку текстом — для чата', 'Joylashuvni matn ko‘rinishida nusxalash — chat uchun')}
+    >
+      {state === 'done' ? <Check size={16} /> : <Copy size={16} />}
+      {state === 'done' && tr('Скопировано', 'Nusxalandi')}
+      {state === 'failed' && tr('Не вышло', 'Bo‘lmadi')}
+      {state === 'idle' && tr('Копировать', 'Nusxalash')}
+    </button>
   )
 }
 
