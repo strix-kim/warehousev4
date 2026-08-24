@@ -19,6 +19,7 @@ const loadVehiclesPage = () => import('../features/vehicles/VehiclesPage').then(
 const loadVehicleFormPage = () => import('../features/vehicles/VehicleFormPage').then((module) => ({ default: module.VehicleFormPage }))
 const loadHallPlansPage = () => import('../features/halls/HallPlansPage').then((module) => ({ default: module.HallPlansPage }))
 const loadHallPlanPage = () => import('../features/halls/HallPlanPage').then((module) => ({ default: module.HallPlanPage }))
+const loadHallTvPage = () => import('../features/halls/HallTvPage').then((module) => ({ default: module.HallTvPage }))
 const loadHomePage = () => import('../features/home/HomePage').then((module) => ({ default: module.HomePage }))
 
 const LoginPage = lazyWithReload(loadLoginPage)
@@ -32,6 +33,7 @@ const VehiclesPage = lazyWithReload(loadVehiclesPage)
 const VehicleFormPage = lazyWithReload(loadVehicleFormPage)
 const HallPlansPage = lazyWithReload(loadHallPlansPage)
 const HallPlanPage = lazyWithReload(loadHallPlanPage)
+const HallTvPage = lazyWithReload(loadHallTvPage)
 const HomePage = lazyWithReload(loadHomePage)
 
 export function App() {
@@ -64,6 +66,9 @@ export function App() {
         <Route path="/halls" element={<RouteBoundary><HallPlansPage /></RouteBoundary>} />
         <Route path="/halls/:planId" element={<RouteBoundary><HallPlanPage /></RouteBoundary>} />
       </Route>
+      {/* ТВ-режим — вне AppShell: на экране в зале не нужны ни сайдбар, ни
+          отступы приложения. Гейт сессии у маршрута свой, как у шелла. */}
+      <Route path="/halls/:planId/tv" element={session ? <RouteBoundary variant="app"><HallTvPage /></RouteBoundary> : <LoginRedirect />} />
       <Route path="*" element={<Navigate to={session ? '/' : '/login'} replace />} />
     </Routes>
 }

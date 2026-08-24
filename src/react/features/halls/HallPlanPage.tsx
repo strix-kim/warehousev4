@@ -1,4 +1,4 @@
-import { ArrowLeft, CircleAlert, LayoutGrid, Pencil, Presentation } from 'lucide-react'
+import { ArrowLeft, CircleAlert, LayoutGrid, MonitorPlay, Pencil, Presentation } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { HallMatrix } from './HallMatrix'
@@ -84,6 +84,12 @@ export function HallPlanPage() {
           />
           <button className="button button--secondary" onClick={() => setMetaOpen(true)}>
             <Pencil size={16} /> {tr('Изменить', 'O‘zgartirish')}
+          </button>
+          {/* Обычная навигация, не новая вкладка: на самом ТВ адрес открывают
+              браузером телевизора, а здесь кнопка нужна, чтобы посмотреть
+              витрину и вернуться Esc-ом. */}
+          <button className="button button--secondary" onClick={() => navigate(`/halls/${plan.id}/tv`)}>
+            <MonitorPlay size={16} /> {tr('ТВ', 'TV')}
           </button>
         </div>
       </header>

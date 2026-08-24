@@ -1,0 +1,103 @@
+/* ТВ-режим плана залов (с21, Ш2). Файл импортирует сама страница, поэтому Vite
+   кладёт его в её чанк: на обычных экранах приложения эти правила не грузятся.
+   halls.css отсюда НЕ подключается — витрина самодостаточна, у неё своя тёмная
+   палитра и своя раскладка, а редакторские стили светлые и с прокруткой.
+
+   Тёмная тема — решение прораба: экран висит в зале часами и не должен слепить.
+   Приложение тёмных токенов не имеет, поэтому палитра объявлена здесь локально;
+   светлые --radius-* и прочие :root из styles.css остаются доступны, но цвет
+   витрина не берёт из них ни одного. */
+
+.hall-tv {
+  --tv-bg: #0f1216;
+  --tv-panel: #171c22;
+  --tv-line: #262d35;
+  --tv-ink: #f2f5f7;
+  --tv-ink-soft: #98a3ac;
+  --tv-ink-faint: #626c75;
+  /* Сколько высоты забирают шапка и подвал — из этого остатка считается кегль. */
+  --tv-chrome: 152px;
+  position: fixed;
+  z-index: 1;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--tv-ink);
+  background: var(--tv-bg);
+}
+
+.hall-tv__head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 20px; border-bottom: 1px solid var(--tv-line); }
+.hall-tv__title { min-width: 0; }
+.hall-tv__title h1 { margin: 0; overflow: hidden; font-size: clamp(20px, 2.4vw, 34px); font-weight: 800; letter-spacing: -.02em; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+.hall-tv__title p { margin: 2px 0 0; color: var(--tv-ink-soft); font-size: clamp(13px, 1.2vw, 18px); font-weight: 650; }
+
+.hall-tv__head-side { flex: 0 0 auto; display: flex; align-items: center; gap: 14px; }
+/* Возраст данных — мелко и в углу: это служебная строка, а не содержимое
+   витрины, и спорить с именами она не имеет права. */
+.hall-tv__refreshed { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--tv-ink-faint); font-size: 12.5px; font-weight: 650; white-space: nowrap; }
+/* Поллинг отказал — данные на экране остались, но они старые, и это надо
+   назвать. Цвет тревожный, а не красный: сбой связи не портит расстановку. */
+.hall-tv__refreshed.is-stale { color: #e0a336; }
+
+.hall-tv__button { display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; border: 1px solid var(--tv-line); border-radius: 9px; color: var(--tv-ink-soft); background: var(--tv-panel); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.hall-tv__button:hover { border-color: var(--tv-ink-faint); color: var(--tv-ink); }
+
+/* Состояния — по центру пустого экрана: на ТВ их читают издалека, поэтому это
+   не строка в панели, а весь остаток высоты. */
+.hall-tv__state { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; color: var(--tv-ink-soft); text-align: center; }
+.hall-tv__state strong { color: var(--tv-ink); font-size: 22px; font-weight: 800; }
+.hall-tv__state span { font-size: 15px; font-weight: 600; }
+.hall-tv__state svg { color: var(--tv-ink-faint); }
+
+/* Матрица: остаток экрана, БЕЗ прокрутки. Кегль имени считается от того, что
+   осталось по высоте после шапки с подвалом, и от ширины на колонку; clamp
+   держит края — на трёх строках буквы не разрастаются в плакат, на дюжине не
+   ужимаются в нечитаемое. Остальные кегли внутри — em от этого.
+   Волосяные линии сделаны зазором в 1 px поверх подложки, как в списках. */
+.hall-tv__board {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  background: var(--tv-line);
+  font-size: clamp(13px, min(
+    calc((100vh - var(--tv-chrome)) / var(--rows) * .32),
+    calc(90vw / var(--cols) / 7)
+  ), 42px);
+}
+
+.hall-tv__corner { display: flex; align-items: flex-end; padding: 8px 12px; background: var(--tv-bg); color: var(--tv-ink-faint); font-size: .5em; font-weight: 700; }
+
+/* Шапка колонки залита цветом зала. Белый текст держит палитра: все восемь
+   цветов тёмные настолько, что контраст с белым проходит на любом из них. */
+.hall-tv__colhead { display: flex; align-items: center; gap: .4em; min-width: 0; padding: 8px 12px; color: #fff; background: var(--hall-color, var(--tv-panel)); }
+.hall-tv__number { flex: 0 0 auto; min-width: 1.5em; height: 1.5em; display: inline-grid; place-items: center; padding: 0 .3em; border-radius: 6px; background: rgba(255,255,255,.22); font-size: .58em; font-weight: 800; font-variant-numeric: tabular-nums; }
+.hall-tv__hall-name { min-width: 0; overflow: hidden; font-size: .66em; font-weight: 800; letter-spacing: -.01em; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Первая колонка — название позиции. Приглушена и уже редакторской: на витрине
+   это подпись строки, а главное в ней — имена людей справа. */
+.hall-tv__rowhead { display: flex; align-items: center; min-width: 0; padding: 6px 12px; background: var(--tv-bg); color: var(--tv-ink-soft); }
+.hall-tv__rowhead span { min-width: 0; overflow: hidden; font-size: .58em; font-weight: 700; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Клетка тонирована цветом своего зала плотнее, чем в редакторе (16% против
+   7%): на тёмном фоне слабая заливка исчезает вовсе, а колонка обязана читаться
+   полосой с другого конца зала. */
+.hall-tv__cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .04em; min-width: 0; padding: 4px 8px; overflow: hidden; background: color-mix(in srgb, var(--hall-color, transparent) 16%, var(--tv-panel)); text-align: center; }
+
+/* Имя — первой строкой и в полный кегль, фамилия под ним мельче и приглушена. */
+.hall-tv__first { max-width: 100%; overflow: hidden; font-weight: 750; letter-spacing: -.01em; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+.hall-tv__last { max-width: 100%; overflow: hidden; color: var(--tv-ink-soft); font-size: .72em; font-weight: 650; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Слот «Наём» — пунктирный чип, как в редакторе: он обязан читаться иначе, чем
+   человек, иначе «Наём» с расстояния принимают за фамилию. */
+.hall-tv__slot { max-width: 100%; overflow: hidden; padding: .12em .5em; border: 1px dashed var(--tv-ink-faint); border-radius: .4em; color: var(--tv-ink-soft); font-size: .74em; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Пустая клетка — тусклый прочерк, ровно как на бумажном образце. */
+.hall-tv__dash { color: var(--tv-ink-faint); font-size: .8em; font-weight: 700; opacity: .55; }
+/* Сотрудника не отдала политика чтения: место занято, имени нет. */
+.hall-tv__hidden { color: var(--tv-ink-faint); font-size: .66em; font-weight: 650; }
+
+.hall-tv__foot { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 26px; padding: 11px 20px; border-top: 1px solid var(--tv-line); color: var(--tv-ink-soft); font-size: clamp(13px, 1.15vw, 18px); font-weight: 650; }
+.hall-tv__foot strong { color: var(--tv-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
