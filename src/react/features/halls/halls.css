@@ -263,3 +263,100 @@
   .position-suggestions { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
   .position-chip { flex: 0 0 auto; }
 }
+
+/* ---------- Печать матрицы (с22) ---------- */
+/* Лист уезжает на площадку: на бумаге нужны имена, номера залов и счётчики, а
+   всё, чем управляют мышью, — мусор. Альбомная ориентация не выбор вкуса:
+   залов почти всегда больше, чем позиций.
+
+   Цвет зала на бумаге живёт РАМКОЙ, а не заливкой. Фоны браузер печатает
+   только при включённой «фоновой графике», а она выключена по умолчанию —
+   белый текст шапки на белом листе исчез бы вместе с заливкой. Границы
+   печатаются всегда, поэтому колонку опознают по цветной черте под именем. */
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+
+  /* Всё интерактивное: навигация, кнопки шапки, добавление зала и позиций,
+     подтверждения удаления, пикер клетки. */
+  .sidebar,
+  .editor-header > .icon-button,
+  .editor-header__actions,
+  .hall-add-column,
+  .position-suggestions,
+  .hall-add-position,
+  .hall-matrix__corner small,
+  .hall-matrix__menu,
+  .hall-matrix__confirm,
+  .hall-matrix__row-delete,
+  .hall-matrix__clear,
+  .hall-matrix__empty-hint,
+  .hall-colors,
+  .hall-cell-picker { display: none !important; }
+
+  /* Фон приложения на листе — серый прямоугольник во всю страницу и лишний
+     тонер: бумага и так белая. */
+  body, .app-shell, .app-content { background: #fff; }
+  .app-shell { display: block; }
+  .app-content { max-width: none; padding: 0; }
+  /* Та же болезнь, что у панели: блочный бокс шапки на печати не рисуется, и
+     лист уходил без имени плана. display: contents убирает бокс — период и
+     заголовок встают прямо в поток страницы. Заодно снимается вопрос о трёх
+     колонках сетки, осыпавшихся бы в 42px без кнопок по краям. */
+  .editor-header { display: contents; }
+  .editor-header > div { margin-bottom: 10px; }
+  .editor-header h1 { font-size: 19px; }
+  .eyebrow { margin-bottom: 3px; font-size: 10px; }
+  .hall-counts { margin-bottom: 6px; font-size: 11px; }
+  .hall-counts strong { font-size: 12px; }
+  .hall-free { margin-bottom: 8px; font-size: 10.5px; }
+
+  /* Прокрутки на бумаге нет. Липкие заголовки обязаны стать обычными: иначе
+     они прилипают к первой полосе и на второй странице сетка едет без шапки. */
+  /* display: contents, а не «убрать рамку и тень». Chrome при разбиении на
+     страницы НЕ рисует сетку, завёрнутую в блочный бокс панели: лист выходит
+     пустым, хотя раскладка и цвета правильные (проверено печатью в PDF —
+     обезвреженная рамка не помогает, помогает только снятие самого бокса).
+     На бумаге панель и не нужна: её рамка, тень и скругление — экранный
+     декор. */
+  .data-panel--halls { display: contents; }
+  .data-panel { padding: 0; border: 0; box-shadow: none; }
+  .hall-matrix-scroll { max-height: none; min-height: 0; overflow: visible; border: 0; border-radius: 0; }
+  .hall-matrix__corner,
+  .hall-matrix__colhead,
+  .hall-matrix__rowhead { position: static; }
+
+  /* minmax(180px) — экранный минимум под пикер; на листе он выносит правые
+     залы за поля. На бумаге пикера нет, и колонки ужимаются по содержимому. */
+  /* flex-shrink: 0 экранной сетки на бумаге отрезает правые залы: сжиматься ей
+     там нечем, а прокрутки, которая спасает на экране, у листа нет. */
+  .hall-matrix { --hall-head-w: 136px; --hall-col-min: 0; flex: 1 1 auto; min-width: 0; }
+  .hall-matrix__cell, .hall-matrix__rowhead, .hall-matrix__colhead { break-inside: avoid; }
+
+  /* Заливки — прочь, границы — на месте: так лист читается и на чёрно-белом
+     принтере, и при выключенной фоновой графике. */
+  .hall-matrix__colhead { color: var(--ink); background: none; border-bottom: 3px solid var(--hall-color, var(--ink)); }
+  .hall-matrix__colhead-row { padding: 4px 5px; }
+  .hall-matrix__number { min-width: 0; height: auto; padding: 0; color: var(--ink-soft); background: none; font-size: 10px; }
+  .hall-matrix__corner, .hall-matrix__rowhead { background: none; }
+  .hall-matrix__cell { background: none !important; }
+  .hall-matrix__cell.is-linked { box-shadow: none; }
+  .hall-matrix__badge { border: 1px solid var(--line-strong); background: none; font-size: 9px; }
+
+  /* Кегль на ступень ниже экранного: строк на листе больше, чем в поле зрения. */
+  .hall-matrix__corner { padding: 4px 6px; font-size: 10px; }
+  .hall-matrix__rowhead { padding: 4px 6px; }
+  /* Иконке роли переноситься некуда: сорвавшись на вторую строку, она тянет
+     вверх всю строку матрицы, и лист идёт лесенкой. */
+  .hall-matrix__rowhead-main { flex-wrap: nowrap; }
+  /* На экране длинное имя обрезается многоточием — там его дочитывают
+     подсказкой. На бумаге подсказки нет, поэтому имя переносится, а не
+     теряется: лишняя строка дешевле неизвестной фамилии. */
+  .inline-text, .hall-matrix__person-name, .hall-matrix__slot-name {
+    overflow: visible; white-space: normal; text-overflow: clip;
+  }
+  .inline-text, .inline-text--head { padding: 0; font-size: 11px; }
+  .hall-matrix__person, .hall-matrix__slot { padding: 4px 6px; font-size: 11px; }
+  .hall-matrix__slot { margin: 3px; padding: 2px 5px; }
+  .hall-matrix__empty { min-height: 26px; padding: 3px; font-size: 11px; }
+  .hall-role { width: 18px; height: 18px; }
+}

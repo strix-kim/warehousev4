@@ -36,8 +36,11 @@ export function HallMatrix({ editor }: { editor: HallPlanEditor }) {
 
   // repeat(0, …) — недопустимое значение, и при плане без залов сетка сложилась
   // бы в ноль колонок вместо одной с заголовками строк.
+  // Минимум колонки — переменной, а не числом: на печати (halls.css, @media
+  // print) его обнуляют, иначе 180px × десяток залов уносит правые колонки за
+  // поля листа. На экране минимум держит клетку шире пикера.
   const columns = editor.halls.length > 0
-    ? `var(--hall-head-w) repeat(${editor.halls.length}, minmax(180px, 1fr))`
+    ? `var(--hall-head-w) repeat(${editor.halls.length}, minmax(var(--hall-col-min, 180px), 1fr))`
     : 'var(--hall-head-w)'
 
   return (
