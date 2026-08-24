@@ -11,7 +11,7 @@ import { reportAppError } from '../../lib/reportAppError'
 import { supabase } from '../../lib/supabase'
 import { downloadBlob, safeFileName } from '../../lib/xlsx/download'
 import { docText, eventDocumentTitle, formatDocumentDate, type EventDocumentMeta } from '../../lib/xlsx/eventDocument'
-import { buildEventSheet, DATA_START_ROW, type EventSheetCell, type EventSheetColumn } from '../../lib/xlsx/eventSheet'
+import { buildEventSheet, DATA_START_ROW, TOP_ROW_HEIGHTS_PT, type EventSheetCell, type EventSheetColumn } from '../../lib/xlsx/eventSheet'
 import { columnWidthToPx, drawingXml, EMU_PER_PX, fitImage, oneCellAnchor, rowHeightToEmu } from '../../lib/xlsx/images'
 import { buildWorkbookPackage } from '../../lib/xlsx/package'
 import { BUCKET } from './api'
@@ -155,6 +155,12 @@ export function buildEmployeeEventSheet(rows: Employee[], meta: EventDocumentMet
   // Размеры ячейки G в EMU — по ним картинка центрируется офсетами якоря.
   const cellWidthEmu = columnWidthToPx(PHOTO_COLUMN_WIDTH) * EMU_PER_PX
   const cellHeightEmu = rowHeightToEmu(DATA_ROW_HEIGHT_PT)
+  // Абсолютные координаты угла ячейки G для a:xfrm: слева — сумма ширин колонок
+  // A–F, сверху — служебные строки 1–5 и шапка. Ширины и высоты фиксированы
+  // константами, поэтому раскладка считается без обхода листа.
+  const cellLeftEmu = COLUMN_LAYOUT.slice(0, PHOTO_COLUMN_INDEX)
+    .reduce((sum, column) => sum + columnWidthToPx(column.width), 0) * EMU_PER_PX
+  const topRowsPt = TOP_ROW_HEIGHTS_PT.reduce((sum, pt) => sum + pt, 0) + HEADER_HEIGHT_PT
 
   const sheetRows: EventSheetCell[][] = rows.map((employee, index) => {
     const photo = photos.get(employee.id)
@@ -179,6 +185,8 @@ export function buildEmployeeEventSheet(rows: Employee[], meta: EventDocumentMet
         heightPx: Math.min(PHOTO_BOX.heightPx, photo.height),
       })
       images.push(photo.bytes)
+      const colOffEmu = Math.max(0, Math.round((cellWidthEmu - cx) / 2))
+      const rowOffEmu = Math.max(0, Math.round((cellHeightEmu - cy) / 2))
       anchors.push(oneCellAnchor({
         // id фигуры начинается с 2: единицу занимает сам лист.
         id: images.length + 1,
@@ -186,8 +194,10 @@ export function buildEmployeeEventSheet(rows: Employee[], meta: EventDocumentMet
         descr: employeeFullName(employee),
         col: PHOTO_COLUMN_INDEX,
         row: DATA_START_ROW + index - 1,
-        colOffEmu: Math.max(0, Math.round((cellWidthEmu - cx) / 2)),
-        rowOffEmu: Math.max(0, Math.round((cellHeightEmu - cy) / 2)),
+        colOffEmu,
+        rowOffEmu,
+        xEmu: cellLeftEmu + colOffEmu,
+        yEmu: rowHeightToEmu(topRowsPt + index * DATA_ROW_HEIGHT_PT) + rowOffEmu,
         cx,
         cy,
         rId: images.length,

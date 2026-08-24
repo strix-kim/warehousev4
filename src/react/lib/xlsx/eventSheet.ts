@@ -26,6 +26,12 @@ export type EventSheetCell = string | number
 export const HEADER_ROW = 6
 export const DATA_START_ROW = 7
 
+// Высоты служебных строк 1–5 (плашка, зазор, заголовок, реквизиты, зазор) в
+// пунктах. Наружу — потому что слой картинок складывает из них абсолютный y
+// для a:xfrm: просмотрщики без раскладки листа (QuickLook на iPhone) читают
+// не якорь, а готовые координаты.
+export const TOP_ROW_HEIGHTS_PT = [46, 9, 58, 32, 9] as const
+
 // Стили данных парами «обычная строка / чередующаяся»: индексы в cellXfs.
 const DATA_STYLES: Record<EventSheetAlign, [number, number]> = {
   left: [6, 16],
@@ -75,11 +81,11 @@ export function buildEventSheet(input: EventSheetInput): EventSheet {
   cells.push(
     // Плашка как у оборудования: красный квадрат с «A» в первой колонке и тёмная
     // полоса на всю остальную ширину.
-    `<row r="1" ht="46" customHeight="1">${textCell('A1', 'A', 12)}${textCell('B1', `ARGO MEDIA · ${input.plaque}`, 13)}</row>`,
-    '<row r="2" ht="9" customHeight="1"/>',
-    `<row r="3" ht="58" customHeight="1">${textCell('A3', title, 20)}</row>`,
-    `<row r="4" ht="32" customHeight="1">${textCell('A4', companyDetails, 19)}</row>`,
-    '<row r="5" ht="9" customHeight="1"/>',
+    `<row r="1" ht="${TOP_ROW_HEIGHTS_PT[0]}" customHeight="1">${textCell('A1', 'A', 12)}${textCell('B1', `ARGO MEDIA · ${input.plaque}`, 13)}</row>`,
+    `<row r="2" ht="${TOP_ROW_HEIGHTS_PT[1]}" customHeight="1"/>`,
+    `<row r="3" ht="${TOP_ROW_HEIGHTS_PT[2]}" customHeight="1">${textCell('A3', title, 20)}</row>`,
+    `<row r="4" ht="${TOP_ROW_HEIGHTS_PT[3]}" customHeight="1">${textCell('A4', companyDetails, 19)}</row>`,
+    `<row r="5" ht="${TOP_ROW_HEIGHTS_PT[4]}" customHeight="1"/>`,
     `<row r="${HEADER_ROW}" ht="${input.headerHeightPt}" customHeight="1">${columns
       .map((column, index) => textCell(`${columnLetter(index)}${HEADER_ROW}`, column.header, 3))
       .join('')}</row>`,

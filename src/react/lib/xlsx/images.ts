@@ -42,6 +42,12 @@ export type OneCellAnchor = {
   row: number
   colOffEmu: number
   rowOffEmu: number
+  // Абсолютная позиция картинки на листе в EMU — дубль якоря для a:xfrm.
+  // Excel позицию берёт из <xdr:from> и a:xfrm при сохранении пересчитывает сам,
+  // а просмотрщики без раскладки листа (QuickLook на iPhone/Mac) читают ТОЛЬКО
+  // готовый a:xfrm: с нулями там все фото ложатся стопкой в левый верхний угол.
+  xEmu: number
+  yEmu: number
   cx: number
   cy: number
   // Номер связи в xl/drawings/_rels/drawing1.xml.rels — он же порядковый номер картинки.
@@ -51,7 +57,7 @@ export type OneCellAnchor = {
 // Якорь oneCellAnchor: точка привязки — левый верхний угол, размер задан явно.
 // Картинка не тянется за размером ячейки, зато и не искажается при переносе строк.
 export function oneCellAnchor(anchor: OneCellAnchor) {
-  return `<xdr:oneCellAnchor><xdr:from><xdr:col>${anchor.col}</xdr:col><xdr:colOff>${anchor.colOffEmu}</xdr:colOff><xdr:row>${anchor.row}</xdr:row><xdr:rowOff>${anchor.rowOffEmu}</xdr:rowOff></xdr:from><xdr:ext cx="${anchor.cx}" cy="${anchor.cy}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${anchor.id}" name="${xml(anchor.name)}" descr="${xml(anchor.descr)}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId${anchor.rId}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${anchor.cx}" cy="${anchor.cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`
+  return `<xdr:oneCellAnchor><xdr:from><xdr:col>${anchor.col}</xdr:col><xdr:colOff>${anchor.colOffEmu}</xdr:colOff><xdr:row>${anchor.row}</xdr:row><xdr:rowOff>${anchor.rowOffEmu}</xdr:rowOff></xdr:from><xdr:ext cx="${anchor.cx}" cy="${anchor.cy}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${anchor.id}" name="${xml(anchor.name)}" descr="${xml(anchor.descr)}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId${anchor.rId}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="${anchor.xEmu}" y="${anchor.yEmu}"/><a:ext cx="${anchor.cx}" cy="${anchor.cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`
 }
 
 export function drawingXml(anchors: string[]) {
