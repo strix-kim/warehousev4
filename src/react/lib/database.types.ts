@@ -386,31 +386,37 @@ export type Database = {
       // обязаны пересобраться сами.
       // employee_id стал NOT NULL, sort_order снят — миграция 20260824140000
       // («одна ячейка — один человек», вакансия теперь пустая клетка).
+      // employee_id снова nullable, добавлен is_external — миграция
+      // 20260824160000: ячейка бывает слотом «Наём» (место занято, человека
+      // нет). Равенство (employee_id is null) = is_external держит CHECK базы.
       hall_assignments: {
         Row: {
           created_at: string
           created_by: string | null
-          employee_id: string
+          employee_id: string | null
           hall_id: string
           id: string
+          is_external: boolean
           plan_id: string
           position_id: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
-          employee_id: string
+          employee_id?: string | null
           hall_id: string
           id?: string
+          is_external?: boolean
           plan_id: string
           position_id: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
-          employee_id?: string
+          employee_id?: string | null
           hall_id?: string
           id?: string
+          is_external?: boolean
           plan_id?: string
           position_id?: string
         }

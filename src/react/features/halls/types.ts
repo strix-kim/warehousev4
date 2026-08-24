@@ -22,9 +22,11 @@ export type HallAssignment = Tables<'hall_assignments'>
 export type PositionCatalogEntry = Tables<'position_catalog'>
 
 // Ячейка со встроенным сотрудником — ровно то, что отдаёт fetchHallAssignments.
-// employee_id теперь NOT NULL, но employees всё равно бывает null: строку
-// сотрудника может не отдать политика чтения. Пустая клетка — это ОТСУТСТВИЕ
-// записи, а не запись без человека.
+// employee_id снова бывает null, но значит это НЕ «человека не выбрали»: с
+// миграции 20260824160000 null возможен только у слота «Наём» (is_external),
+// и равенство держит CHECK базы. employees бывает null и у обычной ячейки:
+// строку сотрудника может не отдать политика чтения. Пустая клетка — это
+// по-прежнему ОТСУТСТВИЕ записи, а не запись без человека.
 export type AssignmentWithEmployee = HallAssignment & { employees: EmployeeBrief | null }
 
 export type Tr = (ru: string, uz: string) => string
@@ -136,15 +138,28 @@ export function nextRole(role: string): HallRole {
 // «Свободно» здесь больше не считается: с одиночной ячейкой (миграция
 // 20260824140000) незанятое место — это ОТСУТСТВИЕ записи, и посчитать его
 // можно только по всей сетке «строки × залы», а не по списку ячеек.
+//
+// Слоты «Наём» (с21) считаются ЯЧЕЙКАМИ, а не людьми: два слота — это два
+// найма, и сворачивать их уникальностью нечем — имени, по которому человека
+// узнают дважды, у слота нет. Поэтому hired идёт отдельным числом и в счёт
+// людей (everyone/byRole) не попадает.
 export function countPlan(
   positions: Pick<PlanPosition, 'id' | 'role'>[],
-  assignments: Pick<HallAssignment, 'position_id' | 'employee_id'>[],
+  assignments: Pick<HallAssignment, 'position_id' | 'employee_id' | 'is_external'>[],
 ) {
   const roleOf = new Map(positions.map((position) => [position.id, position.role]))
   const byRole = new Map<string, Set<string>>()
   const everyone = new Set<string>()
+  let hired = 0
 
   for (const cell of assignments) {
+    if (cell.is_external) {
+      hired += 1
+      continue
+    }
+    // Человека нет, а слотом ячейка не помечена — такого база не пустит
+    // (CHECK), но локальная копия могла разъехаться после отказа записи.
+    if (!cell.employee_id) continue
     everyone.add(cell.employee_id)
     // Ячейка без своей строки в списке — гонка удаления, а не данные:
     // каскад базы уже унёс её, локальная копия ещё нет. В счёт не идёт.
@@ -160,5 +175,6 @@ export function countPlan(
     operators: byRole.get('operator')?.size ?? 0,
     others: byRole.get('other')?.size ?? 0,
     totalPeople: everyone.size,
+    hired,
   }
 }

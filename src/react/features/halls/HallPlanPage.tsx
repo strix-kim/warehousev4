@@ -163,7 +163,11 @@ function SaveState({ state, savedAt, errorText, onRetry }: {
 // четыре зала — один техник в бригаде (см. countPlan). «Свободно» отсюда ушло
 // вместе с вакансиями-записями (миграция 20260824140000): пустая клетка теперь
 // это отсутствие записи, и её видно в самой матрице прочерком.
-function PlanCounts({ counts }: { counts: { technicians: number; operators: number; others: number; totalPeople: number } }) {
+//
+// «Наём» стоит отдельным пунктом и только при N > 0: это не люди бригады, а
+// сколько внешних операторов ещё предстоит взять. Пока слотов нет, лишнего
+// нуля в строке быть не должно.
+function PlanCounts({ counts }: { counts: { technicians: number; operators: number; others: number; totalPeople: number; hired: number } }) {
   const { tr, locale } = useLanguage()
 
   return (
@@ -172,6 +176,7 @@ function PlanCounts({ counts }: { counts: { technicians: number; operators: numb
       <span><strong>{counts.technicians.toLocaleString(locale)}</strong> {tr('видеоинженеров', 'videoinjener')}</span>
       <span><strong>{counts.operators.toLocaleString(locale)}</strong> {tr('операторов', 'operator')}</span>
       {counts.others > 0 && <span><strong>{counts.others.toLocaleString(locale)}</strong> {tr('прочих', 'boshqa')}</span>}
+      {counts.hired > 0 && <span>{tr('Наём:', 'Yollash:')} <strong>{counts.hired.toLocaleString(locale)}</strong></span>}
     </div>
   )
 }

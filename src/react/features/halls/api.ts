@@ -154,9 +154,10 @@ export function hallPlanErrorText(error: unknown, tr: Tr): string {
   // Ячейка занята: пока здесь заполняли клетку, её занял кто-то из другой
   // вкладки. Клиент об этом узнать не мог — правило держит база (UNIQUE
   // (position_id, hall_id)), поэтому и текст про обновление, а не про ошибку
-  // ввода. Ловится именем индекса, а не кодом 23505.
+  // ввода. Ловится именем индекса, а не кодом 23505. «Занята», а не «стоит
+  // сотрудник»: с21 клетку занимает ещё и слот наёма.
   if (message.includes('hall_assignments_cell_key')) {
-    return tr('В этой ячейке уже стоит сотрудник — обновите план.', 'Bu katakda allaqachon xodim bor — rejani yangilang.')
+    return tr('Эта ячейка уже занята — обновите план.', 'Bu katak allaqachon band — rejani yangilang.')
   }
   // Дубль имени в справочнике позиций. Обычный путь сюда не приходит:
   // createCatalogEntry глотает этот отказ сам — «позиция уже есть» не ошибка.
@@ -258,26 +259,38 @@ export async function deletePlanPosition(id: string): Promise<void> {
 // NOT NULL, а два составных FK проверят, что зал и строка из ОДНОГО плана.
 // Подставить чужую строку в обход интерфейса не выйдет — прилетит 23503.
 //
-// Человек обязателен: пустая клетка с миграции 20260824140000 — это отсутствие
-// записи, а не запись без сотрудника.
+// employeeId === null — слот «Наём» (с21, миграция 20260824160000): место
+// занято решением «берём внешнего оператора», имени ещё нет. Пустая клетка —
+// по-прежнему отсутствие записи, а не запись без человека.
+//
+// is_external передаём явно, а не полагаемся на default false: пара «человек /
+// слот» связана CHECK-ом, и вычислять её в двух местах по-разному нельзя.
 export async function createHallAssignment({ planId, hallId, positionId, employeeId }: {
   planId: string
   hallId: string
   positionId: string
-  employeeId: string
+  employeeId: string | null
 }): Promise<HallAssignment> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase
     .from('hall_assignments')
-    .insert({ plan_id: planId, hall_id: hallId, position_id: positionId, employee_id: employeeId })
+    .insert({
+      plan_id: planId,
+      hall_id: hallId,
+      position_id: positionId,
+      employee_id: employeeId,
+      is_external: employeeId === null,
+    })
     .select()
     .single()
   if (error) throw error
   return data
 }
 
-// Единственная правка ячейки — замена человека: клетка одна, порядка в ней нет.
-export async function updateHallAssignment(id: string, patch: { employee_id: string }): Promise<HallAssignment> {
+// Единственная правка ячейки — замена её содержимого: клетка одна, порядка в
+// ней нет. Оба поля идут ВМЕСТЕ (человек↔слот в обе стороны): раздельная правка
+// оставила бы «человек и слот сразу» и упёрлась бы в CHECK базы.
+export async function updateHallAssignment(id: string, patch: { employee_id: string | null; is_external: boolean }): Promise<HallAssignment> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase.from('hall_assignments').update(patch).eq('id', id).select().single()
   if (error) throw error
@@ -373,7 +386,10 @@ export async function duplicateHallPlan(planId: string, tr: Tr): Promise<HallPla
       plan_id: copy.id,
       hall_id: hallId,
       position_id: positionId,
+      // Слот наёма копируется слотом: без is_external пачка ушла бы с
+      // employee_id = null и false, и её отбил бы CHECK — вся копия ячеек.
       employee_id: cell.employee_id,
+      is_external: cell.is_external,
     }]
   })
   if (cellRows.length > 0) {

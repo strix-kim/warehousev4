@@ -335,36 +335,48 @@ export function useHallPlanEditor(planId: string | undefined) {
 
   // ─── Ячейки ────────────────────────────────────────────────────────────────
 
-  // Назначение человека в клетку. Клетка занята — это ЗАМЕНА (update), пуста —
-  // вставка: «одна ячейка — один человек» держит база (hall_assignments_cell_key),
+  // Занять клетку. Клетка занята — это ЗАМЕНА (update), пуста — вставка:
+  // «одна ячейка — один человек» держит база (hall_assignments_cell_key),
   // и второй записью сюда всё равно не встать.
+  //
+  // employee === null — слот «Наём» (с21). Путь для человека и для слота ОДИН,
+  // иначе замена «человек → слот» и «слот → человек» пошли бы разными ветками
+  // и разъехались бы на первой же правке.
   //
   // Ждёт базу в обеих ветках, в отличие от прочих правок: вставка упирается в
   // тот же UNIQUE, и показать человека, которого база не приняла, здесь легче
   // всего.
-  async function assign(key: CellKey, employee: EmployeeBrief): Promise<void> {
+  async function assign(key: CellKey, employee: EmployeeBrief | null): Promise<void> {
     if (!planId || addingCell) return
     // Ищем по списку, а не по cellMap: раскладка объявлена ниже по файлу, и
     // опираться отсюда на порядок объявлений — лишняя хрупкость.
     const current = assignments.find((cell) => cell.hall_id === key.hallId && cell.position_id === key.positionId)
     setAddingCell(cellKeyOf(key))
     if (current) {
-      await run('replace-assignment', () => updateHallAssignment(current.id, { employee_id: employee.id }), (row) => {
+      const patch = { employee_id: employee?.id ?? null, is_external: !employee }
+      await run('replace-assignment', () => updateHallAssignment(current.id, patch), (row) => {
         setAssignments((rows) => rows.map((cell) => cell.id === row.id ? { ...row, employees: employee } : cell))
       })
     } else {
       await runInsert(
         'create-assignment',
-        () => createHallAssignment({ planId, hallId: key.hallId, positionId: key.positionId, employeeId: employee.id }),
+        () => createHallAssignment({ planId, hallId: key.hallId, positionId: key.positionId, employeeId: employee?.id ?? null }),
         (row) => { setAssignments((rows) => [...rows, { ...row, employees: employee }]) },
       )
     }
     setAddingCell('')
   }
 
+  // Слот «Наём» — та же занятая клетка, только без человека. Отдельного имени
+  // заслуживает лишь вызов: правило «слот бывает только в строке операторов»
+  // живёт в кнопке (MatrixCell), база его не проверяет.
+  function assignSlot(key: CellKey): Promise<void> {
+    return assign(key, null)
+  }
+
   // Освободить клетку — удалить запись: «место есть, человека нет» с миграции
   // 20260824140000 выражается пустой клеткой, и хранить для этого строку больше
-  // не нужно.
+  // не нужно. Слот снимается тем же путём: он тоже занятая ячейка.
   function clearCell(id: string) {
     setAssignments((current) => current.filter((cell) => cell.id !== id))
     void run('delete-assignment', () => deleteHallAssignment(id), () => {})
@@ -389,9 +401,14 @@ export function useHallPlanEditor(planId: string | undefined) {
   // Сколько РАЗ человек стоит в плане — для бейджа ×N в клетке: страховка на
   // четыре зала это одна фамилия в четырёх клетках, и увидеть это нужно с любой
   // из них.
+  //
+  // Слоты наёма сюда не идут: человека у них нет, и null ключом Map стать не
+  // должен — иначе «свободные» и бейдж ×N посчитались бы по несуществующему
+  // сотруднику. То же правило у linkedInHall и hallNamesByEmployee ниже.
   const planCountByEmployee = useMemo(() => {
     const counter = new Map<string, number>()
     for (const cell of assignments) {
+      if (!cell.employee_id) continue
       counter.set(cell.employee_id, (counter.get(cell.employee_id) ?? 0) + 1)
     }
     return counter
@@ -411,7 +428,7 @@ export function useHallPlanEditor(planId: string | undefined) {
     const map = new Map<string, { positionId: string; name: string }[]>()
     for (const position of positions) {
       for (const cell of assignments) {
-        if (cell.position_id !== position.id) continue
+        if (cell.position_id !== position.id || !cell.employee_id) continue
         const key = hallPersonKeyOf(cell.hall_id, cell.employee_id)
         const list = map.get(key)
         if (list) list.push({ positionId: position.id, name: position.name })
@@ -442,7 +459,7 @@ export function useHallPlanEditor(planId: string | undefined) {
     const map = new Map<string, string[]>()
     for (const hall of halls) {
       for (const cell of assignments) {
-        if (cell.hall_id !== hall.id) continue
+        if (cell.hall_id !== hall.id || !cell.employee_id) continue
         const names = map.get(cell.employee_id)
         if (!names) map.set(cell.employee_id, [hall.name])
         else if (!names.includes(hall.name)) names.push(hall.name)
@@ -487,6 +504,7 @@ export function useHallPlanEditor(planId: string | undefined) {
     cycleRole,
     removePosition,
     assign,
+    assignSlot,
     clearCell,
     updateMeta,
   }

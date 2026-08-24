@@ -177,6 +177,16 @@
 .hall-matrix__cell.is-linked .hall-matrix__link { color: var(--ink); }
 .hall-matrix__cell.is-linked .hall-matrix__badge { background: #fff; }
 
+/* Слот «Наём» (с21): место занято решением «берём внешнего», человека нет.
+   Пунктирный чип ВНУТРИ клетки, а не текст во всю ширину, как у человека, —
+   разница должна ловиться боковым зрением, иначе «Наём» читают как фамилию.
+   Кегль тот же (14px), тон приглушённый: слот это обещание, а не бригада. */
+.hall-matrix__slot { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; margin: 6px 2px 6px 8px; padding: 4px 8px; border: 1px dashed var(--line-strong); border-radius: 8px; color: var(--ink-soft); background: none; font-size: 14px; font-weight: 650; text-align: left; }
+.hall-matrix__slot:hover:not(:disabled) { border-color: var(--ink-faint); color: var(--ink); background: #fff; }
+.hall-matrix__slot:disabled { opacity: .55; }
+.hall-matrix__slot-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hall-matrix__cell.is-armed .hall-matrix__slot { border-color: var(--danger); }
+
 .hall-matrix__clear { flex: 0 0 auto; align-self: center; width: 22px; height: 22px; display: inline-grid; place-items: center; margin-right: 5px; padding: 0; border: 0; border-radius: 50%; color: var(--ink-faint); background: none; }
 .hall-matrix__clear:hover { color: var(--danger); background: var(--danger-bg); }
 /* Взведённый крестик красит всю клетку: следующий клик снимет человека. */
@@ -222,6 +232,11 @@
    Своя подложка нужна инпуту: он висит над матрицей, а не в форме. */
 .hall-cell-picker { position: fixed; z-index: 70; padding: 9px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.98); box-shadow: 0 18px 46px rgba(15,22,28,.18), 0 2px 8px rgba(15,22,28,.08); backdrop-filter: blur(16px); animation: popover-in .16s ease-out; }
 .hall-cell-picker .field { margin: 0; }
+/* «Наём» — отдельная строка над поиском, вторичной кнопкой: это альтернатива
+   всему списку, а не одна из его строк. Отступ снизу свой — .field в поповере
+   обнулён, и без него кнопка слиплась бы с полем. Высота ниже общих 44 px:
+   в поповере на 260 px кнопка в полный рост спорила бы с самим полем поиска. */
+.hall-cell-picker__hire { min-height: 38px; margin-bottom: 8px; }
 
 /* Правка имени на месте: в покое — обычный текст, под курсором — намёк рамкой. */
 .inline-text { min-width: 0; max-width: 100%; overflow: hidden; padding: 3px 6px; border: 1px solid transparent; border-radius: 6px; color: inherit; background: none; font: inherit; font-size: 14px; font-weight: 650; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
