@@ -43,6 +43,10 @@ export function HallColumnHeader({ hall, index, cellCount, editor }: {
             className="hall-matrix__confirm"
             onClick={() => armed.fire(() => editor.removeHall(hall.id))}
             onBlur={armed.disarm}
+            // Safari: mousedown по кнопке не фокусирует её, но блюрит текущий
+            // фокус — то есть ЕЁ САМУ (autoFocus): onBlur гасил взвод раньше
+            // click, и «Удалить зал?» не срабатывал (найдено прорабом, с21).
+            onMouseDown={(event) => event.preventDefault()}
           >
             <Trash2 size={14} /> {tr('Удалить зал?', 'Zal o‘chirilsinmi?')}
           </button>

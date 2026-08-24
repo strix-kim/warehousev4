@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   createCatalogEntry,
   createHall,
@@ -159,14 +159,33 @@ export function useHallPlanEditor(planId: string | undefined) {
 
   // Отказ не гасим: у панели пикера своя кнопка повтора, иначе пустая выдача
   // читалась бы как «сотрудников нет».
+  //
+  // Защита от второго запроса — ref, а не проверка candidatesState: звать
+  // загрузку теперь могут двое (страница плана сразу, пикер при первом
+  // раскрытии), а в StrictMode эффект страницы монтируется дважды в одном
+  // коммите — состояние там ещё 'idle' в обоих вызовах, ref же меняется
+  // синхронно. Отказ ref отпускает: кнопка «Повторить» обязана работать.
+  const requested = useRef(false)
+
   function loadCandidates() {
+    if (requested.current) return
+    requested.current = true
     setCandidatesState('loading')
     fetchEmployeeBriefs()
       .then((rows) => {
-        setCandidates(rows)
+        // Директор в расстановку не попадает (решение прораба с21): фильтр
+        // здесь, а не в пикере — тогда чист и пикер, и строка «Свободны»,
+        // которые кормятся одним списком. Узнаём по должности: отдельного
+        // признака в employees нет, а магический uuid сломался бы молча при
+        // перезаведении записи. Ru и uz — оба написания.
+        setCandidates(rows.filter((row) => {
+          const position = (row.position ?? '').trim().toLowerCase()
+          return position !== 'директор' && position !== 'direktor'
+        }))
         setCandidatesState('ready')
       })
       .catch((error: unknown) => {
+        requested.current = false
         reportAppError(error, { scope: 'loader', route: '/halls/:planId', detail: { source: 'candidates', plan: planId ?? null } })
         setCandidatesState('failed')
       })
@@ -411,15 +430,22 @@ export function useHallPlanEditor(planId: string | undefined) {
     return map
   }, [assignments])
 
-  // «Уже в {зал}» в выдаче пикера: по человеку — первый зал, где он стоит.
-  // Порядок залов здесь тот же, что на экране, поэтому «первый» одинаков для
-  // всех клеток и не зависит от того, откуда открыли пикер.
-  const firstHallByEmployee = useMemo(() => {
-    const map = new Map<string, string>()
+  // Занятость человека в выдаче пикера: ВСЕ залы, где он стоит, а не первый из
+  // них (с21). Ставя человека в клетку, смотрят именно на это — «уже в Зал 1»
+  // молчало о том, что он там же и в Зал 3, и страховку на четыре зала было
+  // видно только бейджем ×N постфактум.
+  //
+  // Внешний цикл по halls: имена обязаны идти в порядке КОЛОНОК матрицы, а не в
+  // том, в каком база вернула ячейки. Имена уникальные — человек на трёх
+  // позициях одного зала называет этот зал один раз.
+  const hallNamesByEmployee = useMemo(() => {
+    const map = new Map<string, string[]>()
     for (const hall of halls) {
       for (const cell of assignments) {
         if (cell.hall_id !== hall.id) continue
-        if (!map.has(cell.employee_id)) map.set(cell.employee_id, hall.name)
+        const names = map.get(cell.employee_id)
+        if (!names) map.set(cell.employee_id, [hall.name])
+        else if (!names.includes(hall.name)) names.push(hall.name)
       }
     }
     return map
@@ -436,7 +462,7 @@ export function useHallPlanEditor(planId: string | undefined) {
     counts,
     planCountByEmployee,
     linkedInHall,
-    firstHallByEmployee,
+    hallNamesByEmployee,
     candidates,
     candidatesState,
     loadCandidates,

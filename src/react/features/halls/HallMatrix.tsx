@@ -79,6 +79,10 @@ export function HallMatrix({ editor }: { editor: HallPlanEditor }) {
                     // глазами, скринридеру пересечения не видно.
                     positionName={position.name}
                     hallName={hall.name}
+                    // Цвет колонки — в саму клетку: тонировка держит колонку
+                    // вместе на десятке залов, где шапка уже уехала за верх
+                    // прокрутки (с21).
+                    hallColor={hall.color}
                     cell={editor.cellMap.get(cellKeyOf({ hallId: hall.id, positionId: position.id }))}
                     editor={editor}
                   />

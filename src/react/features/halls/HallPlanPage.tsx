@@ -1,10 +1,11 @@
 import { ArrowLeft, CircleAlert, LayoutGrid, Pencil, Presentation } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { HallMatrix } from './HallMatrix'
 import { HallPlanMetaDrawer } from './HallPlanMetaDrawer'
-import { useHallPlanEditor } from './useHallPlanEditor'
+import { useHallPlanEditor, type HallPlanEditor } from './useHallPlanEditor'
 import { formatPlanPeriod } from './types'
+import { employeeDisplayName } from '../employees/types'
 import { formatTime } from '../../lib/date'
 import { useLanguage } from '../../lib/i18n'
 import './halls.css'
@@ -18,6 +19,18 @@ export function HallPlanPage() {
   const { planId } = useParams<{ planId: string }>()
   const editor = useHallPlanEditor(planId)
   const [isMetaOpen, setMetaOpen] = useState(false)
+
+  // Сотрудников грузим сразу, а не по первому клику в клетку (с21): строка
+  // «Свободны» стоит над матрицей и нужна ДО того, как открыли пикер. Повторов
+  // не боимся — loadCandidates держит свой ref (StrictMode монтирует эффект
+  // дважды, и состояние в обоих проходах ещё 'idle').
+  // В зависимостях только loadState: сама loadCandidates пересоздаётся каждым
+  // рендером редактора, и держать её в списке значило бы перезапускать эффект
+  // на каждый ввод буквы в имя зала. Замыкание при этом не устаревает — функция
+  // ходит в базу и пишет через setState, внешнего состояния не читает.
+  useEffect(() => {
+    if (editor.loadState === 'ready') editor.loadCandidates()
+  }, [editor.loadState])
 
   if (editor.loadState !== 'ready' || !editor.plan) {
     return (
@@ -76,6 +89,7 @@ export function HallPlanPage() {
       </header>
 
       <PlanCounts counts={editor.counts} />
+      <FreeEmployees editor={editor} />
 
       <section className="data-panel data-panel--halls">
         {editor.positions.length === 0
@@ -159,5 +173,35 @@ function PlanCounts({ counts }: { counts: { technicians: number; operators: numb
       <span><strong>{counts.operators.toLocaleString(locale)}</strong> {tr('операторов', 'operator')}</span>
       {counts.others > 0 && <span><strong>{counts.others.toLocaleString(locale)}</strong> {tr('прочих', 'boshqa')}</span>}
     </div>
+  )
+}
+
+// Кто из сотрудников не стоит в плане ни разу (с21). Счётчики говорят, сколько
+// человек набрано, эта строка — кем добирать: иначе ответ на «кто ещё свободен»
+// собирается открытием пикера в каждой клетке.
+//
+// Свободные считаются от ВСЕХ сотрудников, а не от тех, кого видно в матрице:
+// список кандидатов ровно тот же, что отдаёт пикер, и разойтись они не могут.
+function FreeEmployees({ editor }: { editor: HallPlanEditor }) {
+  const { tr, locale } = useLanguage()
+
+  const free = useMemo(
+    () => editor.candidates.filter((candidate) => !editor.planCountByEmployee.has(candidate.id)),
+    [editor.candidates, editor.planCountByEmployee],
+  )
+
+  // Кандидаты ещё в пути — строки нет вовсе: «Свободных нет» на недогруженном
+  // списке было бы враньём, а скелет ради одной серой строки избыточен.
+  if (editor.candidatesState !== 'ready') return null
+
+  const names = free.map(employeeDisplayName).join(', ')
+  const count = free.length.toLocaleString(locale)
+
+  return (
+    <p className="hall-free">
+      {free.length > 0
+        ? tr(`Свободны: ${count} — ${names}`, `Bo‘sh: ${count} — ${names}`)
+        : tr('Свободных нет', 'Bo‘sh xodim yo‘q')}
+    </p>
   )
 }

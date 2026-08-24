@@ -1,4 +1,4 @@
-import { Trash2, Video, Wrench } from 'lucide-react'
+import { Asterisk, Trash2, Video, Wrench } from 'lucide-react'
 import { InlineText } from './InlineText'
 import { roleLabel, type PlanPosition } from './types'
 import { useLanguage } from '../../lib/i18n'
@@ -29,16 +29,20 @@ export function PositionRowHeader({ position, cellCount, onRename, onCycleRole, 
         {/* Роль перебирается кликом, а не выбирается из списка: значений три,
             и круг техник → оператор → другое короче любого выпадающего меню.
             Роль стоит у СТРОКИ, а не у ячейки: «Операторы» — это оператор во
-            всех залах сразу, и держать её в каждой клетке было бы дублем. */}
+            всех залах сразу, и держать её в каждой клетке было бы дублем.
+            Подписи у чипа нет (с21): «Видеоинженер» под «Millumin» дублировал
+            очевидное — роль это служебное поле счётчиков, а не текст строки.
+            Имя роли осталось в подсказке. */}
         <button
           type="button"
           className={`hall-role hall-role--${position.role}`}
           onClick={onCycleRole}
-          title={tr('Сменить роль', 'Rolni almashtirish')}
+          aria-label={tr(`Роль: ${roleLabel(position.role, tr)} — сменить`, `Rol: ${roleLabel(position.role, tr)} — almashtirish`)}
+          title={tr(`Роль: ${roleLabel(position.role, tr)} — сменить`, `Rol: ${roleLabel(position.role, tr)} — almashtirish`)}
         >
-          {position.role === 'technician' && <Wrench size={12} />}
-          {position.role === 'operator' && <Video size={12} />}
-          {roleLabel(position.role, tr)}
+          {position.role === 'technician' && <Wrench size={13} />}
+          {position.role === 'operator' && <Video size={13} />}
+          {position.role !== 'technician' && position.role !== 'operator' && <Asterisk size={13} />}
         </button>
       </div>
 
@@ -51,6 +55,11 @@ export function PositionRowHeader({ position, cellCount, onRename, onCycleRole, 
           className="hall-matrix__row-delete hall-matrix__row-delete--armed"
           onClick={() => armed.fire(onRemove)}
           onBlur={armed.disarm}
+          // Safari: mousedown по кнопке не даёт ей фокус, но снимает его с
+          // текущего держателя — а держатель и есть эта кнопка (autoFocus).
+          // Без preventDefault её же onBlur гасил взвод раньше click, и
+          // подтверждение «не нажималось» (та же природа, что у свотчей цвета).
+          onMouseDown={(event) => event.preventDefault()}
         >
           {cellCount > 0
             ? tr(`Удалить строку и её ячейки (${cellCount})?`, `Qator va uning kataklari (${cellCount}) o‘chirilsinmi?`)

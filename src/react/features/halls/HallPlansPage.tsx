@@ -243,6 +243,9 @@ function HallPlanCard({ plan, isDeleting, isCopying, onOpen, onCopy, onDelete }:
             className="button button--secondary hall-plan-card__confirm"
             onClick={() => armed.fire(onDelete)}
             onBlur={armed.disarm}
+            // Safari: mousedown не фокусирует кнопку, а блюрит её же (autoFocus)
+            // — взвод гас до click; см. одноимённый фикс в HallColumnHeader.
+            onMouseDown={(event) => event.preventDefault()}
           >
             <Trash2 size={16} /> {tr('Удалить план?', 'Reja o‘chirilsinmi?')}
           </button>
