@@ -134,9 +134,7 @@ export function HallTvPage() {
         </div>
       </header>
 
-      {editor.loadState === 'loading' && (
-        <div className="hall-tv__state"><span>{tr('Загружаем план…', 'Reja yuklanmoqda…')}</span></div>
-      )}
+      {editor.loadState === 'loading' && <TvBoardSkeleton />}
 
       {/* «План закрыт», а не «не найден»: на ТВ этот экран видят те, кто смотрел
           рабочую расстановку минуту назад, — для них план именно закрыли. */}
@@ -262,6 +260,49 @@ function TvBoard({ editor }: { editor: HallPlanEditor }) {
               cell={editor.cellMap.get(cellKeyOf({ hallId: hall.id, positionId: position.id }))}
               editor={editor}
             />
+          ))}
+        </Fragment>
+      ))}
+    </div>
+  )
+}
+
+// Болванка доски на время чтения (с25). Строка «Загружаем план…» посреди
+// чёрного экрана в зале читалась как «экран сломался»; каркас сетки читается
+// как «сейчас будет расстановка». Реальных чисел до ответа базы нет, поэтому
+// размер типовой — четыре зала на пять позиций: столько же занимает и средний
+// план, так что подмена каркаса настоящей доской не бросается в глаза.
+const SKELETON_COLS = 4
+const SKELETON_ROWS = 5
+
+function TvBoardSkeleton() {
+  const { tr } = useLanguage()
+
+  // Раскладка ровно та же, что у настоящей доски: те же доли колонок и строк и
+  // те же --rows/--cols, от которых считается кегль.
+  const layout = {
+    gridTemplateColumns: `minmax(0, .72fr) repeat(${SKELETON_COLS}, minmax(0, 1fr))`,
+    gridTemplateRows: `auto repeat(${SKELETON_ROWS}, minmax(0, 1fr))`,
+    '--rows': SKELETON_ROWS,
+    '--cols': SKELETON_COLS,
+  } as CSSProperties
+
+  return (
+    <div
+      className="hall-tv__board hall-tv__board--skeleton"
+      style={layout}
+      role="status"
+      aria-label={tr('Загружаем план…', 'Reja yuklanmoqda…')}
+    >
+      <div className="hall-tv__skeleton-corner" />
+      {Array.from({ length: SKELETON_COLS }, (_, index) => (
+        <div key={index} className="hall-tv__skeleton-colhead"><span /></div>
+      ))}
+      {Array.from({ length: SKELETON_ROWS }, (_, row) => (
+        <Fragment key={row}>
+          <div className="hall-tv__skeleton-rowhead"><span /></div>
+          {Array.from({ length: SKELETON_COLS }, (_, col) => (
+            <div key={col} className="hall-tv__skeleton-cell"><span /></div>
           ))}
         </Fragment>
       ))}

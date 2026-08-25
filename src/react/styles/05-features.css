@@ -286,6 +286,27 @@
 .editor-draft-notice strong { font-size: 13px; }
 .editor-draft-notice small { color: var(--ink-faint); font-size: 12px; line-height: 1.45; }
 .detail-skeleton { height: 58px; margin-bottom: 14px; border-radius: 9px; background: linear-gradient(90deg, #f0f2ef 25%, #f7f8f6 50%, #f0f2ef 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+/* Болванки загрузки под конкретные экраны. Блок стоит ПОСЛЕ .detail-skeleton
+   намеренно: у модификаторов ровно один класс, то есть та же специфичность, и
+   высоту с отступом переопределяет последний по порядку. Перенесёшь выше —
+   останутся базовые 58px. */
+/* Скелет карточки сотрудника. Лежит прямо в .data-panel, без .form-section,
+   поэтому падинг секции держит на себе — иначе полосы прилипают к рамке. */
+.employee-form-skeleton { display: grid; gap: 16px; padding: 24px; }
+/* Полоса на месте заголовка секции: базовые 58px во всю ширину читаются как ещё
+   одно поле, а margin-bottom сдваивается с gap обёртки. */
+.employee-form-skeleton__title { width: min(320px, 60%); height: 34px; margin-bottom: 0; }
+/* Высота болванки — как у .field > input; вертикальный ритм держит gap самой .form-grid. */
+.employee-form-skeleton .form-grid .detail-skeleton { height: 45px; margin-bottom: 0; }
+/* Заглушка списка файлов встаёт на место .unit-lists__items / .muted — отступ от заголовка тот же. */
+.employee-files-skeleton { margin-top: 10px; }
+/* Строка файла в .unit-lists__items — это 10px падинга плюс 17px иконки, около 44px,
+   радиус 10px, разделены строки gap: 8px. Базовые 58px/14px дают скачок при подмене списком. */
+.employee-files-skeleton__row { height: 44px; margin-bottom: 8px; border-radius: 10px; }
+.employee-files-skeleton__row:last-child { margin-bottom: 0; }
+/* Болванка поля формы: подпись 13px + gap 8 + input 45 = 66px. Отступов нет —
+   элемент лежит прямым ребёнком .form-grid и живёт её gap: 16px. */
+.field-skeleton { height: 66px; border-radius: 9px; background: linear-gradient(90deg, #f0f2ef 25%, #f7f8f6 50%, #f0f2ef 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 .history-section { margin-top: 22px; border-top: 1px solid var(--line); }
 .history-section .panel-heading { padding-inline: 0; }
 .history-section .panel-heading h3 { margin: 0 0 3px; font-size: 16px; }

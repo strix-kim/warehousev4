@@ -38,7 +38,7 @@ import {
   type EquipmentList,
   type SavedListComposition,
 } from './api'
-import { useLanguage } from '../../lib/i18n'
+import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
@@ -114,6 +114,7 @@ function formatCardDate(start: string | null, end: string | null, locale: string
 export function ListsPage() {
   const navigate = useNavigate()
   const { tr, locale, language } = useLanguage()
+  useDocumentTitle(tr('Списки', 'Ro‘yxatlar'))
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(preferredListsPageSize)
   const [searchInput, setSearchInput] = useState('')

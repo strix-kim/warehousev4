@@ -1,4 +1,4 @@
-import { CircleAlert, Copy, Ellipsis, PanelsTopLeft, Plus, Presentation, Search, Trash2 } from 'lucide-react'
+import { CircleAlert, Copy, Ellipsis, PanelsTopLeft, Plus, Presentation, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createHallPlan, deleteHallPlan, duplicateHallPlan, fetchHallPlans, type HallPlanInput, type HallPlanWithHalls } from './api'
@@ -6,7 +6,7 @@ import { HallPlanMetaDrawer } from './HallPlanMetaDrawer'
 import { formatPlanPeriod, sortHalls } from './types'
 import { ActionMenu } from '../../components/ActionMenu'
 import { formatDateTime } from '../../lib/date'
-import { useLanguage } from '../../lib/i18n'
+import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import { useArmedAction } from '../../lib/useArmedAction'
 import './halls.css'
@@ -14,6 +14,7 @@ import './halls.css'
 export function HallPlansPage() {
   const navigate = useNavigate()
   const { tr, locale } = useLanguage()
+  useDocumentTitle(tr('Залы', 'Zallar'))
   const [plans, setPlans] = useState<HallPlanWithHalls[]>([])
   // Поиск клиентский и в адрес не едет: выдача полная (сто планов), фильтр
   // мгновенный, а запоминать его в истории незачем.
@@ -125,8 +126,20 @@ export function HallPlansPage() {
               placeholder={tr('Название плана…', 'Reja nomi…')}
               aria-label={tr('Поиск планов', 'Rejalarni qidirish')}
             />
+            {search && (
+              <button className="icon-button" onClick={() => setSearch('')} aria-label={tr('Очистить поиск', 'Qidiruvni tozalash')}>
+                <X size={16} />
+              </button>
+            )}
           </label>
-          <span className="toolbar__count">{tr('Планов', 'Rejalar')}: {visible.length.toLocaleString(locale)}</span>
+          {/* При поиске одного «Планов: N» мало: человек перестаёт понимать, это
+              весь раздел так пуст или запрос отсёк лишнее. Поэтому второе число —
+              сколько планов всего. */}
+          <span className="toolbar__count">
+            {query
+              ? tr(`Найдено: ${visible.length.toLocaleString(locale)} из ${plans.length.toLocaleString(locale)}`, `Topildi: ${plans.length.toLocaleString(locale)} tadan ${visible.length.toLocaleString(locale)} tasi`)
+              : `${tr('Планов', 'Rejalar')}: ${plans.length.toLocaleString(locale)}`}
+          </span>
         </div>
 
         {deleteFailed && (

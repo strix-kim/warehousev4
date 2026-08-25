@@ -2,7 +2,7 @@ import { CircleAlert, Pencil, UserRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { fetchVehicleFiles, getSignedUrls } from './api'
-import { VehicleFilesList } from './VehicleFilesList'
+import { VehicleFilesList, VehicleFilesSkeleton } from './VehicleFilesList'
 import { driverFullName, vehicleTitle, type Tr, type VehicleFile, type VehicleWithDrivers } from './types'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
@@ -60,16 +60,17 @@ export function VehicleDrawer({ vehicle, onClose }: { vehicle: VehicleWithDriver
 
   const rows = detailRows(vehicle, tr)
   const title = vehicleTitle(vehicle.brand, vehicle.model)
-  // Марка с моделью и цветом уходят в надзаголовок, а крупно стоит госномер:
-  // машину на площадке опознают по номеру, а не по названию модели.
-  const eyebrow = [title, vehicle.color].filter(Boolean).join(' · ')
 
   return (
     <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Карточка машины', 'Mashina kartasi')} onMouseDown={onClose}>
       <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
           <div>
-            <p className="eyebrow">{eyebrow}</p>
+            {/* Надзаголовок называет КЛАСС записи, а крупно стоит госномер: машину
+                на площадке опознают по номеру, а не по названию модели. Марка,
+                модель и цвет — строками в .detail-list ниже, в надзаголовке они
+                были бы вторым показом тех же данных. */}
+            <p className="eyebrow">{tr('Автомобиль', 'Avtomobil')}</p>
             <h2><span className="plate-badge plate-badge--lg">{vehicle.plate_number}</span></h2>
           </div>
           <div className="drawer__header-actions">
@@ -85,7 +86,7 @@ export function VehicleDrawer({ vehicle, onClose }: { vehicle: VehicleWithDriver
           {hasError
             ? <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить фото машины.', 'Mashina fotolarini yuklab bo‘lmadi.')}</p>
             : isLoading
-              ? <p className="muted">{tr('Загружаем фото…', 'Fotolar yuklanmoqda…')}</p>
+              ? <VehicleFilesSkeleton />
               : files.length === 0
                 ? <p className="muted">{tr('Фото пока нет.', 'Hozircha fotolar yo‘q.')}</p>
                 : <VehicleFilesList files={files} urls={urls} photoAlt={title} />}

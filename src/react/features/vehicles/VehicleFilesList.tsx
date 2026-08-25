@@ -28,3 +28,20 @@ export function VehicleFilesList({ files, urls, photoAlt }: {
     </div>
   )
 }
+
+// Заглушка на время загрузки. Рядом со списком по той же причине, что и у
+// сотрудников: фото показывают два места — дровер и режим правки, — и высота
+// ожидания у них обязана быть одинаковой.
+// Классы взяты employee-*: фото машин и сегодня рисуются геометрией человека
+// (.employee-photos выше в этом же файле). Заводить второй набор имён под ту
+// же разметку значит закрепить расхождение, а не вылечить его — машинная
+// геометрия отдельным шагом, вместе с миниатюрой в строке реестра.
+export function VehicleFilesSkeleton({ rows = 2 }: { rows?: number }) {
+  const { tr } = useLanguage()
+
+  return (
+    <div className="employee-files-skeleton" role="status" aria-label={tr('Загружаем фото', 'Fotolar yuklanmoqda')}>
+      {Array.from({ length: rows }, (_, index) => <div className="detail-skeleton employee-files-skeleton__row" key={index} />)}
+    </div>
+  )
+}

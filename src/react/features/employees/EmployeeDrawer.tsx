@@ -2,7 +2,7 @@ import { CircleAlert, Pencil, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchEmployeeFiles, getSignedUrls, setEmployeeDocumentPhoto } from './api'
-import { EmployeeFilesList } from './EmployeeFilesList'
+import { EmployeeFilesList, EmployeeFilesSkeleton } from './EmployeeFilesList'
 import { employeeFullName, type Employee, type EmployeeFile, type Tr } from './types'
 import { formatEventDate, parseDateValue } from '../../lib/date'
 import { useLanguage } from '../../lib/i18n'
@@ -126,7 +126,7 @@ export function EmployeeDrawer({ employee, onClose, onDocumentPhotoChange }: {
           {hasError
             ? <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить файлы сотрудника.', 'Xodim fayllarini yuklab bo‘lmadi.')}</p>
             : isLoading
-              ? <p className="muted">{tr('Загружаем файлы…', 'Fayllar yuklanmoqda…')}</p>
+              ? <EmployeeFilesSkeleton />
               : files.length === 0
                 ? <p className="muted">{tr('Файлов пока нет.', 'Hozircha fayllar yo‘q.')}</p>
                 : <EmployeeFilesList

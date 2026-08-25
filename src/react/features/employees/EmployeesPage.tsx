@@ -1,4 +1,4 @@
-import { CircleAlert, FileSpreadsheet, Plus, Search, UserRound, Users } from 'lucide-react'
+import { BriefcaseBusiness, CircleAlert, FileSpreadsheet, Plus, Search, UserRound, Users, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchEmployeePhotos, fetchEmployees, getSignedUrls, pickDocumentPhoto, type EmployeePhotoRef } from './api'
@@ -6,7 +6,8 @@ import { EmployeeDrawer } from './EmployeeDrawer'
 import { EmployeeEventExportDrawer } from './EmployeeEventExportDrawer'
 import { downloadEmployeeEventXlsx, loadEventPhotos } from './eventExport'
 import { employeeFullName, type Employee } from './types'
-import { useLanguage } from '../../lib/i18n'
+import { AppSelect } from '../../components/AppSelect'
+import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import type { EventDocumentMeta } from '../../lib/xlsx/eventDocument'
 
@@ -31,6 +32,7 @@ function matchesSearch(employee: Employee, query: string, digits: string) {
 export function EmployeesPage() {
   const navigate = useNavigate()
   const { tr, locale } = useLanguage()
+  useDocumentTitle(tr('Сотрудники', 'Xodimlar'))
   // Открытая карточка живёт в АДРЕСЕ: заход в «Добавить сотрудника» и обратно
   // размонтирует страницу, а на телефоне жест «назад» обязан закрывать карточку,
   // а не выкидывать из раздела.
@@ -40,6 +42,9 @@ export function EmployeesPage() {
   // Поиск здесь клиентский и в адрес не едет — как у машин: выдача полная,
   // фильтр мгновенный, запоминать его в истории незачем.
   const [search, setSearch] = useState('')
+  // Должность — такой же клиентский фильтр, как поиск, и складывается с ним:
+  // выбранная должность сужает найденное, а не заменяет его.
+  const [position, setPosition] = useState('')
   // Состав будущего документа — черновик действия, а не состояние экрана:
   // ни в адресе, ни в хранилище его нет, уход со страницы сбрасывает выбор.
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -96,11 +101,30 @@ export function EmployeesPage() {
   }, [reloadKey])
 
   const query = normalized(search)
+  const isFiltered = Boolean(query) || Boolean(position)
   const visible = useMemo(() => {
-    if (!query) return employees
+    if (!isFiltered) return employees
     const digits = digitsOnly(query)
-    return employees.filter((employee) => matchesSearch(employee, query, digits))
-  }, [employees, query])
+    return employees.filter((employee) => {
+      if (position && employee.position !== position) return false
+      return !query || matchesSearch(employee, query, digits)
+    })
+  }, [employees, query, position, isFiltered])
+
+  // Должности берём из самой выдачи — отдельного справочника у сотрудников нет,
+  // а список здесь полный, так что счёт по нему честный. Считаем по ПОЛНОЙ
+  // выдаче, а не по видимому: иначе выбранная должность выкинула бы из списка
+  // все остальные и сменить её было бы нечем.
+  const positionOptions = useMemo(() => {
+    const values = [...new Set(employees.map((employee) => employee.position).filter((value): value is string => Boolean(value)))]
+    values.sort((a, b) => a.localeCompare(b, 'ru'))
+    return values
+  }, [employees])
+
+  function resetFilters() {
+    setSearch('')
+    setPosition('')
+  }
 
   // Карточка — тоже адрес. Открытие пушит запись, поэтому «назад» её закрывает;
   // закрытие ЗАМЕНЯЕТ текущую запись, иначе «назад» открыло бы её снова (§7).
@@ -194,14 +218,28 @@ export function EmployeesPage() {
               placeholder={tr('Фамилия, должность или телефон…', 'Familiya, lavozim yoki telefon…')}
               aria-label={tr('Поиск сотрудников', 'Xodimlarni qidirish')}
             />
+            {search && (
+              <button className="icon-button" onClick={() => setSearch('')} aria-label={tr('Очистить поиск', 'Qidiruvni tozalash')}>
+                <X size={16} />
+              </button>
+            )}
           </label>
+          <AppSelect
+            value={position}
+            options={[{ value: '', label: tr('Все должности', 'Barcha lavozimlar') }, ...positionOptions.map((value) => ({ value, label: value }))]}
+            icon={<BriefcaseBusiness size={17} />}
+            onChange={setPosition}
+            ariaLabel={tr('Фильтр по должности', 'Lavozim bo‘yicha filtr')}
+          />
           <label className="select-all">
             <input type="checkbox" checked={allShownSelected} disabled={visible.length === 0} onChange={toggleAllShown} />
-            <span>{tr('Выбрать всех показанных', 'Ko‘rsatilganlarning barchasini tanlash')} ({visible.length.toLocaleString(locale)})</span>
+            {/* Числа в подписи нет намеренно: сколько сейчас показано, печатает
+                один toolbar__count — два счётчика рядом расходились бы в глазах. */}
+            <span>{tr('Выбрать всех показанных', 'Ko‘rsatilganlarning barchasini tanlash')}</span>
           </label>
           <span className="toolbar__count">
-            {query
-              ? tr(`Показано ${visible.length.toLocaleString(locale)} из ${employees.length.toLocaleString(locale)}`, `${employees.length.toLocaleString(locale)} tadan ${visible.length.toLocaleString(locale)} tasi ko‘rsatilgan`)
+            {isFiltered
+              ? tr(`Найдено: ${visible.length.toLocaleString(locale)} из ${employees.length.toLocaleString(locale)}`, `Topildi: ${employees.length.toLocaleString(locale)} tadan ${visible.length.toLocaleString(locale)} tasi`)
               : `${tr('Сотрудников', 'Xodimlar')}: ${employees.length.toLocaleString(locale)}`}
           </span>
         </div>
@@ -281,6 +319,9 @@ export function EmployeesPage() {
 
             {!isLoading && employees.length === 0 && (
               <div className="state-block">
+                {/* Иллюстрации у раздела пока нет. Когда арт придёт — на место
+                    иконки одной строкой встаёт <img src="…" alt="" aria-hidden="true" />,
+                    а блоку добавляются state-block--illustrated и --roomy. */}
                 <Users size={27} />
                 <strong>{tr('Сотрудников пока нет', 'Hozircha xodimlar yo‘q')}</strong>
                 <span>{tr('Заведите первую карточку — паспортные данные и сканы можно добить позже.', 'Birinchi kartani yarating — pasport ma’lumotlari va nusxalarni keyinroq to‘ldirish mumkin.')}</span>
@@ -293,9 +334,13 @@ export function EmployeesPage() {
             {!isLoading && employees.length > 0 && visible.length === 0 && (
               <div className="state-block">
                 <Search size={27} />
-                <strong>{tr(`Ничего не найдено по «${search.trim()}»`, `«${search.trim()}» bo‘yicha hech narsa topilmadi`)}</strong>
-                <span>{tr('Проверьте написание фамилии — телефон можно набрать и одними цифрами.', 'Familiya yozilishini tekshiring — telefonni faqat raqamlar bilan ham kiritish mumkin.')}</span>
-                <button className="button button--secondary" onClick={() => setSearch('')}>{tr('Сбросить поиск', 'Qidiruvni tozalash')}</button>
+                {/* Пусто может быть и от одной должности, без единой буквы в поиске —
+                    тогда заголовок с пустыми кавычками врал бы про запрос. */}
+                <strong>{search.trim()
+                  ? tr(`Ничего не найдено по «${search.trim()}»`, `«${search.trim()}» bo‘yicha hech narsa topilmadi`)
+                  : tr('Ничего не найдено', 'Hech narsa topilmadi')}</strong>
+                <span>{tr('Проверьте написание фамилии или снимите фильтр по должности — телефон можно набрать и одними цифрами.', 'Familiya yozilishini tekshiring yoki lavozim filtrini oling — telefonni faqat raqamlar bilan ham kiritish mumkin.')}</span>
+                <button className="button button--secondary" onClick={resetFilters}>{tr('Сбросить фильтры', 'Filtrlarni tozalash')}</button>
               </div>
             )}
           </div>

@@ -38,28 +38,45 @@
 
 .hall-tv__head-side { flex: 0 0 auto; display: flex; align-items: center; gap: 14px; }
 /* Возраст данных — мелко и в углу: это служебная строка, а не содержимое
-   витрины, и спорить с именами она не имеет права. */
-.hall-tv__refreshed { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--tv-ink-faint); font-size: 12.5px; font-weight: 650; white-space: nowrap; }
+   витрины, и спорить с именами она не имеет права. Но 12.5 px с пяти метров
+   не читались вовсе (с25), поэтому мелкость теперь относительная: кегль растёт
+   с экраном и упирается в потолок ниже, чем у имени зала. */
+.hall-tv__refreshed { display: inline-flex; align-items: center; gap: .45em; margin: 0; color: var(--tv-ink-faint); font-size: clamp(12.5px, .95vw, 18px); font-weight: 650; white-space: nowrap; }
+.hall-tv__refreshed svg { width: 1.05em; height: 1.05em; }
 /* Поллинг отказал — данные на экране остались, но они старые, и это надо
-   назвать. Цвет тревожный, а не красный: сбой связи не портит расстановку. */
-.hall-tv__refreshed.is-stale { color: #e0a336; }
+   назвать. Цвет тревожный, а не красный: сбой связи не портит расстановку.
+   «Нет связи» — единственное сообщение, которое приходит на РАБОЧИЙ экран, и
+   заметить его надо от двери, поэтому оно крупнее обычного «Обновлено». */
+.hall-tv__refreshed.is-stale { color: #e0a336; font-size: clamp(14px, 1.15vw, 22px); }
 
 /* Статус автосохранения (Ш3): в покое его нет вовсе — голос только у «идёт» и
    «не прошло». Текст отказа обрезается, полный — в title. */
-.hall-tv__save { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--tv-ink-soft); font-size: 12.5px; font-weight: 650; white-space: nowrap; }
+.hall-tv__save { display: inline-flex; align-items: center; gap: .45em; margin: 0; color: var(--tv-ink-soft); font-size: clamp(12.5px, .95vw, 18px); font-weight: 650; white-space: nowrap; }
+.hall-tv__save svg { width: 1.05em; height: 1.05em; }
 .hall-tv__save.is-failed { color: var(--tv-danger); }
-.hall-tv__save-text { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.hall-tv__save-text { max-width: 18em; overflow: hidden; text-overflow: ellipsis; }
 .hall-tv__save button { padding: 0; border: 0; color: inherit; background: none; font: inherit; font-weight: 800; text-decoration: underline; }
 
-.hall-tv__button { display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; border: 1px solid var(--tv-line); border-radius: 9px; color: var(--tv-ink-soft); background: var(--tv-panel); font-size: 13px; font-weight: 700; white-space: nowrap; }
+/* Отступы кнопки — в em: кегль теперь плавает с шириной экрана, а фиксированные
+   8/13 px на 4K превратили бы её в марку на конверте. */
+.hall-tv__button { display: inline-flex; align-items: center; gap: .5em; padding: .55em .9em; border: 1px solid var(--tv-line); border-radius: .6em; color: var(--tv-ink-soft); background: var(--tv-panel); font-size: clamp(13px, .95vw, 18px); font-weight: 700; white-space: nowrap; }
+.hall-tv__button svg { width: 1.1em; height: 1.1em; }
 .hall-tv__button:hover { border-color: var(--tv-ink-faint); color: var(--tv-ink); }
 
 /* Состояния — по центру пустого экрана: на ТВ их читают издалека, поэтому это
-   не строка в панели, а весь остаток высоты. */
-.hall-tv__state { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; color: var(--tv-ink-soft); text-align: center; }
-.hall-tv__state strong { color: var(--tv-ink); font-size: 22px; font-weight: 800; }
-.hall-tv__state span { font-size: 15px; font-weight: 600; }
-.hall-tv__state svg { color: var(--tv-ink-faint); }
+   не строка в панели, а весь остаток высоты.
+   Кегль считается от экрана, как и на доске (с25): фиксированные 22/15 px были
+   набраны для монитора в метре от глаз, а «План закрыт» с пяти метров не
+   читалось. Формулу доски дословно сюда не перенести — она делится на --rows и
+   --cols, а у пустого экрана нет ни строк, ни залов; поэтому база берётся от
+   ширины витрины, а иконка, подпись и кнопка — em от базы. */
+.hall-tv__state { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6em; padding: 24px; color: var(--tv-ink-soft); font-size: clamp(16px, 1.6vw, 30px); text-align: center; }
+.hall-tv__state strong { color: var(--tv-ink); font-size: 1.5em; font-weight: 800; }
+.hall-tv__state span { font-size: 1em; font-weight: 600; }
+/* Размер иконки приезжает из JSX атрибутом size — CSS его перебивает, иначе
+   34 px висели бы точкой под сорокапиксельным заголовком. */
+.hall-tv__state svg { width: 2.2em; height: 2.2em; color: var(--tv-ink-faint); }
+.hall-tv__state .hall-tv__button { font-size: .85em; }
 
 /* Матрица: остаток экрана, БЕЗ прокрутки. Кегль имени считается от того, что
    осталось по высоте после шапки с подвалом, и от ширины на колонку; clamp
@@ -78,6 +95,29 @@
     calc(90vw / var(--cols) / 7)
   ), 42px);
 }
+
+/* Болванка доски на время чтения (с25). Раньше здесь висела строка «Загружаем
+   план…» посреди чёрного экрана — в зале это читалось как «сломалось». Скелет
+   держит ту же сетку и ту же формулу кегля, что настоящая доска, поэтому в
+   момент ответа базы каркас не прыгает: меняется только содержимое клеток.
+   Светлые скелеты приложения (.skeleton-row, .list-card--loading) сюда не
+   годятся: они нарисованы бликом по белому и на витрине дали бы вспышку.
+   Здесь болванка дышит прозрачностью — на тёмном это спокойнее, а общий
+   prefers-reduced-motion из 06-responsive гасит анимацию сам. */
+.hall-tv__board--skeleton { pointer-events: none; }
+.hall-tv__skeleton-corner { background: var(--tv-bg); }
+.hall-tv__skeleton-colhead { display: flex; align-items: center; padding: 8px 12px; background: var(--tv-panel); }
+.hall-tv__skeleton-rowhead { display: flex; align-items: center; padding: 6px 12px; background: var(--tv-bg); }
+.hall-tv__skeleton-cell { display: flex; align-items: center; justify-content: center; padding: 4px 8px; background: var(--tv-panel); }
+.hall-tv__board--skeleton span { display: block; height: .5em; border-radius: .25em; background: var(--tv-line); animation: tv-skeleton 1.6s ease-in-out infinite; }
+.hall-tv__skeleton-colhead span { width: 62%; background: var(--tv-ink-faint); }
+.hall-tv__skeleton-rowhead span { width: 74%; }
+/* Клетки болванки разной ширины: одинаковые полоски выглядят таблицей, а не
+   людьми, которых сейчас подставят. */
+.hall-tv__skeleton-cell span { width: 66%; height: .62em; }
+.hall-tv__skeleton-cell:nth-child(3n) span { width: 44%; animation-delay: .2s; }
+.hall-tv__skeleton-cell:nth-child(4n) span { width: 80%; animation-delay: .4s; }
+@keyframes tv-skeleton { 0%, 100% { opacity: .35; } 50% { opacity: .8; } }
 
 .hall-tv__corner { display: flex; align-items: flex-end; padding: 8px 12px; background: var(--tv-bg); color: var(--tv-ink-faint); font-size: .5em; font-weight: 700; }
 
@@ -116,8 +156,12 @@
 .hall-tv__busy { color: var(--tv-ink-soft); font-size: .6em; font-weight: 650; }
 
 /* Имя и ×N в одну строку: бейдж стоит у имени, а не в углу клетки, — глаз
-   читает «Ахад ×3» как один факт. Фон полупрозрачный белый, как у номера зала. */
-.hall-tv__name-row { min-width: 0; max-width: 100%; display: inline-flex; align-items: center; gap: .3em; }
+   читает «Ахад ×3» как один факт. Фон полупрозрачный белый, как у номера зала.
+   Перенос разрешён (с25): бейдж занимает у имени около 39 px, и на узком экране
+   «Александр ×2» переставал помещаться — имя рвалось посреди слова. Теперь при
+   нехватке места вниз уезжает БЕЙДЖ, а имя остаётся целым и того же кегля, что
+   у соседей. На экране планёрки (1920 и шире) строка не переносится вовсе. */
+.hall-tv__name-row { min-width: 0; max-width: 100%; display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .3em; }
 .hall-tv__badge { flex: 0 0 auto; padding: 0 .35em; border-radius: 999px; color: var(--tv-ink); background: rgba(255,255,255,.16); font-size: .5em; font-weight: 800; font-variant-numeric: tabular-nums; }
 
 /* Крестик снятия — только под курсором: на витрине в покое он висел бы мусором
@@ -129,9 +173,17 @@
 .hall-tv__cell.is-armed { background: var(--tv-danger-bg); }
 .hall-tv__cell.is-armed .hall-tv__clear { color: var(--tv-danger); background: rgba(255, 111, 97, .2); }
 
-/* Имя — первой строкой и в полный кегль, фамилия под ним мельче и приглушена. */
-.hall-tv__first { max-width: 100%; overflow: hidden; font-weight: 750; letter-spacing: -.01em; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
-.hall-tv__last { max-width: 100%; overflow: hidden; color: var(--tv-ink-soft); font-size: .72em; font-weight: 650; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+/* Длинное имя до с25 резалось многоточием («Алексан…»): виноваты были nowrap
+   с text-overflow на .hall-tv__first и .hall-tv__last. Теперь имя ПЕРЕНОСИТСЯ
+   второй строкой, а кегль у всех клеток остаётся один.
+   Ужимать кегль под длину имени пробовали в с25 и отказались: доска планёрки
+   читается как список равных, а разный кегль назначает Максиму важность, которой
+   у него нет. Кегль доски считает одна формула на всех (--tv-cell выше, принята
+   в с21) — вторая, зависящая от длины строки, ей противоречит.
+   В высоту клетка от переноса не растёт: строки доски заданы minmax(0, 1fr) в
+   контейнере фиксированной высоты, лишнее подрезает overflow клетки. */
+.hall-tv__first { max-width: 100%; display: -webkit-box; overflow: hidden; font-weight: 750; letter-spacing: -.01em; line-height: 1.1; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.hall-tv__last { max-width: 100%; display: -webkit-box; overflow: hidden; color: var(--tv-ink-soft); font-size: .72em; font-weight: 650; line-height: 1.15; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
 /* Слот «Наём» — пунктирный чип, как в редакторе: он обязан читаться иначе, чем
    человек, иначе «Наём» с расстояния принимают за фамилию. */

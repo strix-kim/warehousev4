@@ -65,6 +65,13 @@
 .model-add-unit__actions .button { width: 100%; }
 .model-add-unit .form-error { margin: 0; }
 .unit-lists > .button, .unit-lists > .form-success, .unit-lists > .form-error, .unit-lists > .muted { margin-top: 10px; }
+/* Болванки загрузки в дровере машины стоят прямыми детьми .unit-lists, на месте
+   бывшего .muted, — отступ от заголовка блока им нужен тот же. Отдельным правилом,
+   а не дописыванием в строку выше: там принятый набор состояний, его не трогаем. */
+.unit-lists > .detail-skeleton { margin-top: 10px; }
+/* Последней болванке хвост не нужен: у настоящего списка его нет, а собственный
+   margin-bottom: 14px от .detail-skeleton рисует пустую полосу перед .detail-list. */
+.unit-lists > .detail-skeleton:last-child { margin-bottom: 0; }
 .unit-lists > .button { width: 100%; }
 .unit-lists__items { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
 /* Отступ — только у пикера под кнопкой; принятый вид «Сейчас в списках» не трогаем. */

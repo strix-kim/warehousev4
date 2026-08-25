@@ -165,6 +165,9 @@
   .clear-selection { min-height: 44px; padding: 0 10px; }
   .equipment-form-layout { display: block; }
   .form-section { padding: 20px 16px; }
+  /* Скелет карточки сотрудника несёт падинг секции сам (см. 05-features.css) — на
+     телефоне он обязан ужаться вместе с ней, иначе болванки шире реальной формы. */
+  .employee-form-skeleton { padding: 20px 16px; }
   .record-kind-grid, .form-grid { grid-template-columns: 1fr; }
   .form-grid__wide { grid-column: auto; }
   .equipment-preview { display: none; }

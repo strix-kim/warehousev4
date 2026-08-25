@@ -380,3 +380,32 @@
   .hall-print .hall-matrix__empty { min-height: 26px; padding: 3px; font-size: 11px; }
   .hall-print .hall-role { width: 18px; height: 18px; }
 }
+
+/* ---------- Скелет матрицы на время загрузки плана (с25) ----------
+   Геометрия повторяет .hall-matrix, а не рисует «какие-то серые полоски»: та же
+   ширина первой колонки, тот же минимум колонки зала, те же высоты строк и те же
+   разделительные линии. Смысл болванки в площади — приехавшая матрица обязана
+   встать на её место без прыжка, а для этого сетка должна совпасть, а не
+   намекнуть.
+
+   Контейнер общий с настоящей матрицей (.hall-matrix-scroll): рамка, минимальная
+   высота и прокрутка у них обязаны быть одни, иначе расходиться они начнут при
+   первой же правке. Здесь остаётся только снятие внутреннего поля.
+
+   Шиммер домовой (@keyframes shimmer, 04-data.css) — гасится он там же общим
+   правилом prefers-reduced-motion. */
+.hall-skeleton { padding: 0; }
+.hall-skeleton__grid { --hall-head-w: 208px; min-width: 100%; display: grid; grid-template-columns: var(--hall-head-w) repeat(4, minmax(180px, 1fr)); }
+/* Угол задаёт высоту шапки: у настоящего внутри две строки — «Позиция» и
+   пояснение про строки и колонки. */
+.hall-skeleton__corner { min-height: 52px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface-soft); }
+.hall-skeleton__colhead { display: flex; align-items: center; min-width: 0; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.hall-skeleton__rowhead { display: flex; align-items: center; min-width: 0; padding: 8px 10px; border-right: 1px solid var(--line); border-top: 1px solid var(--line); background: var(--surface-soft); }
+.hall-skeleton__cell { display: flex; align-items: center; min-width: 0; padding: 8px 9px; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.hall-skeleton span { width: 100%; height: 26px; border-radius: 7px; background: linear-gradient(90deg, #f0f2ef 25%, #f7f8f6 50%, #f0f2ef 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+
+/* Первая колонка ужимается вместе с настоящей — иначе на телефоне болванка
+   листалась бы вбок там, где матрица помещается. */
+@media (max-width: 820px) {
+  .hall-skeleton__grid { --hall-head-w: 150px; }
+}

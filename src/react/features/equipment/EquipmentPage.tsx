@@ -31,12 +31,13 @@ import { EquipmentModelDrawer } from './EquipmentModelDrawer'
 import type { Equipment } from './types'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
-import { useLanguage } from '../../lib/i18n'
+import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 
 export function EquipmentPage() {
   const navigate = useNavigate()
   const { tr, locale, language } = useLanguage()
+  useDocumentTitle(tr('Оборудование', 'Uskunalar'))
   const availabilityOptions = [
     { value: '', label: tr('Все статусы', 'Barcha holatlar') },
     ...equipmentAvailabilityOptions(tr),

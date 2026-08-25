@@ -105,3 +105,16 @@ export function EmployeeFilesList({ files, urls, photoAlt, documentPhotoId, onCh
     </>
   )
 }
+
+// Заглушка на время загрузки списка. Живёт рядом с самим списком по той же
+// причине, что и он: показывают файлы два места — дровер и режим правки, —
+// и высота ожидания у них обязана быть одинаковой.
+export function EmployeeFilesSkeleton({ rows = 3 }: { rows?: number }) {
+  const { tr } = useLanguage()
+
+  return (
+    <div className="employee-files-skeleton" role="status" aria-label={tr('Загружаем файлы', 'Fayllar yuklanmoqda')}>
+      {Array.from({ length: rows }, (_, index) => <div className="detail-skeleton employee-files-skeleton__row" key={index} />)}
+    </div>
+  )
+}
