@@ -6,9 +6,16 @@
     <meta name="theme-color" content="#0c1116" />
     <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon.png" />
-    <!-- Единственная картинка первого экрана: иллюстрация страницы входа (она же арт «Оборудования» на главной).
-         Остальное грузят сами компоненты — у них loading="eager" и fetchPriority="high". -->
-    <link rel="preload" href="/illustrations/av-warehouse.webp" as="image" type="image/webp" />
+    <!-- Соединение с Supabase поднимаем заранее: DNS, TLS и HTTP/2 первого запроса
+         иначе считаются уже ПОСЛЕ того, как загрузился и выполнился бандл. Адрес
+         подставляет Vite из той же переменной, что читает клиент (%VITE_*% в
+         index.html — штатная подстановка), поэтому второго источника правды нет. -->
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
+    <!-- Предзагрузки иллюстрации здесь больше нет: тег в index.html висит на ВСЕХ
+         адресах, а картинка нужна двум — входу и главной. Остальные четыре раздела
+         платили за неё 69 КБ и получали от Chromium «preloaded but not used».
+         Обе страницы, которым она нужна, грузят её сами: loading="eager" плюс
+         fetchPriority="high" на самом <img>. -->
     <title>ARGO · Учёт оборудования</title>
   </head>
   <body>

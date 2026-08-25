@@ -33,6 +33,21 @@
 .equipment-thumb--large:not(.equipment-thumb--photo) { height: 96px; margin: 14px 0; }
 .equipment-thumb--large.equipment-thumb--photo { width: min(100%, var(--equipment-image-width, 420px)); height: auto; min-height: 0; aspect-ratio: var(--equipment-image-ratio, 1.6); margin-inline: auto; border-color: #e1e5e0; background: #fff; box-shadow: 0 12px 30px rgba(15,22,28,.08); }
 .equipment-thumb--large img { padding: 0; }
+/* Появление фотографии в строке (сотрудник, машина). Геометрию задаёт класс
+   вызывающего — здесь только выход картинки поверх плейсхолдера. Кадры движения
+   переиспользуют equipment-image-arrive ниже: язык появления картинки в системе
+   один, второй набор кадров развёл бы витрину оборудования и фото людей. */
+.photo-thumb { position: relative; }
+.photo-thumb__placeholder { position: absolute; inset: 0; display: grid; place-items: center; opacity: 1; transition: opacity .16s ease; }
+.photo-thumb img { opacity: 0; transition: opacity .16s ease; }
+.photo-thumb--ready .photo-thumb__placeholder { opacity: 0; }
+.photo-thumb--ready img { opacity: 1; animation: equipment-image-arrive .34s cubic-bezier(.2,.82,.32,1.18) both; }
+/* Проявление остаётся, «наезд» снимается: движение масштабом — украшение,
+   а разница «пусто → фото» обязана читаться и без него. */
+@media (prefers-reduced-motion: reduce) {
+  .photo-thumb--ready img { animation: none; }
+}
+
 @keyframes equipment-image-arrive {
   0% { opacity: 0; transform: scale(.965); }
   70% { opacity: 1; transform: scale(1.018); }

@@ -2,12 +2,14 @@ import { CarFront, CircleAlert, FileSpreadsheet, Plus, Search, X } from 'lucide-
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
-import { fetchVehiclePhotoPaths, fetchVehicles, getSignedUrls } from './api'
+import { DataAge } from '../../components/DataAge'
+import { PhotoThumb } from '../../components/PhotoThumb'
+import { fetchVehiclePhotoPaths, fetchVehicles, getSignedUrls, readCachedVehicles, readCachedVehiclesMeta } from './api'
 import { downloadVehicleEventXlsx } from './eventExport'
 import { VehicleDrawer } from './VehicleDrawer'
 import { VehicleEventExportDrawer } from './VehicleEventExportDrawer'
 import { plateForSearch, vehicleTitle, type VehicleWithDrivers } from './types'
-import { fetchEmployees } from '../employees/api'
+import { fetchEmployeesByIds } from '../employees/api'
 import { employeeShortName, type Employee } from '../employees/types'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
@@ -22,7 +24,10 @@ export function VehiclesPage() {
   // а не выкидывать из раздела.
   const [params, setParams] = useSearchParams()
   const vehicleId = params.get('vehicle') ?? ''
-  const [vehicles, setVehicles] = useState<VehicleWithDrivers[]>([])
+  // Первый кадр берём из кэша: выдача машин лежит и на диске (паспортных данных
+  // в ней нет, api.ts), поэтому раздел открывается с данными и после F5.
+  const [cachedVehicles] = useState(() => readCachedVehicles())
+  const [vehicles, setVehicles] = useState<VehicleWithDrivers[]>(() => cachedVehicles ?? [])
   // Поиск здесь клиентский и в адрес не едет: выдача полная, фильтр мгновенный,
   // а запоминать его в истории незачем — в отличие от открытой карточки.
   const [search, setSearch] = useState('')
@@ -34,42 +39,72 @@ export function VehiclesPage() {
   // Подписанные ссылки на первое фото каждой машины — только память страницы:
   // URL живёт час, и в persistentCache ему не место.
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map())
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(() => !cachedVehicles)
   // Флаг, а не текст: строка в стейте потянула бы tr в зависимости эффекта, и
   // смена языка перезагружала бы список.
   const [hasError, setHasError] = useState(false)
+  // Момент записи показанной выдачи. Значение принадлежит persistentCache —
+  // здесь только перечитывается, ничего производного не храним.
+  const [dataAt, setDataAt] = useState<number | null>(null)
+  // Отдельный флаг от isLoading: isLoading означает «показывать нечего, рисуем
+  // скелет» и при живом кэше всегда false, а кнопке «Обновить» нужен признак
+  // «запрос в полёте».
+  const [isFetching, setIsFetching] = useState(false)
+  // Исход ПОСЛЕДНЕГО запроса: бейдж обязан отличать «данные старые» от
+  // «обновиться не удалось».
+  const [lastFetchFailed, setLastFetchFailed] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let isCurrent = true
-    setIsLoading(true)
+    // Показали кэш — обязаны перепроверить у сервера; «Обновить» обходит кэш
+    // всегда, потому что её жмут именно от недоверия к показанному.
+    const bypassCache = reloadKey > 0 || Boolean(cachedVehicles)
+    // Метка ДО запроса: при живой записи cachedQuery подменяет провал последним
+    // значением и промис РЕЗОЛВИТСЯ, поэтому единственный честный признак
+    // «ответа не было» — несдвинувшаяся метка (gotchas §11).
+    const ageBefore = readCachedVehiclesMeta()?.touchedAt ?? null
+    setIsLoading(!cachedVehicles)
+    setIsFetching(true)
     setHasError(false)
-    fetchVehicles()
+    setDataAt(null)
+
+    // Фото стартуют ВМЕСТЕ со списком: они спрашивают другую таблицу и выдачи
+    // машин не ждут. Миниатюры — украшение строки, их отказ не роняет список,
+    // поэтому у них своя ветка и свой отчёт.
+    void fetchVehiclePhotoPaths({ bypassCache })
+      .then((paths) => getSignedUrls([...paths.values()]).then((urls) => ({ paths, urls })))
+      .then(({ paths, urls }) => {
+        if (!isCurrent) return
+        const byVehicle = new Map<string, string>()
+        for (const [id, path] of paths) {
+          const url = urls.get(path)
+          if (url) byVehicle.set(id, url)
+        }
+        setPhotoUrls(byVehicle)
+      })
+      .catch((error: unknown) => reportAppError(error, { scope: 'loader', route: '/vehicles', detail: { source: 'photos' } }))
+
+    fetchVehicles({ bypassCache })
       .then((rows) => {
         if (!isCurrent) return
         setVehicles(rows)
-        // Миниатюры — украшение строки: их отказ не должен ронять список,
-        // поэтому у них своя ветка и свой отчёт.
-        void fetchVehiclePhotoPaths()
-          .then((paths) => getSignedUrls([...paths.values()]).then((urls) => ({ paths, urls })))
-          .then(({ paths, urls }) => {
-            if (!isCurrent) return
-            const byVehicle = new Map<string, string>()
-            for (const [id, path] of paths) {
-              const url = urls.get(path)
-              if (url) byVehicle.set(id, url)
-            }
-            setPhotoUrls(byVehicle)
-          })
-          .catch((error: unknown) => reportAppError(error, { scope: 'loader', route: '/vehicles', detail: { source: 'photos' } }))
+        const ageAfter = readCachedVehiclesMeta()?.touchedAt ?? null
+        setLastFetchFailed(ageAfter !== null && ageAfter === ageBefore)
+        setDataAt(ageAfter)
       })
       .catch((error: unknown) => {
         if (!isCurrent) return
-        setHasError(true)
+        setLastFetchFailed(true)
+        setDataAt(readCachedVehiclesMeta()?.touchedAt ?? null)
+        // Кэш уже на экране — сбой обновления не повод рушить показанный список.
+        if (!cachedVehicles) setHasError(true)
         reportAppError(error, { scope: 'loader', route: '/vehicles' })
       })
       .finally(() => {
-        if (isCurrent) setIsLoading(false)
+        if (!isCurrent) return
+        setIsLoading(false)
+        setIsFetching(false)
       })
     return () => { isCurrent = false }
   }, [reloadKey])
@@ -155,11 +190,15 @@ export function VehiclesPage() {
   // сотрудников одним запросом и раскладываем по id. Отменённый прогон файл НЕ
   // отдаёт: человек уже закрыл дровер, и загрузка «сама собой» его бы озадачила.
   async function exportEventList(meta: EventDocumentMeta, options: { signal: AbortSignal }) {
-    const rows = await fetchEmployees()
-    const driverIds = new Set(chosen.flatMap((vehicle) => vehicle.drivers.map((driver) => driver.id)))
+    // Раньше сюда приезжали ВСЕ сотрудники целиком, чтобы выбрать из них
+    // водителей выбранных машин. Спрашиваем сразу нужных: паспортные данные
+    // посторонних людей не должны оказываться в памяти вкладки ради документа
+    // на три машины.
+    const driverIds = [...new Set(chosen.flatMap((vehicle) => vehicle.drivers.map((driver) => driver.id)))]
+    const rows = await fetchEmployeesByIds(driverIds)
     const employeesById = new Map<string, Employee>()
     for (const row of rows) {
-      if (driverIds.has(row.id)) employeesById.set(row.id, row)
+      employeesById.set(row.id, row)
     }
     if (!options.signal.aborted) downloadVehicleEventXlsx({ vehicles: chosen, employeesById, meta })
   }
@@ -214,6 +253,9 @@ export function VehiclesPage() {
               ? tr(`Найдено: ${visible.length.toLocaleString(locale)} из ${vehicles.length.toLocaleString(locale)}`, `Topildi: ${vehicles.length.toLocaleString(locale)} tadan ${visible.length.toLocaleString(locale)} tasi`)
               : `${tr('Машин', 'Mashinalar')}: ${vehicles.length.toLocaleString(locale)}`}
           </span>
+          {/* Рядом с блоком «Ошибка загрузки» бейдж не рисуем: на экране оказались
+              бы два разных предложения обновиться. */}
+          {!hasError && <DataAge touchedAt={dataAt} isRefreshing={isFetching} failed={lastFetchFailed} onRefresh={() => setReloadKey((value) => value + 1)} />}
         </div>
 
         {hasError ? (
@@ -268,11 +310,7 @@ export function VehiclesPage() {
                           </td>
                           <td>
                             <div className="equipment-cell">
-                              <span className="employee-avatar">
-                                {photo
-                                  ? <img src={photo} alt="" loading="lazy" decoding="async" />
-                                  : <CarFront size={18} />}
-                              </span>
+                              <PhotoThumb className="employee-avatar" url={photo} placeholder={<CarFront size={18} />} />
                               <span>
                                 <strong>{vehicleTitle(vehicle.brand, vehicle.model)}</strong>
                                 <small>{vehicle.color || tr('Цвет не указан', 'Rang ko‘rsatilmagan')}</small>

@@ -1,10 +1,19 @@
 import { supabase } from '../../lib/supabase'
+import { cachedQuery, invalidateCachePrefix, readCachedQuery, readCachedQueryMeta } from '../../lib/persistentCache'
 import { createSignedUrlCache } from '../../lib/signedUrlCache'
 import { EMPLOYEE_BRIEF_COLUMNS } from '../employees/types'
 import type { Tr, Vehicle, VehicleDriver, VehicleFile, VehicleWithDrivers } from './types'
 
 // Приватный бакет: наружу фото уходит только по подписанной ссылке.
 const BUCKET = 'vehicle-files'
+
+// Общий префикс на весь модуль: и выдача машин, и карта фото сбрасываются одним
+// вызовом, чтобы ключ и его сброс не разъезжались. Владелец значения — этот
+// модуль, правило сброса — собственные записи плюс TTL.
+const VEHICLES_CACHE_PREFIX = 'vehicles:'
+const VEHICLES_LIST_CACHE_KEY = `${VEHICLES_CACHE_PREFIX}list`
+const VEHICLE_PHOTOS_CACHE_KEY = `${VEHICLES_CACHE_PREFIX}photos`
+const VEHICLES_CACHE_TTL = 10 * 60 * 1000
 
 // Машин десятки — выдача целиком, и водители едут ОДНИМ запросом: встраивание
 // связки vehicle_drivers избавляет от второго обхода и от склейки по id на
@@ -28,17 +37,33 @@ function withDrivers(row: Vehicle & { vehicle_drivers: { employees: VehicleDrive
   return { ...vehicle, drivers }
 }
 
-export async function fetchVehicles(): Promise<VehicleWithDrivers[]> {
-  if (!supabase) throw new Error('Supabase не настроен')
-  const { data, error } = await supabase
-    .from('vehicles')
-    .select(`*, vehicle_drivers(employee_id, employees(${EMPLOYEE_BRIEF_COLUMNS}))`)
-    .order('brand')
-    .order('plate_number')
-    .order('id')
-  if (error) throw error
+// Выдача ложится и на диск: в ней имя, телефон и должность водителя — ровно те
+// колонки, что уже персистит справочник `employees:briefs`, паспортных данных
+// здесь нет. Оговорка про встроенного водителя: переименование сотрудника
+// сбрасывает префикс `employees:`, но не этот — до конца TTL машина покажет
+// старое имя. Водителей переименовывают реже, чем раз в десять минут.
+export function fetchVehicles({ bypassCache = false } = {}): Promise<VehicleWithDrivers[]> {
+  return cachedQuery(VEHICLES_LIST_CACHE_KEY, VEHICLES_CACHE_TTL, async () => {
+    if (!supabase) throw new Error('Supabase не настроен')
+    const { data, error } = await supabase
+      .from('vehicles')
+      .select(`*, vehicle_drivers(employee_id, employees(${EMPLOYEE_BRIEF_COLUMNS}))`)
+      .order('brand')
+      .order('plate_number')
+      .order('id')
+    if (error) throw error
 
-  return (data ?? []).map(withDrivers)
+    return (data ?? []).map(withDrivers)
+  }, { bypass: bypassCache })
+}
+
+// Синхронное чтение той же записи — для первого кадра страницы.
+export function readCachedVehicles(): VehicleWithDrivers[] | null {
+  return readCachedQuery<VehicleWithDrivers[]>(VEHICLES_LIST_CACHE_KEY)
+}
+
+export function readCachedVehiclesMeta() {
+  return readCachedQueryMeta(VEHICLES_LIST_CACHE_KEY)
 }
 
 // Одна машина прямо по id — вместе с водителями: прямая ссылка на
@@ -70,7 +95,17 @@ export async function fetchVehicleFiles(vehicleId: string): Promise<VehicleFile[
 
 // Первое фото каждой машины — для миниатюр списка. Отдельный запрос вместо
 // fetchVehicleFiles по каждой строке: карточек десятки, запросов было бы столько же.
-export async function fetchVehiclePhotoPaths(): Promise<Map<string, string>> {
+// В отличие от выдачи машин, эта запись живёт только в памяти: значение — Map,
+// а persistentCache персистит через JSON.stringify, который превращает Map в `{}`.
+export function fetchVehiclePhotoPaths({ bypassCache = false } = {}): Promise<Map<string, string>> {
+  return cachedQuery(VEHICLE_PHOTOS_CACHE_KEY, VEHICLES_CACHE_TTL, () => loadVehiclePhotoPaths(), { bypass: bypassCache, persist: false })
+}
+
+export function readCachedVehiclePhotoPaths(): Map<string, string> | null {
+  return readCachedQuery<Map<string, string>>(VEHICLE_PHOTOS_CACHE_KEY)
+}
+
+async function loadVehiclePhotoPaths(): Promise<Map<string, string>> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase
     .from('vehicle_files')
@@ -120,6 +155,7 @@ export async function createVehicle(fields: VehicleInput): Promise<Vehicle> {
     .select()
     .single()
   if (error) throw error
+  invalidateCachePrefix(VEHICLES_CACHE_PREFIX)
   return data
 }
 
@@ -136,6 +172,7 @@ export async function updateVehicle(id: string, fields: VehicleInput): Promise<V
     .select()
     .single()
   if (error) throw error
+  invalidateCachePrefix(VEHICLES_CACHE_PREFIX)
   return data
 }
 
@@ -174,6 +211,10 @@ export async function saveVehicleDrivers(vehicleId: string, before: string[], af
       .in('employee_id', removed)
     if (error) throw error
   }
+
+  // Сброс ОДИН на всю функцию и в самом конце: водители едут встроенными в
+  // выдачу машин, а diff — две записи, после каждой из которых состав неполон.
+  if (added.length > 0 || removed.length > 0) invalidateCachePrefix(VEHICLES_CACHE_PREFIX)
 }
 
 // Расширение берём из имени файла (близнец helper'а в employees/api.ts): тип из
@@ -205,6 +246,8 @@ export async function uploadVehiclePhoto(vehicleId: string, file: File): Promise
     .select()
     .single()
   if (error) throw error
+  // Новое фото меняет карту миниатюр, а её теперь читают из кэша.
+  invalidateCachePrefix(VEHICLES_CACHE_PREFIX)
   return data
 }
 

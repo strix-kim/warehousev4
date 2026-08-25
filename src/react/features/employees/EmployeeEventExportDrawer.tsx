@@ -1,7 +1,7 @@
 import { FileSpreadsheet, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { pickDocumentPhoto, type EmployeePhotoRef } from './api'
-import { employeeFullName, type Employee } from './types'
+import { employeeFullName, type EmployeeListItem } from './types'
 import { EventDocumentFields } from '../../components/EventDocumentFields'
 import { todayDateValue } from '../../lib/date'
 import { useLanguage } from '../../lib/i18n'
@@ -26,7 +26,9 @@ export type EmployeeEventExportRun = (meta: EventDocumentMeta, options: {
 // странице состава. Выбор остаётся на странице — дровер его не копирует и при
 // закрытии не сбрасывает.
 export function EmployeeEventExportDrawer({ employees, photos, photosKnown, onClose, onExport }: {
-  employees: Employee[]
+  // Строки РЕЕСТРА: дровер печатает имена и считает, у кого нет фото, — паспорт
+  // ему не нужен. Полные строки страница дотягивает в момент сборки файла.
+  employees: EmployeeListItem[]
   photos: Map<string, EmployeePhotoRef[]>
   // Карта фото загружена. false — запрос не ответил: «фото есть у всех» тогда
   // было бы не сводкой, а выдумкой (gotchas §11).

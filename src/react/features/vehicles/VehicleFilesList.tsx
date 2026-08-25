@@ -1,5 +1,6 @@
 import { ImageOff } from 'lucide-react'
 import type { VehicleFile } from './types'
+import { PhotoThumb } from '../../components/PhotoThumb'
 import { useLanguage } from '../../lib/i18n'
 
 // Фото машины — ТОЛЬКО на чтение: удаление запрещено политиками бакета, поэтому
@@ -21,7 +22,7 @@ export function VehicleFilesList({ files, urls, photoAlt }: {
         const url = urls.get(file.storage_path)
         return url
           ? <a key={file.id} href={url} target="_blank" rel="noreferrer">
-            <img src={url} alt={file.original_name ?? photoAlt} loading="lazy" decoding="async" />
+            <PhotoThumb url={url} alt={file.original_name ?? photoAlt} placeholder={<ImageOff size={18} />} />
           </a>
           : <span key={file.id} className="employee-photos__missing" title={tr('Ссылка не получена', 'Havola olinmadi')}><ImageOff size={18} /></span>
       })}

@@ -1,10 +1,11 @@
 import { CircleAlert, Copy, Ellipsis, PanelsTopLeft, Plus, Presentation, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createHallPlan, deleteHallPlan, duplicateHallPlan, fetchHallPlans, type HallPlanInput, type HallPlanWithHalls } from './api'
+import { createHallPlan, deleteHallPlan, duplicateHallPlan, fetchHallPlans, readCachedHallPlans, readCachedHallPlansMeta, type HallPlanInput, type HallPlanWithHalls } from './api'
 import { HallPlanMetaDrawer } from './HallPlanMetaDrawer'
 import { formatPlanPeriod, sortHalls } from './types'
 import { ActionMenu } from '../../components/ActionMenu'
+import { DataAge } from '../../components/DataAge'
 import { formatDateTime } from '../../lib/date'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
@@ -15,14 +16,27 @@ export function HallPlansPage() {
   const navigate = useNavigate()
   const { tr, locale } = useLanguage()
   useDocumentTitle(tr('Залы', 'Zallar'))
-  const [plans, setPlans] = useState<HallPlanWithHalls[]>([])
+  // Первый кадр берём из кэша. Кэшируется ТОЛЬКО этот список: сам план и ТВ
+  // читают базу напрямую — там общий черновик, который правят несколько человек.
+  const [cachedPlans] = useState(() => readCachedHallPlans())
+  const [plans, setPlans] = useState<HallPlanWithHalls[]>(() => cachedPlans ?? [])
   // Поиск клиентский и в адрес не едет: выдача полная (сто планов), фильтр
   // мгновенный, а запоминать его в истории незачем.
   const [search, setSearch] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(() => !cachedPlans)
   // Флаг, а не текст: строка в стейте потянула бы tr в зависимости эффекта, и
   // смена языка перезагружала бы список.
   const [hasError, setHasError] = useState(false)
+  // Момент записи показанной выдачи. Значение принадлежит persistentCache —
+  // здесь только перечитывается, ничего производного не храним.
+  const [dataAt, setDataAt] = useState<number | null>(null)
+  // Отдельный флаг от isLoading: isLoading означает «показывать нечего, рисуем
+  // скелет» и при живом кэше всегда false, а кнопке «Обновить» нужен признак
+  // «запрос в полёте».
+  const [isFetching, setIsFetching] = useState(false)
+  // Исход ПОСЛЕДНЕГО запроса: бейдж обязан отличать «данные старые» от
+  // «обновиться не удалось».
+  const [lastFetchFailed, setLastFetchFailed] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [isCreateOpen, setCreateOpen] = useState(false)
   const [deletingId, setDeletingId] = useState('')
@@ -34,19 +48,37 @@ export function HallPlansPage() {
 
   useEffect(() => {
     let isCurrent = true
-    setIsLoading(true)
+    // Показали кэш — обязаны перепроверить у сервера; «Обновить» обходит кэш
+    // всегда, потому что её жмут именно от недоверия к показанному.
+    const bypassCache = reloadKey > 0 || Boolean(cachedPlans)
+    // Метка ДО запроса: при живой записи cachedQuery подменяет провал последним
+    // значением и промис РЕЗОЛВИТСЯ, поэтому единственный честный признак
+    // «ответа не было» — несдвинувшаяся метка (gotchas §11).
+    const ageBefore = readCachedHallPlansMeta()?.touchedAt ?? null
+    setIsLoading(!cachedPlans)
+    setIsFetching(true)
     setHasError(false)
-    fetchHallPlans()
+    setDataAt(null)
+    fetchHallPlans({ bypassCache })
       .then((rows) => {
-        if (isCurrent) setPlans(rows)
+        if (!isCurrent) return
+        setPlans(rows)
+        const ageAfter = readCachedHallPlansMeta()?.touchedAt ?? null
+        setLastFetchFailed(ageAfter !== null && ageAfter === ageBefore)
+        setDataAt(ageAfter)
       })
       .catch((error: unknown) => {
         if (!isCurrent) return
-        setHasError(true)
+        setLastFetchFailed(true)
+        setDataAt(readCachedHallPlansMeta()?.touchedAt ?? null)
+        // Кэш уже на экране — сбой обновления не повод рушить показанный список.
+        if (!cachedPlans) setHasError(true)
         reportAppError(error, { scope: 'loader', route: '/halls' })
       })
       .finally(() => {
-        if (isCurrent) setIsLoading(false)
+        if (!isCurrent) return
+        setIsLoading(false)
+        setIsFetching(false)
       })
     return () => { isCurrent = false }
   }, [reloadKey])
@@ -140,6 +172,9 @@ export function HallPlansPage() {
               ? tr(`Найдено: ${visible.length.toLocaleString(locale)} из ${plans.length.toLocaleString(locale)}`, `Topildi: ${plans.length.toLocaleString(locale)} tadan ${visible.length.toLocaleString(locale)} tasi`)
               : `${tr('Планов', 'Rejalar')}: ${plans.length.toLocaleString(locale)}`}
           </span>
+          {/* Рядом с блоком «Ошибка загрузки» бейдж не рисуем: на экране оказались
+              бы два разных предложения обновиться. */}
+          {!hasError && <DataAge touchedAt={dataAt} isRefreshing={isFetching} failed={lastFetchFailed} onRefresh={() => setReloadKey((current) => current + 1)} />}
         </div>
 
         {deleteFailed && (

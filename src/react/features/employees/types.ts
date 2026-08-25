@@ -14,6 +14,19 @@ export type EmployeeBrief = Pick<Tables<'employees'>, 'id' | 'last_name' | 'firs
 // с типом EmployeeBrief, иначе они разъедутся на первой же новой колонке.
 export const EMPLOYEE_BRIEF_COLUMNS = 'id, last_name, first_name, middle_name, phone, position'
 
+// Строка РЕЕСТРА сотрудников: то, что видно в таблице, плюс выбранное фото для
+// документов (по нему рисуется миниатюра). Отдельный тип от EmployeeBrief не
+// прихоть: brief читают пикеры, где фото не показывают, и лишняя колонка там
+// уехала бы в кэш без надобности.
+//
+// Разделение выдачи надвое — решение прораба (с26) с названной ценой: реестр
+// кэшируется НА ДИСК, потому что паспортных данных здесь нет вовсе, а карточка
+// с паспортом, ПИНФЛ и адресом прописки приезжает отдельным запросом ровно
+// тогда, когда её открывают. Пока выдача была одна, диск был закрыт для всей.
+export type EmployeeListItem = Pick<Tables<'employees'>, 'id' | 'last_name' | 'first_name' | 'middle_name' | 'phone' | 'position' | 'document_photo_id'>
+
+export const EMPLOYEE_LIST_COLUMNS = 'id, last_name, first_name, middle_name, phone, position, document_photo_id'
+
 // Виды файлов повторяют CHECK на employee_files.kind: список закрыт базой,
 // клиент только раскладывает его по секциям формы и карточки.
 export type EmployeeFileKind = 'photo' | 'passport_front' | 'passport_back' | 'intl_passport' | 'residence_reg'

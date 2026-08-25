@@ -1,5 +1,5 @@
 import { ArrowUpRight, Boxes, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Presentation, Users, Warehouse, X } from 'lucide-react'
-import { Suspense, useEffect, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AppErrorBoundary } from '../components/AppErrorBoundary'
 import { useAuth } from '../features/auth/AuthProvider'
@@ -92,6 +92,10 @@ function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('argo:sidebar-collapsed') === 'true')
   const [isMoreOpen, setMoreOpen] = useState(false)
   const { pathname } = useLocation()
+  // Прогрев каталога — один раз на загрузку страницы, а не на каждый вход
+  // в раздел: сама выгрузка кэшируется в памяти, но повторные заходы не должны
+  // заново заводить таймер.
+  const catalogWarmedRef = useRef(false)
 
   // Лист закрывается на любую смену маршрута, а не только по своей ссылке:
   // жест «назад» увёл бы страницу из-под открытого листа, и он остался бы
@@ -118,11 +122,27 @@ function AppShell() {
         loadHallPlanPage(),
       ])
     }, 0)
+    // Прогрев выдач всех шести разделов, а не только двух старых (решение прораба,
+    // с26: «чтобы данные были загружены заранее»). Сюда попадает только ЛЁГКОЕ —
+    // реестры на 1–3 КБ, которые всё равно спросят через секунду. Тяжёлое остаётся
+    // за порогом: полный каталог (109 КБ) греется ниже и только под /lists, фото
+    // сотрудников (около мегабайта) не греются вовсе — их качает тот, кто открыл
+    // раздел. Реестр сотрудников безопасен для диска: паспортных полей в нём нет.
     const primaryDataTimer = window.setTimeout(() => {
       void Promise.all([
         import('../features/equipment/api'),
         import('../features/lists/api'),
-      ]).then(([equipmentApi, listsApi]) => Promise.allSettled([
+        import('../features/employees/api'),
+        import('../features/vehicles/api'),
+        import('../features/halls/api'),
+      ]).then(([equipmentApi, listsApi, employeesApi, vehiclesApi, hallsApi]) => Promise.allSettled([
+        employeesApi.fetchEmployeeList(),
+        vehiclesApi.fetchVehicles(),
+        hallsApi.fetchHallPlans(),
+        // Таксономия переехала сюда из тяжёлой пачки ниже: она весит пару
+        // килобайт, живёт сутки и лежит на диске — греть её стоит везде, а вот
+        // тащить ради неё полный каталог (см. ниже) не стоит нигде.
+        equipmentApi.fetchEquipmentTaxonomy(),
         // Каталог модельный с U29 — греем агрегат, а не построчную выдачу.
         equipmentApi.fetchEquipmentModels({
           page: 1,
@@ -150,24 +170,34 @@ function AppShell() {
       // самого import() модулей api.
       }).catch((error: unknown) => reportAppError(error, { scope: 'prefetch', detail: { batch: 'primary-data' } }))
     }, 120)
+    return () => {
+      window.clearTimeout(moduleTimer)
+      window.clearTimeout(primaryDataTimer)
+    }
+  }, [])
+
+  // Полная выгрузка каталога — 109 КБ сжатого JSON, и она приезжает НА КАЖДЫЙ
+  // заход: persist: false, в localStorage ей не место (equipment/api.ts). Нужна
+  // она ровно одному экрану — редактору списка, а грелась на всех шести, включая
+  // сотрудников и залы, где каталога нет вовсе. Гейт по адресу: под /lists она
+  // приезжает заранее, в остальных разделах не приезжает совсем.
+  useEffect(() => {
+    if (!pathname.startsWith('/lists') || catalogWarmedRef.current) return
     const editorDataTimer = window.setTimeout(() => {
+      // Отметку ставим здесь, а не в теле эффекта: уход с /lists раньше 700 мс
+      // снимает таймер, и прогрев должен остаться несделанным, а не считаться
+      // выполненным.
+      catalogWarmedRef.current = true
       void Promise.all([
         import('../features/equipment/api'),
         import('../components/EquipmentVisual'),
       ]).then(async ([equipmentApi, visuals]) => {
-        const [equipment] = await Promise.all([
-          equipmentApi.fetchAllEquipment(),
-          equipmentApi.fetchEquipmentTaxonomy(),
-        ])
+        const equipment = await equipmentApi.fetchAllEquipment()
         visuals.preloadEquipmentImages(equipment, 32)
       }).catch((error: unknown) => reportAppError(error, { scope: 'prefetch', detail: { batch: 'editor-data' } }))
     }, 700)
-    return () => {
-      window.clearTimeout(moduleTimer)
-      window.clearTimeout(primaryDataTimer)
-      window.clearTimeout(editorDataTimer)
-    }
-  }, [])
+    return () => window.clearTimeout(editorDataTimer)
+  }, [pathname])
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`}>
