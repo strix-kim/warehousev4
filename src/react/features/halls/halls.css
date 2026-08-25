@@ -52,14 +52,23 @@
 
 /* Счётчики под шапкой — сводка бригады одной строкой. «Свободно» красным: это
    единственное число здесь, которое требует действия. */
-.hall-counts { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 12px; color: var(--ink-soft); font-size: 14px; font-weight: 650; }
+/* Полоса сводки под шапкой (с25): счётчики слева, «Свободны» справа, а на
+   узком — друг под другом. До этого оба блока висели голыми абзацами между
+   шапкой и панелью, чего в доме нет нигде. */
+.hall-summary { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 20px; margin: 0 0 12px; }
+.hall-counts { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0; color: var(--ink-soft); font-size: 14px; font-weight: 650; }
 .hall-counts strong { color: var(--ink); font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
 
 /* Кто ещё не расставлен — строкой под счётчиками. Тон вторичный: это не цифра
    плана, а подсказка «кем добирать», и спорить со счётчиками ей нельзя. Пара со
    счётчиками стоит плотно, поэтому их нижний отступ здесь ужимается. */
-.hall-counts:has(+ .hall-free) { margin-bottom: 5px; }
-.hall-free { margin: 0 0 12px; color: var(--ink-faint); font-size: 13.5px; font-weight: 600; line-height: 1.45; }
+.hall-free { min-width: 0; margin: 0; color: var(--ink-faint); font-size: 13.5px; font-weight: 600; line-height: 1.45; }
+/* Полный список — только для бумаги, на экране его заменяет обрезанный. */
+.hall-free__print { display: none; }
+/* «и ещё N» — ссылка, а не кнопка: разворачивает ту же строку на месте,
+   ничего не открывая и никуда не уводя. */
+.hall-free__more { margin-left: 6px; padding: 0; border: 0; color: var(--ink-soft); background: none; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.hall-free__more:hover { color: var(--ink); }
 
 /* Панель матрицы — единственное место, где .data-panel нужны внутренние поля:
    сетка рисует свои линии и не должна упираться в её край. */
@@ -322,6 +331,14 @@
   .hall-print .editor-header > div { margin-bottom: 10px; }
   .hall-print .editor-header h1 { font-size: 19px; }
   .hall-print .eyebrow { margin-bottom: 3px; font-size: 10px; }
+  /* Полоса — та же болезнь, что у панели и шапки: блочный бокс на печати
+     мешает, а её правила адресованы вложенным .hall-counts и .hall-free.
+     display: contents убирает бокс, оставляя оба блока на прежних местах. */
+  .hall-print .hall-summary { display: contents; }
+  /* На бумаге список свободных полный: лист несут на планёрку, и «и ещё 9»
+     там не значит ничего. */
+  .hall-print .hall-free__screen { display: none; }
+  .hall-print .hall-free__print { display: inline; }
   .hall-print .hall-counts { margin-bottom: 6px; font-size: 11px; }
   .hall-print .hall-counts strong { font-size: 12px; }
   .hall-print .hall-free { margin-bottom: 8px; font-size: 10.5px; }

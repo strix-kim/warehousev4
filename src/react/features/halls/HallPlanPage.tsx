@@ -115,8 +115,14 @@ export function HallPlanPage() {
         </div>
       </header>
 
-      <PlanCounts counts={editor.counts} />
-      <FreeEmployees editor={editor} />
+      {/* Одна полоса вместо двух голых абзацев между шапкой и панелью (с25):
+          в доме сводки живут либо в тулбаре, либо в подвале панели, третьего
+          места нет. На печати полоса снимается display: contents — правила
+          листа адресованы .hall-counts и .hall-free, и они остаются на месте. */}
+      <div className="hall-summary">
+        <PlanCounts counts={editor.counts} />
+        <FreeEmployees editor={editor} />
+      </div>
 
       <section className="data-panel data-panel--halls">
         {editor.positions.length === 0
@@ -291,15 +297,24 @@ function PlanCounts({ counts }: { counts: { technicians: number; operators: numb
   const { tr, locale } = useLanguage()
 
   return (
+    // Форма «метка: число», а не «7 видеоинженеров»: на единице выходило
+    // «1 операторов». Своего словаря окончаний в проекте нет намеренно
+    // (lib/date.ts, formatAge) — вести его на два языка дороже, чем набрать
+    // сводку формой, которая не склоняется вовсе. Ровно так же подписан
+    // подвал ТВ, и теперь эти две сводки читаются одинаково.
     <div className="hall-counts">
-      <span><strong>{counts.totalPeople.toLocaleString(locale)}</strong> {tr('человек', 'kishi')}</span>
-      <span><strong>{counts.technicians.toLocaleString(locale)}</strong> {tr('видеоинженеров', 'videoinjener')}</span>
-      <span><strong>{counts.operators.toLocaleString(locale)}</strong> {tr('операторов', 'operator')}</span>
-      {counts.others > 0 && <span><strong>{counts.others.toLocaleString(locale)}</strong> {tr('прочих', 'boshqa')}</span>}
-      {counts.hired > 0 && <span>{tr('Наём:', 'Yollash:')} <strong>{counts.hired.toLocaleString(locale)}</strong></span>}
+      <span>{tr('Людей', 'Odamlar')}: <strong>{counts.totalPeople.toLocaleString(locale)}</strong></span>
+      <span>{tr('Видеоинженеры', 'Videoinjenerlar')}: <strong>{counts.technicians.toLocaleString(locale)}</strong></span>
+      <span>{tr('Операторы', 'Operatorlar')}: <strong>{counts.operators.toLocaleString(locale)}</strong></span>
+      {counts.others > 0 && <span>{tr('Прочие', 'Boshqalar')}: <strong>{counts.others.toLocaleString(locale)}</strong></span>}
+      {counts.hired > 0 && <span>{tr('Наём', 'Yollash')}: <strong>{counts.hired.toLocaleString(locale)}</strong></span>}
     </div>
   )
 }
+
+// Сколько имён показывает строка «Свободны» до разворота. Шесть — столько
+// влезает в одну строку на типовом ноутбуке, не отжимая матрицу вниз.
+const VISIBLE_FREE = 6
 
 // Кто из сотрудников не стоит в плане ни разу (с21). Счётчики говорят, сколько
 // человек набрано, эта строка — кем добирать: иначе ответ на «кто ещё свободен»
@@ -309,6 +324,7 @@ function PlanCounts({ counts }: { counts: { technicians: number; operators: numb
 // список кандидатов ровно тот же, что отдаёт пикер, и разойтись они не могут.
 function FreeEmployees({ editor }: { editor: HallPlanEditor }) {
   const { tr, locale } = useLanguage()
+  const [isExpanded, setExpanded] = useState(false)
 
   const free = useMemo(
     () => editor.candidates.filter((candidate) => !editor.planCountByEmployee.has(candidate.id)),
@@ -319,14 +335,31 @@ function FreeEmployees({ editor }: { editor: HallPlanEditor }) {
   // списке было бы враньём, а скелет ради одной серой строки избыточен.
   if (editor.candidatesState !== 'ready') return null
 
-  const names = free.map(employeeDisplayName).join(', ')
+  const all = free.map(employeeDisplayName)
+  const names = all.join(', ')
   const count = free.length.toLocaleString(locale)
 
+  if (free.length === 0) return <p className="hall-free">{tr('Свободных нет', 'Bo‘sh xodim yo‘q')}</p>
+
+  // На экране список обрезан: на полном штате он выдавливал матрицу вниз, и
+  // расстановка начиналась ниже сгиба. На БУМАГЕ обрезать нельзя — лист несут
+  // на планёрку, и «и ещё 9» там ничего не значит. Поэтому вариантов два, и
+  // печать показывает свой (см. @media print).
+  const shown = isExpanded ? all : all.slice(0, VISIBLE_FREE)
+  const rest = all.length - shown.length
+
   return (
-    <p className="hall-free">
-      {free.length > 0
-        ? tr(`Свободны: ${count} — ${names}`, `Bo‘sh: ${count} — ${names}`)
-        : tr('Свободных нет', 'Bo‘sh xodim yo‘q')}
+    <p className="hall-free" title={names}>
+      <span className="hall-free__screen">
+        {tr(`Свободны: ${count} — `, `Bo‘sh: ${count} — `)}
+        {shown.join(', ')}
+        {rest > 0 && (
+          <button type="button" className="hall-free__more" onClick={() => setExpanded(true)}>
+            {tr(`и ещё ${rest}`, `va yana ${rest}`)}
+          </button>
+        )}
+      </span>
+      <span className="hall-free__print">{tr(`Свободны: ${count} — ${names}`, `Bo‘sh: ${count} — ${names}`)}</span>
     </p>
   )
 }

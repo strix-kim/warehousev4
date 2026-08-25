@@ -16,9 +16,10 @@
 }
 
 @media (max-width: 1500px) {
-  .home-destinations { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .home-destination--employees { min-height: 300px; grid-column: 1 / -1; }
-  .home-destination--employees strong, .home-destination--employees p, .home-destination--employees .home-destination__action { max-width: 48%; }
+  /* Нижний ярус: 2 + 1 вместо трёх в ряд — три плитки по 300 px на 1440 сжимают
+     текст до двух слов в строке. Третья занимает ряд целиком. */
+  .home-row--refs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-row--refs > :last-child { grid-column: 1 / -1; }
   .home-destination__art--employees { right: -4%; bottom: -18%; width: 54%; max-height: 112%; }
 }
 
@@ -124,9 +125,9 @@
   .home-page { min-height: auto; justify-content: flex-start; }
   .home-page__header { margin-bottom: 22px; }
   .home-page__header h1 { font-size: 36px; }
-  .home-destinations { grid-template-columns: 1fr; }
+  .home-row--work, .home-row--refs { grid-template-columns: 1fr; }
+  .home-row--refs > :last-child { grid-column: auto; }
   /* Главная работа на телефоне — списки, поэтому их плитка идёт первой */
-  .home-destination--lists { order: -1; }
   .home-destination { min-height: 285px; padding: 24px; }
   .home-destination__icon { width: 52px; height: 52px; }
   .home-destination__arrow { top: 22px; right: 22px; }
@@ -135,8 +136,6 @@
   .home-destination__art { right: -12%; bottom: -2%; width: 76%; max-height: 72%; opacity: .34; }
   .home-destination__art--equipment { width: 82%; opacity: .45; }
   .home-destination__art--lists { bottom: -8%; width: 80%; opacity: .36; }
-  .home-destination--employees { grid-column: auto; }
-  .home-destination--employees strong, .home-destination--employees p, .home-destination--employees .home-destination__action { max-width: 76%; }
   .home-destination__art--employees { right: -12%; bottom: -4%; width: 80%; max-height: 74%; opacity: .32; }
   .list-card, .list-card--loading { min-height: 195px; gap: 14px; padding: 16px; }
   /* Кнопок теперь две вместо трёх — они помещаются в ряд и не съедают
