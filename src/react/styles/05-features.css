@@ -34,19 +34,41 @@
 .list-card:has(.list-card__title:hover) { z-index: 1; box-shadow: 0 0 0 1px var(--line-strong); }
 .list-card:has(.list-card__title:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
 
-.home-page { min-height: calc(100dvh - 70px); display: flex; flex-direction: column; justify-content: center; }
-.home-page__header { max-width: 720px; margin-bottom: 32px; animation: rise-in .3s cubic-bezier(.2,.7,.2,1) both; }
-.home-page__header h1 { margin: 4px 0 10px; font-size: clamp(34px, 4vw, 56px); letter-spacing: -.045em; }
+/* Главная обязана помещаться в экран целиком: это витрина выбора, а не текст —
+   листать её вниз, чтобы увидеть два из пяти разделов, значит спрятать половину
+   системы. Отсюда весь блок ниже: вертикальные метрики привязаны к ВЫСОТЕ окна
+   (vh), а не только к ширине, как было. На ноутбуке 1440x780 прежние числа
+   давали 981 px контента при 780 доступных. */
+.home-page { min-height: calc(100dvh - 96px); display: flex; flex-direction: column; justify-content: center; }
+/* Оболочка держит 40/56 отступа на все страницы — главной этого много: она одна
+   обязана уместиться в экран целиком, а 56 px пустоты под последней плиткой и
+   есть та полоса прокрутки, ради которой приходится крутить колесо. :has, а не
+   класс на .app-content: страница не должна знать про оболочку, чтобы её
+   настроить. */
+.app-content:has(.home-page) { padding-bottom: clamp(18px, 3vh, 56px); }
+.home-page__header { max-width: 720px; margin-bottom: clamp(12px, 3vh, 32px); animation: rise-in .3s cubic-bezier(.2,.7,.2,1) both; }
+/* Кегль заголовка считает и высоту, и ширину: на широком и низком экране рос бы
+   один только 4vw и съедал место, которого нет по вертикали. */
+.home-page__header h1 { margin: 4px 0 clamp(4px, 1.2vh, 10px); font-size: clamp(28px, calc(1.6vh + 2.4vw), 56px); letter-spacing: -.045em; }
 .home-page__header > p:last-child { margin: 0; color: var(--ink-soft); font-size: 15px; line-height: 1.55; }
 /* Два яруса (с25). Верхний — ежедневная работа, нижний — справочники; сетки у
    них разные, поэтому это два грида, а не один на шесть колонок: иначе плитки
    верхнего ряда пришлось бы растягивать span-ами и держать это в голове при
    каждой правке. */
-.home-destinations { display: grid; gap: 18px; }
-.home-row { display: grid; gap: 18px; }
+/* Ярусы делят ОСТАТОК высоты поровну: flex: 1 отдаёт им всё, что не занял
+   заголовок, grid-auto-rows: 1fr выравнивает их между собой. 1fr здесь читается
+   как minmax(auto, 1fr) — ряд не сожмётся ниже своего содержимого, поэтому на
+   низком окне плитки не схлопнутся в кашу, а честно вернут скролл. */
+/* grid-auto-rows намеренно НЕ 1fr по умолчанию. 1fr выравнивает ярусы между
+   собой, и это верно, пока нижний ярус — одна строка. Как только он ломается
+   в 2 + 1 (три плитки на два места), его строка становится двойной, а верхний
+   ярус подтягивается до той же высоты — главная раздувается вдвое. Растягивание
+   включается ниже, ровно там, где ярусов честно два. */
+.home-destinations { flex: 1; min-height: 0; display: grid; grid-auto-rows: auto; gap: clamp(10px, 1.6vh, 18px); }
+.home-row { min-height: 0; display: grid; gap: clamp(10px, 1.6vh, 18px); }
 .home-row--work { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .home-row--refs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.home-destination { position: relative; min-height: 360px; display: flex; flex-direction: column; align-items: flex-start; padding: clamp(25px, 3vw, 40px); overflow: hidden; border: 1px solid var(--line); border-radius: 16px; color: var(--ink); background: #fff; box-shadow: var(--shadow); text-decoration: none; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; animation: rise-in .38s .05s cubic-bezier(.2,.7,.2,1) both; }
+.home-destination { position: relative; min-height: clamp(184px, 24vh, 360px); display: flex; flex-direction: column; align-items: flex-start; padding: clamp(16px, 2.2vh, 40px) clamp(25px, 3vw, 40px); overflow: hidden; border: 1px solid var(--line); border-radius: 16px; color: var(--ink); background: #fff; box-shadow: var(--shadow); text-decoration: none; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; animation: rise-in .38s .05s cubic-bezier(.2,.7,.2,1) both; }
 .home-destination::after { content: ''; position: absolute; right: -75px; bottom: -95px; width: 250px; height: 250px; border-radius: 50%; background: rgba(23,28,32,.035); transition: transform .25s ease; }
 .home-destination:hover { transform: translateY(-4px); border-color: var(--line-strong); box-shadow: 0 20px 45px rgba(13,18,23,.11); }
 .home-destination:hover::after { transform: scale(1.12); }
@@ -57,22 +79,22 @@
 .home-destination--lists::after { background: rgba(255,255,255,.09); }
 .home-destination--equipment::after { background: rgba(255,255,255,.05); }
 .home-destination--employees::after { background: rgba(239,18,54,.055); }
-.home-destination__icon { width: 62px; height: 62px; display: grid; place-items: center; margin-bottom: auto; border-radius: 14px; color: var(--accent); background: rgba(239,18,54,.08); }
+.home-destination__icon { width: clamp(44px, 5.6vh, 62px); height: clamp(44px, 5.6vh, 62px); display: grid; place-items: center; margin-bottom: auto; border-radius: 14px; color: var(--accent); background: rgba(239,18,54,.08); }
 .home-destination--lists .home-destination__icon { color: #fff; background: rgba(255,255,255,.14); }
 .home-destination--equipment .home-destination__icon { color: #fff; background: rgba(255,255,255,.1); }
 .home-destination--employees .home-destination__icon { color: var(--accent); background: rgba(239,18,54,.09); }
 .home-destination__arrow { position: absolute; top: 28px; right: 28px; width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--ink-soft); }
 .home-destination--lists .home-destination__arrow { color: #fff; border-color: rgba(255,255,255,.28); }
 .home-destination--equipment .home-destination__arrow { color: #fff; border-color: rgba(255,255,255,.18); }
-.home-destination .eyebrow { margin-top: 42px; }
+.home-destination .eyebrow { margin-top: clamp(10px, 2.2vh, 42px); }
 .home-destination--lists .eyebrow { color: rgba(255,255,255,.72); }
 .home-destination--equipment .eyebrow { color: rgba(255,255,255,.62); }
-.home-destination strong { position: relative; z-index: 1; margin: 6px 0 10px; font-family: inherit; font-size: clamp(26px, 3vw, 39px); font-weight: 800; letter-spacing: -.045em; }
-.home-destination p { position: relative; z-index: 1; max-width: 440px; margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.65; }
+.home-destination strong { position: relative; z-index: 1; margin: clamp(3px, .7vh, 6px) 0 clamp(4px, 1.1vh, 10px); font-family: inherit; font-size: clamp(21px, calc(1.2vh + 1.5vw), 39px); font-weight: 800; letter-spacing: -.045em; }
+.home-destination p { position: relative; z-index: 1; max-width: 440px; margin: 0; color: var(--ink-soft); font-size: clamp(12px, 1.6vh, 14px); line-height: 1.55; }
 .home-destination--lists p { color: rgba(255,255,255,.76); }
 .home-destination--equipment p { color: rgba(255,255,255,.7); }
 /* color/text-decoration — потому что у списков действие теперь ссылка, а не span */
-.home-destination__action { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; margin-top: 28px; color: inherit; font-size: 13px; font-weight: 800; text-decoration: none; }
+.home-destination__action { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; margin-top: clamp(10px, 1.9vh, 28px); color: inherit; font-size: 13px; font-weight: 800; text-decoration: none; }
 /* Тело плитки — растянутая ссылка: у неё position: static, поэтому её ::after считает
    inset: 0 от самой плитки и кликается вся площадь, а подпись-действие остаётся
    отдельной целью поверх (z-index 2). width: 100% обязателен из-за align-items:
@@ -95,7 +117,11 @@
 .home-destination--halls::after { background: rgba(76,29,149,.05); }
 .home-destination--halls .home-destination__icon { color: var(--accent); background: rgba(239,18,54,.09); }
 .home-destination__art--halls { right: -5%; bottom: -14%; width: 44%; opacity: .6; mask-image: linear-gradient(to right, transparent 0%, #000 22%, #000 100%); }
-.home-row--refs .home-destination { min-height: 300px; }
+/* Нижний ярус ниже верхнего — там справочники, а не ежедневная работа. Число
+   было жёстким (300px) и перебивало общий clamp по СПЕЦИФИЧНОСТИ: два класса
+   против одного. На ноутбучном окне ровно оно и держало главную за краем
+   экрана. Пропорция сохранена — просто считается от высоты окна. */
+.home-row--refs .home-destination { min-height: clamp(150px, 20vh, 300px); }
 .home-destination .eyebrow, .home-destination strong, .home-destination p, .home-destination__action, .home-destination__icon, .home-destination__arrow { position: relative; z-index: 2; }
 .home-destination__arrow { position: absolute; }
 .home-destination strong, .home-destination p, .home-destination__action { max-width: 58%; }
