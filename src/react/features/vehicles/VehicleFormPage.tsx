@@ -2,14 +2,14 @@ import { ArrowLeft, CarFront, CheckCircle2, CircleAlert, Save, X } from 'lucide-
 import { FormEvent, useMemo, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createVehicle, fetchVehicleById, fetchVehicleFiles, getSignedUrls, saveVehicleDrivers, updateVehicle, uploadVehiclePhoto, vehicleSaveErrorText, type VehicleInput } from './api'
-import { VehicleFilesList } from './VehicleFilesList'
+import { VehicleFilesList, VehicleFilesSkeleton } from './VehicleFilesList'
 import { driverFullName, vehicleTitle, type VehicleDriver, type VehicleFile } from './types'
 import { fetchEmployeeBriefs } from '../employees/api'
 import { EmployeePicker } from '../../components/EmployeePicker'
 import { PhotoPickField } from '../../components/PhotoPickField'
 import { UploadQueue, type UploadItem } from '../../components/UploadQueue'
 import { compressPhoto } from '../../lib/compressPhoto'
-import { useLanguage } from '../../lib/i18n'
+import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 
 const emptyDraft: VehicleInput = {
@@ -70,6 +70,10 @@ export function VehicleFormPage() {
   // политикой): это честное состояние, а не пустая форма, иначе «Сохранить»
   // молча создало бы вторую машину.
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'missing' | 'failed'>(vehicleId ? 'loading' : 'ready')
+  // Госномер как он лежит в базе — только для имени вкладки. Черновик тут не
+  // годится: поле правится посимвольно, и заголовок дёргал бы провайдер на
+  // каждом нажатии.
+  const [loadedPlate, setLoadedPlate] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const [existingFiles, setExistingFiles] = useState<VehicleFile[]>([])
   const [fileUrls, setFileUrls] = useState<Map<string, string>>(new Map())
@@ -87,6 +91,7 @@ export function VehicleFormPage() {
           return
         }
         setDraft(draftFromVehicle(vehicle))
+        setLoadedPlate(vehicle.plate_number)
         setDrivers(vehicle.drivers)
         setSavedDriverIds(vehicle.drivers.map((driver) => driver.id))
         setLoadState('ready')
@@ -123,6 +128,12 @@ export function VehicleFormPage() {
       })
     return () => { isCurrent = false }
   }, [vehicleId, reloadKey])
+
+  // Машину опознают по госномеру, поэтому в правке вкладка называется им, а не
+  // маркой; на создании — самим действием.
+  useDocumentTitle(isEditing
+    ? loadedPlate ? tr(`${loadedPlate} — машина`, `${loadedPlate} — mashina`) : ''
+    : tr('Добавить машину', 'Mashina qo‘shish'))
 
   const canSave = Boolean(draft.brand.trim() && draft.plate_number.trim())
   const backTarget = vehicleId ? `/vehicles?vehicle=${vehicleId}` : '/vehicles'
@@ -278,12 +289,29 @@ export function VehicleFormPage() {
     void save()
   }
 
+  // Форма занимает экран целиком, поэтому её загрузка показывается болванками
+  // полей: одна строка текста посреди пустой панели читается как «здесь ничего
+  // нет», а не как «сейчас будет».
+  if (isEditing && loadState === 'loading') {
+    return (
+      <section className="data-panel vehicle-form" role="status" aria-label={tr('Загружаем карточку машины', 'Mashina kartasi yuklanmoqda')}>
+        <div className="form-section">
+          <div className="form-grid">
+            {Array.from({ length: 4 }, (_, index) => <div className="field-skeleton" key={index} />)}
+          </div>
+        </div>
+        <div className="form-section">
+          <div className="form-grid">
+            {Array.from({ length: 2 }, (_, index) => <div className="field-skeleton" key={index} />)}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   if (isEditing && loadState !== 'ready') {
     return (
       <section className="data-panel">
-        {loadState === 'loading' && (
-          <div className="state-block"><span>{tr('Загружаем карточку…', 'Karta yuklanmoqda…')}</span></div>
-        )}
         {loadState === 'missing' && (
           <div className="state-block">
             <CarFront size={27} />
@@ -408,7 +436,7 @@ export function VehicleFormPage() {
               {filesState === 'failed'
                 ? <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить фото машины.', 'Mashina fotolarini yuklab bo‘lmadi.')}</p>
                 : filesState === 'loading'
-                  ? <p className="muted">{tr('Загружаем фото…', 'Fotolar yuklanmoqda…')}</p>
+                  ? <VehicleFilesSkeleton />
                   : existingFiles.length === 0
                     ? <p className="muted">{tr('Фото пока нет.', 'Hozircha fotolar yo‘q.')}</p>
                     : <VehicleFilesList files={existingFiles} urls={fileUrls} photoAlt={vehicleTitle(draft.brand, draft.model)} />}

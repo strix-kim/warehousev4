@@ -1,6 +1,7 @@
-import { CarFront, CircleAlert, FileSpreadsheet, Plus, Search } from 'lucide-react'
+import { CarFront, CircleAlert, FileSpreadsheet, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { AppSelect } from '../../components/AppSelect'
 import { fetchVehiclePhotoPaths, fetchVehicles, getSignedUrls } from './api'
 import { downloadVehicleEventXlsx } from './eventExport'
 import { VehicleDrawer } from './VehicleDrawer'
@@ -8,13 +9,14 @@ import { VehicleEventExportDrawer } from './VehicleEventExportDrawer'
 import { plateForSearch, vehicleTitle, type VehicleWithDrivers } from './types'
 import { fetchEmployees } from '../employees/api'
 import { employeeShortName, type Employee } from '../employees/types'
-import { useLanguage } from '../../lib/i18n'
+import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import type { EventDocumentMeta } from '../../lib/xlsx/eventDocument'
 
 export function VehiclesPage() {
   const navigate = useNavigate()
   const { tr, locale } = useLanguage()
+  useDocumentTitle(tr('Автомобили', 'Avtomobillar'))
   // Открытая карточка живёт в АДРЕСЕ: заход в «Добавить машину» и обратно
   // размонтирует страницу, а на телефоне жест «назад» обязан закрывать карточку,
   // а не выкидывать из раздела.
@@ -24,6 +26,7 @@ export function VehiclesPage() {
   // Поиск здесь клиентский и в адрес не едет: выдача полная, фильтр мгновенный,
   // а запоминать его в истории незачем — в отличие от открытой карточки.
   const [search, setSearch] = useState('')
+  const [brand, setBrand] = useState('')
   // Состав будущего документа — черновик действия, а не состояние экрана:
   // ни в адресе, ни в хранилище его нет, уход со страницы сбрасывает выбор.
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -75,14 +78,33 @@ export function VehiclesPage() {
   // (в базе он с пробелами, в голове у человека — слитно), марку с моделью и
   // фамилию водителя — обычной подстрокой.
   const query = search.trim()
+  // Фильтр складывается с поиском, а не отменяет его: марку выбирают, чтобы
+  // сузить уже найденное, а не чтобы начать сначала.
+  const isFiltered = Boolean(query) || Boolean(brand)
   const visible = useMemo(() => {
-    if (!query) return vehicles
+    if (!isFiltered) return vehicles
     const plateQuery = plateForSearch(query)
     const lowered = query.toLowerCase()
-    return vehicles.filter((vehicle) => plateForSearch(vehicle.plate_number).includes(plateQuery)
-      || vehicleTitle(vehicle.brand, vehicle.model).toLowerCase().includes(lowered)
-      || vehicle.drivers.some((driver) => driver.last_name.toLowerCase().includes(lowered)))
-  }, [vehicles, query])
+    return vehicles.filter((vehicle) => {
+      if (brand && vehicle.brand !== brand) return false
+      if (!query) return true
+      return plateForSearch(vehicle.plate_number).includes(plateQuery)
+        || vehicleTitle(vehicle.brand, vehicle.model).toLowerCase().includes(lowered)
+        || vehicle.drivers.some((driver) => driver.last_name.toLowerCase().includes(lowered))
+    })
+  }, [vehicles, query, brand, isFiltered])
+
+  // Марки собираются из фактической выдачи: справочника марок у сущности нет,
+  // и заводить его ради фильтра — это вторая правда о том же значении.
+  const brandOptions = useMemo(() => {
+    const values = [...new Set(vehicles.map((vehicle) => vehicle.brand).filter((value): value is string => Boolean(value)))]
+    return values.sort((a, b) => a.localeCompare(b))
+  }, [vehicles])
+
+  function resetFilters() {
+    setSearch('')
+    setBrand('')
+  }
 
   // Карточка — тоже адрес. Открытие пушит запись, поэтому «назад» её закрывает;
   // закрытие ЗАМЕНЯЕТ текущую запись, иначе «назад» открыло бы её снова (§7).
@@ -165,12 +187,33 @@ export function VehiclesPage() {
               placeholder={tr('Госномер, марка или водитель…', 'Davlat raqami, marka yoki haydovchi…')}
               aria-label={tr('Поиск машин', 'Mashinalarni qidirish')}
             />
+            {search && (
+              <button className="icon-button" onClick={() => setSearch('')} aria-label={tr('Очистить поиск', 'Qidiruvni tozalash')}>
+                <X size={16} />
+              </button>
+            )}
           </label>
+          <AppSelect
+            value={brand}
+            options={[{ value: '', label: tr('Все марки', 'Barcha markalar') }, ...brandOptions.map((value) => ({ value, label: value }))]}
+            icon={<CarFront size={17} />}
+            onChange={setBrand}
+            ariaLabel={tr('Фильтр по марке', 'Marka bo‘yicha filtr')}
+          />
           <label className="select-all">
             <input type="checkbox" checked={allShownSelected} disabled={visible.length === 0} onChange={toggleAllShown} />
-            <span>{tr('Выбрать всех показанных', 'Ko‘rsatilganlarning barchasini tanlash')} ({visible.length.toLocaleString(locale)})</span>
+            {/* Числа в подписи нет намеренно: сколько сейчас показано, печатает
+                один toolbar__count — два счётчика рядом расходились бы в глазах. */}
+            <span>{tr('Выбрать всех показанных', 'Ko‘rsatilganlarning barchasini tanlash')}</span>
           </label>
-          <span className="toolbar__count">{tr('Машин', 'Mashinalar')}: {visible.length.toLocaleString(locale)}</span>
+          {/* Счётчик отвечает на один вопрос: без фильтра — сколько машин всего,
+              с фильтром — сколько нашлось из скольких. Прежняя строка печатала
+              visible в обоих случаях, и общее число просто пропадало. */}
+          <span className="toolbar__count">
+            {isFiltered
+              ? tr(`Найдено: ${visible.length.toLocaleString(locale)} из ${vehicles.length.toLocaleString(locale)}`, `Topildi: ${vehicles.length.toLocaleString(locale)} tadan ${visible.length.toLocaleString(locale)} tasi`)
+              : `${tr('Машин', 'Mashinalar')}: ${vehicles.length.toLocaleString(locale)}`}
+          </span>
         </div>
 
         {hasError ? (
@@ -260,9 +303,11 @@ export function VehiclesPage() {
             {!isLoading && vehicles.length > 0 && visible.length === 0 && (
               <div className="state-block">
                 <Search size={27} />
-                <strong>{tr(`Ничего не найдено по «${query}»`, `«${query}» bo‘yicha hech narsa topilmadi`)}</strong>
-                <span>{tr('Проверьте написание номера или марки — пробелы в номере не важны.', 'Raqam yoki marka yozilishini tekshiring — raqamdagi bo‘shliqlar muhim emas.')}</span>
-                <button className="button button--secondary" onClick={() => setSearch('')}>{tr('Сбросить поиск', 'Qidiruvni tozalash')}</button>
+                <strong>{query
+                  ? tr(`Ничего не найдено по «${query}»`, `«${query}» bo‘yicha hech narsa topilmadi`)
+                  : tr('Ничего не найдено', 'Hech narsa topilmadi')}</strong>
+                <span>{tr('Проверьте написание номера или снимите фильтр по марке — пробелы в номере не важны.', 'Raqam yozilishini tekshiring yoki marka filtrini oling — raqamdagi bo‘shliqlar muhim emas.')}</span>
+                <button className="button button--secondary" onClick={resetFilters}>{tr('Сбросить фильтры', 'Filtrlarni tozalash')}</button>
               </div>
             )}
           </div>

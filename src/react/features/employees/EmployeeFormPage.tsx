@@ -3,12 +3,12 @@ import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createEmployee, employeeSaveErrorText, fetchEmployeeById, fetchEmployeeFiles, findNamesakes, getSignedUrls, setEmployeeDocumentPhoto, updateEmployee, uploadEmployeeFile, type EmployeeInput, type EmployeeNamesake } from './api'
 import { EmployeeFileFields, emptyFileSelection, selectedFiles, type EmployeeFileSelection } from './EmployeeFileFields'
-import { EmployeeFilesList } from './EmployeeFilesList'
+import { EmployeeFilesList, EmployeeFilesSkeleton } from './EmployeeFilesList'
 import { employeeFileKindLabel, employeeFullName, type Employee, type EmployeeFile, type EmployeeFileKind } from './types'
 import { UploadQueue, type UploadItem } from '../../components/UploadQueue'
 import { compressPhoto } from '../../lib/compressPhoto'
 import { parseDateValue } from '../../lib/date'
-import { useLanguage } from '../../lib/i18n'
+import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 
 const emptyDraft: EmployeeInput = {
@@ -143,6 +143,13 @@ export function EmployeeFormPage() {
       })
     return () => { isCurrent = false }
   }, [employeeId, reloadKey])
+
+  // Вкладка называет себя: у правки — именем сотрудника, у новой карточки —
+  // общим заголовком. Пока карточка не загрузилась, имени нет — пустая строка
+  // возвращает общее имя приложения, а не «Загружаем…» в заголовке окна.
+  useDocumentTitle(isEditing
+    ? (loadState === 'ready' ? employeeFullName(draft) : '')
+    : tr('Новый сотрудник', 'Yangi xodim'))
 
   // Тот же запрос, что и в карточке: правило одно, мест показа два.
   async function chooseDocumentPhoto(fileId: string) {
@@ -296,8 +303,15 @@ export function EmployeeFormPage() {
   if (isEditing && loadState !== 'ready') {
     return (
       <section className="data-panel">
+        {/* Болванки полей вместо строки «Загружаем карточку…»: экран сразу
+            показывает, ЧТО грузится и сколько места это займёт. */}
         {loadState === 'loading' && (
-          <div className="state-block"><span>{tr('Загружаем карточку…', 'Karta yuklanmoqda…')}</span></div>
+          <div className="employee-form-skeleton" role="status" aria-label={tr('Загружаем карточку', 'Karta yuklanmoqda')}>
+            <div className="detail-skeleton employee-form-skeleton__title" />
+            <div className="form-grid">
+              {Array.from({ length: 6 }, (_, index) => <div className="detail-skeleton" key={index} />)}
+            </div>
+          </div>
         )}
         {loadState === 'missing' && (
           <div className="state-block">
@@ -408,7 +422,7 @@ export function EmployeeFormPage() {
               {filesState === 'failed'
                 ? <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить файлы сотрудника.', 'Xodim fayllarini yuklab bo‘lmadi.')}</p>
                 : filesState === 'loading'
-                  ? <p className="muted">{tr('Загружаем файлы…', 'Fayllar yuklanmoqda…')}</p>
+                  ? <EmployeeFilesSkeleton />
                   : existingFiles.length === 0
                     ? <p className="muted">{tr('Файлов пока нет.', 'Hozircha fayllar yo‘q.')}</p>
                     : <EmployeeFilesList

@@ -1,0 +1,75 @@
+
+.app-shell { min-height: 100vh; display: grid; grid-template-columns: 256px minmax(0, 1fr); transition: grid-template-columns .22s ease; }
+.sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; padding: 22px 16px 16px; color: #f8faf8; background: radial-gradient(circle at 16% 70%, rgba(239,18,54,.12), transparent 28%), linear-gradient(160deg, #10171d 0%, var(--sidebar) 56%, #080c10 100%); transition: padding .22s ease; }
+.sidebar::before { content: ''; position: absolute; inset: 0; opacity: .34; pointer-events: none; background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: 28px 28px; mask-image: linear-gradient(to bottom, transparent 9%, #000 38%, #000 78%, transparent 96%); }
+.sidebar::after { content: ''; position: absolute; left: 26px; bottom: 190px; width: 1px; height: 210px; opacity: .7; pointer-events: none; background: linear-gradient(transparent, rgba(239,18,54,.72), transparent); box-shadow: 46px 25px 0 rgba(255,255,255,.045), 92px -12px 0 rgba(255,255,255,.045), 138px 38px 0 rgba(255,255,255,.045), 184px 4px 0 rgba(255,255,255,.045); transform: rotate(68deg); }
+.sidebar > * { position: relative; z-index: 1; }
+.sidebar__brand { display: flex; align-items: center; justify-content: space-between; padding: 0 6px 22px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.brand-lockup { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+.brand-lockup--light { color: #fff; }
+.brand-lockup--home { margin: -4px; padding: 4px; border-radius: 10px; text-decoration: none; transition: background .18s ease, transform .18s ease; }
+.brand-lockup--home:hover { background: rgba(255,255,255,.055); transform: translateY(-1px); }
+.brand-lockup--home:active { transform: translateY(0); }
+.brand-lockup--home:focus-visible { outline: 3px solid rgba(239,18,54,.28); outline-offset: 3px; }
+.brand-lockup--home .brand-mark { transition: transform .18s ease, box-shadow .18s ease; }
+.brand-lockup--home:hover .brand-mark { transform: scale(1.04); box-shadow: 0 6px 18px rgba(239,18,54,.22); }
+.brand-mark { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 7px; color: #fff; background: var(--accent); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-size: 18px; font-weight: 800; }
+.brand-name { font-size: 19px; letter-spacing: .09em; }
+.sidebar__nav { flex: 0 0 auto; padding: 24px 0 10px; }
+.nav-section-label { margin: 0 10px 10px; color: #68737c; font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.sidebar__nav a { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; margin: 4px 0; padding: 0 12px; border-radius: 9px; color: #a9b1b7; text-decoration: none; font-size: 15px; font-weight: 600; transition: .18s ease; }
+.sidebar__nav a:hover { color: #fff; background: rgba(255,255,255,.05); }
+.sidebar__nav a.active { color: #fff; background: rgba(239,18,54,.14); }
+.sidebar__nav a.active::before { content: ''; position: absolute; left: 0; width: 3px; height: 22px; border-radius: 4px; background: var(--accent); }
+.sidebar__nav a.active svg { color: var(--accent); }
+.sidebar__utility { display: grid; gap: 10px; margin: 14px 0 18px; }
+.sidebar__quick-action { min-height: 68px; display: grid; grid-template-columns: 38px minmax(0, 1fr) 16px; align-items: center; gap: 10px; padding: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; color: #fff; background: linear-gradient(135deg, rgba(255,255,255,.075), rgba(255,255,255,.025)); box-shadow: inset 0 1px rgba(255,255,255,.04); text-decoration: none; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.sidebar__quick-action:hover { border-color: rgba(239,18,54,.42); background: linear-gradient(135deg, rgba(239,18,54,.15), rgba(255,255,255,.035)); transform: translateY(-1px); }
+.sidebar__quick-action > span { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 9px; color: #fff; background: var(--accent); box-shadow: 0 6px 18px rgba(239,18,54,.22); }
+.sidebar__quick-action > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sidebar__quick-action strong { font-size: 13px; }
+.sidebar__quick-action small { color: #7f8990; font-size: 10px; }
+.sidebar__quick-action > svg { color: #7c878e; }
+/* Нижний блок сайдбара прижат к низу отсюда: раньше это делала строка «Склад в
+   рабочем режиме» своим margin-top: auto, и вместе с ней он бы всплыл к навигации. */
+.sidebar__scope { display: flex; align-items: center; gap: 10px; margin-top: auto; margin-bottom: 12px; padding: 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; color: #9fa8ae; }
+.sidebar__scope > span { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.sidebar__scope strong { overflow: hidden; color: #e9edeb; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar__language { margin-bottom: 10px; }
+/* Кнопка «Ещё» — только для нижней панели телефона (блок 820). На десктопе всё её
+   содержимое стоит в сайдбаре открытым, и лишний слой был бы кликом в никуда. */
+.sidebar__more { display: none; }
+.language-switch { width: max-content; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin: 0 0 24px auto; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); }
+.language-switch button { min-width: 42px; height: 30px; padding: 0 8px; border: 0; border-radius: 6px; color: var(--ink-faint); background: transparent; font-size: 12px; font-weight: 800; }
+.language-switch button.active { color: #fff; background: var(--accent); box-shadow: 0 2px 7px rgba(239,18,54,.18); }
+.language-switch--compact { width: 100%; margin: 0; border-color: rgba(255,255,255,.09); background: rgba(255,255,255,.035); }
+.language-switch--compact button { color: #77828a; }
+.language-switch--compact button.active { color: #fff; }
+.sidebar__footer { display: grid; grid-template-columns: 36px minmax(0, 1fr) 34px; align-items: center; gap: 9px; padding: 15px 5px 2px; border-top: 1px solid rgba(255,255,255,.08); }
+.user-avatar { width: 36px; height: 36px; display: grid; place-items: center; overflow: hidden; border: 1px solid rgba(255,255,255,.14); border-radius: 50%; color: #fff; background: #171c20; }
+.user-avatar img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.user-copy { min-width: 0; display: flex; flex-direction: column; }
+.user-copy strong { overflow: hidden; color: #fff; font-size: 13px; text-overflow: ellipsis; }
+.user-copy span { overflow: hidden; color: #66727a; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+
+.app-shell--sidebar-collapsed { grid-template-columns: 76px minmax(0, 1fr); }
+.app-shell--sidebar-collapsed .sidebar { padding-inline: 10px; }
+.app-shell--sidebar-collapsed .sidebar__brand { justify-content: center; }
+.app-shell--sidebar-collapsed .sidebar__brand .brand-lockup, .app-shell--sidebar-collapsed .nav-section-label, .app-shell--sidebar-collapsed .sidebar__nav a span, .app-shell--sidebar-collapsed .sidebar__scope span, .app-shell--sidebar-collapsed .user-copy { display: none; }
+.app-shell--sidebar-collapsed .sidebar__brand > button { display: grid; }
+.app-shell--sidebar-collapsed .sidebar__nav a { justify-content: center; padding: 0; }
+.app-shell--sidebar-collapsed .sidebar__scope { justify-content: center; padding: 12px 0; }
+.app-shell--sidebar-collapsed .sidebar__footer { grid-template-columns: 1fr; justify-items: center; }
+.app-shell--sidebar-collapsed .sidebar__utility { display: none; }
+.app-shell--sidebar-collapsed .sidebar__language { width: 100%; }
+.app-shell--sidebar-collapsed .language-switch--compact { grid-template-columns: 1fr; }
+.app-shell--sidebar-collapsed .language-switch--compact button { width: 100%; min-width: 0; padding-inline: 0; }
+
+.app-content { width: 100%; max-width: 1700px; min-width: 0; margin: 0 auto; padding: 40px clamp(24px, 4vw, 64px) 56px; }
+/* Полоса аккаунта живёт только там, где спрятан подвал сайдбара, — см. блок ≤820 */
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+.page-header h1 { margin-bottom: 8px; }
+.page-description { margin: 0; color: var(--ink-soft); font-size: 15px; line-height: 1.55; }
+.eyebrow { margin-bottom: 8px; color: #7b858c; font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.eyebrow--light { color: var(--accent); }
+.muted { color: var(--ink-soft); }

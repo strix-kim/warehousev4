@@ -1,5 +1,5 @@
-import { ArrowLeft, Check, CircleAlert, Copy, LayoutGrid, MonitorPlay, Pencil, Presentation } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, Check, CircleAlert, Copy, LayoutGrid, MonitorPlay, Pencil, Plus, Presentation } from 'lucide-react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { HallMatrix } from './HallMatrix'
 import { HallPlanMetaDrawer } from './HallPlanMetaDrawer'
@@ -54,10 +54,10 @@ export function HallPlanPage() {
 
   if (editor.loadState !== 'ready' || !editor.plan) {
     return (
-      <section className="data-panel">
-        {editor.loadState === 'loading' && (
-          <div className="state-block"><span>{tr('Загружаем план…', 'Reja yuklanmoqda…')}</span></div>
-        )}
+      // Поля панели (--halls) нужны только болванке матрицы: отказ и «не найден»
+      // это .state-block, он центрирует себя сам.
+      <section className={editor.loadState === 'loading' ? 'data-panel data-panel--halls' : 'data-panel'}>
+        {editor.loadState === 'loading' && <MatrixSkeleton />}
         {/* 'missing' — строки нет (или её не видно политикой): честное состояние,
             а не пустая шапка, иначе ссылка на удалённый план выглядела бы рабочей. */}
         {editor.loadState === 'missing' && (
@@ -131,6 +131,9 @@ export function HallPlanPage() {
                 'Выберите позицию из готовых под матрицей или впишите свою.',
                 'Matritsa ostidagi tayyor lavozimlardan tanlang yoki o‘zingiznikini kiriting.',
               )}</span>
+              <button className="button button--primary" onClick={focusPositionInput}>
+                <Plus size={17} /> {tr('Добавить позицию', 'Lavozim qo‘shish')}
+              </button>
             </div>
           )
           : null}
@@ -150,6 +153,54 @@ export function HallPlanPage() {
         />
       )}
     </>
+  )
+}
+
+// Единственное действие пустого плана — поле «Добавить позицию», а лежит оно
+// ПОД матрицей, ниже сгиба: пустое состояние звало сделать то, чего не видно.
+// Поле живёт внутри HallMatrix, и тянуть ref через два компонента ради одного
+// клика незачем — берём его из DOM, как ListEditorPage берёт поля раскрытой
+// панели по id.
+//
+// preventScroll обязателен: обычный фокус прыгает к полю мгновенно и обрывает
+// плавную прокрутку (та же грабля, что в редакторе списков).
+function focusPositionInput() {
+  const input = document.querySelector<HTMLInputElement>('.hall-add-position input')
+  if (!input) return
+  input.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  input.focus({ preventScroll: true })
+}
+
+// Болванка матрицы на время загрузки. Строка «Загружаем план…» стояла в
+// .state-block на 260 px, а приезжала на её место сетка в пол-экрана — контент
+// прыгал ровно в тот момент, когда на него начинали смотреть.
+//
+// Числа взяты типовые и НЕ угадывают конкретный план: болванка обязана совпасть
+// с матрицей площадью, а не составом — сколько в плане залов и позиций, до
+// ответа базы неизвестно в принципе.
+const SKELETON_HALLS = 4
+const SKELETON_ROWS = 5
+
+function MatrixSkeleton() {
+  const { tr } = useLanguage()
+
+  return (
+    <div className="hall-matrix-scroll hall-skeleton" role="status" aria-label={tr('Загружаем план…', 'Reja yuklanmoqda…')}>
+      <div className="hall-skeleton__grid">
+        <div className="hall-skeleton__corner" />
+        {Array.from({ length: SKELETON_HALLS }, (_, index) => (
+          <div className="hall-skeleton__colhead" key={index}><span /></div>
+        ))}
+        {Array.from({ length: SKELETON_ROWS }, (_, row) => (
+          <Fragment key={row}>
+            <div className="hall-skeleton__rowhead"><span /></div>
+            {Array.from({ length: SKELETON_HALLS }, (_, column) => (
+              <div className="hall-skeleton__cell" key={column}><span /></div>
+            ))}
+          </Fragment>
+        ))}
+      </div>
+    </div>
   )
 }
 
