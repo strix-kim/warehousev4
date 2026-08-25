@@ -1,27 +1,38 @@
-import { CircleAlert, Pencil, UserRound, X } from 'lucide-react'
+import { CarFront, CircleAlert, Palette, Pencil, UserRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { fetchVehicleFiles, getSignedUrls } from './api'
 import { VehicleFilesList, VehicleFilesSkeleton } from './VehicleFilesList'
 import { driverFullName, vehicleTitle, type Tr, type VehicleFile, type VehicleWithDrivers } from './types'
+import { ProfileHead, ProfileSections, type ProfileSection } from '../../components/ProfileCard'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import { useModalLayer } from '../../lib/useModalLayer'
 
-type DetailRow = { key: string; label: string; value: string | null }
-
-// Строки карточки: показываем ТОЛЬКО заполненные — обязательных полей у машины
+// Реквизиты карточки: показываем ТОЛЬКО заполненные — обязательных полей у машины
 // два (марка и номер), остальное добивается позже, и половина «—» превращала бы
-// карточку в бланк.
-function detailRows(vehicle: VehicleWithDrivers, tr: Tr): DetailRow[] {
+// карточку в бланк. Марки с моделью здесь нет намеренно: они стоят главным фактом
+// в шапке, и строкой это был бы второй показ тех же данных.
+function detailSections(vehicle: VehicleWithDrivers, tr: Tr): ProfileSection[] {
   return [
-    { key: 'brand', label: tr('Марка', 'Marka'), value: vehicle.brand },
-    { key: 'model', label: tr('Модель', 'Model'), value: vehicle.model },
-    { key: 'color', label: tr('Цвет', 'Rang'), value: vehicle.color },
-  ].filter((row) => Boolean(row.value))
+    {
+      key: 'specs',
+      title: tr('Реквизиты', 'Rekvizitlar'),
+      fields: [
+        { key: 'color', label: tr('Цвет', 'Rang'), value: vehicle.color, icon: <Palette size={13} /> },
+      ],
+    },
+  ]
 }
 
-export function VehicleDrawer({ vehicle, onClose }: { vehicle: VehicleWithDrivers; onClose: () => void }) {
+export function VehicleDrawer({ vehicle, photoUrl, onClose }: {
+  vehicle: VehicleWithDrivers
+  // Подписанная ссылка на главное фото — та же, что показывает строка списка:
+  // шапка не ждёт круга сети (с26). В проде vehicle_files пуста, поэтому обычное
+  // состояние сегодня — плейсхолдер, и он обязан выглядеть намеренным.
+  photoUrl?: string
+  onClose: () => void
+}) {
   const { tr } = useLanguage()
   const navigate = useNavigate()
   useModalLayer(onClose)
@@ -58,29 +69,36 @@ export function VehicleDrawer({ vehicle, onClose }: { vehicle: VehicleWithDriver
     return () => { isCurrent = false }
   }, [vehicle.id])
 
-  const rows = detailRows(vehicle, tr)
+  const sections = detailSections(vehicle, tr)
   const title = vehicleTitle(vehicle.brand, vehicle.model)
 
   return (
     <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Карточка машины', 'Mashina kartasi')} onMouseDown={onClose}>
       <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
-          <div>
-            {/* Надзаголовок называет КЛАСС записи, а крупно стоит госномер: машину
-                на площадке опознают по номеру, а не по названию модели. Марка,
-                модель и цвет — строками в .detail-list ниже, в надзаголовке они
-                были бы вторым показом тех же данных. */}
-            <p className="eyebrow">{tr('Автомобиль', 'Avtomobil')}</p>
-            <h2><span className="plate-badge plate-badge--lg">{vehicle.plate_number}</span></h2>
-          </div>
+          {/* Надзаголовок называет КЛАСС записи, крупно стоит госномер — машину на
+              площадке опознают по номеру, а не по названию модели, — и марка с
+              моделью идут главным фактом под ним. */}
+          <ProfileHead
+            eyebrow={tr('Автомобиль', 'Avtomobil')}
+            title={<span className="plate-badge plate-badge--lg">{vehicle.plate_number}</span>}
+            fact={title}
+            photoUrl={photoUrl}
+            photoAlt={title}
+            photoPlaceholder={<CarFront size={24} />}
+            photoShape="wide"
+          />
           <div className="drawer__header-actions">
             <button className="button button--secondary" onClick={() => navigate(`/vehicles/${vehicle.id}/edit`)}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>
             <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
           </div>
         </div>
 
-        {/* Фото стоит ВЫШЕ реквизитов: у машины это главный опознавательный
-            признак — по нему человек понимает, ту ли карточку открыл. */}
+        <ProfileSections sections={sections} />
+
+        {/* Опознание уехало в шапку (с27), поэтому галерея больше не обязана
+            стоять первой: снимков у машины несколько, и это уже подробность, а не
+            ответ на «ту ли карточку открыл». */}
         <section className="unit-lists">
           <div className="panel-heading"><div><h3>{tr('Фото', 'Fotolar')}</h3><p>{tr('Открываются по временной ссылке — она действует час.', 'Vaqtinchalik havola orqali ochiladi — u bir soat amal qiladi.')}</p></div></div>
           {hasError
@@ -91,14 +109,6 @@ export function VehicleDrawer({ vehicle, onClose }: { vehicle: VehicleWithDriver
                 ? <p className="muted">{tr('Фото пока нет.', 'Hozircha fotolar yo‘q.')}</p>
                 : <VehicleFilesList files={files} urls={urls} photoAlt={title} />}
         </section>
-
-        <dl className="detail-list">
-          {rows.map((row) => (
-            <div key={row.key}>
-              <dt>{row.label}</dt><dd>{row.value}</dd>
-            </div>
-          ))}
-        </dl>
 
         <section className="unit-lists">
           <div className="panel-heading"><div><h3>{tr('Водители', 'Haydovchilar')}</h3><p>{tr('Карточка сотрудника открывается в разделе «Сотрудники».', 'Xodim kartasi «Xodimlar» bo‘limida ochiladi.')}</p></div></div>

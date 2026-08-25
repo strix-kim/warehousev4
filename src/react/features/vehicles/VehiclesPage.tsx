@@ -362,7 +362,7 @@ export function VehiclesPage() {
         </div>
       )}
 
-      {openCard && <VehicleDrawer vehicle={openCard} onClose={closeVehicle} />}
+      {openCard && <VehicleDrawer vehicle={openCard} photoUrl={photoUrls.get(openCard.id)} onClose={closeVehicle} />}
       {isExportOpen && <VehicleEventExportDrawer vehicles={chosen} onClose={() => setIsExportOpen(false)} onExport={exportEventList} />}
     </>
   )

@@ -1,10 +1,12 @@
-import { CircleAlert, Pencil, X } from 'lucide-react'
+import { Cake, CalendarDays, CircleAlert, Hash, House, IdCard, Landmark, MapPin, Pencil, Phone, Shirt, UserRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchEmployeeById, fetchEmployeeFiles, getSignedUrls, setEmployeeDocumentPhoto } from './api'
 import { EmployeeFilesList, EmployeeFilesSkeleton } from './EmployeeFilesList'
 import { employeeFullName, type Employee, type EmployeeFile, type EmployeeListItem, type Tr } from './types'
+import { ProfileBadges, ProfileHead, ProfileSections, type ProfileBadge, type ProfileSection } from '../../components/ProfileCard'
 import { formatEventDate, parseDateValue } from '../../lib/date'
+import { expiryBadgeClass, expiryState } from '../../lib/expiry'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import { useModalLayer } from '../../lib/useModalLayer'
@@ -17,43 +19,82 @@ function dateLabel(value: string | null, locale: string) {
   return date ? formatEventDate(date, locale) : value
 }
 
-type DetailRow = { key: string; label: string; value: string | null; wide?: boolean }
+// Сроки живут ТОЛЬКО бейджем: цвет отвечает на «можно ли ставить в работу», а
+// дата стоит тут же, поэтому отдельной строки в реквизитах им не нужно — это
+// был бы второй показ тех же данных. Срок не заполнен — бейджа нет вовсе
+// (решение прораба, с27): молчание честнее серого «не указан», который выглядел
+// бы как проверенный факт.
+function expiryBadges(employee: Employee, tr: Tr, locale: string): ProfileBadge[] {
+  const badges: ProfileBadge[] = []
+  const add = (key: string, value: string | null, label: (date: string) => string) => {
+    const state = expiryState(value)
+    const date = dateLabel(value, locale)
+    if (!state || !date) return
+    badges.push({ key, className: expiryBadgeClass(state), label: label(date) })
+  }
+  add('passport', employee.passport_expires_at, (date) => tr(`Паспорт до ${date}`, `Pasport ${date} gacha`))
+  add('clearance', employee.clearance_expires_at, (date) => tr(`Допуск до ${date}`, `Ruxsat ${date} gacha`))
+  return badges
+}
 
-// Строки карточки: показываем ТОЛЬКО заполненные — пустая половина «—» на два
-// десятка полей превращала бы карточку в бланк.
-function detailRows(employee: Employee, tr: Tr, locale: string): DetailRow[] {
+// Реквизиты секциями: человек ищет не «двенадцатую строку сверху», а телефон,
+// паспорт или прописку — и группа подсказывает, где смотреть.
+function detailSections(employee: Employee, tr: Tr, locale: string): ProfileSection[] {
   const passport = [employee.passport_series, employee.passport_number].filter(Boolean).join(' ')
   return [
-    { key: 'position', label: tr('Должность', 'Lavozim'), value: employee.position },
-    { key: 'phone', label: tr('Телефон', 'Telefon'), value: employee.phone },
-    { key: 'birth_date', label: tr('Дата рождения', 'Tug‘ilgan sana'), value: dateLabel(employee.birth_date, locale) },
-    { key: 'birth_place', label: tr('Место рождения', 'Tug‘ilgan joyi'), value: employee.birth_place },
-    { key: 'passport', label: tr('Паспорт', 'Pasport'), value: passport || null },
-    { key: 'pinfl', label: tr('ПИНФЛ', 'JSHSHIR'), value: employee.pinfl },
-    { key: 'passport_issued_at', label: tr('Дата выдачи', 'Berilgan sana'), value: dateLabel(employee.passport_issued_at, locale) },
-    { key: 'passport_expires_at', label: tr('Действителен до', 'Amal qilish muddati'), value: dateLabel(employee.passport_expires_at, locale) },
-    { key: 'clearance_expires_at', label: tr('Допуск до', 'Ruxsat muddati'), value: dateLabel(employee.clearance_expires_at, locale) },
-    { key: 't_shirt_size', label: tr('Размер футболки / худи', 'Futbolka / xudi o‘lchami'), value: employee.t_shirt_size },
-    { key: 'passport_issued_by', label: tr('Кем выдан', 'Kim tomonidan berilgan'), value: employee.passport_issued_by, wide: true },
-    { key: 'residence_address', label: tr('Адрес прописки', 'Ro‘yxatdan o‘tgan manzil'), value: employee.residence_address, wide: true },
-  ].filter((row) => Boolean(row.value))
+    {
+      key: 'contacts',
+      title: tr('Контакты', 'Aloqa'),
+      fields: [
+        { key: 'phone', label: tr('Телефон', 'Telefon'), value: employee.phone, icon: <Phone size={13} />, strong: true },
+      ],
+    },
+    {
+      key: 'personal',
+      title: tr('Личное', 'Shaxsiy'),
+      fields: [
+        { key: 'birth_date', label: tr('Дата рождения', 'Tug‘ilgan sana'), value: dateLabel(employee.birth_date, locale), icon: <Cake size={13} /> },
+        { key: 't_shirt_size', label: tr('Размер футболки / худи', 'Futbolka / xudi o‘lchami'), value: employee.t_shirt_size, icon: <Shirt size={13} /> },
+        { key: 'birth_place', label: tr('Место рождения', 'Tug‘ilgan joyi'), value: employee.birth_place, icon: <MapPin size={13} />, wide: true },
+      ],
+    },
+    {
+      key: 'documents',
+      title: tr('Документы', 'Hujjatlar'),
+      fields: [
+        { key: 'passport', label: tr('Паспорт', 'Pasport'), value: passport || null, icon: <IdCard size={13} />, strong: true },
+        { key: 'pinfl', label: tr('ПИНФЛ', 'JSHSHIR'), value: employee.pinfl, icon: <Hash size={13} /> },
+        { key: 'passport_issued_at', label: tr('Дата выдачи', 'Berilgan sana'), value: dateLabel(employee.passport_issued_at, locale), icon: <CalendarDays size={13} /> },
+        { key: 'passport_issued_by', label: tr('Кем выдан', 'Kim tomonidan berilgan'), value: employee.passport_issued_by, icon: <Landmark size={13} />, wide: true },
+        { key: 'residence_address', label: tr('Адрес прописки', 'Ro‘yxatdan o‘tgan manzil'), value: employee.residence_address, icon: <House size={13} />, wide: true },
+      ],
+    },
+  ]
 }
 
-// Строки, которые известны ДО запроса: они уже лежат в реестре, и прятать их за
+// Реквизиты, известные ДО запроса: они уже лежат в реестре, и прятать их за
 // скелетом только ради единообразия значит показать пустоту вместо того, что
 // у нас на руках.
-function knownRows(employee: EmployeeListItem, tr: Tr): DetailRow[] {
+function knownSections(employee: EmployeeListItem, tr: Tr): ProfileSection[] {
   return [
-    { key: 'position', label: tr('Должность', 'Lavozim'), value: employee.position },
-    { key: 'phone', label: tr('Телефон', 'Telefon'), value: employee.phone },
-  ].filter((row) => Boolean(row.value))
+    {
+      key: 'contacts',
+      title: tr('Контакты', 'Aloqa'),
+      fields: [
+        { key: 'phone', label: tr('Телефон', 'Telefon'), value: employee.phone, icon: <Phone size={13} />, strong: true },
+      ],
+    },
+  ]
 }
 
-export function EmployeeDrawer({ employee, onClose, onDocumentPhotoChange }: {
+export function EmployeeDrawer({ employee, photoUrl, onClose, onDocumentPhotoChange }: {
   // Строка РЕЕСТРА, а не полная карточка: паспорт, ПИНФЛ и адрес прописки в
   // кэше реестра не лежат (решение с26), поэтому дровер догружает их сам —
   // шапка и контакты рисуются мгновенно, документы дорисовываются.
   employee: EmployeeListItem
+  // Подписанная ссылка на фото для документов — та же, что показывает строка
+  // списка. Приходит готовой, чтобы шапка не ждала круга сети (с26).
+  photoUrl?: string
   onClose: () => void
   // Выбор фото уезжает наверх, на страницу: там же лежит строка сотрудника, из
   // которой карточка получает employee, и там же — миниатюра списка.
@@ -128,36 +169,39 @@ export function EmployeeDrawer({ employee, onClose, onDocumentPhotoChange }: {
     }
   }
 
+  const fullName = employeeFullName(employee)
   // Пока карточка едет, показываем то, что уже есть в реестре, и добираем
   // скелетом — так видно, что данные не кончились, а грузятся.
-  const rows = card ? detailRows(card, tr, locale) : knownRows(employee, tr)
+  const sections = card ? detailSections(card, tr, locale) : knownSections(employee, tr)
+  const badges = card ? expiryBadges(card, tr, locale) : []
 
   return (
     <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Карточка сотрудника', 'Xodim kartasi')} onMouseDown={onClose}>
       <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
-          <div>
-            <p className="eyebrow">{employee.position || tr('Сотрудник', 'Xodim')}</p>
-            <h2>{employeeFullName(employee)}</h2>
-          </div>
+          {/* Надзаголовок называет КЛАСС записи, а должность стоит главным фактом
+              под именем: раньше она была и там, и строкой в реквизитах — один и
+              тот же факт дважды. */}
+          <ProfileHead
+            eyebrow={tr('Сотрудник', 'Xodim')}
+            title={fullName}
+            fact={employee.position}
+            photoUrl={photoUrl}
+            photoAlt={fullName}
+            photoPlaceholder={<UserRound size={26} />}
+          />
           <div className="drawer__header-actions">
             <button className="button button--secondary" onClick={() => navigate(`/employees/${employee.id}/edit`)}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>
             <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
           </div>
         </div>
 
-        {rows.length > 0 && (
-          <dl className="detail-list">
-            {rows.map((row) => (
-              <div key={row.key} className={row.wide ? 'detail-list__wide' : undefined}>
-                <dt>{row.label}</dt><dd>{row.value}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
+        <ProfileBadges badges={badges} />
+        <ProfileSections sections={sections} />
+
         {isCardLoading && <div className="detail-skeleton employee-card-skeleton" />}
         {hasCardError && <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить документы карточки.', 'Karta hujjatlarini yuklab bo‘lmadi.')}</p>}
-        {!isCardLoading && !hasCardError && rows.length === 0 && (
+        {!isCardLoading && !hasCardError && sections.every((section) => section.fields.every((field) => !field.value)) && (
           <p className="muted">{tr('Кроме имени, в карточке пока ничего нет.', 'Kartada ismdan boshqa hozircha hech narsa yo‘q.')}</p>
         )}
 
@@ -172,7 +216,7 @@ export function EmployeeDrawer({ employee, onClose, onDocumentPhotoChange }: {
                 : <EmployeeFilesList
                   files={files}
                   urls={urls}
-                  photoAlt={employeeFullName(employee)}
+                  photoAlt={fullName}
                   documentPhotoId={employee.document_photo_id}
                   onChooseDocumentPhoto={chooseDocumentPhoto}
                 />}

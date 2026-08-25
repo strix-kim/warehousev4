@@ -227,6 +227,11 @@ export function EmployeesPage() {
   // нет, поэтому дровер догружает карточку по id сам: шапка рисуется мгновенно,
   // документы дорисовываются, когда приедут.
   const openCard = employeeId ? employees.find((employee) => employee.id === employeeId) ?? null : null
+  // Фото шапки карточки — та же подписанная ссылка, что показывает строка списка.
+  // Своего запроса дровер не делает: ссылка уже в памяти страницы, значит шапка
+  // рисуется в первом кадре, а не через круг сети (с26).
+  const openCardPhotoPath = openCard ? pickDocumentPhoto(openCard, photos.get(openCard.id))?.storage_path : undefined
+  const openCardPhotoUrl = openCardPhotoPath ? photoUrls.get(openCardPhotoPath) : undefined
   const chosen = employees.filter((employee) => selected.has(employee.id))
 
   // Сборка документа: качаем фото (те же, что показывает список — pickDocumentPhoto
@@ -410,7 +415,7 @@ export function EmployeesPage() {
         </div>
       )}
 
-      {openCard && <EmployeeDrawer employee={openCard} onClose={closeEmployee} onDocumentPhotoChange={(fileId) => applyDocumentPhoto(openCard.id, fileId)} />}
+      {openCard && <EmployeeDrawer employee={openCard} photoUrl={openCardPhotoUrl} onClose={closeEmployee} onDocumentPhotoChange={(fileId) => applyDocumentPhoto(openCard.id, fileId)} />}
       {isExportOpen && <EmployeeEventExportDrawer employees={chosen} photos={photos} photosKnown={photosKnown} onClose={() => setIsExportOpen(false)} onExport={exportEventList} />}
     </>
   )

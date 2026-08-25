@@ -552,3 +552,27 @@
 .loader-line::after { content: ''; width: 45px; height: 100%; display: block; background: #1f272c; animation: loader 1s ease-in-out infinite alternate; }
 @keyframes loader { to { transform: translateX(75px); } }
 @keyframes popover-in { from { opacity: 0; transform: translateY(-4px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+/* Карточка-профиль: шапка с фото и главным фактом, секции реквизитов, бейджи
+   состояния (с27). Общие .detail-list и .badge из 04-data НЕ переписываются —
+   их потребляют дроверы оборудования, дровер модели и каталог редактора; здесь
+   только модификаторы, и они обязаны лежать ПОСЛЕ базы, то есть в этом слое. */
+.profile-head { min-width: 0; display: flex; align-items: center; gap: 14px; }
+.profile-head__photo { flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); color: var(--ink-faint); background: var(--surface-soft); }
+/* Круг — человек, прямоугольник — предмет: форма отвечает на «что за запись»
+   раньше, чем прочитан надзаголовок. */
+.profile-head__photo--round { width: 64px; height: 64px; border-radius: 50%; }
+.profile-head__photo--wide { width: 92px; height: 64px; border-radius: 10px; }
+.profile-head__photo img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.profile-head__text { min-width: 0; }
+.profile-head__text .eyebrow { margin-bottom: 5px; }
+.profile-head__fact { margin: 6px 0 0; color: var(--ink-soft); font-size: 13px; font-weight: 600; line-height: 1.4; }
+.profile-badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+.profile-section { margin-top: 22px; }
+.profile-section__title { margin: 0 0 9px; color: var(--ink-faint); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+/* Сетка секции — та же .detail-list, без её внешних отступов: расстояние между
+   секциями задаёт сама секция, иначе два отступа складываются. */
+.profile-section .detail-list { margin: 0; }
+.detail-list--profile dt { display: flex; align-items: center; gap: 6px; }
+.detail-list--profile dt svg { flex: 0 0 auto; color: var(--ink-faint); }
+.detail-list--profile .detail-list__value--strong { font-size: 15px; font-weight: 700; }
