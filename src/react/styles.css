@@ -402,8 +402,12 @@ h2 { letter-spacing: -0.025em; }
 .panel-heading h2 { margin-bottom: 4px; font-size: 19px; }
 .panel-heading p { margin: 0; color: var(--ink-faint); font-size: 13px; line-height: 1.5; }
 .read-only-label { min-height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 5px 10px; border-radius: 99px; color: #727c82; background: #eef0ee; font-size: 11px; font-weight: 800; line-height: 1; letter-spacing: .05em; text-align: center; text-transform: uppercase; white-space: nowrap; }
-.list-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); }
-.list-card { position: relative; min-height: 250px; display: flex; flex-direction: column; gap: 20px; padding: 20px; background: #fff; transition: border-color .16s ease; }
+/* Разделители рисуют САМИ карточки тенью вправо и вниз, а не подложка контейнера
+   под зазором в 1px: подложка видна в незанятых ячейках, и неполный ряд
+   превращался в серый прямоугольник до края панели (с25). Внешние тени срезает
+   overflow: hidden у .data-panel. */
+.list-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.list-card { position: relative; min-height: 250px; display: flex; flex-direction: column; gap: 20px; padding: 20px; background: #fff; box-shadow: 1px 0 0 var(--line), 0 1px 0 var(--line); transition: box-shadow .16s ease; }
 .list-card__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 /* Дата мероприятия и заказчик — первичный идентификатор списка вместо названия:
    название у всех дефолтное, а «форум в Hyatt 25 августа» человек помнит. */
@@ -431,7 +435,7 @@ h2 { letter-spacing: -0.025em; }
 .list-card__title { padding: 0; border: 0; color: inherit; background: none; font: inherit; text-align: left; }
 .list-card__title::after { content: ''; position: absolute; z-index: 0; inset: 0; }
 .list-card__open, .list-card__export { position: relative; z-index: 1; }
-.list-card:has(.list-card__title:hover) { border-color: var(--line-strong); }
+.list-card:has(.list-card__title:hover) { z-index: 1; box-shadow: 0 0 0 1px var(--line-strong); }
 .list-card:has(.list-card__title:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 .home-page { min-height: calc(100dvh - 70px); display: flex; flex-direction: column; justify-content: center; }
