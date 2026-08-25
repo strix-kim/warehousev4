@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@0.0.79",
+        "--caps", "pdf",
+        "--user-data-dir", ".playwright-profile",
+        "--output-dir", ".playwright-out"
+      ]
+    }
+  }
+}
