@@ -81,10 +81,15 @@
 
 .hall-tv__corner { display: flex; align-items: flex-end; padding: 8px 12px; background: var(--tv-bg); color: var(--tv-ink-faint); font-size: .5em; font-weight: 700; }
 
-/* Шапка колонки залита цветом зала. Белый текст держит палитра: все восемь
-   цветов тёмные настолько, что контраст с белым проходит на любом из них. */
+/* Шапка колонки залита цветом зала. Белый текст держит палитра: контраст
+   каждого из восьми цветов посчитан и записан числом в HALL_PALETTE (types.ts),
+   минимум 4.60. До с24 три цвета норму не держали, и на витрине с трёх метров
+   имя зала — главный ориентир — выцветало. */
 .hall-tv__colhead { display: flex; align-items: center; gap: .4em; min-width: 0; padding: 8px 12px; color: #fff; background: var(--hall-color, var(--tv-panel)); }
-.hall-tv__number { flex: 0 0 auto; min-width: 1.5em; height: 1.5em; display: inline-grid; place-items: center; padding: 0 .3em; border-radius: 6px; background: rgba(255,255,255,.22); font-size: .58em; font-weight: 800; font-variant-numeric: tabular-nums; }
+/* Кружок тёмный, как в редакторе: на витрине кегль крупный и белая плашка .22
+   формально проходит (порог крупного текста 3:1), но два разных номера зала в
+   одной системе — хуже, чем один запас контраста. */
+.hall-tv__number { flex: 0 0 auto; min-width: 1.5em; height: 1.5em; display: inline-grid; place-items: center; padding: 0 .3em; border-radius: 6px; background: rgba(0,0,0,.18); font-size: .58em; font-weight: 800; font-variant-numeric: tabular-nums; }
 .hall-tv__hall-name { min-width: 0; overflow: hidden; font-size: .66em; font-weight: 800; letter-spacing: -.01em; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Первая колонка — название позиции. Приглушена и уже редакторской: на витрине

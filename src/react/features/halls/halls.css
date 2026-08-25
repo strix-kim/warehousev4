@@ -102,12 +102,18 @@
 .hall-matrix__corner { position: sticky; top: 0; left: 0; z-index: 3; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 10px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface-soft); color: var(--ink-soft); font-size: 13px; font-weight: 800; }
 .hall-matrix__corner small { color: var(--ink-faint); font-size: 11px; font-weight: 600; line-height: 1.3; }
 
-/* Шапка колонки залита цветом зала; белый текст держит палитра — все восемь
-   цветов тёмные настолько, что контраст с белым проходит на любом из них. */
+/* Шапка колонки залита цветом зала; белый текст держит палитра. «Держит» здесь
+   посчитано, а не заявлено: контраст каждого из восьми цветов с белым лежит
+   в HALL_PALETTE (types.ts) числом рядом с цветом, минимум 4.60 при пороге 4.5
+   для 15px/800. До с24 три цвета норму не держали. */
 .hall-matrix__colhead { position: sticky; top: 0; z-index: 2; min-width: 0; border-bottom: 1px solid var(--line); color: #fff; background: var(--hall-color, var(--ink)); }
 .hall-matrix__colhead-row { display: flex; align-items: center; gap: 6px; padding: 7px 8px; }
-/* Номер зала — индекс порядка, а не часть имени: имена правят руками. */
-.hall-matrix__number { flex: 0 0 auto; min-width: 22px; height: 22px; display: inline-grid; place-items: center; padding: 0 5px; border-radius: 6px; background: rgba(255,255,255,.22); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+/* Номер зала — индекс порядка, а не часть имени: имена правят руками.
+   Кружок ТЁМНЫЙ, а не белый полупрозрачный: белая плашка .22 осветляет заливку,
+   и белые цифры на ней дают 3.37–4.31 на ВСЕХ восьми цветах — то есть замена
+   трёх провальных цветов эту половину не чинит. Чёрный .18 держит минимум 6.34
+   (с24). */
+.hall-matrix__number { flex: 0 0 auto; min-width: 22px; height: 22px; display: inline-grid; place-items: center; padding: 0 5px; border-radius: 6px; background: rgba(0,0,0,.18); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
 
 /* Меню зала — только иконка: подпись и шеврон в цветной шапке лишние, а сам
    .action-menu__trigger растянут на всю ширину общими стилями. */
