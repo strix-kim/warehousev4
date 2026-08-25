@@ -367,7 +367,7 @@ export function EquipmentCreatePage() {
                   <span>{tr('Серийные номера — по одному в строке', 'Seriya raqamlari — har birini alohida qatorga')} *</span>
                   <textarea
                     ref={batchInputRef}
-                    className={`mono${batchDuplicates.length > 0 || parsedSerials.length > BATCH_LIMIT ? ' input-error' : ''}`}
+                    className={`input-mono${batchDuplicates.length > 0 || parsedSerials.length > BATCH_LIMIT ? ' input-error' : ''}`}
                     value={serialBatch}
                     onChange={(event) => setSerialBatch(event.target.value)}
                     rows={6}

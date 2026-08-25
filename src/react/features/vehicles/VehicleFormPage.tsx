@@ -359,7 +359,7 @@ export function VehicleFormPage() {
                 канон на клиенте разошёлся бы с ним на первой же правке. */}
             <label className="field">
               <span>{tr('Госномер', 'Davlat raqami')} *</span>
-              <input className="mono" value={draft.plate_number} onChange={(event) => changeField('plate_number', event.target.value)} placeholder="01 A 123 BC" required />
+              <input className="input-mono" value={draft.plate_number} onChange={(event) => changeField('plate_number', event.target.value)} placeholder="01 A 123 BC" required />
               <small className="field-hint">{tr('Регистр и пробелы не важны — система приведёт номер сама.', 'Registr va bo‘shliqlar muhim emas — tizim raqamni o‘zi keltiradi.')}</small>
             </label>
           </div>

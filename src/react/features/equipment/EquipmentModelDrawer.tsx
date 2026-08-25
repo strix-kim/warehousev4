@@ -160,7 +160,7 @@ export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, 
               <div className="model-add-unit__fields">
                 <label className="field">
                   <span>{tr('Серийный номер — если есть', 'Seriya raqami — bo‘lsa')}</span>
-                  <input autoFocus className="mono" value={addSerial} onChange={(event) => setAddSerial(event.target.value)} placeholder={tr('Можно оставить пустым', 'Bo‘sh qoldirsa bo‘ladi')} />
+                  <input autoFocus className="input-mono" value={addSerial} onChange={(event) => setAddSerial(event.target.value)} placeholder={tr('Можно оставить пустым', 'Bo‘sh qoldirsa bo‘ladi')} />
                 </label>
                 <label className="field">
                   <span>{tr('Сколько', 'Nechta')}</span>

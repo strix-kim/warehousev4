@@ -379,9 +379,9 @@ export function EmployeeFormPage() {
             <span>02</span><div><h2>{tr('Паспорт', 'Pasport')}</h2><p>{tr('Все поля необязательны. Серия, номер и ПИНФЛ нормализуются при сохранении.', 'Barcha maydonlar ixtiyoriy. Seriya, raqam va JSHSHIR saqlashda normallashtiriladi.')}</p></div>
           </div>
           <div className="form-grid">
-            <label className="field"><span>{tr('Серия', 'Seriya')}</span><input className="mono" value={draft.passport_series} onChange={(event) => changeField('passport_series', event.target.value)} placeholder="AA" maxLength={10} /></label>
-            <label className="field"><span>{tr('Номер', 'Raqam')}</span><input className="mono" value={draft.passport_number} onChange={(event) => changeField('passport_number', event.target.value)} inputMode="numeric" placeholder="1234567" /></label>
-            <label className="field"><span>{tr('ПИНФЛ', 'JSHSHIR')}</span><input className="mono" value={draft.pinfl} onChange={(event) => changeField('pinfl', event.target.value)} inputMode="numeric" placeholder={tr('14 цифр', '14 ta raqam')} /></label>
+            <label className="field"><span>{tr('Серия', 'Seriya')}</span><input className="input-mono" value={draft.passport_series} onChange={(event) => changeField('passport_series', event.target.value)} placeholder="AA" maxLength={10} /></label>
+            <label className="field"><span>{tr('Номер', 'Raqam')}</span><input className="input-mono" value={draft.passport_number} onChange={(event) => changeField('passport_number', event.target.value)} inputMode="numeric" placeholder="1234567" /></label>
+            <label className="field"><span>{tr('ПИНФЛ', 'JSHSHIR')}</span><input className="input-mono" value={draft.pinfl} onChange={(event) => changeField('pinfl', event.target.value)} inputMode="numeric" placeholder={tr('14 цифр', '14 ta raqam')} /></label>
             {/* Нативный date, а не AppDatePicker: тот листает месяцы по одному, и
                 дата рождения 1987 года стоила бы человеку четырёхсот нажатий. */}
             <label className="field"><span>{tr('Дата рождения', 'Tug‘ilgan sana')}</span><input type="date" value={draft.birth_date} onChange={(event) => changeField('birth_date', event.target.value)} /></label>
