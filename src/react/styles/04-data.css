@@ -1,0 +1,162 @@
+.table-scroll { position: relative; overflow-x: auto; }
+.table-scroll--refreshing::after { content: ''; position: absolute; z-index: 2; top: 0; left: 0; width: 32%; height: 2px; border-radius: 99px; background: var(--accent); animation: refresh-progress .9s ease-in-out infinite alternate; }
+.data-table { width: 100%; min-width: 1050px; border-collapse: collapse; table-layout: fixed; }
+.data-table th { height: 40px; padding: 0 15px; border-bottom: 1px solid var(--line); color: #747e84; background: var(--surface-soft); font-size: 11px; font-weight: 800; letter-spacing: .09em; text-align: left; text-transform: uppercase; }
+/* Пять колонок вместо шести: «Локация» ушла из каталога (значение одно на все
+   строки), её проценты разошлись по оставшимся. */
+.data-table th:nth-child(1) { width: 34%; }
+.data-table th:nth-child(2) { width: 22%; }
+.data-table th:nth-child(3) { width: 18%; }
+.data-table th:nth-child(4) { width: 11%; }
+.data-table th:nth-child(5) { width: 15%; }
+.data-table td { height: 72px; padding: 9px 15px; border-bottom: 1px solid #edf0ec; color: #4f5a61; font-size: 14px; vertical-align: middle; }
+.data-table tbody tr { cursor: pointer; transition: background .15s ease; }
+.data-table tbody tr:hover { background: #fafbf8; }
+.data-table tbody tr:last-child td { border-bottom: 0; }
+.equipment-cell { display: flex; align-items: center; gap: 11px; }
+.equipment-cell > span:last-child { min-width: 0; display: flex; flex-direction: column; }
+.equipment-cell strong { overflow: hidden; color: var(--ink); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.equipment-cell small { overflow: hidden; margin-top: 3px; color: var(--ink-faint); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.equipment-thumb { position: relative; width: 36px; height: 36px; display: grid; flex: 0 0 auto; place-items: center; overflow: hidden; border: 1px solid #e6e9e4; border-radius: 8px; color: #68737a; background: #eef1ed; }
+.equipment-thumb--photo { background: #fff; }
+.equipment-thumb__placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: #7b858b; opacity: 1; transition: opacity .16s ease; }
+.equipment-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; min-width: 0; min-height: 0; display: block; object-fit: contain; opacity: 0; transition: opacity .16s ease; }
+.equipment-thumb--ready .equipment-thumb__placeholder { opacity: 0; }
+.equipment-thumb--ready img { opacity: 1; animation: equipment-image-arrive .34s cubic-bezier(.2,.82,.32,1.18) both; }
+.equipment-thumb--compact { width: 52px; height: 48px; padding: 4px; border-color: #e1e5df; border-radius: 10px; background: linear-gradient(145deg, #f7f9f5, #ecefea); box-shadow: inset 0 1px rgba(255,255,255,.9); }
+.equipment-thumb--compact.equipment-thumb--photo { background: radial-gradient(circle at 50% 44%, #fff 0 54%, #f1f4ef 100%); }
+.equipment-thumb--compact img { position: relative; inset: auto; width: 100%; height: 100%; border-radius: 6px; object-fit: contain; object-position: center; transition: opacity .16s ease, transform .18s ease; }
+.equipment-cell:hover .equipment-thumb--compact img, .picker-item__preview:hover .equipment-thumb--compact img { transform: scale(1.025); }
+.equipment-thumb--large { width: 100%; height: 220px; margin: 20px 0; border-radius: 12px; color: var(--accent); background: linear-gradient(145deg, #f7f8f5, #ecefea); }
+/* Без фотографии 220 px — это 220 px пустоты с иконкой посередине: у модели без
+   снимка заглушка занимала первый экран карточки. */
+.equipment-thumb--large:not(.equipment-thumb--photo) { height: 96px; margin: 14px 0; }
+.equipment-thumb--large.equipment-thumb--photo { width: min(100%, var(--equipment-image-width, 420px)); height: auto; min-height: 0; aspect-ratio: var(--equipment-image-ratio, 1.6); margin-inline: auto; border-color: #e1e5e0; background: #fff; box-shadow: 0 12px 30px rgba(15,22,28,.08); }
+.equipment-thumb--large img { padding: 0; }
+@keyframes equipment-image-arrive {
+  0% { opacity: 0; transform: scale(.965); }
+  70% { opacity: 1; transform: scale(1.018); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.drawer__header-actions { flex: 0 0 auto; display: flex; gap: 8px; }
+.equipment-edit-panel { display: flex; flex-direction: column; gap: 18px; margin: 24px 0; }
+.equipment-edit-section { padding: 16px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-soft); }
+.equipment-edit-section__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.equipment-edit-section__heading h3 { margin: 0 0 4px; font-size: 15px; }
+.equipment-edit-section__heading p { margin: 0; color: var(--ink-faint); font-size: 10px; line-height: 1.45; }
+.equipment-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.equipment-edit-grid .field { margin: 0; }
+.equipment-edit-grid .field--wide { grid-column: 1 / -1; }
+/* Липкий низ панели правки: .drawer сам прокручивается, поэтому sticky держит
+   кнопки и сообщение о конфликте в поле зрения на любой длине формы. Отрицательные
+   поля растягивают подложку на всю ширину дровера поверх его padding — иначе из-под
+   блока видно прокручивающийся текст. */
+.equipment-edit-footer { position: sticky; bottom: -30px; z-index: 1; display: flex; flex-direction: column; gap: 10px; margin: 0 -30px -30px; padding: 14px 30px 30px; border-top: 1px solid var(--line); background: rgba(255,255,255,.98); box-shadow: 0 -10px 28px rgba(15,22,28,.07); }
+.equipment-edit-footer .form-error { margin: 0; }
+/* «Сейчас в списках» в карточке оборудования. Раздел появляется только когда
+   единица где-то стоит, поэтому пустого состояния у него нет. */
+.unit-lists { margin: 26px 0 0; }
+/* Сводка дровера модели: два бейджа под заголовком. */
+.model-drawer-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Форма «+1 единица» в дровере модели: серийник широкий, количество узкое. */
+.model-add-unit { display: grid; gap: 10px; margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
+.model-add-unit__fields { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 8px; }
+.model-add-unit__actions { display: grid; grid-template-columns: .8fr 1.2fr; gap: 8px; }
+.model-add-unit__actions .button { width: 100%; }
+.model-add-unit .form-error { margin: 0; }
+.unit-lists > .button, .unit-lists > .form-success, .unit-lists > .form-error, .unit-lists > .muted { margin-top: 10px; }
+.unit-lists > .button { width: 100%; }
+.unit-lists__items { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+/* Отступ — только у пикера под кнопкой; принятый вид «Сейчас в списках» не трогаем. */
+.unit-lists > .button + .unit-lists__items { margin-top: 10px; }
+/* Строка пикера «Добавить в список» — кнопка, но выглядит как ссылка раздела
+   «Сейчас в списках»: один список, одна форма строки. */
+.unit-lists__items a, .unit-lists__items button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface-soft); font: inherit; text-align: left; text-decoration: none; cursor: pointer; transition: border-color .16s ease, background .16s ease; }
+.unit-lists__items a:hover, .unit-lists__items button:hover:not(:disabled) { border-color: var(--line-strong); background: #fff; }
+.unit-lists__items button:disabled { cursor: default; opacity: .55; }
+.unit-lists__items a > svg, .unit-lists__items button > svg { flex: 0 0 auto; color: var(--ink-faint); }
+.unit-lists__items span { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.unit-lists__items strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.unit-lists__items small { color: var(--ink-faint); font-size: 12px; }
+.equipment-edit-actions { display: grid; grid-template-columns: .8fr 1.2fr; gap: 8px; }
+.equipment-edit-actions .button { width: 100%; }
+@media (max-width: 520px) {
+  .drawer__header { flex-wrap: wrap; }
+  .drawer__header > div:first-child { min-width: 0; flex: 1 1 100%; }
+  .drawer__header-actions { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 42px; }
+  .drawer__header-actions:not(:has(.button)) { grid-template-columns: 42px; justify-content: end; }
+  .drawer__header-actions .button { width: 100%; }
+  .equipment-edit-grid { grid-template-columns: 1fr; }
+  .equipment-edit-grid .field--wide { grid-column: auto; }
+  .equipment-edit-section__heading { flex-direction: column; }
+  /* В описании модели из каталога один крестик, поэтому переносить его на
+     отдельную строку незачем — он остаётся в строке заголовка. */
+  .catalog-preview-drawer .drawer__header { flex-wrap: nowrap; }
+  .catalog-preview-drawer .drawer__header > div:first-child { flex: 1 1 auto; }
+  .catalog-preview-drawer .drawer__header-actions { width: auto; }
+  /* «Добавить в список» прилипает к низу модалки: отрицательный bottom равен
+     нижнему паддингу drawer, поэтому кнопка садится на самую кромку. */
+  .catalog-preview-drawer__footer { position: sticky; bottom: calc(-1 * (30px + env(safe-area-inset-bottom))); padding: 12px 0 calc(30px + env(safe-area-inset-bottom)); background: #fff; }
+}
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px !important; }
+.badge { min-height: 27px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px; border-radius: 99px; color: #5d676d; background: #eef0ee; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.badge i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.badge--success { color: var(--success); background: var(--success-bg); }
+.badge--warning { color: var(--warning); background: var(--warning-bg); }
+.badge--neutral { color: #687279; background: #eef0ee; }
+.badge--danger { color: var(--danger); background: var(--danger-bg); }
+.skeleton-row td { padding: 17px 15px; }
+.skeleton-row span { height: 30px; display: block; border-radius: 7px; background: linear-gradient(90deg, #f0f2ef 25%, #f7f8f6 50%, #f0f2ef 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+@keyframes refresh-progress { from { transform: translateX(-15%); } to { transform: translateX(225%); } }
+
+.pagination { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 10px 16px; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: 13px; }
+.pagination__controls { display: flex; align-items: center; gap: 9px; }
+.pagination__controls strong { color: var(--ink); }
+.state-block { min-height: 260px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 30px; color: var(--ink-faint); text-align: center; }
+.state-block strong { color: var(--ink); }
+.state-block span { font-size: 14px; }
+.state-block--error svg { color: var(--danger); }
+.state-block--illustrated { gap: 10px; }
+.state-block--illustrated img { width: min(250px, 70%); max-height: 175px; display: block; margin-bottom: 2px; object-fit: contain; filter: drop-shadow(0 14px 18px rgba(15,22,28,.12)); }
+.state-block--illustrated span { max-width: 520px; line-height: 1.55; }
+.state-block--roomy { min-height: 410px; }
+
+.drawer-layer { position: fixed; z-index: 20; inset: 0; display: flex; justify-content: flex-end; background: rgba(8,12,15,.46); animation: fade-in .17s ease-out; }
+/* Переход между двумя открытыми дроверами (модель ↔ карточка) — это смена
+   содержимого, а не появление окна: повторный fade подложки и slide-in читались
+   как «окно мигнуло и обновилось дважды». */
+.drawer-layer--instant, .drawer-layer--instant .drawer { animation: none; }
+/* Нижний лист телефона. z-index выше панели навигации (15), иначе фиксированная
+   панель проступала бы сквозь затемнение и оставалась кликабельной. */
+.sheet-layer { position: fixed; z-index: 25; inset: 0; display: flex; align-items: flex-end; background: rgba(8,12,15,.46); animation: fade-in .17s ease-out; }
+.sheet { width: 100%; display: flex; flex-direction: column; gap: 14px; padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; background: #fff; box-shadow: 0 -18px 42px rgba(8,12,15,.18); animation: sheet-up .2s cubic-bezier(.2,.7,.2,1); }
+.sheet__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sheet__header strong { font-size: 17px; }
+.sheet__action { min-height: 62px; display: grid; grid-template-columns: 38px minmax(0, 1fr) 16px; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--surface-soft); text-decoration: none; }
+.sheet__action > span { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 9px; color: #fff; background: var(--accent); }
+.sheet__action > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sheet__action strong { font-size: 14px; }
+.sheet__action small { color: var(--ink-faint); font-size: 11px; }
+.sheet__action > svg { color: var(--ink-faint); }
+.sheet__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink-soft); font-size: 14px; }
+.sheet__account { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: 13px; }
+.sheet__account > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes sheet-up { from { transform: translateY(14px); opacity: .6 } to { transform: none; opacity: 1 } }
+.drawer { width: min(480px, 100%); height: 100%; padding: 30px; background: #fff; box-shadow: -18px 0 42px rgba(8,12,15,.12); overflow-y: auto; animation: slide-in .22s ease-out; }
+.drawer__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 14px; }
+.drawer__header h2 { margin-bottom: 0; font-size: 25px; }
+.detail-list { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 26px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--line); overflow: hidden; }
+.detail-list > div { min-height: 78px; display: flex; flex-direction: column; gap: 7px; padding: 14px; background: #fff; }
+.detail-list dt { color: var(--ink-faint); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.detail-list dd { margin: 0; color: var(--ink); font-size: 14px; line-height: 1.5; }
+.detail-list__wide { grid-column: 1 / -1; }
+.drawer__notice { display: flex; gap: 12px; padding: 14px; border-radius: 10px; color: #6d5b28; background: #fff8df; }
+.drawer__notice p { margin: 0; font-size: 13px; line-height: 1.6; }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes slide-in { from { transform: translateX(30px); opacity: .8; } }
+
+.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+.panel-heading h2 { margin-bottom: 4px; font-size: 19px; }
+.panel-heading p { margin: 0; color: var(--ink-faint); font-size: 13px; line-height: 1.5; }
+.read-only-label { min-height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 5px 10px; border-radius: 99px; color: #727c82; background: #eef0ee; font-size: 11px; font-weight: 800; line-height: 1; letter-spacing: .05em; text-align: center; text-transform: uppercase; white-space: nowrap; }
