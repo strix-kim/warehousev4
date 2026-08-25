@@ -6,7 +6,7 @@ import { EmployeeFilesList, EmployeeFilesSkeleton } from './EmployeeFilesList'
 import { employeeFullName, type Employee, type EmployeeFile, type EmployeeListItem, type Tr } from './types'
 import { ProfileBadges, ProfileHead, ProfileSections, type ProfileBadge, type ProfileSection } from '../../components/ProfileCard'
 import { formatEventDate, parseDateValue } from '../../lib/date'
-import { expiryBadgeClass, expiryState } from '../../lib/expiry'
+import { expiryBadgeClass, expiryState, type ExpiryState } from '../../lib/expiry'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import { useModalLayer } from '../../lib/useModalLayer'
@@ -24,16 +24,30 @@ function dateLabel(value: string | null, locale: string) {
 // был бы второй показ тех же данных. Срок не заполнен — бейджа нет вовсе
 // (решение прораба, с27): молчание честнее серого «не указан», который выглядел
 // бы как проверенный факт.
+//
+// Слово, а не только цвет: «истёк», «истекает» и «действителен до» — три разных
+// текста. Один текст на три цвета читался бы одинаково и дальтоником, и любым,
+// кто смотрит на карточку мельком.
 function expiryBadges(employee: Employee, tr: Tr, locale: string): ProfileBadge[] {
   const badges: ProfileBadge[] = []
-  const add = (key: string, value: string | null, label: (date: string) => string) => {
+  const add = (key: string, value: string | null, labels: Record<ExpiryState, (date: string) => string>) => {
     const state = expiryState(value)
     const date = dateLabel(value, locale)
     if (!state || !date) return
-    badges.push({ key, className: expiryBadgeClass(state), label: label(date) })
+    badges.push({ key, className: expiryBadgeClass(state), label: labels[state](date) })
   }
-  add('passport', employee.passport_expires_at, (date) => tr(`Паспорт до ${date}`, `Pasport ${date} gacha`))
-  add('clearance', employee.clearance_expires_at, (date) => tr(`Допуск до ${date}`, `Ruxsat ${date} gacha`))
+  // Узбекский принимает дату ПЕРЕД послелогом и пишет его слитно: formatEventDate
+  // отдаёт «12-sentabr 2026-yil», отсюда «…2026-yilgacha» и «…2026-yilda».
+  add('passport', employee.passport_expires_at, {
+    expired: (date) => tr(`Паспорт истёк ${date}`, `Pasport muddati ${date}da tugagan`),
+    soon: (date) => tr(`Паспорт истекает ${date}`, `Pasport muddati ${date}da tugaydi`),
+    valid: (date) => tr(`Паспорт действителен до ${date}`, `Pasport ${date}gacha amal qiladi`),
+  })
+  add('clearance', employee.clearance_expires_at, {
+    expired: (date) => tr(`Допуск истёк ${date}`, `Ruxsat muddati ${date}da tugagan`),
+    soon: (date) => tr(`Допуск истекает ${date}`, `Ruxsat muddati ${date}da tugaydi`),
+    valid: (date) => tr(`Допуск до ${date}`, `Ruxsat ${date}gacha`),
+  })
   return badges
 }
 
@@ -51,7 +65,7 @@ function detailSections(employee: Employee, tr: Tr, locale: string): ProfileSect
     },
     {
       key: 'personal',
-      title: tr('Личное', 'Shaxsiy'),
+      title: tr('Личное', 'Shaxsiy ma’lumotlar'),
       fields: [
         { key: 'birth_date', label: tr('Дата рождения', 'Tug‘ilgan sana'), value: dateLabel(employee.birth_date, locale), icon: <Cake size={13} /> },
         { key: 't_shirt_size', label: tr('Размер футболки / худи', 'Futbolka / xudi o‘lchami'), value: employee.t_shirt_size, icon: <Shirt size={13} /> },
@@ -201,7 +215,7 @@ export function EmployeeDrawer({ employee, photoUrl, onClose, onDocumentPhotoCha
 
         {isCardLoading && <div className="detail-skeleton employee-card-skeleton" />}
         {hasCardError && <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить документы карточки.', 'Karta hujjatlarini yuklab bo‘lmadi.')}</p>}
-        {!isCardLoading && !hasCardError && sections.every((section) => section.fields.every((field) => !field.value)) && (
+        {!isCardLoading && !hasCardError && !employee.position && badges.length === 0 && sections.every((section) => section.fields.every((field) => !field.value)) && (
           <p className="muted">{tr('Кроме имени, в карточке пока ничего нет.', 'Kartada ismdan boshqa hozircha hech narsa yo‘q.')}</p>
         )}
 

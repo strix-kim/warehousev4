@@ -17,7 +17,7 @@ function detailSections(vehicle: VehicleWithDrivers, tr: Tr): ProfileSection[] {
   return [
     {
       key: 'specs',
-      title: tr('Реквизиты', 'Rekvizitlar'),
+      title: tr('Характеристики', 'Xususiyatlar'),
       fields: [
         { key: 'color', label: tr('Цвет', 'Rang'), value: vehicle.color, icon: <Palette size={13} /> },
       ],
