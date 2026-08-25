@@ -4,7 +4,7 @@ description: Проектирование планов реализации дл
 disallowedTools: Edit, Write, NotebookEdit
 # Fable — архитектор по вызову; ведущего сессии прораб выбирает сам (с18).
 # Fable недоступен → временно opus, прорабу оговорка.
-model: fable
+model: opus
 effort: xhigh
 color: purple
 ---
