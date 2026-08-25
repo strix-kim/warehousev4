@@ -145,9 +145,9 @@ export function HallPlansPage() {
             <button className="button button--secondary" onClick={() => setReloadKey((value) => value + 1)}>{tr('Повторить', 'Qayta urinish')}</button>
           </div>
         ) : (
-          <div className="hall-plan-grid" aria-busy={isLoading}>
+          <div className="list-grid" aria-busy={isLoading}>
             {isLoading && plans.length === 0
-              ? Array.from({ length: 6 }, (_, index) => <div className="hall-plan-card hall-plan-card--loading" key={index} />)
+              ? Array.from({ length: 6 }, (_, index) => <div className="list-card list-card--loading" key={index} />)
               : visible.map((plan) => (
                 <HallPlanCard
                   key={plan.id}
@@ -205,19 +205,25 @@ function HallPlanCard({ plan, isDeleting, isCopying, onOpen, onCopy, onDelete }:
   const changedAt = formatDateTime(new Date(plan.updated_at).getTime(), locale)
 
   return (
-    <article className="hall-plan-card">
-      <div>
-        {/* Период — крупной строкой, как дата у списков: план узнают по числам
-            мероприятия, а не по названию, которое у всех похожее. */}
-        <p className="hall-plan-card__date">{formatPlanPeriod(plan, locale, tr)}</p>
-        {/* Название — вход в редактор: его псевдоэлемент растянут на карточку,
-            поэтому «клик куда угодно» открывает план. */}
-        <h3><button type="button" className="hall-plan-card__title" onClick={onOpen}>{plan.name}</button></h3>
+    // Карточка плана — та же .list-card, что у списков (с25): жанр один
+    // (работа со своей идентичностью и двумя действиями), и второй экземпляр
+    // уже успел разъехаться с оригиналом по высоте и анимации. Своё у плана
+    // только одно — ряд цветных точек на месте описания.
+    <article className="list-card list-card--plan">
+      <div className="list-card__top">
+        <div className="list-card__identity">
+          {/* Период — крупной строкой, как дата у списков: план узнают по числам
+              мероприятия, а не по названию, которое у всех похожее. */}
+          <p className="list-card__date">{formatPlanPeriod(plan, locale, tr)}</p>
+          {/* Название — вход в редактор: его псевдоэлемент растянут на карточку,
+              поэтому «клик куда угодно» открывает план. */}
+          <h3><button type="button" className="list-card__title" onClick={onOpen}>{plan.name}</button></h3>
+        </div>
       </div>
 
-      <div className="hall-plan-card__halls">
+      <div className="hall-plan-dots">
         {halls.length === 0
-          ? <span className="hall-plan-card__empty">{tr('Залов пока нет', 'Hozircha zallar yo‘q')}</span>
+          ? <span className="hall-plan-dots__empty">{tr('Залов пока нет', 'Hozircha zallar yo‘q')}</span>
           : halls.map((hall) => (
             <span className="hall-plan-dot" key={hall.id} style={{ '--hall-color': hall.color } as CSSProperties}>
               <i aria-hidden="true" />{hall.name}
@@ -225,13 +231,13 @@ function HallPlanCard({ plan, isDeleting, isCopying, onOpen, onCopy, onDelete }:
           ))}
       </div>
 
-      <div className="hall-plan-card__meta">
+      <div className="list-card__meta">
         <span><strong>{halls.length.toLocaleString(locale)}</strong> {tr('залов', 'zal')}</span>
         <span>{tr(`изменён ${changedAt}`, `${changedAt} da o‘zgartirilgan`)}</span>
       </div>
 
-      <div className="hall-plan-card__actions">
-        <button className="button button--primary hall-plan-card__open" onClick={onOpen}>
+      <div className="list-card__actions">
+        <button className="button button--primary list-card__open" onClick={onOpen}>
           <PanelsTopLeft size={16} /> {tr('Открыть', 'Ochish')}
         </button>
         {armed.armed ? (
@@ -240,7 +246,7 @@ function HallPlanCard({ plan, isDeleting, isCopying, onOpen, onCopy, onDelete }:
           // заново. Первый клик — пункт меню, второй — вот эта кнопка.
           <button
             autoFocus
-            className="button button--secondary hall-plan-card__confirm"
+            className="button button--secondary hall-plan-confirm"
             onClick={() => armed.fire(onDelete)}
             onBlur={armed.disarm}
             // Safari: mousedown не фокусирует кнопку, а блюрит её же (autoFocus)
@@ -251,7 +257,7 @@ function HallPlanCard({ plan, isDeleting, isCopying, onOpen, onCopy, onDelete }:
           </button>
         ) : (
           <ActionMenu
-            className="hall-plan-card__menu"
+            className="hall-plan-menu"
             label={isDeleting ? tr('Удаляем…', 'O‘chirilmoqda…') : isCopying ? tr('Копируем…', 'Nusxa olinmoqda…') : tr('Ещё', 'Yana')}
             ariaLabel={tr('Действия с планом', 'Reja bilan amallar')}
             icon={<Ellipsis size={16} />}
