@@ -199,9 +199,9 @@ export function EmployeeDrawer({ employee, photoUrl, onClose, onDocumentPhotoCha
           <ProfileHead
             eyebrow={tr('Сотрудник', 'Xodim')}
             title={fullName}
+            copyValue={fullName}
             fact={employee.position}
             photoUrl={photoUrl}
-            photoAlt={fullName}
             photoPlaceholder={<UserRound size={26} />}
           />
           <div className="drawer__header-actions">
@@ -219,8 +219,9 @@ export function EmployeeDrawer({ employee, photoUrl, onClose, onDocumentPhotoCha
           <p className="muted">{tr('Кроме имени, в карточке пока ничего нет.', 'Kartada ismdan boshqa hozircha hech narsa yo‘q.')}</p>
         )}
 
-        <section className="unit-lists">
-          <div className="panel-heading"><div><h3>{tr('Файлы', 'Fayllar')}</h3><p>{tr('Открываются по временной ссылке — она действует час.', 'Vaqtinchalik havola orqali ochiladi — u bir soat amal qiladi.')}</p></div></div>
+        <section className="unit-lists profile-section">
+          <h3 className="profile-section__title">{tr('Файлы', 'Fayllar')}</h3>
+          <p className="profile-section__hint">{tr('Открываются по временной ссылке — она действует час.', 'Vaqtinchalik havola orqali ochiladi — u bir soat amal qiladi.')}</p>
           {hasError
             ? <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить файлы сотрудника.', 'Xodim fayllarini yuklab bo‘lmadi.')}</p>
             : isLoading

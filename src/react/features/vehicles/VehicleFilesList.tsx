@@ -1,6 +1,7 @@
 import { ImageOff } from 'lucide-react'
 import type { VehicleFile } from './types'
 import { PhotoThumb } from '../../components/PhotoThumb'
+import { toDownloadUrl } from '../../lib/signedUrlCache'
 import { useLanguage } from '../../lib/i18n'
 
 // Фото машины — ТОЛЬКО на чтение: удаление запрещено политиками бакета, поэтому
@@ -21,7 +22,8 @@ export function VehicleFilesList({ files, urls, photoAlt }: {
       {files.map((file) => {
         const url = urls.get(file.storage_path)
         return url
-          ? <a key={file.id} href={url} target="_blank" rel="noreferrer">
+          // Нажатие скачивает снимок — как и у сотрудника (с27).
+          ? <a key={file.id} href={toDownloadUrl(url, file.original_name)} rel="noreferrer" title={tr('Скачать снимок', 'Suratni yuklab olish')}>
             <PhotoThumb url={url} alt={file.original_name ?? photoAlt} placeholder={<ImageOff size={18} />} />
           </a>
           : <span key={file.id} className="employee-photos__missing" title={tr('Ссылка не получена', 'Havola olinmadi')}><ImageOff size={18} /></span>

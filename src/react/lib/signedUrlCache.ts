@@ -94,3 +94,18 @@ export function createSignedUrlCache(bucket: string) {
 
   return { getSignedUrl, getSignedUrls }
 }
+
+// Ссылка, по которой файл СКАЧИВАЕТСЯ, а не открывается на просмотр. Storage
+// отдаёт Content-Disposition: attachment, когда в подписанном адресе есть
+// параметр download, — и это единственный работающий путь: HTML-атрибут
+// `download` на ссылке другого домена браузер игнорирует молча, а Supabase нам
+// как раз другой домен.
+//
+// Имя файла отдаём своё: в бакете лежит путь вида `<id>/<uuid>.jpg`, и без
+// подсказки человек сохранил бы себе набор цифр.
+export function toDownloadUrl(url: string, fileName?: string | null) {
+  const separator = url.includes('?') ? '&' : '?'
+  return fileName
+    ? `${url}${separator}download=${encodeURIComponent(fileName)}`
+    : `${url}${separator}download`
+}

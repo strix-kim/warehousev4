@@ -82,9 +82,9 @@ export function VehicleDrawer({ vehicle, photoUrl, onClose }: {
           <ProfileHead
             eyebrow={tr('Автомобиль', 'Avtomobil')}
             title={<span className="plate-badge plate-badge--lg">{vehicle.plate_number}</span>}
+            copyValue={vehicle.plate_number}
             fact={title}
             photoUrl={photoUrl}
-            photoAlt={title}
             photoPlaceholder={<CarFront size={24} />}
             photoShape="wide"
           />
@@ -96,22 +96,9 @@ export function VehicleDrawer({ vehicle, photoUrl, onClose }: {
 
         <ProfileSections sections={sections} />
 
-        {/* Опознание уехало в шапку (с27), поэтому галерея больше не обязана
-            стоять первой: снимков у машины несколько, и это уже подробность, а не
-            ответ на «ту ли карточку открыл». */}
-        <section className="unit-lists">
-          <div className="panel-heading"><div><h3>{tr('Фото', 'Fotolar')}</h3><p>{tr('Открываются по временной ссылке — она действует час.', 'Vaqtinchalik havola orqali ochiladi — u bir soat amal qiladi.')}</p></div></div>
-          {hasError
-            ? <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить фото машины.', 'Mashina fotolarini yuklab bo‘lmadi.')}</p>
-            : isLoading
-              ? <VehicleFilesSkeleton />
-              : files.length === 0
-                ? <p className="muted">{tr('Фото пока нет.', 'Hozircha fotolar yo‘q.')}</p>
-                : <VehicleFilesList files={files} urls={urls} photoAlt={title} />}
-        </section>
-
-        <section className="unit-lists">
-          <div className="panel-heading"><div><h3>{tr('Водители', 'Haydovchilar')}</h3><p>{tr('Карточка сотрудника открывается в разделе «Сотрудники».', 'Xodim kartasi «Xodimlar» bo‘limida ochiladi.')}</p></div></div>
+        <section className="unit-lists profile-section">
+          <h3 className="profile-section__title">{tr('Водители', 'Haydovchilar')}</h3>
+          <p className="profile-section__hint">{tr('Карточка сотрудника открывается в разделе «Сотрудники».', 'Xodim kartasi «Xodimlar» bo‘limida ochiladi.')}</p>
           {vehicle.drivers.length === 0
             ? <p className="muted">{tr('Водители не назначены.', 'Haydovchilar tayinlanmagan.')}</p>
             : <ul className="unit-lists__items">
@@ -128,6 +115,23 @@ export function VehicleDrawer({ vehicle, photoUrl, onClose }: {
               ))}
             </ul>}
         </section>
+        {/* Галерея идёт ПОСЛЕ водителей: опознание уехало в шапку (с27), а в
+            проде vehicle_files пуста — «Фото пока нет» стояло бы над единственным
+            содержательным блоком карточки. Появятся снимки — порядок останется
+            верным: несколько фото это подробность, а не ответ на «ту ли карточку
+            открыл». */}
+        <section className="unit-lists profile-section">
+          <h3 className="profile-section__title">{tr('Фото', 'Fotolar')}</h3>
+          <p className="profile-section__hint">{tr('Открываются по временной ссылке — она действует час.', 'Vaqtinchalik havola orqali ochiladi — u bir soat amal qiladi.')}</p>
+          {hasError
+            ? <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить фото машины.', 'Mashina fotolarini yuklab bo‘lmadi.')}</p>
+            : isLoading
+              ? <VehicleFilesSkeleton />
+              : files.length === 0
+                ? <p className="muted">{tr('Фото пока нет.', 'Hozircha fotolar yo‘q.')}</p>
+                : <VehicleFilesList files={files} urls={urls} photoAlt={title} />}
+        </section>
+
       </aside>
     </div>
   )

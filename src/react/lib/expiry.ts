@@ -13,12 +13,15 @@ export type ExpiryState = 'expired' | 'soon' | 'valid'
 
 // Порог «скоро истекает». Меньше — предупреждение приходит поздно, больше —
 // оранжевый бейдж висит месяцами и перестаёт что-либо значить.
-export const EXPIRY_SOON_DAYS = 30
+const EXPIRY_SOON_DAYS = 30
 
 // Полных календарных дней от сегодня до срока. Отрицательное — срок позади.
+// Наружу не выставлено намеренно: сроку в интерфейсе нужен ответ «истёк / скоро
+// / в порядке», а не число дней. Понадобится «осталось 12 дней» — экспортировать
+// тогда, а не заранее.
 // Обе даты приводятся к локальной полуночи: иначе «сегодня вечером» и «сегодня
 // утром» давали бы разный ответ на один и тот же срок.
-export function daysUntilExpiry(value: string | null | undefined, now = new Date()): number | null {
+function daysUntilExpiry(value: string | null | undefined, now = new Date()): number | null {
   if (!value) return null
   const date = parseDateValue(value)
   if (!date) return null

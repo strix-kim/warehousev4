@@ -567,7 +567,7 @@
 .profile-head__photo img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .profile-head__text { min-width: 0; }
 .profile-head__text .eyebrow { margin-bottom: 5px; }
-.profile-head__fact { margin: 6px 0 0; color: var(--ink-soft); font-size: 13px; font-weight: 600; line-height: 1.4; }
+.profile-head__fact { margin: 6px 0 0; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; color: var(--ink-soft); font-size: 13px; font-weight: 600; line-height: 1.4; }
 
 /* Кнопки шапки уезжают на свою строку, как только в шапке появилось фото.
    Дровер шириной 480 px: фото 92 + имя + «Редактировать» с крестиком в один ряд
@@ -579,7 +579,11 @@
 .drawer__header:has(.profile-head) .drawer__header-actions { width: 100%; justify-content: flex-end; }
 
 .profile-badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
-.profile-section { margin-top: 22px; }
+/* Тексты сроков длиннее любого статуса оборудования, а общий .badge не
+   переносится. Разрешаем перенос только здесь: править .badge нельзя — он
+   держит однострочные статусы в трёх других дроверах. */
+.profile-badges .badge { max-width: 100%; white-space: normal; text-align: left; }
+.profile-section { margin: 22px 0; }
 .profile-section__title { margin: 0 0 9px; color: var(--ink-faint); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 /* Сетка секции — та же .detail-list, без её внешних отступов: расстояние между
    секциями задаёт сама секция, иначе два отступа складываются. */
@@ -601,6 +605,11 @@
    размен осознанный, копирование нажатием его и заменяет. */
 .detail-list__cell { position: relative; }
 .detail-list__copy { position: absolute; inset: 0; width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; }
+/* Своё кольцо кнопки гасим и рисуем его на ячейке ВНУТРЬ: у .detail-list стоит
+   overflow: hidden ради скруглённых углов, и наружная обводка срезалась
+   начисто — обход с клавиатуры шёл вслепую. */
+.detail-list__copy:focus-visible { outline: none; }
+.detail-list__cell:has(.detail-list__copy:focus-visible) { outline: 3px solid rgba(239,18,54,.22); outline-offset: -3px; }
 .detail-list__cell:hover { background: var(--surface-soft); }
 .detail-list__cell:has(.detail-list__copy:focus-visible) { background: var(--surface-soft); }
 /* Значок копирования проявляется под курсором и при обходе с клавиатуры: висеть
@@ -613,9 +622,31 @@
    мельком. */
 .detail-list__cell--copied { background: var(--success-bg); }
 .detail-list__cell--copied .detail-list__copy-mark { color: var(--success); opacity: 1; }
-.detail-list__copy-note { position: absolute; top: 9px; right: 32px; color: var(--success); font-size: 11px; font-weight: 800; letter-spacing: .02em; pointer-events: none; animation: fade-in .14s ease-out; }
-.detail-list__copy-note--failed { color: var(--danger); }
+.detail-list__copy-note { position: absolute; top: 7px; right: 32px; max-width: 55%; padding: 2px 6px; border-radius: 6px; color: var(--success); background: var(--success-bg); font-size: 11px; font-weight: 800; letter-spacing: .02em; pointer-events: none; animation: fade-in .14s ease-out; }
+.detail-list__copy-note--failed { color: var(--danger); background: var(--danger-bg); }
 @media (prefers-reduced-motion: reduce) {
   .detail-list__copy-mark { transition: none; }
   .detail-list__copy-note { animation: none; }
+}
+
+/* Заголовки секций внутри профиля — один язык на всю карточку. Раньше «Файлы»,
+   «Фото» и «Водители» несли .panel-heading: крупный заголовок с рамкой и
+   отступом 20 px внутрь, из-за чего в одной карточке жили два разных
+   заголовочных стиля. .panel-heading НЕ трогаем — он остаётся у оборудования,
+   модели и каталога; профиль просто перестал им пользоваться. */
+.profile-section__hint { margin: -4px 0 10px; color: var(--ink-faint); font-size: 12px; line-height: 1.45; }
+
+/* Копирование значений шапки: госномер, ФИО, главный факт (с27). Кнопка стоит
+   РЯДОМ со значением, а не поверх него: в шапке значение соседствует с
+   надзаголовком и фактом, и цель во всю ширину ловила бы нажатия мимо. */
+.profile-head__title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.profile-head__copy { flex: 0 0 auto; width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 7px; color: var(--ink-faint); background: var(--surface); opacity: .5; transition: opacity .14s ease, color .14s ease; }
+.profile-head:hover .profile-head__copy, .profile-head__copy:focus-visible { opacity: 1; }
+.profile-head__copy:hover { color: var(--ink); }
+.profile-head__copy--copied { color: var(--success); border-color: var(--success); opacity: 1; }
+.profile-head__copy-note { color: var(--success); font-size: 11px; font-weight: 800; animation: fade-in .14s ease-out; }
+.profile-head__copy-note--failed { color: var(--danger); }
+@media (prefers-reduced-motion: reduce) {
+  .profile-head__copy { transition: none; }
+  .profile-head__copy-note { animation: none; }
 }

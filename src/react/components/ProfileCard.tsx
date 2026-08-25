@@ -17,7 +17,31 @@ import { useLanguage } from '../lib/i18n'
 // структуре «первый div — текст, второй div — действия». Сломаем структуру —
 // молча поедет телефонная раскладка всех дроверов.
 
-export function ProfileHead({ eyebrow, title, fact, photoUrl, photoAlt, photoPlaceholder, photoShape = 'round' }: {
+// Копирование с подтверждением — один крючок на всю карточку. Ключ, а не булев
+// флаг: подтверждение обязано гореть ровно на нажатом месте, а не на всех сразу.
+function useCopyFeedback() {
+  const [copiedKey, setCopiedKey] = useState('')
+  const [failedKey, setFailedKey] = useState('')
+  const timer = useRef<number | undefined>(undefined)
+
+  // Таймер живёт дольше карточки: не сняв его, получим setState на размонтированном
+  // дровере — закрыли карточку сразу после копирования, и в консоли предупреждение.
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  async function copy(key: string, value: string) {
+    const ok = await copyText(value)
+    window.clearTimeout(timer.current)
+    setCopiedKey(ok ? key : '')
+    setFailedKey(ok ? '' : key)
+    // Полторы секунды: меньше — подтверждение не успевает попасть в глаз,
+    // больше — оно ещё горит, когда человек копирует следующее поле.
+    timer.current = window.setTimeout(() => { setCopiedKey(''); setFailedKey('') }, 1500)
+  }
+
+  return { copiedKey, failedKey, copy }
+}
+
+export function ProfileHead({ eyebrow, title, fact, copyValue, photoUrl, photoPlaceholder, photoShape = 'round' }: {
   // Класс записи («Сотрудник», «Автомобиль»), а не повтор заголовка.
   eyebrow: string
   // Главный опознавательный признак: ФИО, госномер.
@@ -25,27 +49,69 @@ export function ProfileHead({ eyebrow, title, fact, photoUrl, photoAlt, photoPla
   // Один главный факт под именем — должность, марка с моделью. Ровно один:
   // второй превращает шапку в тот же список, от которого мы уходим.
   fact?: string | null
+  // Что копировать по нажатию на заголовок. Госномер и ФИО переносят в чат и в
+  // документы не реже телефона, а живут они в шапке, где ячейки с копированием
+  // нет: без этого нажатие по самому заметному значению карточки не делало
+  // ничего (находка прораба, с27).
+  copyValue?: string | null
   // Ссылка приезжает ГОТОВОЙ со страницы: там она уже подписана ради миниатюры
   // в строке. Свой запрос за тем же файлом отложил бы шапку на круг сети и
   // сломал бы первый кадр (с26).
   photoUrl?: string
-  photoAlt: string
   photoPlaceholder: ReactNode
   // Круг — человек, прямоугольник — предмет. Третьей формы не заводим.
   photoShape?: 'round' | 'wide'
 }) {
+  const { tr } = useLanguage()
+  const { copiedKey, failedKey, copy } = useCopyFeedback()
+
+  // Кнопка копирования рядом со значением шапки. Растянуть её на весь заголовок,
+  // как сделано в ячейке реквизитов, здесь нельзя: в шапке значение соседствует
+  // с надзаголовком и фактом, и цель во всю ширину ловила бы нажатия мимо.
+  function copyButton(key: string, value: string, what: string) {
+    const isCopied = copiedKey === key
+    const hasFailed = failedKey === key
+    return (
+      <>
+        <button
+          type="button"
+          className={`profile-head__copy${isCopied ? ' profile-head__copy--copied' : ''}`}
+          onClick={() => void copy(key, value)}
+          aria-label={tr(`Скопировать: ${what}`, `Nusxalash: ${what}`)}
+        >
+          {isCopied ? <Check size={14} /> : <Copy size={13} />}
+        </button>
+        {(isCopied || hasFailed) && (
+          <span className={`profile-head__copy-note${hasFailed ? ' profile-head__copy-note--failed' : ''}`} role="status">
+            {isCopied ? tr('Скопировано', 'Nusxalandi') : tr('Не скопировалось', 'Nusxalanmadi')}
+          </span>
+        )}
+      </>
+    )
+  }
+
   return (
     <div className="profile-head">
+      {/* alt пустой намеренно: имя или госномер стоят строкой правее, и
+          скринридер прочитал бы их дважды. Фото здесь — опознание глазами. */}
       <PhotoThumb
         className={`profile-head__photo profile-head__photo--${photoShape}`}
         url={photoUrl}
-        alt={photoAlt}
+        alt=""
         placeholder={photoPlaceholder}
       />
       <div className="profile-head__text">
         <p className="eyebrow">{eyebrow}</p>
-        <h2>{title}</h2>
-        {fact && <p className="profile-head__fact">{fact}</p>}
+        <h2 className="profile-head__title">
+          {title}
+          {copyValue && copyButton('head:title', copyValue, tr('номер или имя карточки', 'karta raqami yoki ismi'))}
+        </h2>
+        {fact && (
+          <p className="profile-head__fact">
+            {fact}
+            {copyButton('head:fact', fact, fact)}
+          </p>
+        )}
       </div>
     </div>
   )
@@ -89,25 +155,7 @@ export type ProfileSection = { key: string; title: string; fields: ProfileField[
 // иконкой в углу: целиться в неё не нужно.
 export function ProfileSections({ sections }: { sections: ProfileSection[] }) {
   const { tr } = useLanguage()
-  // Какое поле только что скопировано. Ключ, а не булев флаг: подтверждение
-  // обязано гореть ровно на нажатой ячейке, а не на всех сразу.
-  const [copiedKey, setCopiedKey] = useState('')
-  const [failedKey, setFailedKey] = useState('')
-  const timer = useRef<number | undefined>(undefined)
-
-  // Таймер живёт дольше карточки: не сняв его, получим setState на размонтированном
-  // дровере — закрыли карточку сразу после копирования, и в консоли предупреждение.
-  useEffect(() => () => window.clearTimeout(timer.current), [])
-
-  async function copy(key: string, value: string) {
-    const ok = await copyText(value)
-    window.clearTimeout(timer.current)
-    setCopiedKey(ok ? key : '')
-    setFailedKey(ok ? '' : key)
-    // Полторы секунды: меньше — подтверждение не успевает попасть в глаз,
-    // больше — оно ещё горит, когда человек копирует следующее поле.
-    timer.current = window.setTimeout(() => { setCopiedKey(''); setFailedKey('') }, 1500)
-  }
+  const { copiedKey, failedKey, copy } = useCopyFeedback()
 
   const filled = sections
     .map((section) => ({ ...section, fields: section.fields.filter((field) => Boolean(field.value)) }))
@@ -126,30 +174,35 @@ export function ProfileSections({ sections }: { sections: ProfileSection[] }) {
               return (
                 <div key={field.key} className={`detail-list__cell${isCopied ? ' detail-list__cell--copied' : ''}`}>
                   <dt>{field.icon}{field.label}</dt>
-                  <dd className={field.strong ? 'detail-list__value--strong' : undefined}>{field.value}</dd>
-                  {/* Кнопка прозрачная и лежит поверх всей ячейки: нажатие куда
+                  {/* Кнопка, значок и подтверждение живут ВНУТРИ <dd>, а не
+                      соседями dt/dd: по спецификации обёртка div внутри <dl>
+                      содержит только dt и dd, посторонние узлы там невалидны.
+                      На вид это не влияет — кнопка растянута по .detail-list__cell,
+                      а он и есть тот самый div с position: relative.
+
+                      Кнопка прозрачная и лежит поверх всей ячейки: нажатие куда
                       угодно по ней копирует. Цена решения — выделить значение
                       мышью больше нельзя, и это осознанный размен: копирование
-                      нажатием и есть замена выделению, а промахнуться мимо цели
-                      размером с ячейку невозможно. Внутри <dl> допустимы только
-                      dt/dd и обёртка div, поэтому кнопка живёт здесь, а не
-                      оборачивает содержимое. */}
-                  <button
-                    type="button"
-                    className="detail-list__copy"
-                    onClick={() => void copy(key, field.value ?? '')}
-                    aria-label={tr(`Скопировать: ${field.label}`, `Nusxalash: ${field.label}`)}
-                  />
-                  <span className="detail-list__copy-mark" aria-hidden="true">
-                    {isCopied ? <Check size={14} /> : <Copy size={13} />}
-                  </span>
-                  {/* Подтверждение словом, а не только цветом; role=status даёт
-                      его и скринридеру, которому подсветка ячейки не видна. */}
-                  {(isCopied || hasFailed) && (
-                    <span className={`detail-list__copy-note${hasFailed ? ' detail-list__copy-note--failed' : ''}`} role="status">
-                      {isCopied ? tr('Скопировано', 'Nusxalandi') : tr('Не скопировалось', 'Nusxalanmadi')}
+                      нажатием и есть замена выделению, а целиться не нужно. */}
+                  <dd className={field.strong ? 'detail-list__value--strong' : undefined}>
+                    {field.value}
+                    <button
+                      type="button"
+                      className="detail-list__copy"
+                      onClick={() => void copy(key, field.value ?? '')}
+                      aria-label={tr(`Скопировать: ${field.label}`, `Nusxalash: ${field.label}`)}
+                    />
+                    <span className="detail-list__copy-mark" aria-hidden="true">
+                      {isCopied ? <Check size={14} /> : <Copy size={13} />}
                     </span>
-                  )}
+                    {/* Подтверждение словом, а не только цветом; role=status даёт
+                        его и скринридеру, которому подсветка ячейки не видна. */}
+                    {(isCopied || hasFailed) && (
+                      <span className={`detail-list__copy-note${hasFailed ? ' detail-list__copy-note--failed' : ''}`} role="status">
+                        {isCopied ? tr('Скопировано', 'Nusxalandi') : tr('Не скопировалось', 'Nusxalanmadi')}
+                      </span>
+                    )}
+                  </dd>
                 </div>
               )
             })}

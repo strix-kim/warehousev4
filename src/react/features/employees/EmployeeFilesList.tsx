@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { documentPhotoErrorText } from './api'
 import { employeeFileKindLabel, type EmployeeFile } from './types'
 import { PhotoThumb } from '../../components/PhotoThumb'
+import { toDownloadUrl } from '../../lib/signedUrlCache'
 import { useLanguage } from '../../lib/i18n'
 
 // Уже загруженные файлы карточки — ТОЛЬКО на чтение: удаление запрещено
@@ -56,7 +57,13 @@ export function EmployeeFilesList({ files, urls, photoAlt, documentPhotoId, onCh
             return (
               <div className={`employee-photos__item ${isDocument ? 'employee-photos__item--document' : ''}`} key={photo.id}>
                 {url
-                  ? <a href={url} target="_blank" rel="noreferrer">
+                  // Нажатие СКАЧИВАЕТ снимок, а не открывает вкладку с картинкой
+                  // (находка прораба, с27): фото сотрудника несут в документы, и
+                  // «посмотреть» здесь не работа, а лишний шаг. Атрибут download
+                  // на чужой домен не действует — за вложение отвечает параметр
+                  // в подписанном адресе (toDownloadUrl). Документы ниже остаются
+                  // на просмотр: скан открывают, чтобы прочитать.
+                  ? <a href={toDownloadUrl(url, photo.original_name)} rel="noreferrer" title={tr('Скачать снимок', 'Suratni yuklab olish')}>
                     <PhotoThumb url={url} alt={photo.original_name ?? photoAlt} placeholder={<FileText size={18} />} />
                   </a>
                   : <span className="employee-photos__missing" title={tr('Ссылка не получена', 'Havola olinmadi')}><FileText size={18} /></span>}
