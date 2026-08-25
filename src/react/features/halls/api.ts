@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { cachedQuery, invalidateCachePrefix, readCachedQuery, readCachedQueryMeta } from '../../lib/persistentCache'
 import {
   hallColorAt,
   sortHalls,
@@ -41,7 +42,39 @@ function planRow(input: HallPlanInput) {
   }
 }
 
-export async function fetchHallPlans(): Promise<HallPlanWithHalls[]> {
+// Кэшируется ТОЛЬКО список планов. Сам план и ТВ кэшу не отдаются намеренно:
+// это общий черновик, который правят несколько человек сразу, а витрина ТВ
+// перечитывает его каждые 30 секунд — показать там значение из кэша значит
+// показать чужую расстановку как текущую.
+const HALL_PLANS_CACHE_PREFIX = 'hall-plans:'
+const HALL_PLANS_CACHE_KEY = `${HALL_PLANS_CACHE_PREFIX}list`
+// TTL вдвое короче, чем у сотрудников и машин: план правят вдвоём и втроём за
+// одну планёрку, и чужая правка должна доезжать за минуты, а не за десять минут.
+const HALL_PLANS_CACHE_TTL = 5 * 60 * 1000
+
+// Любая запись модуля меняет то, что видно на карточке: имя, даты, точки залов
+// и подпись «изменён …» — updated_at база двигает и на правку зала, и на правку
+// строки, и на правку ячейки. Поэтому сбрасывает кэш КАЖДАЯ запись, а не только
+// правка самого плана.
+function touched<T>(value: T): T {
+  invalidateCachePrefix(HALL_PLANS_CACHE_PREFIX)
+  return value
+}
+
+export function fetchHallPlans({ bypassCache = false } = {}): Promise<HallPlanWithHalls[]> {
+  return cachedQuery(HALL_PLANS_CACHE_KEY, HALL_PLANS_CACHE_TTL, () => loadHallPlans(), { bypass: bypassCache })
+}
+
+// Синхронное чтение той же записи — для первого кадра страницы.
+export function readCachedHallPlans(): HallPlanWithHalls[] | null {
+  return readCachedQuery<HallPlanWithHalls[]>(HALL_PLANS_CACHE_KEY)
+}
+
+export function readCachedHallPlansMeta() {
+  return readCachedQueryMeta(HALL_PLANS_CACHE_KEY)
+}
+
+async function loadHallPlans(): Promise<HallPlanWithHalls[]> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase
     .from('hall_plans')
@@ -111,7 +144,7 @@ export async function createHallPlan(
     const { error: hallsError } = await supabase.from('halls').insert(hallRows, { defaultToNull: false })
     insertError = hallsError ?? null
   }
-  return { plan, hallsError: insertError }
+  return touched({ plan, hallsError: insertError })
 }
 
 // Правка шапки плана без оптимистичной блокировки: планов десятки, правят их по
@@ -125,7 +158,7 @@ export async function updateHallPlan(id: string, input: HallPlanInput): Promise<
     .select()
     .single()
   if (error) throw error
-  return data
+  return touched(data)
 }
 
 // Залы, строки матрицы и ячейки уходят вместе с планом каскадом — отдельных
@@ -135,6 +168,7 @@ export async function deleteHallPlan(id: string): Promise<void> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { error } = await supabase.from('hall_plans').delete().eq('id', id)
   if (error) throw error
+  touched(null)
 }
 
 // Перевод отказа базы в человеческую фразу. Разбираем ИМЕНЕМ ограничения, а не
@@ -211,14 +245,14 @@ export async function createHall(planId: string, name: string, color: string, so
     .select()
     .single()
   if (error) throw error
-  return data
+  return touched(data)
 }
 
 export async function updateHall(id: string, patch: { name?: string; color?: string; sort_order?: number }): Promise<Hall> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase.from('halls').update(patch).eq('id', id).select().single()
   if (error) throw error
-  return data
+  return touched(data)
 }
 
 // Позиции зала уходят каскадом составного внешнего ключа — удалять их отдельно
@@ -227,6 +261,7 @@ export async function deleteHall(id: string): Promise<void> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { error } = await supabase.from('halls').delete().eq('id', id)
   if (error) throw error
+  touched(null)
 }
 
 export async function createPlanPosition(planId: string, name: string, role: string, sortOrder: number): Promise<PlanPosition> {
@@ -237,14 +272,14 @@ export async function createPlanPosition(planId: string, name: string, role: str
     .select()
     .single()
   if (error) throw error
-  return data
+  return touched(data)
 }
 
 export async function updatePlanPosition(id: string, patch: { name?: string; role?: string; sort_order?: number }): Promise<PlanPosition> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase.from('plan_positions').update(patch).eq('id', id).select().single()
   if (error) throw error
-  return data
+  return touched(data)
 }
 
 // Ячейки строки уходят каскадом составного FK — удалять их отдельно нельзя:
@@ -253,6 +288,7 @@ export async function deletePlanPosition(id: string): Promise<void> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { error } = await supabase.from('plan_positions').delete().eq('id', id)
   if (error) throw error
+  touched(null)
 }
 
 // plan_id передаётся явно, хотя выводится и из зала, и из строки: колонка
@@ -284,7 +320,7 @@ export async function createHallAssignment({ planId, hallId, positionId, employe
     .select()
     .single()
   if (error) throw error
-  return data
+  return touched(data)
 }
 
 // Единственная правка ячейки — замена её содержимого: клетка одна, порядка в
@@ -294,13 +330,14 @@ export async function updateHallAssignment(id: string, patch: { employee_id: str
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase.from('hall_assignments').update(patch).eq('id', id).select().single()
   if (error) throw error
-  return data
+  return touched(data)
 }
 
 export async function deleteHallAssignment(id: string): Promise<void> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { error } = await supabase.from('hall_assignments').delete().eq('id', id)
   if (error) throw error
+  touched(null)
 }
 
 // Копия плана: план → залы → строки → ячейки, каждая ступень своим запросом.
@@ -397,7 +434,7 @@ export async function duplicateHallPlan(planId: string, tr: Tr): Promise<HallPla
     if (cellsError) throw cellsError
   }
 
-  return copy
+  return touched(copy)
 }
 
 // ─── Справочник позиций ─────────────────────────────────────────────────────

@@ -1,12 +1,14 @@
 import { BriefcaseBusiness, CircleAlert, FileSpreadsheet, Plus, Search, UserRound, Users, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { fetchEmployeePhotos, fetchEmployees, getSignedUrls, pickDocumentPhoto, type EmployeePhotoRef } from './api'
+import { fetchEmployeeList, fetchEmployeePhotos, fetchEmployeesByIds, getSignedUrls, pickDocumentPhoto, readCachedEmployeeList, readCachedEmployeeListMeta, readCachedEmployeePhotos, type EmployeePhotoRef } from './api'
 import { EmployeeDrawer } from './EmployeeDrawer'
 import { EmployeeEventExportDrawer } from './EmployeeEventExportDrawer'
 import { downloadEmployeeEventXlsx, loadEventPhotos } from './eventExport'
-import { employeeFullName, type Employee } from './types'
+import { employeeFullName, type EmployeeListItem } from './types'
 import { AppSelect } from '../../components/AppSelect'
+import { DataAge } from '../../components/DataAge'
+import { PhotoThumb } from '../../components/PhotoThumb'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import type { EventDocumentMeta } from '../../lib/xlsx/eventDocument'
@@ -23,7 +25,7 @@ function digitsOnly(value: string) {
   return value.replace(/\D+/g, '')
 }
 
-function matchesSearch(employee: Employee, query: string, digits: string) {
+function matchesSearch(employee: EmployeeListItem, query: string, digits: string) {
   const haystack = normalized([employee.last_name, employee.first_name, employee.middle_name, employee.position, employee.phone].filter(Boolean).join(' '))
   if (haystack.includes(query)) return true
   return Boolean(digits) && digitsOnly(employee.phone ?? '').includes(digits)
@@ -38,7 +40,10 @@ export function EmployeesPage() {
   // а не выкидывать из раздела.
   const [params, setParams] = useSearchParams()
   const employeeId = params.get('employee') ?? ''
-  const [employees, setEmployees] = useState<Employee[]>([])
+  // Первый кадр берём из кэша. В реестре нет паспортных данных (api.ts), поэтому
+  // запись лежит на диске и раздел открывается с людьми даже после перезагрузки.
+  const [cachedEmployees] = useState(() => readCachedEmployeeList())
+  const [employees, setEmployees] = useState<EmployeeListItem[]>(() => cachedEmployees ?? [])
   // Поиск здесь клиентский и в адрес не едет — как у машин: выдача полная,
   // фильтр мгновенный, запоминать его в истории незачем.
   const [search, setSearch] = useState('')
@@ -51,51 +56,92 @@ export function EmployeesPage() {
   const [isExportOpen, setIsExportOpen] = useState(false)
   // Фото сотрудников: карта нужна не только миниатюрам — сводка «без фото»
   // в экспорте считается по ней же, тем же pickDocumentPhoto.
-  const [photos, setPhotos] = useState<Map<string, EmployeePhotoRef[]>>(new Map())
+  const [photos, setPhotos] = useState<Map<string, EmployeePhotoRef[]>>(() => readCachedEmployeePhotos() ?? new Map())
   // Подписанные ссылки по пути в бакете — только память страницы: URL живёт час,
   // и в persistentCache ему не место.
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map())
   // Пустая карта фото и НЕотвеченный запрос — разные состояния (gotchas §11):
   // без этого флага сводка экспорта после отказа уверенно говорила бы «без фото
   // все», хотя мы просто не знаем.
-  const [photosKnown, setPhotosKnown] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [photosKnown, setPhotosKnown] = useState(() => readCachedEmployeePhotos() !== null)
+  const [isLoading, setIsLoading] = useState(() => !cachedEmployees)
   // Флаг, а не текст: строка в стейте потянула бы tr в зависимости эффекта, и
   // смена языка перезагружала бы список.
   const [hasError, setHasError] = useState(false)
+  // Момент записи показанной выдачи. Значение принадлежит persistentCache —
+  // здесь только перечитывается, ничего производного не храним.
+  const [dataAt, setDataAt] = useState<number | null>(null)
+  // Отдельный флаг от isLoading: isLoading означает «показывать нечего, рисуем
+  // скелет» и при живом кэше всегда false, а кнопке «Обновить» нужен признак
+  // «запрос в полёте».
+  const [isFetching, setIsFetching] = useState(false)
+  // Исход ПОСЛЕДНЕГО запроса: бейдж обязан отличать «данные старые» от
+  // «обновиться не удалось».
+  const [lastFetchFailed, setLastFetchFailed] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let isCurrent = true
-    setIsLoading(true)
+    // Показали кэш — обязаны перепроверить у сервера; «Обновить» обходит кэш
+    // всегда, потому что её жмут именно от недоверия к показанному.
+    const bypassCache = reloadKey > 0 || Boolean(cachedEmployees)
+    // Метка ДО запроса. Отказ сети не всегда доходит до .catch: при живой записи
+    // cachedQuery подменяет провал последним значением и промис РЕЗОЛВИТСЯ.
+    // Единственный честный признак «ответа не было» — несдвинувшаяся метка
+    // (gotchas §11): кэш двигает её только на успешном ответе.
+    const ageBefore = readCachedEmployeeListMeta()?.touchedAt ?? null
+    setIsLoading(!cachedEmployees)
+    setIsFetching(true)
     setHasError(false)
-    fetchEmployees()
-      .then((rows) => {
+    setDataAt(null)
+
+    // Два круга вместо трёх: фото спрашивают ДРУГУЮ таблицу и выдачи сотрудников
+    // не ждут — раньше запрос за ними стартовал только после её ответа.
+    // Миниатюры — украшение строки: их отказ не должен ронять список, поэтому у
+    // них своя ветка и свой отчёт.
+    const photosPromise = fetchEmployeePhotos({ bypassCache })
+      .then((byEmployee) => {
+        if (isCurrent) {
+          // Карту кладём ДО подписи ссылок: сводка «без фото» считается по ней,
+          // и провал подписи не должен превращаться в «фото нет ни у кого».
+          setPhotos(byEmployee)
+          setPhotosKnown(true)
+        }
+        return byEmployee
+      })
+      .catch((error: unknown) => {
+        reportAppError(error, { scope: 'loader', route: '/employees', detail: { source: 'photos' } })
+        return null
+      })
+
+    fetchEmployeeList({ bypassCache })
+      .then(async (rows) => {
         if (!isCurrent) return
         setEmployees(rows)
-        // Миниатюры — украшение строки: их отказ не должен ронять список,
-        // поэтому у них своя ветка и свой отчёт. Подписываем только фото для
-        // документов: остальные снимки на этом экране не видны.
-        void fetchEmployeePhotos()
-          .then(async (byEmployee) => {
-            if (!isCurrent) return
-            // Карту кладём ДО подписи ссылок: сводка «без фото» считается по ней,
-            // и провал подписи не должен превращаться в «фото нет ни у кого».
-            setPhotos(byEmployee)
-            setPhotosKnown(true)
-            const paths = rows.map((row) => pickDocumentPhoto(row, byEmployee.get(row.id))?.storage_path).filter((path): path is string => Boolean(path))
-            const urls = await getSignedUrls(paths)
-            if (isCurrent) setPhotoUrls(urls)
-          })
-          .catch((error: unknown) => reportAppError(error, { scope: 'loader', route: '/employees', detail: { source: 'photos' } }))
+        const ageAfter = readCachedEmployeeListMeta()?.touchedAt ?? null
+        setLastFetchFailed(ageAfter !== null && ageAfter === ageBefore)
+        setDataAt(ageAfter)
+
+        // Подписываем только фото для документов: остальные снимки на этом
+        // экране не видны.
+        const byEmployee = await photosPromise
+        if (!isCurrent || !byEmployee) return
+        const paths = rows.map((row) => pickDocumentPhoto(row, byEmployee.get(row.id))?.storage_path).filter((path): path is string => Boolean(path))
+        const urls = await getSignedUrls(paths)
+        if (isCurrent) setPhotoUrls(urls)
       })
       .catch((error: unknown) => {
         if (!isCurrent) return
-        setHasError(true)
+        setLastFetchFailed(true)
+        setDataAt(readCachedEmployeeListMeta()?.touchedAt ?? null)
+        // Кэш уже на экране — сбой обновления не повод рушить показанный список.
+        if (!cachedEmployees) setHasError(true)
         reportAppError(error, { scope: 'loader', route: '/employees' })
       })
       .finally(() => {
-        if (isCurrent) setIsLoading(false)
+        if (!isCurrent) return
+        setIsLoading(false)
+        setIsFetching(false)
       })
     return () => { isCurrent = false }
   }, [reloadKey])
@@ -128,7 +174,7 @@ export function EmployeesPage() {
 
   // Карточка — тоже адрес. Открытие пушит запись, поэтому «назад» её закрывает;
   // закрытие ЗАМЕНЯЕТ текущую запись, иначе «назад» открыло бы её снова (§7).
-  function openEmployee(employee: Employee) {
+  function openEmployee(employee: EmployeeListItem) {
     const next = new URLSearchParams(params)
     next.set('employee', employee.id)
     setParams(next)
@@ -176,22 +222,30 @@ export function EmployeesPage() {
       .catch((error: unknown) => reportAppError(error, { scope: 'loader', route: '/employees', detail: { source: 'photos' } }))
   }
 
-  // Выдача полная (сотрудников ~200), поэтому карточку из адреса ищем в ней же —
-  // отдельного запроса по id не нужно. Ищем по ПОЛНОМУ списку, а не по
-  // отфильтрованному: набранный поиск не должен закрывать открытую карточку.
+  // Строку из адреса ищем в реестре — по ПОЛНОМУ списку, а не по отфильтрованному:
+  // набранный поиск не должен закрывать открытую карточку. Паспортных полей в ней
+  // нет, поэтому дровер догружает карточку по id сам: шапка рисуется мгновенно,
+  // документы дорисовываются, когда приедут.
   const openCard = employeeId ? employees.find((employee) => employee.id === employeeId) ?? null : null
   const chosen = employees.filter((employee) => selected.has(employee.id))
 
   // Сборка документа: качаем фото (те же, что показывает список — pickDocumentPhoto
   // тут единственный судья), потом собираем файл. Отменённый прогон файл НЕ отдаёт:
   // человек уже закрыл дровер, и загрузка «сама собой» его бы озадачила.
+  // Паспорт, ПИНФЛ и дата рождения в реестре не лежат — за ними идём отдельным
+  // запросом по выбранным id, ровно в момент сборки файла и без кэша.
   async function exportEventList(meta: EventDocumentMeta, options: { onProgress: (done: number, total: number) => void; signal: AbortSignal }) {
     const refs = chosen
       .map((employee) => ({ employeeId: employee.id, photo: pickDocumentPhoto(employee, photos.get(employee.id)) }))
       .filter((item): item is { employeeId: string; photo: EmployeePhotoRef } => Boolean(item.photo))
       .map((item) => ({ employeeId: item.employeeId, storage_path: item.photo.storage_path }))
-    const { photos: loaded, failed } = await loadEventPhotos(refs, options)
-    if (!options.signal.aborted) downloadEmployeeEventXlsx({ employees: chosen, meta, photos: loaded })
+    // Полные строки и фото едут ВМЕСТЕ: ждать их по очереди незачем — запросы
+    // независимы, а человек стоит перед полосой прогресса.
+    const [full, { photos: loaded, failed }] = await Promise.all([
+      fetchEmployeesByIds(chosen.map((employee) => employee.id)),
+      loadEventPhotos(refs, options),
+    ])
+    if (!options.signal.aborted) downloadEmployeeEventXlsx({ employees: full, meta, photos: loaded })
     return { failed }
   }
 
@@ -242,6 +296,9 @@ export function EmployeesPage() {
               ? tr(`Найдено: ${visible.length.toLocaleString(locale)} из ${employees.length.toLocaleString(locale)}`, `Topildi: ${employees.length.toLocaleString(locale)} tadan ${visible.length.toLocaleString(locale)} tasi`)
               : `${tr('Сотрудников', 'Xodimlar')}: ${employees.length.toLocaleString(locale)}`}
           </span>
+          {/* Рядом с блоком «Ошибка загрузки» бейдж не рисуем: на экране оказались
+              бы два разных предложения обновиться. */}
+          {!hasError && <DataAge touchedAt={dataAt} isRefreshing={isFetching} failed={lastFetchFailed} onRefresh={() => setReloadKey((value) => value + 1)} />}
         </div>
 
         {hasError ? (
@@ -298,11 +355,7 @@ export function EmployeesPage() {
                           </td>
                           <td>
                             <div className="equipment-cell">
-                              <span className="employee-avatar">
-                                {url
-                                  ? <img src={url} alt="" loading="lazy" decoding="async" />
-                                  : <UserRound size={18} />}
-                              </span>
+                              <PhotoThumb className="employee-avatar" url={url} placeholder={<UserRound size={18} />} />
                               <span>
                                 <strong>{fullName}</strong>
                                 <small>{employee.position || tr('Должность не указана', 'Lavozim ko‘rsatilmagan')}</small>

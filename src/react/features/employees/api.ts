@@ -1,9 +1,9 @@
 import { supabase } from '../../lib/supabase'
-import { cachedQuery, invalidateCachePrefix } from '../../lib/persistentCache'
+import { cachedQuery, invalidateCachePrefix, readCachedQuery, readCachedQueryMeta } from '../../lib/persistentCache'
 import { escapeLikePattern } from '../../lib/postgrest'
 import { createSignedUrlCache } from '../../lib/signedUrlCache'
-import { EMPLOYEE_BRIEF_COLUMNS } from './types'
-import type { Employee, EmployeeBrief, EmployeeFile, EmployeeFileKind, Tr } from './types'
+import { EMPLOYEE_BRIEF_COLUMNS, EMPLOYEE_LIST_COLUMNS } from './types'
+import type { Employee, EmployeeBrief, EmployeeFile, EmployeeFileKind, EmployeeListItem, Tr } from './types'
 
 // Приватный бакет: наружу файл уходит только по подписанной ссылке. Экспортируется
 // ради генератора документа: он качает фото байтами, а не подписанной ссылкой.
@@ -15,15 +15,49 @@ export const BUCKET = 'employee-files'
 // в employees — одним префиксом, чтобы ключ и его сброс не разъезжались.
 const EMPLOYEES_CACHE_PREFIX = 'employees:'
 const EMPLOYEE_BRIEFS_CACHE_KEY = `${EMPLOYEES_CACHE_PREFIX}briefs`
+const EMPLOYEE_LIST_CACHE_KEY = `${EMPLOYEES_CACHE_PREFIX}list`
+const EMPLOYEE_PHOTOS_CACHE_KEY = `${EMPLOYEES_CACHE_PREFIX}photos`
 const EMPLOYEES_CACHE_TTL = 10 * 60 * 1000
 
-// Сотрудников ~200 — выдача целиком, без страниц. Порядок с ПОЛНЫМ ключом
+// Реестр сотрудников: ~200 строк целиком, без страниц. Порядок с ПОЛНЫМ ключом
 // (…, id): без него однофамильцы-тёзки меняются местами между запросами.
-export async function fetchEmployees(): Promise<Employee[]> {
+// Колонки — только те, что видно в таблице (EMPLOYEE_LIST_COLUMNS), поэтому
+// запись ложится НА ДИСК: паспорта, ПИНФЛ и адреса прописки здесь нет. Полная
+// карточка приезжает отдельно и только когда её открывают — fetchEmployeeById.
+export function fetchEmployeeList({ bypassCache = false } = {}): Promise<EmployeeListItem[]> {
+  return cachedQuery(EMPLOYEE_LIST_CACHE_KEY, EMPLOYEES_CACHE_TTL, async () => {
+    if (!supabase) throw new Error('Supabase не настроен')
+    const { data, error } = await supabase
+      .from('employees')
+      .select(EMPLOYEE_LIST_COLUMNS)
+      .order('last_name')
+      .order('first_name')
+      .order('id')
+    if (error) throw error
+    return data ?? []
+  }, { bypass: bypassCache })
+}
+
+// Синхронное чтение той же записи — для первого кадра страницы.
+export function readCachedEmployeeList(): EmployeeListItem[] | null {
+  return readCachedQuery<EmployeeListItem[]>(EMPLOYEE_LIST_CACHE_KEY)
+}
+
+export function readCachedEmployeeListMeta() {
+  return readCachedQueryMeta(EMPLOYEE_LIST_CACHE_KEY)
+}
+
+// ПОЛНЫЕ строки выбранных людей — для сборки документа. Кэша здесь нет намеренно:
+// это ровно те паспортные данные, которых мы избегаем в реестре, и жить им
+// столько, сколько собирается файл. Порядок задаём тот же, что у реестра, чтобы
+// строки документа шли как на экране.
+export async function fetchEmployeesByIds(ids: string[]): Promise<Employee[]> {
   if (!supabase) throw new Error('Supabase не настроен')
+  if (ids.length === 0) return []
   const { data, error } = await supabase
     .from('employees')
     .select('*')
+    .in('id', ids)
     .order('last_name')
     .order('first_name')
     .order('id')
@@ -71,7 +105,18 @@ export type EmployeePhotoRef = { id: string; storage_path: string }
 // Фото ВСЕХ сотрудников одним запросом — для миниатюр списка и для сводки
 // «без фото» в экспорте. Отдельный запрос вместо fetchEmployeeFiles по каждой
 // строке: 200 карточек дали бы 200 запросов.
-export async function fetchEmployeePhotos(): Promise<Map<string, EmployeePhotoRef[]>> {
+// Кэш здесь тоже только в памяти, и причина другая, чем у выдачи сотрудников:
+// значение — Map, а persistentCache персистит через JSON.stringify, который
+// превращает Map в `{}`. Класть на диск можно лишь то, что переживает JSON.
+export function fetchEmployeePhotos({ bypassCache = false } = {}): Promise<Map<string, EmployeePhotoRef[]>> {
+  return cachedQuery(EMPLOYEE_PHOTOS_CACHE_KEY, EMPLOYEES_CACHE_TTL, () => loadEmployeePhotos(), { bypass: bypassCache, persist: false })
+}
+
+export function readCachedEmployeePhotos(): Map<string, EmployeePhotoRef[]> | null {
+  return readCachedQuery<Map<string, EmployeePhotoRef[]>>(EMPLOYEE_PHOTOS_CACHE_KEY)
+}
+
+async function loadEmployeePhotos(): Promise<Map<string, EmployeePhotoRef[]>> {
   if (!supabase) throw new Error('Supabase не настроен')
   const { data, error } = await supabase
     .from('employee_files')
@@ -272,6 +317,9 @@ export async function uploadEmployeeFile(employeeId: string, kind: EmployeeFileK
     .select()
     .single()
   if (error) throw error
+  // Новый файл меняет карту фото, а её теперь читают из кэша: без сброса
+  // миниатюра только что загруженного снимка не появилась бы до конца TTL.
+  invalidateCachePrefix(EMPLOYEES_CACHE_PREFIX)
   return data
 }
 

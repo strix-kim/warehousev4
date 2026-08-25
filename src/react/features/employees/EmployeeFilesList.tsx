@@ -2,6 +2,7 @@ import { CircleAlert, FileText } from 'lucide-react'
 import { useState } from 'react'
 import { documentPhotoErrorText } from './api'
 import { employeeFileKindLabel, type EmployeeFile } from './types'
+import { PhotoThumb } from '../../components/PhotoThumb'
 import { useLanguage } from '../../lib/i18n'
 
 // Уже загруженные файлы карточки — ТОЛЬКО на чтение: удаление запрещено
@@ -56,7 +57,7 @@ export function EmployeeFilesList({ files, urls, photoAlt, documentPhotoId, onCh
               <div className={`employee-photos__item ${isDocument ? 'employee-photos__item--document' : ''}`} key={photo.id}>
                 {url
                   ? <a href={url} target="_blank" rel="noreferrer">
-                    <img src={url} alt={photo.original_name ?? photoAlt} loading="lazy" decoding="async" />
+                    <PhotoThumb url={url} alt={photo.original_name ?? photoAlt} placeholder={<FileText size={18} />} />
                   </a>
                   : <span className="employee-photos__missing" title={tr('Ссылка не получена', 'Havola olinmadi')}><FileText size={18} /></span>}
                 {onChooseDocumentPhoto && (isDocument
