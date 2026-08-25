@@ -87,7 +87,7 @@ export function HallPlanPage() {
       {/* Шапка редактора, а не .page-header: у раздела с адресом внутри есть
           возврат кнопкой-стрелкой — тот же приём, что у форм машины и сотрудника.
           Период стоит в надстрочнике: h1 здесь однострочный с многоточием. */}
-      <header className="editor-header">
+      <header className="editor-header editor-header--hall">
         <button type="button" className="icon-button icon-button--bordered" onClick={() => navigate('/halls')} aria-label={tr('Назад к планам', 'Rejalarga qaytish')}>
           <ArrowLeft size={18} />
         </button>
