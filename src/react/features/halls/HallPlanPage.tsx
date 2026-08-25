@@ -29,6 +29,29 @@ export function HallPlanPage() {
     ? tr(`${editor.plan.name} — план залов`, `${editor.plan.name} — zallar rejasi`)
     : '')
 
+  // Печать плана — единственная в системе, и по природе она глобальна: гасит
+  // сайдбар, перекрашивает серую шкалу всего документа, кладёт лист на бок.
+  // Раньше эти правила стояли в halls.css без ограничителя, а <style> ленивого
+  // чанка при уходе со страницы НЕ удаляется — и печать каталога портилась
+  // после любого захода в «Залы» (регрессия с22, найдена аудитом с23).
+  // Маркер на body включает блок @media print ровно на время жизни страницы.
+  //
+  // @page едет отдельной таблицей стилей не для красоты: правило страничного
+  // бокса селекторов не принимает вовсе — ни классом, ни маркером его не
+  // ограничить, и снять его можно только вместе с самой таблицей.
+  useEffect(() => {
+    document.body.classList.add('hall-print')
+    const pageStyle = document.createElement('style')
+    // Поле сверху 14 мм, а не 8: часть принтеров физически не печатает у края,
+    // плюс браузер ставит туда свою строку с датой и адресом (с22).
+    pageStyle.textContent = '@media print { @page { size: A4 landscape; margin: 14mm 10mm 10mm } }'
+    document.head.append(pageStyle)
+    return () => {
+      document.body.classList.remove('hall-print')
+      pageStyle.remove()
+    }
+  }, [])
+
   if (editor.loadState !== 'ready' || !editor.plan) {
     return (
       <section className="data-panel">
