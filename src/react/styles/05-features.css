@@ -554,9 +554,10 @@
 @keyframes popover-in { from { opacity: 0; transform: translateY(-4px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
 /* Карточка-профиль: шапка с фото и главным фактом, секции реквизитов, бейджи
-   состояния (с27). Общие .detail-list и .badge из 04-data НЕ переписываются —
-   их потребляют дроверы оборудования, дровер модели и каталог редактора; здесь
-   только модификаторы, и они обязаны лежать ПОСЛЕ базы, то есть в этом слое. */
+   состояния, копирование поля нажатием (с27). Общие .detail-list и .badge из
+   04-data НЕ переписываются — их потребляют дроверы оборудования, дровер модели
+   и каталог редактора; здесь только модификаторы, и они обязаны лежать ПОСЛЕ
+   базы, то есть в этом слое. */
 .profile-head { min-width: 0; display: flex; align-items: center; gap: 14px; }
 .profile-head__photo { flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); color: var(--ink-faint); background: var(--surface-soft); }
 /* Круг — человек, прямоугольник — предмет: форма отвечает на «что за запись»
@@ -567,12 +568,54 @@
 .profile-head__text { min-width: 0; }
 .profile-head__text .eyebrow { margin-bottom: 5px; }
 .profile-head__fact { margin: 6px 0 0; color: var(--ink-soft); font-size: 13px; font-weight: 600; line-height: 1.4; }
+
+/* Кнопки шапки уезжают на свою строку, как только в шапке появилось фото.
+   Дровер шириной 480 px: фото 92 + имя + «Редактировать» с крестиком в один ряд
+   не помещаются, и госномер (он nowrap) уходил под кнопки. Раскладка та же, что
+   даёт правило до 520 px в 04-data.css, — просто теперь она включается и на
+   широком экране, потому что тесно здесь не окну, а дроверу. */
+.drawer__header:has(.profile-head) { flex-wrap: wrap; }
+.drawer__header:has(.profile-head) .profile-head { flex: 1 1 100%; }
+.drawer__header:has(.profile-head) .drawer__header-actions { width: 100%; justify-content: flex-end; }
+
 .profile-badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
 .profile-section { margin-top: 22px; }
 .profile-section__title { margin: 0 0 9px; color: var(--ink-faint); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 /* Сетка секции — та же .detail-list, без её внешних отступов: расстояние между
    секциями задаёт сама секция, иначе два отступа складываются. */
 .profile-section .detail-list { margin: 0; }
+/* ОДНА колонка. Две давали серую дыру на любом нечётном числе полей: подложка
+   .detail-list просвечивает там, где ячейки нет, и «Цвет» в одиночестве выглядел
+   как половина пустой таблицы. Чинить это правилом на чётность нельзя — поля
+   фильтруются по заполненности, и чётность меняется от записи к записи. Плата за
+   надёжность — карточка выше; взамен адрес прописки и «кем выдан» впервые
+   получают полную ширину вместо ~200 px. */
+.detail-list--profile { grid-template-columns: 1fr; }
+.detail-list--profile > div { min-height: 0; gap: 5px; padding: 11px 13px; }
 .detail-list--profile dt { display: flex; align-items: center; gap: 6px; }
 .detail-list--profile dt svg { flex: 0 0 auto; color: var(--ink-faint); }
 .detail-list--profile .detail-list__value--strong { font-size: 15px; font-weight: 700; }
+
+/* Ячейка копируется нажатием: кнопка прозрачна и растянута на всю ячейку, чтобы
+   в неё не нужно было целиться. Выделение значения мышью при этом теряется —
+   размен осознанный, копирование нажатием его и заменяет. */
+.detail-list__cell { position: relative; }
+.detail-list__copy { position: absolute; inset: 0; width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.detail-list__cell:hover { background: var(--surface-soft); }
+.detail-list__cell:has(.detail-list__copy:focus-visible) { background: var(--surface-soft); }
+/* Значок копирования проявляется под курсором и при обходе с клавиатуры: висеть
+   на всех ячейках сразу он не должен — это шум, а не подсказка. */
+.detail-list__copy-mark { position: absolute; top: 10px; right: 11px; display: grid; place-items: center; color: var(--ink-faint); opacity: 0; transition: opacity .14s ease; pointer-events: none; }
+.detail-list__cell:hover .detail-list__copy-mark,
+.detail-list__cell:has(.detail-list__copy:focus-visible) .detail-list__copy-mark { opacity: 1; }
+/* Подтверждение: ячейка коротко зеленеет, а рядом со значком встаёт слово.
+   Цвет без слова не прочитал бы дальтоник, слово без цвета — тот, кто смотрит
+   мельком. */
+.detail-list__cell--copied { background: var(--success-bg); }
+.detail-list__cell--copied .detail-list__copy-mark { color: var(--success); opacity: 1; }
+.detail-list__copy-note { position: absolute; top: 9px; right: 32px; color: var(--success); font-size: 11px; font-weight: 800; letter-spacing: .02em; pointer-events: none; animation: fade-in .14s ease-out; }
+.detail-list__copy-note--failed { color: var(--danger); }
+@media (prefers-reduced-motion: reduce) {
+  .detail-list__copy-mark { transition: none; }
+  .detail-list__copy-note { animation: none; }
+}

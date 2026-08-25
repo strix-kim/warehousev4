@@ -69,7 +69,7 @@ function detailSections(employee: Employee, tr: Tr, locale: string): ProfileSect
       fields: [
         { key: 'birth_date', label: tr('Дата рождения', 'Tug‘ilgan sana'), value: dateLabel(employee.birth_date, locale), icon: <Cake size={13} /> },
         { key: 't_shirt_size', label: tr('Размер футболки / худи', 'Futbolka / xudi o‘lchami'), value: employee.t_shirt_size, icon: <Shirt size={13} /> },
-        { key: 'birth_place', label: tr('Место рождения', 'Tug‘ilgan joyi'), value: employee.birth_place, icon: <MapPin size={13} />, wide: true },
+        { key: 'birth_place', label: tr('Место рождения', 'Tug‘ilgan joyi'), value: employee.birth_place, icon: <MapPin size={13} /> },
       ],
     },
     {
@@ -79,8 +79,8 @@ function detailSections(employee: Employee, tr: Tr, locale: string): ProfileSect
         { key: 'passport', label: tr('Паспорт', 'Pasport'), value: passport || null, icon: <IdCard size={13} />, strong: true },
         { key: 'pinfl', label: tr('ПИНФЛ', 'JSHSHIR'), value: employee.pinfl, icon: <Hash size={13} /> },
         { key: 'passport_issued_at', label: tr('Дата выдачи', 'Berilgan sana'), value: dateLabel(employee.passport_issued_at, locale), icon: <CalendarDays size={13} /> },
-        { key: 'passport_issued_by', label: tr('Кем выдан', 'Kim tomonidan berilgan'), value: employee.passport_issued_by, icon: <Landmark size={13} />, wide: true },
-        { key: 'residence_address', label: tr('Адрес прописки', 'Ro‘yxatdan o‘tgan manzil'), value: employee.residence_address, icon: <House size={13} />, wide: true },
+        { key: 'passport_issued_by', label: tr('Кем выдан', 'Kim tomonidan berilgan'), value: employee.passport_issued_by, icon: <Landmark size={13} /> },
+        { key: 'residence_address', label: tr('Адрес прописки', 'Ro‘yxatdan o‘tgan manzil'), value: employee.residence_address, icon: <House size={13} /> },
       ],
     },
   ]
