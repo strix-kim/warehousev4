@@ -1,8 +1,9 @@
-import { CircleAlert, ClipboardList, Pencil, Plus, Save, X } from 'lucide-react'
+import { AlignLeft, CircleAlert, ClipboardList, FileText, Hash, Layers, MapPin, Pencil, Plus, Ruler, Save, Tag, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
-import { EquipmentVisual } from '../../components/EquipmentVisual'
+import { EquipmentIcon, EquipmentVisual, getEquipmentImageSrc } from '../../components/EquipmentVisual'
+import { ProfileBadges, ProfileHead, ProfileSections, type ProfileSection } from '../../components/ProfileCard'
 import {
   countEquipmentModelUnits,
   fetchEquipmentById,
@@ -15,7 +16,7 @@ import { fetchUnitLists, readCachedUnitLists, type UnitListUsage } from '../list
 import { appendEquipmentToList, fetchAppendTargets, readCachedAppendTargets, type AppendResult, type AppendTarget } from '../lists/listAppend'
 import { formatEventDate, parseDateValue } from '../../lib/date'
 import { equipmentAvailabilityOptions, equipmentAvailabilityView } from './availability'
-import { equipmentCode, equipmentIdentifier, formatUnitCount } from './format'
+import { equipmentHeadParts, equipmentIdentifier, formatUnitCount } from './format'
 import type { Equipment } from './types'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
@@ -73,6 +74,43 @@ function toEditDraft(item: Equipment): EquipmentEditDraft {
   }
 }
 
+// Реквизиты карточки секциями (контракт ProfileCard, с27). Серийного номера и
+// марки с моделью здесь НЕТ намеренно: оба стоят в шапке, а один и тот же факт
+// печатается один раз. Пустые поля контракт не рисует сам — «Не указаны» и
+// «Нет описания» из карточки поэтому ушли.
+function detailSections(item: Equipment, tr: (ru: string, uz: string) => string, language: 'ru' | 'uz'): ProfileSection[] {
+  return [
+    {
+      key: 'what',
+      title: tr('Что это', 'Bu nima'),
+      fields: [
+        { key: 'type', label: tr('Категория', 'Toifa'), value: translateEquipmentTaxonomy(item.type, language), icon: <Layers size={13} />, strong: true },
+        { key: 'subtype', label: tr('Подкатегория', 'Quyi toifa'), value: translateEquipmentTaxonomy(item.subtype, language), icon: <Tag size={13} /> },
+        // 'N/A' — способ базы сказать «длина не применима», и в карточке это
+        // равно пустому полю, а не значению «N/A».
+        { key: 'length', label: tr('Длина', 'Uzunlik'), value: item.lengthinmeters && item.lengthinmeters !== 'N/A' ? item.lengthinmeters : null, icon: <Ruler size={13} /> },
+      ],
+    },
+    {
+      key: 'stock',
+      title: tr('Учёт', 'Hisob'),
+      fields: [
+        { key: 'tracking', label: tr('Способ учёта', 'Hisob turi'), value: item.tracking_mode === 'quantity' ? tr('По количеству', 'Miqdor bo‘yicha') : tr('По серийному номеру', 'Seriya raqami bo‘yicha'), icon: <ClipboardList size={13} /> },
+        { key: 'count', label: tr('Количество', 'Miqdor'), value: tr(`${item.count} шт.`, `${item.count} dona`), icon: <Hash size={13} /> },
+        { key: 'location', label: tr('Локация', 'Joylashuv'), value: item.location, icon: <MapPin size={13} />, strong: true },
+      ],
+    },
+    {
+      key: 'about',
+      title: tr('Описание', 'Tavsif'),
+      fields: [
+        { key: 'specification', label: tr('Характеристики', 'Xususiyatlar'), value: item.technicalspecification, icon: <FileText size={13} /> },
+        { key: 'description', label: tr('Описание', 'Tavsif'), value: item.description, icon: <AlignLeft size={13} /> },
+      ],
+    },
+  ]
+}
+
 export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant = false }: { item: Equipment; onClose: () => void; onRefreshed: (item: Equipment) => void; onUpdated: (item: Equipment) => void; instant?: boolean }) {
   const { tr, locale, language } = useLanguage()
   useModalLayer(onClose)
@@ -117,6 +155,12 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
   const drawerRef = useRef<HTMLElement>(null)
   const { brand, model, type, subtype, specification, length, description, availability, location, count } = draft
   const canSave = Boolean(brand.trim() && model.trim() && type.trim() && subtype.trim() && count >= 0)
+  // Подписи шапки. Из записи, а не из черновика: пока правку не сохранили,
+  // единицу опознают по прежнему номеру.
+  const head = equipmentHeadParts(item)
+  // Данные для картинки: в правке — черновик, чтобы смена бренда или категории
+  // показывалась сразу, а не после сохранения.
+  const visualItem = isEditing ? { brand, model, type, subtype } : item
   // Серийная единица в этих списках уже стоит — пикер блокирует их строки.
   const unitListIds = new Set(unitLists.map((list) => list.id))
 
@@ -344,22 +388,38 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
     <div className={`drawer-layer${skipEnterAnimation ? ' drawer-layer--instant' : ''}`} role="dialog" aria-modal="true" aria-label={tr('Карточка оборудования', 'Uskuna kartasi')} onMouseDown={onClose}>
       <aside className="drawer" ref={drawerRef} onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
-          <div>
-            <p className="eyebrow">{equipmentCode(item.id)}</p>
-            <h2>{item.brand} {item.model}</h2>
-          </div>
+          {/* Крупно стоит то, чем единицу опознают, и у двух способов учёта это
+              РАЗНОЕ. У серийной — номер плашкой, как госномер у машины: модель
+              одна на десятки единиц, а на складе ищут конкретную. У единицы по
+              количеству номера нет вовсе, и крупно идёт её имя: печатать там
+              штамп импорта значило бы выдавать служебную строку за название.
+              Картинка модели переехала в шапку из полосы под ней — в профиле
+              снимок отвечает на вопрос «тот ли это». В правке она следует за
+              черновиком, иначе смена категории перестала бы показываться сразу. */}
+          <ProfileHead
+            eyebrow={tr('Оборудование', 'Uskuna')}
+            title={head.serial ? <span className="plate-badge plate-badge--lg">{head.serial}</span> : head.name}
+            copyValue={head.serial ?? head.name}
+            fact={head.serial ? head.name : head.code}
+            photoUrl={getEquipmentImageSrc(visualItem)}
+            photoPlaceholder={<EquipmentIcon item={visualItem} />}
+            photoShape="wide"
+          />
           <div className="drawer__header-actions">
             {!isEditing && <button className="button button--secondary" onClick={() => { setIsEditing(true); setEditSuccess('') }}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>}
             <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
           </div>
         </div>
-        <span className={`badge badge--${status.tone}`}><i />{status.label}</span>
+        <ProfileBadges badges={[{ key: 'availability', className: `badge badge--${status.tone}`, label: status.label }]} />
         {refreshState !== 'fresh' && (
           <p className="form-error"><CircleAlert size={15} /> {refreshState === 'missing'
             ? tr('Записи больше нет в базе — возможно, её удалили.', 'Yozuv bazada yo‘q — ehtimol, u o‘chirilgan.')
             : tr('Не удалось обновить карточку с сервера — показаны данные из каталога.', 'Kartani serverdan yangilab bo‘lmadi — katalogdagi ma’lumotlar ko‘rsatilmoqda.')}</p>
         )}
-        <EquipmentVisual item={isEditing ? { brand, model, type, subtype } : item} size="large" alt={`${brand} ${model}`} />
+        {/* Полоса-картинка под шапкой в правке остаётся: там она показывает,
+            во что превратится единица при смене категории, и 92 px в шапке для
+            этого мало. В режиме чтения её роль забрала шапка. */}
+        {isEditing && <EquipmentVisual item={visualItem} size="large" alt={`${brand} ${model}`} />}
         {editSuccess && <p className="form-success"><Save size={15} /> {editSuccess}</p>}
         {isEditing ? (
           <div className="equipment-edit-panel">
@@ -408,17 +468,7 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
             </div>
             </div>
           </div>
-        ) : <><dl className="detail-list">
-          <div><dt>{tr('Категория', 'Toifa')}</dt><dd>{translateEquipmentTaxonomy(item.type, language)}</dd></div>
-          <div><dt>{tr('Подкатегория', 'Quyi toifa')}</dt><dd>{translateEquipmentTaxonomy(item.subtype, language)}</dd></div>
-          <div><dt>{tr('Способ учёта', 'Hisob turi')}</dt><dd>{item.tracking_mode === 'quantity' ? tr('По количеству', 'Miqdor bo‘yicha') : tr('По серийному номеру', 'Seriya raqami bo‘yicha')}</dd></div>
-          <div><dt>{item.tracking_mode === 'quantity' ? tr('Внутренний код', 'Ichki kod') : tr('Серийный номер', 'Seriya raqami')}</dt><dd className="mono">{equipmentIdentifier(item, tr)}</dd></div>
-          <div><dt>{tr('Количество', 'Miqdor')}</dt><dd>{item.count} {tr('шт.', 'dona')}</dd></div>
-          <div><dt>{tr('Локация', 'Joylashuv')}</dt><dd>{item.location || '—'}</dd></div>
-          {item.lengthinmeters && item.lengthinmeters !== 'N/A' && <div><dt>{tr('Длина', 'Uzunlik')}</dt><dd>{item.lengthinmeters}</dd></div>}
-          <div className="detail-list__wide"><dt>{tr('Характеристики', 'Xususiyatlar')}</dt><dd>{item.technicalspecification || tr('Не указаны', 'Ko‘rsatilmagan')}</dd></div>
-          <div className="detail-list__wide"><dt>{tr('Описание', 'Tavsif')}</dt><dd>{item.description || tr('Нет описания', 'Tavsif yo‘q')}</dd></div>
-        </dl>
+        ) : <><ProfileSections sections={detailSections(item, tr, language)} />
         {/* U35-б: путь «нашёл в каталоге → добавил в список». Секция стоит перед
             «Сейчас в списках»: действие — над справкой о его результате. */}
         <section className="unit-lists">

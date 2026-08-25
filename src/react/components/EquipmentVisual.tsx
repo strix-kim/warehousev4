@@ -70,6 +70,15 @@ function categoryIcon(item: EquipmentVisualData): LucideIcon {
   return PackageOpen
 }
 
+// Значок категории без витрины: шапка карточки-профиля (ProfileHead) рисует
+// плейсхолдер сама и ждёт готовый узел, а картинку модели берёт из
+// getEquipmentImageSrc. Своей копии выбора значка у неё быть не должно — правило
+// категорий одно на проект и живёт здесь.
+export function EquipmentIcon({ item, size = 24 }: { item: EquipmentVisualData; size?: number }) {
+  const Icon = categoryIcon(item)
+  return <Icon size={size} aria-hidden="true" />
+}
+
 export function EquipmentVisual({ item, size = 'compact', alt = '' }: {
   item: EquipmentVisualData
   size?: 'compact' | 'large'
