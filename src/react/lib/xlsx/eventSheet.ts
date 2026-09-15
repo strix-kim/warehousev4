@@ -8,7 +8,7 @@
 // CT_Worksheet элемент <drawing> идёт ПОСЛЕ headerFooter, поэтому его место
 // здесь, а сам слой собирает тот, кто его наполняет.
 
-import { numberCell, textCell, xml } from './cells'
+import { headerFooterText, numberCell, textCell } from './cells'
 import { companyDetails } from './documentDefaults'
 import { docText, eventDocumentTitle, formatDocumentDate, type EventDocumentMeta } from './eventDocument'
 
@@ -127,7 +127,7 @@ export function buildEventSheet(input: EventSheetInput): EventSheet {
   <printOptions horizontalCentered="1"/>
   <pageMargins left="0.35" right="0.35" top="0.55" bottom="0.55" header="0.25" footer="0.25"/>
   <pageSetup orientation="${input.orientation}" fitToWidth="1" fitToHeight="0" paperSize="9" pageOrder="downThenOver"/>
-  <headerFooter differentOddEven="1"><oddHeader>&amp;LARGO MEDIA&amp;R${xml(meta.name)}</oddHeader><evenHeader>&amp;LARGO MEDIA&amp;R${xml(meta.name)}</evenHeader><oddFooter>&amp;LARGO MEDIA&amp;C${page} &amp;P / &amp;N&amp;R${period}</oddFooter><evenFooter>&amp;LARGO MEDIA&amp;C${page} &amp;P / &amp;N&amp;R${period}</evenFooter></headerFooter>
+  <headerFooter><oddHeader>&amp;LARGO MEDIA&amp;R${headerFooterText(meta.name)}</oddHeader><oddFooter>&amp;LARGO MEDIA&amp;C${page} &amp;P / &amp;N&amp;R${period}</oddFooter></headerFooter>
   ${input.hasDrawing ? '<drawing r:id="rId1"/>' : ''}
 </worksheet>`
 

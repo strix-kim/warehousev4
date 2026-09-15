@@ -1,5 +1,5 @@
 import { toDateValue } from '../../lib/date'
-import { textCell, numberCell, formulaCell, xml } from '../../lib/xlsx/cells'
+import { textCell, numberCell, formulaCell, headerFooterText } from '../../lib/xlsx/cells'
 import { companyDetails, companyLegalName } from '../../lib/xlsx/documentDefaults'
 import { downloadBlob, safeFileName } from '../../lib/xlsx/download'
 import { buildWorkbookPackage } from '../../lib/xlsx/package'
@@ -133,7 +133,7 @@ function buildSheet(input: ExportListInput) {
   <printOptions horizontalCentered="1"/>
   <pageMargins left="0.35" right="0.35" top="0.55" bottom="0.55" header="0.25" footer="0.25"/>
   <pageSetup orientation="portrait" fitToWidth="1" fitToHeight="0" paperSize="9" pageOrder="downThenOver"/>
-  <headerFooter differentOddEven="1"><oddHeader>&amp;LARGO MEDIA&amp;R${xml(input.name)}</oddHeader><evenHeader>&amp;LARGO MEDIA&amp;R${xml(input.name)}</evenHeader><oddFooter>&amp;LARGO MEDIA&amp;C${input.language === 'uz' ? 'Sahifa' : 'Страница'} &amp;P / &amp;N&amp;R${date}</oddFooter><evenFooter>&amp;LARGO MEDIA&amp;C${input.language === 'uz' ? 'Sahifa' : 'Страница'} &amp;P / &amp;N&amp;R${date}</evenFooter></headerFooter>
+  <headerFooter><oddHeader>&amp;LARGO MEDIA&amp;R${headerFooterText(input.name)}</oddHeader><oddFooter>&amp;LARGO MEDIA&amp;C${input.language === 'uz' ? 'Sahifa' : 'Страница'} &amp;P / &amp;N&amp;R${date}</oddFooter></headerFooter>
 </worksheet>`
 }
 

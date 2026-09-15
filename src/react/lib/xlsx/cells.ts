@@ -10,6 +10,13 @@ export function xml(value: string) {
     .replaceAll("'", '&apos;')
 }
 
+// Текст колонтитула. Внутри <oddHeader>/<oddFooter> амперсанд — управляющий
+// символ (&L, &R, &P, &N…), и «Q&A» в названии мероприятия Excel прочитал бы как
+// «Q» плюс код &A (имя листа). Литеральный амперсанд там пишется удвоенным.
+export function headerFooterText(value: string) {
+  return xml(value.replaceAll('&', '&&'))
+}
+
 export function textCell(reference: string, value: string, style: number) {
   return `<c r="${reference}" t="inlineStr" s="${style}"><is><t xml:space="preserve">${xml(value)}</t></is></c>`
 }
