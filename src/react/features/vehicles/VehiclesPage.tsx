@@ -1,8 +1,10 @@
-import { CarFront, CircleAlert, FileSpreadsheet, Plus, Search, X } from 'lucide-react'
+import { CarFront, FileSpreadsheet, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
 import { DataAge } from '../../components/DataAge'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState, RetryButton } from '../../components/ErrorState'
 import { PhotoThumb } from '../../components/PhotoThumb'
 import { fetchVehiclePhotoPaths, fetchVehicles, getSignedUrls, readCachedVehicles, readCachedVehiclesMeta } from './api'
 import { downloadVehicleEventXlsx } from './eventExport'
@@ -259,12 +261,11 @@ export function VehiclesPage() {
         </div>
 
         {hasError ? (
-          <div className="state-block state-block--error">
-            <CircleAlert size={24} />
-            <strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong>
-            <span>{tr('Не удалось загрузить машины. Повторите попытку.', 'Mashinalarni yuklab bo‘lmadi. Qayta urinib ko‘ring.')}</span>
-            <button className="button button--secondary" onClick={() => setReloadKey((value) => value + 1)}>{tr('Повторить', 'Qayta urinish')}</button>
-          </div>
+          <ErrorState
+            title={tr('Не удалось загрузить машины', 'Mashinalarni yuklab bo‘lmadi')}
+            text={tr('Проверьте интернет и повторите. Карточки машин на месте — их просто не удалось показать.', 'Internetni tekshiring va qayta urinib ko‘ring. Mashina kartalari joyida — ularni shunchaki ko‘rsatib bo‘lmadi.')}
+            action={<RetryButton onClick={() => setReloadKey((value) => value + 1)} />}
+          />
         ) : (
           <div className="table-scroll" aria-busy={isLoading}>
             <table className="data-table data-table--selectable">
@@ -328,25 +329,28 @@ export function VehiclesPage() {
             </table>
 
             {!isLoading && vehicles.length === 0 && (
-              <div className="state-block state-block--illustrated state-block--roomy">
-                <img src="/illustrations/av-fleet.webp" alt="" aria-hidden="true" />
-                <strong>{tr('Машин пока нет', 'Hozircha mashinalar yo‘q')}</strong>
-                <span>{tr('Заведите первую карточку — данные можно добить позже.', 'Birinchi kartani yarating — ma’lumotlarni keyinroq to‘ldirish mumkin.')}</span>
-                <button className="button button--primary" onClick={() => navigate('/vehicles/new')}>
-                  <Plus size={18} /> {tr('Добавить машину', 'Mashina qo‘shish')}
-                </button>
-              </div>
+              <EmptyState
+                art
+                roomy
+                title={tr('Машин пока нет', 'Hozircha mashinalar yo‘q')}
+                text={tr('Заведите первую карточку — данные можно добить позже.', 'Birinchi kartani yarating — ma’lumotlarni keyinroq to‘ldirish mumkin.')}
+                action={(
+                  <button className="button button--secondary" onClick={() => navigate('/vehicles/new')}>
+                    <Plus size={18} /> {tr('Добавить машину', 'Mashina qo‘shish')}
+                  </button>
+                )}
+              />
             )}
 
             {!isLoading && vehicles.length > 0 && visible.length === 0 && (
-              <div className="state-block">
-                <Search size={27} />
-                <strong>{query
+              <EmptyState
+                icon={<Search size={27} />}
+                title={query
                   ? tr(`Ничего не найдено по «${query}»`, `«${query}» bo‘yicha hech narsa topilmadi`)
-                  : tr('Ничего не найдено', 'Hech narsa topilmadi')}</strong>
-                <span>{tr('Проверьте написание номера или снимите фильтр по марке — пробелы в номере не важны.', 'Raqam yozilishini tekshiring yoki marka filtrini oling — raqamdagi bo‘shliqlar muhim emas.')}</span>
-                <button className="button button--secondary" onClick={resetFilters}>{tr('Сбросить фильтры', 'Filtrlarni tozalash')}</button>
-              </div>
+                  : tr('Ничего не найдено', 'Hech narsa topilmadi')}
+                text={tr('Проверьте написание номера или снимите фильтр по марке — пробелы в номере не важны.', 'Raqam yozilishini tekshiring yoki marka filtrini oling — raqamdagi bo‘shliqlar muhim emas.')}
+                action={<button className="button button--secondary" onClick={resetFilters}>{tr('Сбросить фильтры', 'Filtrlarni tozalash')}</button>}
+              />
             )}
           </div>
         )}

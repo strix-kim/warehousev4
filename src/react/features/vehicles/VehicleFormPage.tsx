@@ -6,6 +6,8 @@ import { VehicleFilesList, VehicleFilesSkeleton } from './VehicleFilesList'
 import { driverFullName, vehicleTitle, type VehicleDriver, type VehicleFile } from './types'
 import { fetchEmployeeBriefs } from '../employees/api'
 import { EmployeePicker } from '../../components/EmployeePicker'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState, RetryButton } from '../../components/ErrorState'
 import { PhotoPickField } from '../../components/PhotoPickField'
 import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import { UploadQueue, type UploadItem } from '../../components/UploadQueue'
@@ -335,20 +337,19 @@ export function VehicleFormPage() {
     return (
       <section className="data-panel">
         {loadState === 'missing' && (
-          <div className="state-block">
-            <CarFront size={27} />
-            <strong>{tr('Карточка не найдена', 'Karta topilmadi')}</strong>
-            <span>{tr('Возможно, машину удалили или ссылка устарела.', 'Ehtimol, mashina o‘chirilgan yoki havola eskirgan.')}</span>
-            <button className="button button--primary" onClick={() => navigate('/vehicles')}>{tr('К списку машин', 'Mashinalar ro‘yxatiga')}</button>
-          </div>
+          <EmptyState
+            icon={<CarFront size={27} />}
+            title={tr('Карточка не найдена', 'Karta topilmadi')}
+            text={tr('Возможно, машину удалили или ссылка устарела.', 'Ehtimol, mashina o‘chirilgan yoki havola eskirgan.')}
+            action={<button className="button button--secondary" onClick={() => navigate('/vehicles')}>{tr('К списку машин', 'Mashinalar ro‘yxatiga')}</button>}
+          />
         )}
         {loadState === 'failed' && (
-          <div className="state-block state-block--error">
-            <CircleAlert size={24} />
-            <strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong>
-            <span>{tr('Не удалось загрузить карточку машины.', 'Mashina kartasini yuklab bo‘lmadi.')}</span>
-            <button className="button button--secondary" onClick={() => setReloadKey((value) => value + 1)}>{tr('Повторить', 'Qayta urinish')}</button>
-          </div>
+          <ErrorState
+            title={tr('Не удалось открыть карточку машины', 'Mashina kartasini ochib bo‘lmadi')}
+            text={tr('Проверьте интернет и повторите. Сама карточка не изменилась.', 'Internetni tekshiring va qayta urinib ko‘ring. Kartaning o‘zi o‘zgarmadi.')}
+            action={<RetryButton onClick={() => setReloadKey((value) => value + 1)} />}
+          />
         )}
       </section>
     )

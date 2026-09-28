@@ -6,6 +6,8 @@ import { HallPlanMetaDrawer } from './HallPlanMetaDrawer'
 import { formatPlanPeriod, sortHalls } from './types'
 import { ActionMenu } from '../../components/ActionMenu'
 import { DataAge } from '../../components/DataAge'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState, RetryButton } from '../../components/ErrorState'
 import { formatDateTime } from '../../lib/date'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
@@ -186,12 +188,11 @@ export function HallPlansPage() {
         )}
 
         {hasError ? (
-          <div className="state-block state-block--error">
-            <CircleAlert size={24} />
-            <strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong>
-            <span>{tr('Не удалось загрузить планы залов. Повторите попытку.', 'Zallar rejalarini yuklab bo‘lmadi. Qayta urinib ko‘ring.')}</span>
-            <button className="button button--secondary" onClick={() => setReloadKey((value) => value + 1)}>{tr('Повторить', 'Qayta urinish')}</button>
-          </div>
+          <ErrorState
+            title={tr('Не удалось загрузить планы залов', 'Zallar rejalarini yuklab bo‘lmadi')}
+            text={tr('Проверьте интернет и повторите. Планы на месте — их просто не удалось показать.', 'Internetni tekshiring va qayta urinib ko‘ring. Rejalar joyida — ularni shunchaki ko‘rsatib bo‘lmadi.')}
+            action={<RetryButton onClick={() => setReloadKey((value) => value + 1)} />}
+          />
         ) : (
           <div className="list-grid" aria-busy={isLoading}>
             {isLoading && plans.length === 0
@@ -211,23 +212,26 @@ export function HallPlansPage() {
         )}
 
         {!isLoading && !hasError && plans.length === 0 && (
-          <div className="state-block state-block--illustrated state-block--roomy">
-            <img src="/illustrations/av-halls.webp" alt="" aria-hidden="true" />
-            <strong>{tr('Планов пока нет', 'Hozircha rejalar yo‘q')}</strong>
-            <span>{tr('Заведите план мероприятия — залы и позиции добавляются внутри.', 'Tadbir rejasini yarating — zallar va lavozimlar ichida qo‘shiladi.')}</span>
-            <button className="button button--primary" onClick={() => setCreateOpen(true)}>
-              <Plus size={18} /> {tr('Новый план', 'Yangi reja')}
-            </button>
-          </div>
+          <EmptyState
+            art
+            roomy
+            title={tr('Планов пока нет', 'Hozircha rejalar yo‘q')}
+            text={tr('Заведите план мероприятия — залы и позиции добавляются внутри.', 'Tadbir rejasini yarating — zallar va lavozimlar ichida qo‘shiladi.')}
+            action={(
+              <button className="button button--secondary" onClick={() => setCreateOpen(true)}>
+                <Plus size={18} /> {tr('Новый план', 'Yangi reja')}
+              </button>
+            )}
+          />
         )}
 
         {!isLoading && !hasError && plans.length > 0 && visible.length === 0 && (
-          <div className="state-block">
-            <Search size={27} />
-            <strong>{tr(`Ничего не найдено по «${query}»`, `«${query}» bo‘yicha hech narsa topilmadi`)}</strong>
-            <span>{tr('Поиск идёт по названию плана.', 'Qidiruv reja nomi bo‘yicha ishlaydi.')}</span>
-            <button className="button button--secondary" onClick={() => setSearch('')}>{tr('Сбросить поиск', 'Qidiruvni tozalash')}</button>
-          </div>
+          <EmptyState
+            icon={<Search size={27} />}
+            title={tr(`Ничего не найдено по «${query}»`, `«${query}» bo‘yicha hech narsa topilmadi`)}
+            text={tr('Поиск идёт по названию плана.', 'Qidiruv reja nomi bo‘yicha ishlaydi.')}
+            action={<button className="button button--secondary" onClick={() => setSearch('')}>{tr('Сбросить поиск', 'Qidiruvni tozalash')}</button>}
+          />
         )}
       </section>
 

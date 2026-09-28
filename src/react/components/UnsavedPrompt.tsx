@@ -1,5 +1,6 @@
 import { CircleAlert } from 'lucide-react'
 import { useEffect, useId, useRef } from 'react'
+import './unsaved-prompt.css'
 
 type UnsavedPromptProps = {
   message: string

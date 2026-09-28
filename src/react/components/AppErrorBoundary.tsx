@@ -1,7 +1,8 @@
-import { CircleAlert } from 'lucide-react'
+import { RotateCw } from 'lucide-react'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { readStoredLanguage } from '../lib/i18n'
 import { reportAppError } from '../lib/reportAppError'
+import { ErrorState } from './ErrorState'
 
 type Tr = (ru: string, uz: string) => string
 
@@ -62,25 +63,27 @@ export class AppErrorBoundary extends Component<Props, State> {
 
 function ErrorFallback({ error, variant, tr }: { error: Error; variant: 'app' | 'page'; tr: Tr }) {
   const block = (
-    <div className="state-block state-block--error">
-      <CircleAlert size={24} />
-      <strong>{tr('Что-то сломалось', 'Nimadir buzildi')}</strong>
-      <span>{tr('Раздел не удалось показать. Перезагрузите страницу — если не поможет, сообщите администратору.', 'Bo‘limni ko‘rsatib bo‘lmadi. Sahifani qayta yuklang — agar yordam bermasa, administratorga xabar bering.')}</span>
-      {/* Именно перезагрузка, а не «попробовать снова»: React.lazy запоминает отказ
-          загрузки чанка, и повторный рендер того же импорта упал бы снова. */}
-      <button className="button button--secondary" type="button" onClick={() => window.location.reload()}>
-        {tr('Перезагрузить', 'Qayta yuklash')}
-      </button>
+    <ErrorState
+      title={tr('Что-то сломалось', 'Nimadir buzildi')}
+      text={tr('Раздел не удалось показать. Перезагрузите страницу — если не поможет, сообщите администратору.', 'Bo‘limni ko‘rsatib bo‘lmadi. Sahifani qayta yuklang — agar yordam bermasa, administratorga xabar bering.')}
+      action={
+        // Именно перезагрузка, а не «попробовать снова»: React.lazy запоминает отказ
+        // загрузки чанка, и повторный рендер того же импорта упал бы снова.
+        <button className="button button--secondary" type="button" onClick={() => window.location.reload()}>
+          <RotateCw size={16} /> {tr('Перезагрузить', 'Qayta yuklash')}
+        </button>
+      }
+    >
       {/* Ветка вырезается из прод-сборки целиком: import.meta.env.DEV — константа сборки. */}
       {import.meta.env.DEV && (
-        <pre style={{ maxWidth: 'min(720px, 90vw)', overflow: 'auto', textAlign: 'left', fontSize: '12px', whiteSpace: 'pre-wrap' }}>
+        <pre style={{ maxWidth: '100%', margin: '12px 0 0', overflow: 'auto', fontSize: '12px', whiteSpace: 'pre-wrap' }}>
           {error.stack ?? error.message}
         </pre>
       )}
-    </div>
+    </ErrorState>
   )
 
   // Под корневой границей нет ни сайдбара, ни .app-content: блоку нужна собственная
-  // полноэкранная подложка, и это та же, на которой рисуется загрузчик приложения.
-  return variant === 'app' ? <main className="app-loader">{block}</main> : block
+  // полноэкранная подложка того же цвета, что у загрузчика приложения.
+  return variant === 'app' ? <main className="error-screen">{block}</main> : block
 }

@@ -1,6 +1,8 @@
-import { CircleAlert, Info, Plus, Search, X } from 'lucide-react'
+import { Info, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type RefObject } from 'react'
 import { AppSelect } from '../../components/AppSelect'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState } from '../../components/ErrorState'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
 import { WIDE_EDITOR_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
@@ -115,7 +117,14 @@ export function CatalogPanel({ panelRef, isMobileActive, groups, equipmentCount,
         </nav>
       )}
       <div className="picker-results">
-        {hasLoadError && <div className="state-block state-block--error"><CircleAlert size={23} /><span>{tr('Не удалось загрузить каталог.', 'Katalogni yuklab bo‘lmadi.')}</span></div>}
+        {/* Кнопки «Повторить» нет: загрузка каталога живёт в ListEditorPage и
+            перезапуска не умеет. Выход — перезагрузка страницы, о ней и текст. */}
+        {hasLoadError && (
+          <ErrorState
+            title={tr('Не удалось загрузить каталог', 'Katalogni yuklab bo‘lmadi')}
+            text={tr('Без каталога не из чего выбирать оборудование. Проверьте интернет и обновите страницу.', 'Katalogsiz uskuna tanlab bo‘lmaydi. Internetni tekshiring va sahifani yangilang.')}
+          />
+        )}
         {isLoading && equipmentCount === 0 && Array.from({ length: 8 }, (_, index) => <div className="picker-skeleton" key={index} />)}
         {!hasLoadError && visibleGroups.map((group) => {
           const selectedAlready = selectedKeys.has(group.key)
@@ -148,7 +157,7 @@ export function CatalogPanel({ panelRef, isMobileActive, groups, equipmentCount,
             </button>
           </div>
         )}
-        {!isLoading && !hasLoadError && filteredGroups.length === 0 && <div className="state-block"><Search size={25} /><strong>{tr('Ничего не найдено', 'Hech narsa topilmadi')}</strong><span>{tr('Измените поиск или категорию.', 'Qidiruv yoki toifani o‘zgartiring.')}</span></div>}
+        {!isLoading && !hasLoadError && filteredGroups.length === 0 && <EmptyState icon={<Search size={25} />} title={tr('Ничего не найдено', 'Hech narsa topilmadi')} text={tr('Измените поиск или категорию.', 'Qidiruv yoki toifani o‘zgartiring.')} />}
       </div>
       </div>
     </section>

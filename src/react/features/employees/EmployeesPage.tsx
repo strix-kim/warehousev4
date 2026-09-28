@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, CircleAlert, FileSpreadsheet, Plus, Search, UserRound, Users, X } from 'lucide-react'
+import { BriefcaseBusiness, FileSpreadsheet, Plus, Search, UserRound, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchEmployeeList, fetchEmployeePhotos, fetchEmployeesByIds, getSignedUrls, pickDocumentPhoto, readCachedEmployeeList, readCachedEmployeeListMeta, readCachedEmployeePhotos, type EmployeePhotoRef } from './api'
@@ -8,6 +8,8 @@ import { downloadEmployeeEventXlsx, loadEventPhotos } from './eventExport'
 import { employeeFullName, type EmployeeListItem } from './types'
 import { AppSelect } from '../../components/AppSelect'
 import { DataAge } from '../../components/DataAge'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState, RetryButton } from '../../components/ErrorState'
 import { PhotoThumb } from '../../components/PhotoThumb'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
@@ -307,12 +309,11 @@ export function EmployeesPage() {
         </div>
 
         {hasError ? (
-          <div className="state-block state-block--error">
-            <CircleAlert size={24} />
-            <strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong>
-            <span>{tr('Не удалось загрузить сотрудников. Повторите попытку.', 'Xodimlarni yuklab bo‘lmadi. Qayta urinib ko‘ring.')}</span>
-            <button className="button button--secondary" onClick={() => setReloadKey((value) => value + 1)}>{tr('Повторить', 'Qayta urinish')}</button>
-          </div>
+          <ErrorState
+            title={tr('Не удалось загрузить сотрудников', 'Xodimlarni yuklab bo‘lmadi')}
+            text={tr('Проверьте интернет и повторите. Карточки сотрудников на месте — их просто не удалось показать.', 'Internetni tekshiring va qayta urinib ko‘ring. Xodimlar kartalari joyida — ularni shunchaki ko‘rsatib bo‘lmadi.')}
+            action={<RetryButton onClick={() => setReloadKey((value) => value + 1)} />}
+          />
         ) : (
           <div className="table-scroll" aria-busy={isLoading}>
             <table className="data-table data-table--selectable">
@@ -376,30 +377,30 @@ export function EmployeesPage() {
             </table>
 
             {!isLoading && employees.length === 0 && (
-              <div className="state-block">
-                {/* Иллюстрации у раздела пока нет. Когда арт придёт — на место
-                    иконки одной строкой встаёт <img src="…" alt="" aria-hidden="true" />,
-                    а блоку добавляются state-block--illustrated и --roomy. */}
-                <Users size={27} />
-                <strong>{tr('Сотрудников пока нет', 'Hozircha xodimlar yo‘q')}</strong>
-                <span>{tr('Заведите первую карточку — паспортные данные и сканы можно добить позже.', 'Birinchi kartani yarating — pasport ma’lumotlari va nusxalarni keyinroq to‘ldirish mumkin.')}</span>
-                <button className="button button--primary" onClick={() => navigate('/employees/new')}>
-                  <Plus size={18} /> {tr('Добавить сотрудника', 'Xodim qo‘shish')}
-                </button>
-              </div>
+              <EmptyState
+                art
+                roomy
+                title={tr('Сотрудников пока нет', 'Hozircha xodimlar yo‘q')}
+                text={tr('Заведите первую карточку — паспортные данные и сканы можно добить позже.', 'Birinchi kartani yarating — pasport ma’lumotlari va nusxalarni keyinroq to‘ldirish mumkin.')}
+                action={(
+                  <button className="button button--secondary" onClick={() => navigate('/employees/new')}>
+                    <Plus size={18} /> {tr('Добавить сотрудника', 'Xodim qo‘shish')}
+                  </button>
+                )}
+              />
             )}
 
             {!isLoading && employees.length > 0 && visible.length === 0 && (
-              <div className="state-block">
-                <Search size={27} />
-                {/* Пусто может быть и от одной должности, без единой буквы в поиске —
-                    тогда заголовок с пустыми кавычками врал бы про запрос. */}
-                <strong>{search.trim()
+              <EmptyState
+                icon={<Search size={27} />}
+                // Пусто может быть и от одной должности, без единой буквы в поиске —
+                // тогда заголовок с пустыми кавычками врал бы про запрос.
+                title={search.trim()
                   ? tr(`Ничего не найдено по «${search.trim()}»`, `«${search.trim()}» bo‘yicha hech narsa topilmadi`)
-                  : tr('Ничего не найдено', 'Hech narsa topilmadi')}</strong>
-                <span>{tr('Проверьте написание фамилии или снимите фильтр по должности — телефон можно набрать и одними цифрами.', 'Familiya yozilishini tekshiring yoki lavozim filtrini oling — telefonni faqat raqamlar bilan ham kiritish mumkin.')}</span>
-                <button className="button button--secondary" onClick={resetFilters}>{tr('Сбросить фильтры', 'Filtrlarni tozalash')}</button>
-              </div>
+                  : tr('Ничего не найдено', 'Hech narsa topilmadi')}
+                text={tr('Проверьте написание фамилии или снимите фильтр по должности — телефон можно набрать и одними цифрами.', 'Familiya yozilishini tekshiring yoki lavozim filtrini oling — telefonni faqat raqamlar bilan ham kiritish mumkin.')}
+                action={<button className="button button--secondary" onClick={resetFilters}>{tr('Сбросить фильтры', 'Filtrlarni tozalash')}</button>}
+              />
             )}
           </div>
         )}

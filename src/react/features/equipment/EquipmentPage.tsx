@@ -1,7 +1,6 @@
 import {
   ChevronLeft,
   ChevronRight,
-  CircleAlert,
   PackageOpen,
   Plus,
   Search,
@@ -12,6 +11,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
 import { DataAge } from '../../components/DataAge'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState, RetryButton } from '../../components/ErrorState'
 import { EquipmentVisual, preloadEquipmentImages } from '../../components/EquipmentVisual'
 import {
   emptyEquipmentTaxonomy,
@@ -461,12 +462,11 @@ export function EquipmentPage() {
         </div>
 
         {hasLoadError ? (
-          <div className="state-block state-block--error">
-            <CircleAlert size={24} />
-            <strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong>
-            <span>{tr('Не удалось загрузить оборудование. Повторите попытку.', 'Uskunalarni yuklab bo‘lmadi. Qayta urinib ko‘ring.')}</span>
-            <button className="button button--secondary" onClick={() => setReloadKey((value) => value + 1)}>{tr('Повторить', 'Qayta urinish')}</button>
-          </div>
+          <ErrorState
+            title={tr('Не удалось загрузить оборудование', 'Uskunalarni yuklab bo‘lmadi')}
+            text={tr('Проверьте интернет и повторите. Каталог на месте — его просто не удалось показать.', 'Internetni tekshiring va qayta urinib ko‘ring. Katalog joyida — uni shunchaki ko‘rsatib bo‘lmadi.')}
+            action={<RetryButton onClick={() => setReloadKey((value) => value + 1)} />}
+          />
         ) : (
           <div className={`table-scroll ${isLoading && rows.length ? 'table-scroll--refreshing' : ''}`} aria-busy={isLoading}>
             <table className="data-table">
@@ -526,16 +526,16 @@ export function EquipmentPage() {
             </table>
 
             {!isLoading && !rows.length && (
-              <div className="state-block">
-                <PackageOpen size={27} />
-                {/* Пустой ответ БЕЗ запроса и фильтров — это не «ничего не найдено»:
-                    у сотрудника без строки в public.users каталог закрыт политикой
-                    и приходит пустым. Почту администратора в бандл не кладём. */}
-                <strong>{isFiltered ? tr('Ничего не найдено', 'Hech narsa topilmadi') : tr('Каталог пуст или недоступен', 'Katalog bo‘sh yoki mavjud emas')}</strong>
-                <span>{isFiltered
+              <EmptyState
+                icon={<PackageOpen size={27} />}
+                // Пустой ответ БЕЗ запроса и фильтров — это не «ничего не найдено»:
+                // у сотрудника без строки в public.users каталог закрыт политикой
+                // и приходит пустым. Почту администратора в бандл не кладём.
+                title={isFiltered ? tr('Ничего не найдено', 'Hech narsa topilmadi') : tr('Каталог пуст или недоступен', 'Katalog bo‘sh yoki mavjud emas')}
+                text={isFiltered
                   ? tr('Измените запрос или сбросьте фильтры.', 'So‘rovni o‘zgartiring yoki filtrlarni tozalang.')
-                  : tr('Если вы только что получили доступ, обратитесь к администратору склада.', 'Agar siz endigina ruxsat olgan bo‘lsangiz, ombor administratoriga murojaat qiling.')}</span>
-              </div>
+                  : tr('Если вы только что получили доступ, обратитесь к администратору склада.', 'Agar siz endigina ruxsat olgan bo‘lsangiz, ombor administratoriga murojaat qiling.')}
+              />
             )}
           </div>
         )}

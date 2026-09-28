@@ -6,6 +6,8 @@ import { EmployeeFileFields, emptyFileSelection, selectedFiles, type EmployeeFil
 import { EmployeeFilesList, EmployeeFilesSkeleton } from './EmployeeFilesList'
 import { employeeFileKindLabel, employeeFullName, type Employee, type EmployeeFile, type EmployeeFileKind } from './types'
 import { UnsavedPrompt } from '../../components/UnsavedPrompt'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState, RetryButton } from '../../components/ErrorState'
 import { UploadQueue, type UploadItem } from '../../components/UploadQueue'
 import { compressPhoto } from '../../lib/compressPhoto'
 import { parseDateValue } from '../../lib/date'
@@ -336,20 +338,19 @@ export function EmployeeFormPage() {
           </div>
         )}
         {loadState === 'missing' && (
-          <div className="state-block">
-            <UserRound size={27} />
-            <strong>{tr('Карточка не найдена', 'Karta topilmadi')}</strong>
-            <span>{tr('Возможно, сотрудника удалили или ссылка устарела.', 'Ehtimol, xodim o‘chirilgan yoki havola eskirgan.')}</span>
-            <button className="button button--primary" onClick={() => navigate('/employees')}>{tr('К списку сотрудников', 'Xodimlar ro‘yxatiga')}</button>
-          </div>
+          <EmptyState
+            icon={<UserRound size={27} />}
+            title={tr('Карточка не найдена', 'Karta topilmadi')}
+            text={tr('Возможно, сотрудника удалили или ссылка устарела.', 'Ehtimol, xodim o‘chirilgan yoki havola eskirgan.')}
+            action={<button className="button button--secondary" onClick={() => navigate('/employees')}>{tr('К списку сотрудников', 'Xodimlar ro‘yxatiga')}</button>}
+          />
         )}
         {loadState === 'failed' && (
-          <div className="state-block state-block--error">
-            <CircleAlert size={24} />
-            <strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong>
-            <span>{tr('Не удалось загрузить карточку сотрудника.', 'Xodim kartasini yuklab bo‘lmadi.')}</span>
-            <button className="button button--secondary" onClick={() => setReloadKey((value) => value + 1)}>{tr('Повторить', 'Qayta urinish')}</button>
-          </div>
+          <ErrorState
+            title={tr('Не удалось открыть карточку сотрудника', 'Xodim kartasini ochib bo‘lmadi')}
+            text={tr('Проверьте интернет и повторите. Сама карточка не изменилась.', 'Internetni tekshiring va qayta urinib ko‘ring. Kartaning o‘zi o‘zgarmadi.')}
+            action={<RetryButton onClick={() => setReloadKey((value) => value + 1)} />}
+          />
         )}
       </section>
     )

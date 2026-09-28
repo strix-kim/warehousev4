@@ -1,0 +1,20 @@
+/* Вопрос «уйти без сохранения?» (UnsavedPrompt) — родня плашки черновика, но
+   красная: это не сведение, а остановленный переход. */
+.unsaved-prompt { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding: 12px 14px; border: 1px solid var(--bad); border-radius: var(--r-md); background: var(--bad-bg); }
+.unsaved-prompt > svg { flex: 0 0 auto; color: var(--bad); }
+.unsaved-prompt > strong { flex: 1 1 auto; min-width: 0; font-size: 13px; }
+.unsaved-prompt__actions { display: flex; flex: 0 0 auto; gap: 8px; }
+/* В дровере полезной ширины ~420px: вопрос и две длинные кнопки в строку не
+   влезают — текст сжимался бы в столбик по слову. Кнопки уходят второй строкой
+   и сами переносятся друг под друга, если не помещаются рядом. */
+.drawer .unsaved-prompt { flex-wrap: wrap; }
+.drawer .unsaved-prompt__actions { flex: 1 1 100%; flex-wrap: wrap; }
+.drawer .unsaved-prompt__actions .button { flex: 1 1 auto; }
+
+@media (max-width: 700px) {
+  /* Две длинные подписи рядом с текстом на телефон не помещаются — кнопки
+     уходят под вопрос столбиком, во всю ширину. */
+  .unsaved-prompt { flex-wrap: wrap; }
+  .unsaved-prompt__actions { flex: 1 1 100%; flex-direction: column; }
+  .unsaved-prompt__actions .button { width: 100%; }
+}

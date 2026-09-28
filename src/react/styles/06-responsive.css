@@ -30,53 +30,6 @@
   :root:not(:has(.hall-tv)) { --app-zoom: 1.125; zoom: var(--app-zoom); }
 }
 
-@media (max-width: 1500px) {
-  /* Нижний ярус: 2 + 1 вместо трёх в ряд — три плитки по 300 px на 1440 сжимают
-     текст до двух слов в строке. Третья занимает ряд целиком. */
-  .home-row--refs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .home-row--refs > :last-child { grid-column: 1 / -1; }
-  .home-destination__art--employees { right: -4%; bottom: -18%; width: 54%; max-height: 112%; }
-  .home-destination__art--vehicles, .home-destination__art--halls { right: -6%; bottom: -5%; width: 64%; }
-}
-
-/* Правило выше ломает нижний ярус в 2 + 1 ради ширины колонки, но платит за это
-   ТРЕТЬЕЙ полосой плиток, и главная перестаёт помещаться в экран (замер: 1462 px
-   контента при 780 доступных на 1440x780). Витрину выбора листать вниз нельзя —
-   там прячется половина разделов, поэтому ширина колонки уступает: три плитки в
-   ряд, две полосы, всё видно сразу. Довод с25 про «два слова в строке» снят не
-   спором, а изменением условий: кегль описания и отступы теперь считают высоту
-   окна, а само описание обрезается по строкам (ниже). Блок стоит ПОСЛЕ правила
-   1500 намеренно — специфичность та же, побеждает последний. */
-@media (min-width: 950px) and (max-width: 1500px) {
-  .home-row--refs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .home-row--refs > :last-child { grid-column: auto; }
-}
-
-/* Ярусы делят остаток высоты поровну ТОЛЬКО там, где нижний — одна строка:
-   от 950 px он три в ряд (шире 1500 — базовым правилом, между 950 и 1500 —
-   правилом выше). Ниже 950 нижний ярус двухстрочный, и выравнивание раздуло бы
-   верхний до его высоты — там растягивания нет. */
-@media (min-width: 950px) {
-  .home-destinations { grid-auto-rows: 1fr; }
-}
-
-/* Описание плитки — единственное, что можно отнять без потери смысла: иконка,
-   надзаголовок и название раздела остаются. Обрезаем строками, а не прячем
-   целиком: одна-две строки объясняют раздел, а третья уже роскошь. */
-@media (max-height: 860px) {
-  .home-destination p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
-}
-@media (max-height: 720px) {
-  .home-destination p { -webkit-line-clamp: 2; }
-}
-
-/* Подзаголовок главной («выберите рабочий раздел») объясняет то, что и так видно
-   по пяти плиткам. На низком окне он стоит целой строки высоты — уступает
-   плиткам первым. */
-@media (max-height: 780px) {
-  .home-page__header > p:last-child { display: none; }
-}
-
 @media (max-width: 1050px) {
   .app-shell { grid-template-columns: 76px minmax(0, 1fr); }
   .sidebar { padding-inline: 10px; }
@@ -193,21 +146,6 @@
   .skeleton-row td { min-height: 72px; border: 0; }
   .skeleton-row td::before { display: none; }
   .list-grid { grid-template-columns: 1fr; }
-  .home-page { min-height: auto; justify-content: flex-start; }
-  .home-page__header { margin-bottom: 22px; }
-  .home-page__header h1 { font-size: 36px; }
-  .home-row--work, .home-row--refs { grid-template-columns: 1fr; }
-  .home-row--refs > :last-child { grid-column: auto; }
-  /* Главная работа на телефоне — списки, поэтому их плитка идёт первой */
-  .home-destination { min-height: 285px; padding: 24px; }
-  .home-destination__icon { width: 52px; height: 52px; }
-  .home-destination__arrow { top: 22px; right: 22px; }
-  .home-destination .eyebrow { margin-top: 32px; }
-  .home-destination strong, .home-destination p, .home-destination__action { max-width: 76%; }
-  .home-destination__art { right: -12%; bottom: -2%; width: 76%; max-height: 72%; opacity: .34; }
-  .home-destination__art--equipment { width: 82%; opacity: .45; }
-  .home-destination__art--lists { bottom: -8%; width: 80%; opacity: .36; }
-  .home-destination__art--employees { right: -12%; bottom: -4%; width: 80%; max-height: 74%; opacity: .32; }
   .list-card, .list-card--loading { min-height: 195px; gap: 14px; padding: 16px; }
   /* Кнопок теперь две вместо трёх — они помещаются в ряд и не съедают
      150 px высоты карточки, как столбик до волны 2 */
@@ -244,7 +182,7 @@
   .form-submit-mobile { display: block; padding: 0 16px 20px; }
   .success-state { margin-top: 6vh; padding: 32px 20px; }
   .success-state > div { flex-direction: column; }
-  .state-block--roomy { min-height: 340px; }
+  .empty-state--roomy { min-height: 340px; }
   .picker-item { grid-template-columns: minmax(0, 1fr) 44px; }
   .picker-item .picker-item__action { width: auto; min-width: 44px; height: 44px; padding-inline: 8px; }
   .picker-item:has(.picker-item__action span) { grid-template-columns: minmax(0, 1fr) 56px; }
@@ -277,11 +215,6 @@
 @media (max-width: 700px) {
   .editor-header { grid-template-columns: 44px 1fr; }
   .editor-header h1 { font-size: 22px; white-space: normal; }
-  /* Две длинные подписи рядом с текстом на телефон не помещаются — кнопки
-     уходят под вопрос столбиком, во всю ширину. */
-  .unsaved-prompt { flex-wrap: wrap; }
-  .unsaved-prompt__actions { flex: 1 1 100%; flex-direction: column; }
-  .unsaved-prompt__actions .button { width: 100%; }
   /* На телефоне действия живут в футере рабочего списка — рядом с тем, что
      собрал пользователь. Пара в шапке здесь была бы вторым таким же местом. */
   .editor-header--quick { position: static; margin: 0 0 22px; padding: 0; }

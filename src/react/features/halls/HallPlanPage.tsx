@@ -4,6 +4,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { HallMatrix } from './HallMatrix'
 import { HallPlanMetaDrawer } from './HallPlanMetaDrawer'
 import { buildPlanText } from './planText'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState, RetryButton } from '../../components/ErrorState'
 import { copyText } from '../../lib/clipboard'
 import { useHallPlanEditor, type HallPlanEditor } from './useHallPlanEditor'
 import { formatPlanPeriod } from './types'
@@ -56,26 +58,25 @@ export function HallPlanPage() {
   if (editor.loadState !== 'ready' || !editor.plan) {
     return (
       // Поля панели (--halls) нужны только болванке матрицы: отказ и «не найден»
-      // это .state-block, он центрирует себя сам.
+      // это ErrorState и EmptyState, они центрируют себя сами.
       <section className={editor.loadState === 'loading' ? 'data-panel data-panel--halls' : 'data-panel'}>
         {editor.loadState === 'loading' && <MatrixSkeleton />}
         {/* 'missing' — строки нет (или её не видно политикой): честное состояние,
             а не пустая шапка, иначе ссылка на удалённый план выглядела бы рабочей. */}
         {editor.loadState === 'missing' && (
-          <div className="state-block">
-            <Presentation size={27} />
-            <strong>{tr('План не найден', 'Reja topilmadi')}</strong>
-            <span>{tr('Возможно, план удалили или ссылка устарела.', 'Ehtimol, reja o‘chirilgan yoki havola eskirgan.')}</span>
-            <button className="button button--primary" onClick={() => navigate('/halls')}>{tr('К списку планов', 'Rejalar ro‘yxatiga')}</button>
-          </div>
+          <EmptyState
+            icon={<Presentation size={27} />}
+            title={tr('План не найден', 'Reja topilmadi')}
+            text={tr('Возможно, план удалили или ссылка устарела.', 'Ehtimol, reja o‘chirilgan yoki havola eskirgan.')}
+            action={<button className="button button--secondary" onClick={() => navigate('/halls')}>{tr('К списку планов', 'Rejalar ro‘yxatiga')}</button>}
+          />
         )}
         {editor.loadState === 'failed' && (
-          <div className="state-block state-block--error">
-            <CircleAlert size={24} />
-            <strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong>
-            <span>{tr('Не удалось загрузить план залов.', 'Zallar rejasini yuklab bo‘lmadi.')}</span>
-            <button className="button button--secondary" onClick={editor.reload}>{tr('Повторить', 'Qayta urinish')}</button>
-          </div>
+          <ErrorState
+            title={tr('Не удалось открыть план залов', 'Zallar rejasini ochib bo‘lmadi')}
+            text={tr('Проверьте интернет и повторите. Сам план не изменился.', 'Internetni tekshiring va qayta urinib ko‘ring. Rejaning o‘zi o‘zgarmadi.')}
+            action={<RetryButton onClick={editor.reload} />}
+          />
         )}
       </section>
     )
@@ -131,17 +132,19 @@ export function HallPlanPage() {
             // Пустая матрица без строк — не ошибка, а незаполненный план: залы
             // уже стоят, ставить в них некого. Строки берут из справочника
             // чипами под матрицей или вписывают свои.
-            <div className="state-block">
-              <LayoutGrid size={27} />
-              <strong>{tr('В плане нет позиций', 'Rejada lavozimlar yo‘q')}</strong>
-              <span>{tr(
+            <EmptyState
+              icon={<LayoutGrid size={27} />}
+              title={tr('В плане нет позиций', 'Rejada lavozimlar yo‘q')}
+              text={tr(
                 'Выберите позицию из готовых под матрицей или впишите свою.',
                 'Matritsa ostidagi tayyor lavozimlardan tanlang yoki o‘zingiznikini kiriting.',
-              )}</span>
-              <button className="button button--primary" onClick={focusPositionInput}>
-                <Plus size={17} /> {tr('Добавить позицию', 'Lavozim qo‘shish')}
-              </button>
-            </div>
+              )}
+              action={(
+                <button className="button button--secondary" onClick={focusPositionInput}>
+                  <Plus size={17} /> {tr('Добавить позицию', 'Lavozim qo‘shish')}
+                </button>
+              )}
+            />
           )
           : null}
         <HallMatrix editor={editor} />
@@ -179,7 +182,7 @@ function focusPositionInput() {
 }
 
 // Болванка матрицы на время загрузки. Строка «Загружаем план…» стояла в
-// .state-block на 260 px, а приезжала на её место сетка в пол-экрана — контент
+// блоке состояния на 260 px, а приезжала на её место сетка в пол-экрана — контент
 // прыгал ровно в тот момент, когда на него начинали смотреть.
 //
 // Числа взяты типовые и НЕ угадывают конкретный план: болванка обязана совпасть

@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState } from '../../components/ErrorState'
 import { preloadEquipmentImages } from '../../components/EquipmentVisual'
 import { formatDateTime, formatTime, parseDateValue, todayDateValue } from '../../lib/date'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
@@ -648,7 +650,7 @@ export function ListEditorPage() {
         <div className="editor-header__actions">{actionButtons}</div>
       </header>
 
-      {openError && <div className="state-block state-block--error editor-open-error"><CircleAlert size={23} /><strong>{tr('Список не открыт', 'Ro‘yxat ochilmadi')}</strong><span>{tr('Не удалось открыть сохранённый список.', 'Saqlangan ro‘yxatni ochib bo‘lmadi.')}</span><button className="button button--secondary" onClick={() => navigate('/lists')}>{tr('Вернуться к спискам', 'Ro‘yxatlarga qaytish')}</button></div>}
+      {openError && <ErrorState inline className="editor-open-error" title={tr('Список не открыт', 'Ro‘yxat ochilmadi')} text={tr('Не удалось открыть сохранённый список. Проверьте интернет и откройте его из реестра ещё раз — сам список не изменился.', 'Saqlangan ro‘yxatni ochib bo‘lmadi. Internetni tekshiring va uni reestrdan qayta oching — ro‘yxatning o‘zi o‘zgarmadi.')} action={<button className="button button--secondary" onClick={() => navigate('/lists')}>{tr('Вернуться к спискам', 'Ro‘yxatlarga qaytish')}</button>} />}
 
       {draftNotice && (
         <div className="editor-draft-notice">
@@ -717,11 +719,7 @@ export function ListEditorPage() {
 
           <div className="selection-list quick-selection-list">
             {selected.length === 0 && (
-              <div className="state-block state-block--illustrated">
-                <img src="/illustrations/equipment-kit.webp" alt="" aria-hidden="true" />
-                <strong>{tr('Список пока пуст', 'Ro‘yxat hozircha bo‘sh')}</strong>
-                <span>{tr('Нажмите на нужную модель в каталоге.', 'Katalogdagi kerakli modelni bosing.')}</span>
-              </div>
+              <EmptyState art title={tr('Список пока пуст', 'Ro‘yxat hozircha bo‘sh')} text={tr('Нажмите на нужную модель в каталоге.', 'Katalogdagi kerakli modelni bosing.')} />
             )}
             {resolvedSelection.map(({ item, group, label }, index) => (
               <article className="quick-selection-item" key={item.key}>

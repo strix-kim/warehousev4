@@ -17,6 +17,8 @@ import { useNavigate } from 'react-router-dom'
 import { ActionMenu } from '../../components/ActionMenu'
 import { AppSelect } from '../../components/AppSelect'
 import { DataAge } from '../../components/DataAge'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorState, RetryButton } from '../../components/ErrorState'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { formatDateTime, formatEventDate, monthRange, parseDateValue } from '../../lib/date'
@@ -28,6 +30,7 @@ import {
   deleteEquipmentList,
   fetchEquipmentLists,
   LIST_DELETE_FORBIDDEN,
+  listSize,
   prefetchSavedListDetails,
   preferredListsPageSize,
   readCachedEquipmentLists,
@@ -66,13 +69,6 @@ function getDrawerErrorMessage(code: DrawerErrorCode, tr: Tr) {
     case 'delete': return tr('Не удалось удалить список. Попробуйте ещё раз.', 'Ro‘yxatni o‘chirib bo‘lmadi. Qayta urinib ko‘ring.')
     default: return ''
   }
-}
-
-// equipment_ids и equipment_items не пересекаются: RPC кладёт серийные позиции в первый
-// массив, все остальные — во второй. Поэтому размер списка — их сумма при любом list_mode.
-function listSize(list: EquipmentList) {
-  const quantity = list.equipment_items?.reduce((sum, item) => sum + (Number(item.count) || 0), 0) ?? 0
-  return (list.equipment_ids?.length ?? 0) + quantity
 }
 
 type ListsPeriod = 'all' | 'this-month' | 'last-month' | 'next-month'
@@ -325,7 +321,11 @@ export function ListsPage() {
         {exportError && <p className="form-error list-export-error"><CircleAlert size={14} /> {exportError}</p>}
 
         {hasLoadError ? (
-          <div className="state-block state-block--error"><CircleAlert size={25} /><strong>{tr('Ошибка загрузки', 'Yuklash xatosi')}</strong><span>{tr('Не удалось загрузить сохранённые списки.', 'Saqlangan ro‘yxatlarni yuklab bo‘lmadi.')}</span><button className="button button--secondary" onClick={() => setReloadKey((current) => current + 1)}>{tr('Повторить', 'Qayta urinish')}</button></div>
+          <ErrorState
+            title={tr('Не удалось загрузить списки', 'Ro‘yxatlarni yuklab bo‘lmadi')}
+            text={tr('Проверьте интернет и повторите. Сохранённые списки на месте — их просто не удалось показать.', 'Internetni tekshiring va qayta urinib ko‘ring. Saqlangan ro‘yxatlar joyida — ularni shunchaki ko‘rsatib bo‘lmadi.')}
+            action={<RetryButton onClick={() => setReloadKey((current) => current + 1)} />}
+          />
         ) : (
           <div className="list-grid">
             {showDraftCard && draft && (
@@ -427,14 +427,15 @@ export function ListsPage() {
         )}
         {!isLoading && !hasLoadError && rows.length === 0 && !showDraftCard && (
           total === 0 && !isFiltered ? (
-            <div className="state-block state-block--illustrated state-block--roomy">
-              <img src="/illustrations/equipment-kit.webp" alt="" aria-hidden="true" />
-              <strong>{tr('Сохранённых списков пока нет', 'Saqlangan ro‘yxatlar hozircha yo‘q')}</strong>
-              <span>{tr('Соберите первый комплект — его можно сохранить и сразу скачать в Excel.', 'Birinchi jamlanmani tuzing — uni saqlash va darhol Excelga yuklash mumkin.')}</span>
-              <button className="button button--primary" onClick={() => navigate('/lists/new')}><Plus size={17} /> {tr('Создать список', 'Ro‘yxat yaratish')}</button>
-            </div>
+            <EmptyState
+              art
+              roomy
+              title={tr('Сохранённых списков пока нет', 'Saqlangan ro‘yxatlar hozircha yo‘q')}
+              text={tr('Соберите первый комплект — его можно сохранить и сразу скачать в Excel.', 'Birinchi jamlanmani tuzing — uni saqlash va darhol Excelga yuklash mumkin.')}
+              action={<button className="button button--secondary" onClick={() => navigate('/lists/new')}><Plus size={17} /> {tr('Создать список', 'Ro‘yxat yaratish')}</button>}
+            />
           ) : (
-            <div className="state-block"><Search size={25} /><strong>{tr('Списки не найдены', 'Ro‘yxatlar topilmadi')}</strong><span>{tr('Измените запрос или фильтр.', 'So‘rov yoki filtrni o‘zgartiring.')}</span></div>
+            <EmptyState icon={<Search size={25} />} title={tr('Списки не найдены', 'Ro‘yxatlar topilmadi')} text={tr('Измените запрос или фильтр.', 'So‘rov yoki filtrni o‘zgartiring.')} />
           )
         )}
         {!isLoading && !hasLoadError && rows.length > 0 && (
