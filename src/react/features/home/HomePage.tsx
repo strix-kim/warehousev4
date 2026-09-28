@@ -1,89 +1,361 @@
-import { ArrowUpRight, Boxes, CarFront, ClipboardList, Plus, Presentation, UsersRound } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { ArrowRight, ArrowUpRight, Boxes, CarFront, ClipboardList, Plus, Presentation, Search, UsersRound } from 'lucide-react'
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { DataAge } from '../../components/DataAge'
+import { expiryState } from '../../lib/expiry'
 import { useLanguage } from '../../lib/i18n'
+import { reportAppError } from '../../lib/reportAppError'
+import { equipmentAvailabilityLabel } from '../equipment/availability'
+import { formatPlanPeriod } from '../halls/types'
+import { fetchEquipmentLists, listSize, preferredListsPageSize, readCachedEquipmentLists, type EquipmentList, type EquipmentListsPage } from '../lists/api'
+import { fetchHomeSummary, readCachedHomeSummary, readCachedHomeSummaryMeta, type HomeSummary } from './api'
+import './home.css'
+
+type Tr = (ru: string, uz: string) => string
+
+// Склонение для русского: «1 паспорт», «2 паспорта», «5 паспортов». Движок знает
+// правило (21 — «one», 12 — «many»), своя таблица окончаний его бы повторяла.
+// В узбекском счётное слово не склоняется, поэтому хелпер русский и локальный.
+function ruPlural(count: number, one: string, few: string, many: string) {
+  const rule = new Intl.PluralRules('ru').select(count)
+  return rule === 'one' ? one : rule === 'few' ? few : many
+}
+
+// Госномер Узбекистана — «01 439 SNA», «10 D 412 GB»: две цифры региона, пробел,
+// остальное. Только в этом однозначном виде номер делится на ячейки плашки;
+// всё прочее (номер без пробела, иностранный) рисуется целиком одной ячейкой —
+// угадывать границу региона в чужом формате значит показать номер, которого нет.
+function splitPlate(plate: string) {
+  const match = /^(\d{2}) (.+)$/.exec(plate)
+  return match ? { region: match[1], rest: match[2] } : null
+}
+
+// Дата мероприятия списка числами. Полдень в разборе — чтобы Ташкент (UTC+5) не
+// увёл календарный день на сутки назад.
+function formatListDate(value: string | null, locale: string) {
+  return value ? new Intl.DateTimeFormat(locale).format(new Date(`${value}T12:00:00`)) : null
+}
+
+function listSubtitle(list: EquipmentList, tr: Tr) {
+  return [list.client_name, list.venue].filter(Boolean).join(' · ') || tr('Заказчик не указан', 'Buyurtmachi ko‘rsatilmagan')
+}
+
+// Сколько сроков истекло и сколько истекает скоро. Порог — только expiryState:
+// база отдаёт голые даты, чтобы правило «скоро» не жило в двух местах.
+function countExpiries(expiries: string[]) {
+  let expired = 0
+  let soon = 0
+  for (const value of expiries) {
+    const state = expiryState(value)
+    if (state === 'expired') expired += 1
+    else if (state === 'soon') soon += 1
+  }
+  return { expired, soon }
+}
+
+// Сколько последних списков показывать: три на десктопе, две строки на телефоне.
+const RECENT_LISTS = 3
+const PHONE_RECENT_LISTS = 2
+// Сколько цветных квадратиков залов влезает в широкую плитку телефона; остальные — «+N».
+const PHONE_HALL_DOTS = 4
 
 export function HomePage() {
-  const { tr } = useLanguage()
+  const { tr, locale } = useLanguage()
+  const navigate = useNavigate()
+
+  // Первый кадр — из кэша, затем свежий ответ (как в реестрах разделов). Ключ
+  // списков — тот же, что у первой страницы /lists и у прогрева в App.tsx:
+  // размер страницы спрашиваем у самой фичи, иначе кэш был бы не общий.
+  const [listsQuery] = useState(() => ({ page: 1, search: '', pageSize: preferredListsPageSize() }))
+  const [cachedSummary] = useState(() => readCachedHomeSummary())
+  const [cachedLists] = useState(() => readCachedEquipmentLists(listsQuery))
+  const [summary, setSummary] = useState<HomeSummary | null>(cachedSummary)
+  const [lists, setLists] = useState<EquipmentListsPage | null>(cachedLists)
+  const [summaryFailed, setSummaryFailed] = useState(false)
+  const [listsFailed, setListsFailed] = useState(false)
+  // Возраст сводки. Владелец — persistentCache; здесь только перечитывается.
+  const [dataAt, setDataAt] = useState<number | null>(null)
+  const [isFetching, setIsFetching] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    let isCurrent = true
+    // Показали кэш — обязаны перепроверить у сервера; «Обновить» обходит кэш всегда.
+    const bypassCache = reloadKey > 0
+    // Метка ДО запроса: при живой записи cachedQuery подменяет отказ сети старым
+    // значением и промис резолвится. Несдвинувшаяся метка — единственный честный
+    // признак «ответа не было» (gotchas §4).
+    const ageBefore = readCachedHomeSummaryMeta()?.touchedAt ?? null
+    setIsFetching(true)
+    setDataAt(null)
+
+    const summaryLoad = fetchHomeSummary({ bypassCache: bypassCache || Boolean(cachedSummary) })
+      .then((value) => {
+        if (!isCurrent) return
+        setSummary(value)
+        const ageAfter = readCachedHomeSummaryMeta()?.touchedAt ?? null
+        setSummaryFailed(ageAfter !== null && ageAfter === ageBefore)
+        setDataAt(ageAfter)
+      })
+      .catch((error: unknown) => {
+        if (!isCurrent) return
+        // Главная — прежде всего навигация: отказ сводки прячет факты, но ссылки
+        // остаются. Показанный кэш не стираем — у него есть возраст в DataAge.
+        setSummaryFailed(true)
+        setDataAt(readCachedHomeSummaryMeta()?.touchedAt ?? null)
+        reportAppError(error, { scope: 'loader', route: '/', detail: { source: 'home-summary', servedFromCache: Boolean(cachedSummary) } })
+      })
+
+    const listsLoad = fetchEquipmentLists({ ...listsQuery, bypassCache: bypassCache || Boolean(cachedLists) })
+      .then((value) => {
+        if (!isCurrent) return
+        setLists(value)
+        setListsFailed(false)
+      })
+      .catch((error: unknown) => {
+        if (!isCurrent) return
+        setListsFailed(true)
+        reportAppError(error, { scope: 'loader', route: '/', detail: { source: 'recent-lists', servedFromCache: Boolean(cachedLists) } })
+      })
+
+    void Promise.allSettled([summaryLoad, listsLoad]).then(() => { if (isCurrent) setIsFetching(false) })
+    return () => { isCurrent = false }
+  }, [cachedLists, cachedSummary, listsQuery, reloadKey])
+
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    // Каталог читает поиск из ?q= (EquipmentPage) — главная просто открывает его
+    // с уже заданным запросом.
+    const query = search.trim()
+    navigate(query ? `/equipment?${new URLSearchParams({ q: query }).toString()}` : '/equipment')
+  }
+
+  const number = (value: number) => value.toLocaleString(locale)
+  const equipment = summary?.equipment ?? null
+  const employees = summary?.employees ?? null
+  const vehicles = summary?.vehicles ?? null
+  const hallPlan = summary?.hallPlan ?? null
+  const expiries = employees ? countExpiries(employees.expiries) : { expired: 0, soon: 0 }
+  const recent = lists?.rows ?? []
+  const isListsLoading = lists === null && !listsFailed
+  const plate = vehicles?.firstPlate ?? null
+  const plateParts = plate ? splitPlate(plate) : null
+  // «Последний» на плитке телефона — когда создан самый свежий список (выдача
+  // отсортирована по created_at desc), день и месяц без года.
+  const lastCreated = recent[0]?.created_at
+    ? new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit' }).format(new Date(recent[0].created_at))
+    : null
+
+  const documentWord = (count: number) => ruPlural(count, 'документ', 'документа', 'документов')
+  const expiredLabel = tr(
+    `${number(expiries.expired)} ${documentWord(expiries.expired)} ${ruPlural(expiries.expired, 'истёк', 'истекли', 'истекли')}`,
+    `${number(expiries.expired)} ta hujjat muddati o‘tgan`,
+  )
+  const soonLabel = tr(
+    `${number(expiries.soon)} ${documentWord(expiries.soon)} ${ruPlural(expiries.soon, 'истекает', 'истекают', 'истекают')}`,
+    `${number(expiries.soon)} ta hujjat muddati tugayapti`,
+  )
+  const hiresLabel = (count: number) => tr(`${number(count)} ${ruPlural(count, 'наём', 'наёма', 'наёмов')}`, `${number(count)} ta yollash`)
+  // Пилюля — только при отклонении: пустые сроки у всех — это не «проблема», а молчание.
+  const expiryPills = (
+    <>
+      {expiries.expired > 0 && <span className="pill pill--bad">{expiredLabel}</span>}
+      {expiries.soon > 0 && <span className="pill pill--warn">{soonLabel}</span>}
+    </>
+  )
+  const planLine = hallPlan ? `${hallPlan.name} · ${formatPlanPeriod({ event_from: hallPlan.eventFrom, event_to: hallPlan.eventTo }, locale, tr)}` : null
+  const hallDots = (limit: number) => {
+    if (!hallPlan) return null
+    const shown = hallPlan.halls.slice(0, limit)
+    const rest = hallPlan.halls.length - shown.length
+    return (
+      <span className="hallsdots" aria-hidden="true">
+        {shown.map((hall, index) => <i key={index} style={{ '--hall-color': hall.color } as CSSProperties} title={hall.name}>{index + 1}</i>)}
+        {rest > 0 && <i className="hallsdots__rest">+{rest}</i>}
+      </span>
+    )
+  }
 
   return (
-    <section className="home-page">
-      <header className="home-page__header">
-        <p className="eyebrow">ARGO WAREHOUSE</p>
-        <h1>{tr('Что нужно сделать?', 'Nima qilish kerak?')}</h1>
-        <p>{tr('Выберите рабочий раздел — без лишних промежуточных экранов.', 'Kerakli ish bo‘limini tanlang — ortiqcha oraliq ekranlarsiz.')}</p>
+    <section className="home-screen">
+      <header className="home-screen__head">
+        <div>
+          <p className="eyebrow">ARGO Warehouse</p>
+          <h1>{tr('Что нужно сделать?', 'Nima qilish kerak?')}</h1>
+        </div>
+        <DataAge touchedAt={dataAt} isRefreshing={isFetching} failed={summaryFailed} onRefresh={() => setReloadKey((value) => value + 1)} />
       </header>
 
-      {/* Два яруса, а не пять равных плиток (с25). Верхний — то, ради чего сюда
-          заходят каждый день: собрать список и найти технику. Нижний — справочники
-          и планирование. До с25 «Автомобили» и «Залы» лежали слим-баннерами во
-          всю ширину; теперь все пять плиток поддерживают одинаковую композицию. */}
-      <div className="home-destinations">
-        <div className="home-row home-row--work">
-          {/* Плитка — <article>, а не <a>: подпись-действие ведёт своим адресом, а вложить
-              ссылку в ссылку нельзя. Тело плитки кликается растянутой .home-destination__link. */}
-          <article className="home-destination home-destination--lists">
-            <img className="home-destination__art home-destination__art--lists" src="/illustrations/equipment-kit.webp" alt="" aria-hidden="true" loading="eager" decoding="async" fetchPriority="high" />
-            <Link className="home-destination__link" to="/lists">
-              <span className="home-destination__icon"><ClipboardList size={34} /></span>
-              <span className="home-destination__arrow"><ArrowUpRight size={24} /></span>
-              <span className="eyebrow">{tr('Быстрый документ', 'Tezkor hujjat')}</span>
-              <strong>{tr('Списки оборудования', 'Uskunalar ro‘yxatlari')}</strong>
-              <p>{tr('Быстро собрать комплект, указать количество и скачать готовый Excel.', 'Jamlanmani tez yig‘ish, miqdorni ko‘rsatish va tayyor Excelni yuklash.')}</p>
-            </Link>
-            <Link className="home-destination__action" to="/lists/new"><Plus size={16} /> {tr('Создать список', 'Ro‘yxat yaratish')}</Link>
-          </article>
+      {/* Десктоп и планшет (≥ 600). Телефонная раскладка ниже — отдельное дерево,
+          а не перестановка этого: у телефона другой состав (плитки 2×2 вместо
+          панелей, без поиска), и CSS-перестановкой его не собрать. */}
+      <div className="home">
+        <section className="home-list">
+          <p className="eyebrow">{tr('Быстрый документ', 'Tezkor hujjat')}</p>
+          <h2>{tr('Собрать список на выезд', 'Safar uchun ro‘yxat tuzish')}</h2>
+          <p className="home-list__lead">{tr(
+            'Модели, количество, серийные номера — и готовый Excel. Сохранять в системе необязательно.',
+            'Modellar, miqdor, seriya raqamlari — va tayyor Excel. Tizimda saqlash shart emas.',
+          )}</p>
+          <div className="home-list__cta">
+            {/* Единственная красная кнопка экрана (A-04, V-13). */}
+            <Link className="button button--primary home-list__new" to="/lists/new"><Plus size={18} />{tr('Новый список', 'Yangi ro‘yxat')}</Link>
+            <Link className="home-quiet-link" to="/lists">{tr('Все списки', 'Barcha ro‘yxatlar')}<ArrowRight size={16} /></Link>
+          </div>
+          <div className="recent">
+            {isListsLoading && Array.from({ length: RECENT_LISTS }, (_, index) => <span className="recent__skeleton" key={index} />)}
+            {listsFailed && recent.length === 0 && <p className="recent__note">{tr('Не удалось загрузить последние списки.', 'Oxirgi ro‘yxatlarni yuklab bo‘lmadi.')}</p>}
+            {!isListsLoading && !listsFailed && recent.length === 0 && <p className="recent__note">{tr('Списков пока нет — первый соберётся за пару минут.', 'Hozircha ro‘yxatlar yo‘q — birinchisi bir necha daqiqada tuziladi.')}</p>}
+            {recent.slice(0, RECENT_LISTS).map((list) => (
+              <Link key={list.id} to={`/lists/${list.id}/edit`}>
+                <span className="recent__name"><b>{list.name}</b><small>{listSubtitle(list, tr)}</small></span>
+                <small className="recent__date">{formatListDate(list.reservation_start, locale) ?? tr('без даты', 'sanasiz')}</small>
+                <span className="count count--soft" title={tr('Позиций в списке', 'Ro‘yxatdagi birliklar')}>{number(listSize(list))}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
 
-          <article className="home-destination home-destination--equipment">
-            <img className="home-destination__art home-destination__art--equipment" src="/illustrations/av-warehouse.webp" alt="" aria-hidden="true" loading="eager" decoding="async" fetchPriority="high" />
-            <Link className="home-destination__link" to="/equipment">
-              <span className="home-destination__icon"><Boxes size={34} /></span>
-              <span className="home-destination__arrow"><ArrowUpRight size={24} /></span>
-              <span className="eyebrow">{tr('Склад и карточки', 'Ombor va kartalar')}</span>
-              <strong>{tr('Оборудование', 'Uskunalar')}</strong>
-              <p>{tr('Найти технику, проверить количество, серийный номер, описание и расположение.', 'Uskunani topish, miqdor, seriya raqami, tavsif va joylashuvni tekshirish.')}</p>
-              {/* Каталогу отдельная цель не нужна — действие совпадает с самой плиткой */}
-              <span className="home-destination__action">{tr('Открыть каталог', 'Katalogni ochish')} <ArrowUpRight size={16} /></span>
-            </Link>
-          </article>
+        <section className="home-eq">
+          <p className="eyebrow">{tr('Склад и карточки', 'Ombor va kartalar')}</p>
+          <h2>{tr('Оборудование', 'Uskunalar')}</h2>
+          <form className="home-eq__search" role="search" onSubmit={submitSearch}>
+            <Search size={19} aria-hidden="true" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={tr('Модель, бренд или серийный номер…', 'Model, brend yoki seriya raqami…')}
+              aria-label={tr('Поиск по складу', 'Ombor bo‘yicha qidiruv')}
+              enterKeyHint="search"
+            />
+          </form>
+          {/* Факты — только при ответе сводки. Нет данных и нет отказа — прочерки
+              той же геометрии (без прыжка раскладки); отказ без кэша — факты
+              исчезают целиком, панель остаётся поиском и ссылкой. */}
+          {(equipment || !summaryFailed) && (
+            <>
+              <div className="eqfacts">
+                <div><b>{equipment ? number(equipment.rows) : '—'}</b><span>{equipment ? tr(ruPlural(equipment.rows, 'запись', 'записи', 'записей'), 'yozuv') : tr('записей', 'yozuv')}</span></div>
+                <div><b>{equipment ? number(equipment.models) : '—'}</b><span>{equipment ? tr(ruPlural(equipment.models, 'модель', 'модели', 'моделей'), 'model') : tr('моделей', 'model')}</span></div>
+                <div><b>{equipment ? number(equipment.units) : '—'}</b><span>{equipment ? tr(ruPlural(equipment.units, 'штука', 'штуки', 'штук'), 'dona') : tr('штук', 'dona')}</span></div>
+              </div>
+              {/* Полоса — доли ШТУК: available + unavailable + diagnostics = units
+                  (так считает home_summary). Норма серая, цвет — только у отклонений. */}
+              <div className="eqbar" aria-hidden="true">
+                {equipment && equipment.available > 0 && <i className="eqbar__ok" style={{ flexGrow: equipment.available }} />}
+                {equipment && equipment.unavailable > 0 && <i className="eqbar__bad" style={{ flexGrow: equipment.unavailable }} />}
+                {equipment && equipment.diagnostics > 0 && <i className="eqbar__warn" style={{ flexGrow: equipment.diagnostics }} />}
+              </div>
+              <div className="eqlegend">
+                <span className="eqlegend__ok">{equipmentAvailabilityLabel('available', tr)} {equipment ? number(equipment.available) : '—'}</span>
+                <span className="eqlegend__bad">{equipmentAvailabilityLabel('unavailable', tr)} {equipment ? number(equipment.unavailable) : '—'}</span>
+                <span className="eqlegend__warn">{equipmentAvailabilityLabel('diagnostics', tr)} {equipment ? number(equipment.diagnostics) : '—'}</span>
+              </div>
+            </>
+          )}
+        </section>
+
+        {/* Плитки нейтральные все три: цвет несут только факты — пилюли
+            отклонений и номера залов из плана (V-16). */}
+        <div className="home-dests">
+          <Link className="dest" to="/employees">
+            <div className="dest__top"><span className="dest__icon"><UsersRound size={19} /></span><ArrowUpRight className="dest__go" size={19} /></div>
+            <div><h3>{tr('Сотрудники', 'Xodimlar')}</h3><p>{tr('Карточки, документы, списки на пропуск', 'Kartalar, hujjatlar, ruxsatnoma ro‘yxatlari')}</p></div>
+            {employees && employees.count > 0 && (
+              <div className="dest__fact">
+                <span className="faces" aria-hidden="true">
+                  {employees.faces.map((face, index) => <span key={index}>{face}</span>)}
+                  {employees.count > employees.faces.length && <span>+{employees.count - employees.faces.length}</span>}
+                </span>
+                {expiryPills}
+              </div>
+            )}
+          </Link>
+          <Link className="dest" to="/vehicles">
+            <div className="dest__top"><span className="dest__icon"><CarFront size={19} /></span><ArrowUpRight className="dest__go" size={19} /></div>
+            <div><h3>{tr('Автомобили', 'Avtomobillar')}</h3><p>{tr('Госномера и водители для пропусков', 'Ruxsatnomalar uchun davlat raqamlari va haydovchilar')}</p></div>
+            {vehicles && plate && (
+              <div className="dest__fact">
+                {plateParts
+                  ? <span className="plate"><b>{plateParts.region}</b><span>{plateParts.rest}</span><i>UZ</i></span>
+                  : <span className="plate"><span>{plate}</span></span>}
+                {vehicles.count > 1 && <span className="dest__more">{tr(`и ещё ${number(vehicles.count - 1)}`, `yana ${number(vehicles.count - 1)} ta`)}</span>}
+              </div>
+            )}
+          </Link>
+          <Link className="dest" to="/halls">
+            <div className="dest__top"><span className="dest__icon"><Presentation size={19} /></span><ArrowUpRight className="dest__go" size={19} /></div>
+            <div><h3>{tr('Залы', 'Zallar')}</h3><p>{summary ? planLine ?? tr('Планов пока нет', 'Hozircha rejalar yo‘q') : tr('Расстановка людей по залам', 'Odamlarni zallar bo‘yicha taqsimlash')}</p></div>
+            {hallPlan && (hallPlan.halls.length > 0 || hallPlan.hires > 0) && (
+              <div className="dest__fact">
+                {hallDots(hallPlan.halls.length)}
+                {hallPlan.hires > 0 && <span className="pill pill--dashed">{hiresLabel(hallPlan.hires)}</span>}
+              </div>
+            )}
+          </Link>
         </div>
+      </div>
 
-        <div className="home-row home-row--refs">
-          <article className="home-destination home-destination--employees">
-            <img className="home-destination__art home-destination__art--employees" src="/illustrations/av-team.webp" alt="" aria-hidden="true" loading="eager" decoding="async" fetchPriority="high" />
-            <Link className="home-destination__link" to="/employees">
-              <span className="home-destination__icon"><UsersRound size={34} /></span>
-              <span className="home-destination__arrow"><ArrowUpRight size={24} /></span>
-              <span className="eyebrow">{tr('Команда на площадке', 'Maydondagi jamoa')}</span>
-              <strong>{tr('Сотрудники', 'Xodimlar')}</strong>
-              <p>{tr('Карточки сотрудников: контакты, документы, фото и сканы.', 'Xodimlar kartalari: kontaktlar, hujjatlar, foto va nusxalar.')}</p>
+      {/* Телефон (< 600, макет с31): главное действие карточкой, разделы плитками 2×2
+          и широкая «Залы», ниже два последних списка. Поиска здесь нет — на
+          телефоне он живёт во вкладке «Техника». */}
+      <div className="home-phone">
+        <div className="p-home-cta">
+          <h2>{tr('Собрать список на выезд', 'Safar uchun ro‘yxat tuzish')}</h2>
+          <p>{tr('Модели, серийные номера и готовый Excel.', 'Modellar, seriya raqamlari va tayyor Excel.')}</p>
+          <Link className="button button--primary button--wide p-home-cta__new" to="/lists/new"><Plus size={18} />{tr('Новый список', 'Yangi ro‘yxat')}</Link>
+        </div>
+        <div className="p-tiles">
+          <Link className="p-tile p-tile--dark" to="/equipment">
+            <Boxes size={22} />
+            <span><b>{equipment ? number(equipment.rows) : '—'}</b>{equipment && <small>{tr(`${ruPlural(equipment.rows, 'запись', 'записи', 'записей')} · ${number(equipment.models)} ${ruPlural(equipment.models, 'модель', 'модели', 'моделей')}`, `yozuv · ${number(equipment.models)} model`)}</small>}</span>
+            <span className="p-tile__name">{tr('Техника', 'Texnika')}</span>
+          </Link>
+          <Link className="p-tile" to="/lists">
+            <ClipboardList size={22} />
+            <span><b>{lists ? number(lists.total) : '—'}</b>{lastCreated && <small>{tr(`последний ${lastCreated}`, `oxirgisi ${lastCreated}`)}</small>}</span>
+            <span className="p-tile__name">{tr('Списки', 'Ro‘yxatlar')}</span>
+          </Link>
+          <Link className="p-tile" to="/employees">
+            <UsersRound size={22} />
+            <span><b>{employees ? number(employees.count) : '—'}</b>
+              {expiries.expired > 0 && <small className="p-tile__bad">{expiredLabel}</small>}
+              {expiries.soon > 0 && <small className="p-tile__warn">{soonLabel}</small>}
+            </span>
+            <span className="p-tile__name">{tr('Сотрудники', 'Xodimlar')}</span>
+          </Link>
+          <Link className="p-tile" to="/vehicles">
+            <CarFront size={22} />
+            <span><b>{vehicles ? number(vehicles.count) : '—'}</b>{vehicles && vehicles.drivers > 0 && <small>{tr(`${number(vehicles.drivers)} ${ruPlural(vehicles.drivers, 'водитель', 'водителя', 'водителей')}`, `${number(vehicles.drivers)} ta haydovchi`)}</small>}</span>
+            <span className="p-tile__name">{tr('Авто', 'Avto')}</span>
+          </Link>
+          <Link className="p-tile p-tile--wide" to="/halls">
+            <span>
+              <span className="p-tile__name">{tr('Залы', 'Zallar')}</span>
+              {summary && <small>{hallPlan
+                ? [
+                    hallPlan.name,
+                    tr(`${number(hallPlan.halls.length)} ${ruPlural(hallPlan.halls.length, 'зал', 'зала', 'залов')}`, `${number(hallPlan.halls.length)} ta zal`),
+                    hallPlan.hires > 0 ? hiresLabel(hallPlan.hires) : '',
+                  ].filter(Boolean).join(' · ')
+                : tr('Планов пока нет', 'Hozircha rejalar yo‘q')}</small>}
+            </span>
+            {hallDots(PHONE_HALL_DOTS)}
+          </Link>
+        </div>
+        <div className="p-sectiont"><span>{tr('Последние списки', 'Oxirgi ro‘yxatlar')}</span><Link to="/lists">{tr('Все', 'Barchasi')}</Link></div>
+        <div className="p-list">
+          {isListsLoading && Array.from({ length: PHONE_RECENT_LISTS }, (_, index) => <span className="p-row p-row--skeleton" key={index} />)}
+          {listsFailed && recent.length === 0 && <p className="p-list__note">{tr('Не удалось загрузить последние списки.', 'Oxirgi ro‘yxatlarni yuklab bo‘lmadi.')}</p>}
+          {!isListsLoading && !listsFailed && recent.length === 0 && <p className="p-list__note">{tr('Списков пока нет.', 'Hozircha ro‘yxatlar yo‘q.')}</p>}
+          {recent.slice(0, PHONE_RECENT_LISTS).map((list) => (
+            <Link className="p-row" key={list.id} to={`/lists/${list.id}/edit`}>
+              <span className="thumb"><ClipboardList size={18} /></span>
+              <span className="p-row__body"><b>{list.name}</b><small>{[formatListDate(list.reservation_start, locale), list.venue ?? list.client_name].filter(Boolean).join(' · ') || tr('Заказчик не указан', 'Buyurtmachi ko‘rsatilmagan')}</small></span>
+              <span className="count count--soft">{number(listSize(list))}</span>
             </Link>
-            <Link className="home-destination__action" to="/employees/new"><Plus size={16} /> {tr('Добавить сотрудника', 'Xodim qo‘shish')}</Link>
-          </article>
-
-          <article className="home-destination home-destination--vehicles">
-            <img className="home-destination__art home-destination__art--vehicles" src="/illustrations/av-fleet.webp" alt="" aria-hidden="true" loading="eager" decoding="async" fetchPriority="high" />
-            <Link className="home-destination__link" to="/vehicles">
-              <span className="home-destination__icon"><CarFront size={34} /></span>
-              <span className="home-destination__arrow"><ArrowUpRight size={24} /></span>
-              <span className="eyebrow">{tr('Транспорт на выезд', 'Safar transporti')}</span>
-              <strong>{tr('Автомобили', 'Avtomobillar')}</strong>
-              <p>{tr('База машин для пропусков на площадки: госномера, цвета и водители из базы сотрудников.', 'Maydonchalarga ruxsatnomalar uchun mashinalar bazasi: davlat raqamlari, ranglar va xodimlar bazasidagi haydovchilar.')}</p>
-            </Link>
-            <Link className="home-destination__action" to="/vehicles/new"><Plus size={16} /> {tr('Добавить машину', 'Mashina qo‘shish')}</Link>
-          </article>
-
-          <article className="home-destination home-destination--halls">
-            <img className="home-destination__art home-destination__art--halls" src="/illustrations/av-halls.webp" alt="" aria-hidden="true" loading="eager" decoding="async" fetchPriority="high" />
-            <Link className="home-destination__link" to="/halls">
-              <span className="home-destination__icon"><Presentation size={34} /></span>
-              <span className="home-destination__arrow"><ArrowUpRight size={24} /></span>
-              <span className="eyebrow">{tr('Планирование площадки', 'Maydonni rejalashtirish')}</span>
-              <strong>{tr('Залы', 'Zallar')}</strong>
-              <p>{tr('Расставить сотрудников по залам мероприятия и вывести на большой экран.', 'Xodimlarni tadbir zallari bo‘yicha taqsimlash va katta ekranga chiqarish.')}</p>
-              {/* Создание плана живёт в дровере самого раздела, отдельного адреса у него нет — действие совпадает с плиткой */}
-              <span className="home-destination__action">{tr('Открыть залы', 'Zallarni ochish')} <ArrowUpRight size={16} /></span>
-            </Link>
-          </article>
+          ))}
         </div>
       </div>
     </section>

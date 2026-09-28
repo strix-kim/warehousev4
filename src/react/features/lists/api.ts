@@ -114,6 +114,14 @@ function normalizeLegacyList(row: LegacyEquipmentListRow): EquipmentList {
   }
 }
 
+// equipment_ids и equipment_items не пересекаются: RPC кладёт серийные позиции в первый
+// массив, все остальные — во второй. Поэтому размер списка — их сумма при любом list_mode.
+// Живёт здесь, а не в ListsPage: то же число показывает строка списка на главной.
+export function listSize(list: EquipmentList) {
+  const quantity = list.equipment_items?.reduce((sum, item) => sum + (Number(item.count) || 0), 0) ?? 0
+  return (list.equipment_ids?.length ?? 0) + quantity
+}
+
 export type EquipmentListsQuery = {
   page?: number
   search?: string
