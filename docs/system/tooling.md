@@ -131,6 +131,25 @@ git diff --check
    изменит, и не надо — правильный ответ был перейти на штатные `Read`/`Edit`.
    Не ищи в этом файле несуществующее правило.
 
+## Хуки (`.claude/hooks/`)
+
+Скрипты Node, которые Claude Code запускает сам; подключены блоком `hooks` в
+`.claude/settings.json` (файл в git, правит прораб). Перенесены из соседнего
+проекта в с30. Все три **fail-open**: любая внутренняя ошибка — выход 0, работа
+не блокируется.
+
+| Хук | Событие | Что делает |
+|---|---|---|
+| `session-start.mjs` | `SessionStart` | невлитые в `main` ветки `session-*`, расхождение с origin, валидность строки «Актуальный handoff» (файл есть и он последний по номеру — сортировка числовая), бюджет `current-state.md` (порог — константа `BUDGET_KB`); после `/compact` — «перечитай CLAUDE.md» |
+| `context-watch.mjs` | `UserPromptSubmit` | читает размер контекста из лога сессии; на порогах 250k/400k/550k один раз подсказывает агенту предложить закрытие сессии |
+| `guard-git.mjs` | `PreToolUse` (`Bash`) | `deny` на `git add -A`/`.`/`-u`/`--all`, `git commit -a`, `.env*` в `add` и в индексе, `git add <каталог>` с неотслеживаемыми файлами внутри. Ловушки zsh чинит молча: `echo =====` → `echo -----`, `--include=*.ts` → в кавычках |
+
+Проверка руками: `node .claude/hooks/<хук>.mjs < /dev/null` — выход 0, без трейса.
+`guard-git` на входе PreToolUse:
+`echo '{"cwd":"'$PWD'","tool_input":{"command":"git add -A"}}' | node .claude/hooks/guard-git.mjs`
+— печатает JSON с `"permissionDecision":"deny"`; на `git status` — пусто.
+Правка хука действует со следующего вызова, `settings.json` — с перезапуска чата.
+
 ## Мост (Supabase MCP / Vercel MCP)
 
 Инструменты, которыми агент смотрит в прод: схема, миграции, RLS, advisors,
