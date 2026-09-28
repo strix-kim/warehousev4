@@ -135,7 +135,15 @@
 .quick-catalog-toolbar:not(:has(.app-select + .app-select)) { grid-template-columns: minmax(0, 1fr) 240px; }
 .quick-catalog-toolbar .search-field { width: 100%; max-width: none; min-width: 0; }
 .quick-selection-list { background: var(--card); }
-.quick-selection-item { background: var(--card); border-bottom: 1px solid var(--line-2); animation: slide-soft .18s ease both; }
+.quick-selection-item { background: var(--card); border-bottom: 1px solid var(--line-2); }
+/* Позицию, добавленную из каталога, ведёт motion (KitItemFrame: высота и
+   прозрачность, 200 мс); CSS-анимации на самой строке нет — она перебила бы
+   инлайн-стили motion и заодно играла бы у позиций из базы и черновика.
+   Подсветка — на ::after ПОД содержимым (isolation + z-index -1), гаснет за 600 мс
+   по макету. overflow: hidden — чтобы содержимое не торчало из растущей высоты. */
+.quick-selection-item--fresh { position: relative; isolation: isolate; overflow: hidden; }
+.quick-selection-item--fresh::after { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--red-tint); pointer-events: none; animation: kit-item-flash .6s ease-out both; }
+@keyframes kit-item-flash { from { opacity: 1; } to { opacity: 0; } }
 /* Порядкового номера нет (макет с31): красные «01, 02» спорили с главным действием.
    Предпоследняя колонка — под иконку серийных номеров. Корзина прибита к последней
    колонке явно: у позиций без S/N слот пустует, но ряд корзин остаётся ровным. */

@@ -32,6 +32,7 @@ import {
   type SelectedGroup,
 } from './listSelection'
 import { buildExportRows, buildListItems, resolveListName, resolveSelection, selectionFromList, serializeDocument } from './listDocument'
+import { useCountUp } from './useCountUp'
 import { useListDraftAutosave } from './useListDraftAutosave'
 import { useListDraftRestore } from './useListDraftRestore'
 import type { ListDraft } from './api'
@@ -69,6 +70,15 @@ export function ListEditorPage() {
   // согласование. Подсветка снимается с поля, как только его начали править.
   const [requisiteErrors, setRequisiteErrors] = useState<Set<RequisiteField>>(() => new Set())
   const [previewGroup, setPreviewGroup] = useState<CatalogGroup | null>(null)
+  // Позиции, которые пользователь только что добавил из каталога: только они
+  // въезжают в комплект анимацией. Гидратация и черновик идут мимо этого набора —
+  // различаем по источнику, а не по таймеру. Строка комплекта снимает свой ключ
+  // сразу после монтирования (onFreshSettled), чтобы позже поднятая из базы та же
+  // модель не въехала повторно.
+  const [freshKeys, setFreshKeys] = useState<Set<string>>(() => new Set())
+  // Счётчики докручиваются только после первого действия пользователя: до него
+  // числа приходят из базы или черновика и должны встать сразу.
+  const [countsLive, setCountsLive] = useState(false)
   // Лист выбора формата — только телефонный: открывает его липкая плашка.
   const [isExportSheetOpen, setExportSheetOpen] = useState(false)
   const { mobilePanel, moveToMobilePanel, catalogRef, selectionRef } = useMobilePanels()
@@ -246,17 +256,32 @@ export function ListEditorPage() {
   const selectedByKey = useMemo(() => new Map(selected.map((item) => [item.key, item])), [selected])
   const resolvedSelection = useMemo(() => resolveSelection(selected, groupsByKey), [groupsByKey, selected])
   const canSubmit = selectedCount > 0 && !isOpening && !openError
+  const shownUnits = useCountUp(selectedCount, countsLive)
+  const shownPositions = useCountUp(selected.length, countsLive)
 
   function addGroup(group: CatalogGroup) {
     setSuccessMessage('')
+    setCountsLive(true)
+    if (!selectedKeys.has(group.key)) setFreshKeys((current) => new Set(current).add(group.key))
     setSelected((current) => addGroupTo(current, group))
   }
 
+  const settleFreshKey = useCallback((key: string) => {
+    setFreshKeys((current) => {
+      if (!current.has(key)) return current
+      const next = new Set(current)
+      next.delete(key)
+      return next
+    })
+  }, [])
+
   function changeCount(key: string, delta: number) {
+    setCountsLive(true)
     setSelected((current) => changeCountIn(current, key, delta))
   }
 
   function setCount(key: string, count: number) {
+    setCountsLive(true)
     setSelected((current) => setCountIn(current, key, count))
   }
 
@@ -270,6 +295,7 @@ export function ListEditorPage() {
 
   function clearSelection() {
     setSuccessMessage('')
+    setCountsLive(true)
     setSelected([])
   }
 
@@ -434,8 +460,11 @@ export function ListEditorPage() {
       />
 
       <div className="mobile-editor-tabs" role="tablist" aria-label={tr('Раздел редактора', 'Tahrirchi bo‘limi')}>
+        {/* Бегунок сегмента: переезжает CSS-переходом (200 мс) — это сдвиг одного
+            элемента между двумя известными местами, motion здесь не нужен. */}
+        <span className={`mobile-editor-tabs__ind ${mobilePanel === 'selection' ? 'mobile-editor-tabs__ind--end' : ''}`} aria-hidden="true" />
         <button className={mobilePanel === 'catalog' ? 'active' : ''} onClick={() => moveToMobilePanel('catalog')} role="tab" aria-selected={mobilePanel === 'catalog'}>{tr('Каталог', 'Katalog')}</button>
-        <button className={mobilePanel === 'selection' ? 'active' : ''} onClick={() => moveToMobilePanel('selection')} role="tab" aria-selected={mobilePanel === 'selection'}>{tr('Комплект', 'Komplekt')} <span className="count">{selected.length}</span></button>
+        <button className={mobilePanel === 'selection' ? 'active' : ''} onClick={() => moveToMobilePanel('selection')} role="tab" aria-selected={mobilePanel === 'selection'}>{tr('Комплект', 'Komplekt')} <span className="count">{shownPositions}</span></button>
       </div>
 
       <div ref={gridRef} className="editor-grid editor-grid--quick">
@@ -457,6 +486,10 @@ export function ListEditorPage() {
           isMobileActive={mobilePanel === 'selection'}
           resolvedSelection={resolvedSelection}
           selectedCount={selectedCount}
+          shownUnits={shownUnits}
+          shownPositions={shownPositions}
+          freshKeys={freshKeys}
+          onFreshSettled={settleFreshKey}
           onChangeCount={changeCount}
           onSetCount={setCount}
           onToggleSerialPicker={toggleSerialPicker}
@@ -472,7 +505,7 @@ export function ListEditorPage() {
       {/* Плашка и лист — последними и вне .editor-grid/.data-panel: у тех анимация
           с transform, и position: fixed уехал бы вместе с панелью. Счётчик единиц
           на плашке — и обратная связь «добавлено» на вкладке каталога. */}
-      <ListStickyBar unitCount={selectedCount} onOpen={() => setExportSheetOpen(true)} disabled={selectedCount === 0} />
+      <ListStickyBar unitCount={shownUnits} onOpen={() => setExportSheetOpen(true)} disabled={selectedCount === 0} />
       <ListExportSheet
         open={isExportSheetOpen}
         onClose={() => setExportSheetOpen(false)}

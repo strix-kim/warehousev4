@@ -95,7 +95,11 @@
      и 57 px (MOBILE_TABS_HEIGHT, top тулбара каталога) пришлось бы пересчитывать. */
   .mobile-editor-tabs::before { content: ''; position: absolute; top: 5px; right: 12px; bottom: 2px; left: 12px; border-radius: 13px; background: var(--select); }
   .mobile-editor-tabs button { position: relative; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 10px; color: var(--muted); background: transparent; font-size: 14px; font-weight: 600; }
-  .mobile-editor-tabs button.active { color: var(--ink); background: var(--card); box-shadow: 0 1px 3px rgba(15,17,21,.12); }
+  .mobile-editor-tabs button.active { color: var(--ink); }
+  /* Бегунок — карточка активной вкладки; переезжает сдвигом на свою ширину.
+     Отсчёт — от паддинга полосы (15 px по бокам, 8 сверху), как у кнопок. */
+  .mobile-editor-tabs__ind { position: absolute; top: 8px; left: 15px; width: calc((100% - 30px) / 2); height: 44px; border-radius: 10px; background: var(--card); box-shadow: 0 1px 3px rgba(15,17,21,.12); transition: transform .2s cubic-bezier(.2,.7,.2,1); }
+  .mobile-editor-tabs__ind--end { transform: translateX(100%); }
   .editor-grid .catalog-picker, .editor-grid .selection-panel { display: none; min-height: 0; height: auto; overflow: visible; }
   .editor-grid .catalog-picker.mobile-active, .editor-grid .selection-panel.mobile-active { display: flex; }
   .quick-catalog-toolbar, .quick-catalog-toolbar:not(:has(.app-select + .app-select)) { position: sticky; z-index: 7; top: 57px; grid-template-columns: 1fr; background: rgba(255,255,255,.96); backdrop-filter: blur(12px); }

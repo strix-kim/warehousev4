@@ -1,5 +1,6 @@
 import { Check, CircleAlert, Minus, Plus, ScanBarcode, Trash2 } from 'lucide-react'
-import { useState, type ReactNode, type RefObject } from 'react'
+import { m, useReducedMotion } from 'motion/react'
+import { useEffect, useState, type ReactNode, type RefObject } from 'react'
 import { EmptyState } from '../../components/EmptyState'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
@@ -10,11 +11,16 @@ import type { ResolvedSelection } from './listDocument'
 // очистка и экспорт. Сама выборка живёт на странице — панель только просит её
 // изменить. Выбор формата приходит готовым узлом (ExportChoice; на телефоне
 // скрыт — там его показывает лист). Строка состояния — только на телефоне.
-export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selectedCount, onChangeCount, onSetCount, onToggleSerialPicker, onToggleSerial, onClear, exportActions, status }: {
+export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selectedCount, shownUnits, shownPositions, freshKeys, onFreshSettled, onChangeCount, onSetCount, onToggleSerialPicker, onToggleSerial, onClear, exportActions, status }: {
   panelRef: RefObject<HTMLElement | null>
   isMobileActive: boolean
   resolvedSelection: ResolvedSelection
   selectedCount: number
+  // Числа для показа — докрученные страницей (useCountUp); selectedCount — точное.
+  shownUnits: number
+  shownPositions: number
+  freshKeys: Set<string>
+  onFreshSettled: (key: string) => void
   onChangeCount: (key: string, delta: number) => void
   onSetCount: (key: string, count: number) => void
   onToggleSerialPicker: (key: string) => void
@@ -45,7 +51,7 @@ export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selected
     <section ref={panelRef} className={`data-panel selection-panel ${isMobileActive ? 'mobile-active' : ''}`}>
       <div className="panel-heading">
         <div><h2>{tr('Комплект', 'Komplekt')}</h2><p>{tr('Количество сейчас, серийные номера — при необходимости', 'Hozir miqdor, zarur bo‘lsa seriya raqamlari')}</p></div>
-        <span className="count" title={tr('Позиций в комплекте', 'Komplektdagi pozitsiyalar')}>{resolvedSelection.length}</span>
+        <span className="count" title={tr('Позиций в комплекте', 'Komplektdagi pozitsiyalar')}>{shownPositions}</span>
       </div>
 
       <div className="selection-list quick-selection-list">
@@ -53,7 +59,7 @@ export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selected
           <EmptyState art title={tr('Список пока пуст', 'Ro‘yxat hozircha bo‘sh')} text={tr('Нажмите на нужную модель в каталоге.', 'Katalogdagi kerakli modelni bosing.')} />
         )}
         {resolvedSelection.map(({ item, group, label }) => (
-          <article className="quick-selection-item" key={item.key}>
+          <KitItemFrame key={item.key} itemKey={item.key} fresh={freshKeys.has(item.key)} onSettled={onFreshSettled}>
             <div className="quick-selection-item__main">
               <div className="quick-selection-item__copy">
                 <strong>{label.brand} {label.model}</strong>
@@ -100,13 +106,13 @@ export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selected
                 })}</div>
               </div>
             )}
-          </article>
+          </KitItemFrame>
         ))}
       </div>
 
       <footer className="selection-footer">
         <div className="selection-footer__summary">
-          <span className="selection-footer__total">{tr('Всего единиц', 'Jami birliklar')} <strong>{selectedCount}</strong></span>
+          <span className="selection-footer__total">{tr('Всего единиц', 'Jami birliklar')} <strong>{shownUnits}</strong></span>
           {resolvedSelection.length > 0 && (
             <button
               className={`clear-selection ${clearArmed.armed ? 'clear-selection--armed' : ''}`}
@@ -125,5 +131,38 @@ export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selected
         {status}
       </footer>
     </section>
+  )
+}
+
+// Рамка позиции комплекта. Свежая (только что добавленная из каталога) позиция
+// раскрывается по высоте и вспыхивает подсветкой, 200 мс (макет с31). Свежесть
+// фиксируется на монтировании: страница снимает ключ сразу после него, а
+// перерисовки не должны ни запускать въезд заново, ни обрывать подсветку.
+// Ухода нет намеренно: удалённая позиция на 150 мс осталась бы поверх пустого
+// состояния и под живыми кнопками.
+function KitItemFrame({ itemKey, fresh, onSettled, children }: {
+  itemKey: string
+  fresh: boolean
+  onSettled: (key: string) => void
+  children: ReactNode
+}) {
+  // MotionConfig reducedMotion="user" гасит только сдвиги — высоту и прозрачность
+  // при уменьшении движения выключаем сами.
+  const reduceMotion = useReducedMotion()
+  const [enter] = useState(() => fresh && !reduceMotion)
+
+  useEffect(() => {
+    if (fresh) onSettled(itemKey)
+  }, [fresh, itemKey, onSettled])
+
+  return (
+    <m.article
+      className={`quick-selection-item ${enter ? 'quick-selection-item--fresh' : ''}`}
+      initial={enter ? { height: 0, opacity: 0 } : false}
+      animate={{ height: 'auto', opacity: 1 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+    >
+      {children}
+    </m.article>
   )
 }
