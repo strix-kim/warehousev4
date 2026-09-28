@@ -3,9 +3,9 @@
    в её чанк. Токены — из 01-tokens; литералы остались там же, где их держит
    вся система: белый текст на тёмном, дымки rgba и цвета флага на госномере.
 
-   .pill, .count и .plate — элементы дизайн-системы макета, но пока их берёт
-   только главная, они живут здесь. Возьмёт второй экран — переезжают в общий
-   слой (03-controls / 05-features) тем же шагом, копий не заводим.
+   .plate — элемент дизайн-системы макета, но пока его берёт только главная, он
+   живёт здесь. Возьмёт второй экран — переезжает в общий слой тем же шагом,
+   копий не заводим. .pill и .count так и уехали в 03-controls (с35, редактор).
 
    Главная обязана помещаться в экран без прокрутки на 1440×900 и 1920×1080:
    это витрина выбора, а не текст. Отсюда плотные отступы макета, а не
@@ -93,16 +93,6 @@
 .hallsdots i { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 7px; color: #fff; background: var(--hall-color, var(--faint)); font-size: 11px; font-style: normal; font-weight: 700; line-height: 1; }
 .hallsdots .hallsdots__rest { color: var(--ink); background: var(--line); }
 
-/* Пилюля состояния: точка + оттенок. Сплошной заливки у статусов нет — она у бренда. */
-.pill { min-height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px 0 8px; border-radius: 999px; font-size: 12.5px; font-weight: 600; line-height: 1; white-space: nowrap; }
-.pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.pill--warn { color: var(--warn); background: var(--warn-bg); }
-.pill--bad { color: var(--bad); background: var(--bad-bg); }
-/* Пунктир — «место есть, человека нет»: наём ещё предстоит, это не тревога. */
-.pill--dashed { border: 1.5px dashed var(--warn-dot); color: var(--warn); background: transparent; }
-.pill--dashed::before { display: none; }
-.count { min-width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0 7px; border-radius: 999px; color: #fff; background: var(--ink); font-size: 12px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-.count--soft { color: var(--ink); background: var(--select); }
 
 /* Госномер — узнаваемый объект Узбекистана, а не серая плашка: регион, номер,
    флаг. Цвета флага — литералы, как печатная шкала залов: это не тема. */

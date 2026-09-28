@@ -2,7 +2,7 @@ import { ArrowDown, FileCheck2, FileSpreadsheet, ListChecks, Save } from 'lucide
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ErrorState } from '../../components/ErrorState'
-import { formatDateTime, todayDateValue } from '../../lib/date'
+import { todayDateValue } from '../../lib/date'
 import { useLanguage } from '../../lib/i18n'
 import {
   clearListDraft,
@@ -13,7 +13,7 @@ import {
 import { buildCatalogGroups, type CatalogGroup } from './catalogGroups'
 import { CatalogPanel, CatalogPreviewDrawer } from './ListEditorCatalog'
 import { ListEditorDraftNotice } from './ListEditorDraftNotice'
-import { ListEditorHeader } from './ListEditorHeader'
+import { ListEditorHeader, type EditorStatusDot } from './ListEditorHeader'
 import { KitPanel } from './ListEditorKit'
 import { ListEditorMeta, type ListMetaField, type RequisiteField } from './ListEditorMeta'
 import { useEditorChrome } from './useEditorChrome'
@@ -61,8 +61,6 @@ export function ListEditorPage() {
   // Незаполненные реквизиты, на которые указала попытка собрать документ на
   // согласование. Подсветка снимается с поля, как только его начали править.
   const [requisiteErrors, setRequisiteErrors] = useState<Set<RequisiteField>>(() => new Set())
-  // Момент последней записи в базу. Нужен только строке состояния в шапке.
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
   const [previewGroup, setPreviewGroup] = useState<CatalogGroup | null>(null)
   const { mobilePanel, moveToMobilePanel, catalogRef, selectionRef } = useMobilePanels()
   // Панель реквизитов свёрнута по умолчанию: список собирают без неё, а документу
@@ -104,8 +102,6 @@ export function ListEditorPage() {
     setVenue(listToEdit.venue ?? '')
     setDescription(listToEdit.description ?? '')
     setEventDate(listToEdit.reservation_start ?? todayDateValue())
-    const savedAt = Date.parse(listToEdit.created_at ?? '')
-    setLastSavedAt(Number.isNaN(savedAt) ? null : savedAt)
     hydratedMetaRef.current = listToEdit.id
   }, [listToEdit])
 
@@ -292,7 +288,6 @@ export function ListEditorPage() {
       // бы пустыми, а «есть несохранённые правки» — взведённым до перезагрузки.
       if (!name.trim()) setName(saved.name)
       setSuccessMessage(isCreating ? tr('Список сохранён в системе.', 'Ro‘yxat tizimda saqlandi.') : tr('Изменения сохранены.', 'O‘zgarishlar saqlandi.'))
-      setLastSavedAt(Date.now())
       // Черновик своё отработал в любом режиме: состояние уехало в базу, и
       // расхождения больше нет. Автосейв стёр бы его сам следующим тиком, но
       // тогда плашка успела бы мигнуть на перезагрузке в этот интервал.
@@ -360,13 +355,16 @@ export function ListEditorPage() {
   }
 
   const isBusy = isSaving || isExporting !== ''
-  // Один набор действий на две точки монтажа: шапка (десктоп) и футер выборки
-  // (телефон). Разные подписи в двух местах разошлись бы при первой же правке.
-  const actionButtons = (
+  // Сохранение — тихое действие с подписью «необязательно»: продукт экрана —
+  // файл. На десктопе кнопка в шапке, на телефоне — в подвале комплекта (шапочные
+  // действия там скрыты). Экспорт живёт в подвале комплекта на всех ширинах.
+  const saveButton = (
+    <button className="button editor-save-button" onClick={() => void saveList()} disabled={!canSubmit || isBusy}>
+      <Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить в системе', 'Tizimda saqlash')}
+    </button>
+  )
+  const exportButtons = (
     <>
-      <button className="button button--secondary" onClick={() => void saveList()} disabled={!canSubmit || isBusy}>
-        <Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить', 'Saqlash')}
-      </button>
       <button className="button button--secondary" onClick={() => exportList('working')} disabled={!canSubmit || isBusy} title={tr('Только список оборудования — для команды и работы', 'Faqat uskunalar ro‘yxati — jamoa va ish uchun')}>
         <FileSpreadsheet size={17} />{isExporting === 'working' ? tr('Готовим…', 'Tayyorlanmoqda…') : tr('Рабочий Excel', 'Ishchi Excel')}
       </button>
@@ -378,12 +376,16 @@ export function ListEditorPage() {
 
   // Строка состояния занимает место eyebrow и имеет фиксированную высоту: результат
   // действия сменяет нейтральный статус, не двигая раскладку и не заводя тостов.
+  // Статус документа — словами из того же isDirty, что держит защиту от ухода:
+  // время в строке больше не пишем, у открытого списка это было created_at, а не
+  // момент последней правки.
   const statusTone = saveError ? 'error' : successMessage ? 'success' : ''
-  const statusText = saveError || successMessage || (listId
-    ? (lastSavedAt
-      ? tr(`Черновик · сохранён ${formatDateTime(lastSavedAt, locale)}`, `Qoralama · saqlangan ${formatDateTime(lastSavedAt, locale)}`)
-      : tr('Черновик', 'Qoralama'))
-    : tr('Новый список — Excel скачивается без сохранения', 'Yangi ro‘yxat — Excel saqlamasdan yuklanadi'))
+  const statusDot: EditorStatusDot = statusTone ? null : !listId ? 'neutral' : isDirty ? 'warning' : 'success'
+  const statusText = saveError || successMessage || (!listId
+    ? tr('Новый список — Excel скачивается без сохранения', 'Yangi ro‘yxat — Excel saqlamasdan yuklanadi')
+    : isDirty
+      ? tr('Есть несохранённые правки', 'Saqlanmagan o‘zgarishlar bor')
+      : tr('Сохранён в системе', 'Tizimda saqlangan'))
   const statusBody = (
     <>
       {statusText}
@@ -396,8 +398,9 @@ export function ListEditorPage() {
       <ListEditorHeader
         title={name.trim() || tr('Новый список', 'Yangi ro‘yxat')}
         statusTone={statusTone}
+        statusDot={statusDot}
         statusBody={statusBody}
-        actions={actionButtons}
+        actions={<>{saveButton}<span className="editor-save-note">{tr('необязательно', 'ixtiyoriy')}</span></>}
         onBack={() => navigate('/lists')}
       />
 
@@ -416,7 +419,7 @@ export function ListEditorPage() {
 
       <div className="mobile-editor-tabs" role="tablist" aria-label={tr('Раздел редактора', 'Tahrirchi bo‘limi')}>
         <button className={mobilePanel === 'catalog' ? 'active' : ''} onClick={() => moveToMobilePanel('catalog')} role="tab" aria-selected={mobilePanel === 'catalog'}>{tr('Каталог', 'Katalog')}</button>
-        <button className={mobilePanel === 'selection' ? 'active' : ''} onClick={() => moveToMobilePanel('selection')} role="tab" aria-selected={mobilePanel === 'selection'}>{tr('В списке', 'Ro‘yxatda')} <strong>{selectedCount}</strong></button>
+        <button className={mobilePanel === 'selection' ? 'active' : ''} onClick={() => moveToMobilePanel('selection')} role="tab" aria-selected={mobilePanel === 'selection'}>{tr('Комплект', 'Komplekt')} <span className="count">{selected.length}</span></button>
       </div>
 
       <div ref={gridRef} className="editor-grid editor-grid--quick">
@@ -443,7 +446,8 @@ export function ListEditorPage() {
           onToggleSerialPicker={toggleSerialPicker}
           onToggleSerial={toggleSerial}
           onClear={clearSelection}
-          actions={actionButtons}
+          exportActions={exportButtons}
+          mobileActions={saveButton}
           status={statusTone !== '' ? <p className={`editor-status editor-status--${statusTone} editor-status--inline`}>{statusBody}</p> : null}
         />
       </div>

@@ -1,5 +1,6 @@
 /* РЕДАКТОР СПИСКА (features/lists/ListEditor*.tsx): липкая шапка, сетка
    каталог/подборка, реквизиты, степпер, выбор S/N, попап описания модели.
+   Облик — по макету с31 (redesign-s31.html, раздел «c»), с35.
    Вынесен из 05-features чистым переносом в с35: правила идут в исходном
    порядке. Импортируется сразу после 05-features. Общие с другими экранами
    правила (.editor-header без модификатора, .availability-warning,
@@ -11,18 +12,35 @@
 .editor-header--quick { position: sticky; z-index: 9; top: 0; margin: -12px 0 10px; padding: 12px 0; background: var(--bg); }
 /* Строка состояния на месте eyebrow. Высота фиксирована высотой eyebrow: смена
    текста на результат действия не должна двигать заголовок и сетку под ним. */
-.editor-status { min-height: 15px; margin: 0 0 8px; overflow: hidden; color: var(--faint); font-size: 13px; line-height: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.editor-status { min-height: 15px; display: flex; align-items: center; gap: 12px; margin: 0 0 8px; overflow: hidden; color: var(--muted); font-size: 12.5px; font-weight: 500; line-height: 15px; white-space: nowrap; }
+/* Макет с31: над заголовком — род документа капсом и статус словами с точкой.
+   Точка — общий .status-dot (03-controls), здесь только её размер по макету. */
+.editor-status__kind { flex: none; color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.editor-status__state { min-width: 0; display: inline-flex; align-items: center; gap: 7px; }
+.editor-status__state > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.editor-status .status-dot { width: 8px; height: 8px; }
+/* «Сохранить в системе» — тихая кнопка с подписью «необязательно»: продукт экрана —
+   файл, красный цвет остаётся за экспортом (V-13). Модификатор редактора, не
+   общий вариант .button: второго такого места в системе пока нет. */
+.editor-header--quick .editor-header__actions { align-items: center; gap: 2px; }
+.editor-save-button { padding-inline: 12px; color: var(--ink); background: transparent; }
+.editor-save-button:not(:disabled):hover { background: var(--hover); }
+.editor-save-note { color: var(--faint); font-size: 12.5px; white-space: nowrap; }
 .editor-status a { color: inherit; font-weight: 700; }
 .editor-status--success { color: var(--ok); }
 .editor-status--error { color: var(--bad); }
 .mobile-editor-tabs { display: none; }
-.editor-grid { height: clamp(520px, calc(100dvh / var(--app-zoom) - 380px), 760px); min-height: 0; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px, .85fr); gap: 18px; }
+.editor-grid { height: clamp(520px, calc(100dvh / var(--app-zoom) - 380px), 760px); min-height: 0; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; }
 /* Запасное значение на один кадр до измерения: 40 top + 58 шапка + 22 + 50 полоса
    реквизитов + 18 + 56 нижний отступ. Живое ставит useEditorChrome инлайном,
    измеряя всё, что реально стоит над сеткой (баннеры, раскрытые реквизиты). */
 .editor-grid--quick { --editor-chrome: 244px; height: clamp(420px, calc(100dvh / var(--app-zoom) - var(--editor-chrome)), 900px); }
 .catalog-picker, .selection-panel { min-height: 0; height: 100%; display: flex; flex-direction: column; }
-.catalog-picker .panel-heading, .selection-panel .panel-heading { flex: 0 0 auto; }
+.catalog-picker .panel-heading, .selection-panel .panel-heading { flex: 0 0 auto; padding: 16px 18px; border-bottom-color: var(--line-2); }
+/* Заголовок панели по макету (.panel__title): 16 px display. .panel-heading общий
+   с другими экранами, поэтому правка — только внутри панелей редактора. */
+.catalog-picker .panel-heading h2, .selection-panel .panel-heading h2 { margin-bottom: 3px; font-size: 16px; font-weight: 800; letter-spacing: -.01em; line-height: 1.2; }
+.catalog-picker .panel-heading p, .selection-panel .panel-heading p { font-size: 12.5px; line-height: 1.4; }
 /* Тело каталожной панели: до 1800 — только результаты, с 1800 слева встаёт рельс
    категорий. Прокручиваются они по отдельности, иначе длинный список моделей
    уносил бы категории за верх. */
@@ -36,40 +54,43 @@
 @media (hover: hover) and (pointer: fine) {
   .picker-item:hover { background: var(--sunk); }
   .picker-item:hover .picker-item__action > svg { transform: rotate(90deg); }
+  .picker-item__action:hover { border-color: var(--ink); color: #fff; background: var(--ink); }
 }
 .picker-item--selected { opacity: .62; background: var(--sunk); }
 .picker-item__preview { min-width: 0; min-height: 71px; display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 10px 0 10px 14px; border: 0; color: inherit; background: transparent; text-align: left; }
 .picker-item__preview:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .picker-item__copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.picker-item__copy strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.picker-item__copy strong { display: -webkit-box; overflow: hidden; font-size: 14px; font-weight: 600; line-height: 1.3; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .picker-item__copy small { overflow: hidden; color: var(--faint); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.picker-item__count { color: var(--muted); font-size: 12px; font-weight: 700; }
-.picker-item__count--empty { color: var(--warn); }
-.picker-item__action { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-sm); color: #fff; background: var(--red-act); }
-.picker-item--selected .picker-item__action { color: var(--ok); background: var(--ok-bg); }
-.picker-item--grouped.picker-item--selected { opacity: 1; background: var(--red-tint); }
-.picker-item--grouped.picker-item--selected .picker-item__action { color: #fff; background: var(--red-act); }
+.picker-item__count { color: var(--muted); font-size: 12.5px; font-weight: 500; text-align: right; white-space: nowrap; }
+.picker-item__count b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.picker-item__count--empty { color: var(--bad); font-weight: 600; }
+/* «+» нейтральный (V-13): красный — только у главного действия экрана. */
+.picker-item__action { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 1px solid var(--ctl); border-radius: var(--r-md); color: var(--ink); background: var(--card); }
+.picker-item--grouped.picker-item--selected { opacity: 1; background: var(--sunk); }
 .picker-item .picker-item__action { width: auto; min-width: 36px; display: flex; align-items: center; padding: 0 7px; gap: 2px; }
 /* Кнопка с бейджем шире пустой: в колонке 38px плюс и цифра делили место, и
    иконка схлопывалась в вертикальную чёрточку. */
 .picker-item:has(.picker-item__action span) { grid-template-columns: minmax(0, 1fr) 58px; }
 .picker-item__action > svg { flex: 0 0 auto; }
-.picker-item__action span { flex: 0 0 auto; min-width: 19px; height: 19px; display: inline-grid; place-items: center; border-radius: 5px; color: var(--red-act); background: var(--card); font-family: inherit; font-size: 11px; line-height: 1; }
+.picker-item__action span { flex: 0 0 auto; min-width: 19px; height: 19px; display: inline-grid; place-items: center; border-radius: 5px; color: var(--ink); background: var(--select); font-family: inherit; font-size: 11px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
 .picker-skeleton { height: 64px; margin: 1px 0; background: linear-gradient(90deg, var(--sunk) 25%, var(--card) 50%, var(--sunk) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 .picker-load-more { display: grid; place-items: center; padding: 16px; background: var(--sunk); }
 .picker-load-more .button { min-width: 180px; }
-.selection-count { min-width: 34px; height: 34px; display: grid; place-items: center; border-radius: var(--r-sm); color: #fff; background: var(--red-act); font-family: inherit; font-size: 14px; }
 .selection-list { max-height: none; }
-.quantity-stepper { height: 32px; display: grid; grid-template-columns: 30px 34px 30px; align-items: center; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
-.quantity-stepper button { height: 100%; display: grid; place-items: center; padding: 0; border: 0; color: var(--muted); background: var(--sunk); }
-.quantity-stepper button:hover { color: var(--ink); background: var(--hover); }
-.quantity-stepper input { width: 100%; height: 100%; padding: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 13px; font-weight: 700; text-align: center; }
+.quantity-stepper { height: 36px; display: grid; grid-template-columns: 34px 44px 34px; align-items: center; border: 1px solid var(--ctl); border-radius: var(--r-md); overflow: hidden; background: var(--card); }
+.quantity-stepper button { height: 100%; display: grid; place-items: center; padding: 0; border: 0; color: var(--ink); background: transparent; }
+.quantity-stepper button:hover { background: var(--hover); }
+.quantity-stepper input { width: 100%; height: 100%; padding: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; }
 /* Обводка фокуса ушла бы под overflow: hidden степпера — уводим её внутрь. */
 .quantity-stepper input:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
-.selection-footer { flex: 0 0 auto; display: flex; flex-direction: column; gap: 11px; padding: 15px; border-top: 1px solid var(--line); background: var(--sunk); }
-.selection-footer > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 13px; }
-.selection-footer > div strong { color: var(--ink); font-family: inherit; font-size: 18px; }
-.selection-footer__total { display: inline-flex; align-items: center; gap: 8px; }
+.selection-footer { flex: 0 0 auto; display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border-top: 1px solid var(--line); background: var(--card); }
+.selection-footer__summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.selection-footer__total { display: inline-flex; align-items: baseline; gap: 10px; color: var(--muted); font-size: 13px; }
+.selection-footer__total strong { color: var(--ink); font: 800 30px/1 var(--f-display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+/* Экспорт — в подвале комплекта на всех ширинах, рядом с тем, что собрано. */
+.selection-footer__export { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.selection-footer__export .button { min-width: 0; padding-inline: 12px; }
 .selection-footer__mobile { display: none; }
 
 .clear-selection { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: var(--bad); background: transparent; font-size: 12px; font-weight: 700; white-space: nowrap; }
@@ -85,18 +106,18 @@
 /* Экспорт на согласование указал на пустые поля — полоса обязана показывать это
    и в свёрнутом виде: сами поля с подсветкой сейчас размонтированы. */
 .quick-list-meta--invalid { border-color: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 7%, transparent); }
-.quick-list-meta--invalid .quick-list-strip__empty { color: var(--bad); font-weight: 700; }
+.quick-list-meta--invalid .quick-list-strip__pair > .quick-list-strip__empty { color: var(--bad); font-weight: 700; }
 .quick-list-meta--invalid .quick-list-strip__toggle { color: var(--bad); }
 .quick-list-strip { width: 100%; min-height: 50px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 16px; border: 0; border-radius: var(--r-md); color: inherit; background: transparent; text-align: left; }
 .quick-list-strip:hover { background: var(--sunk); }
 .quick-list-meta--open .quick-list-strip { border-bottom: 1px solid var(--line); border-radius: var(--r-md) var(--r-md) 0 0; }
-.quick-list-strip__summary { min-width: 0; display: flex; align-items: baseline; gap: 12px; }
-.quick-list-strip__summary strong { min-width: 0; flex: 0 1 auto; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.quick-list-strip__summary small { min-width: 0; flex: 1 1 auto; display: flex; overflow: hidden; color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
-.quick-list-strip__summary small > span { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
-.quick-list-strip__summary small > span + span::before { content: ' · '; }
-.quick-list-strip__empty { color: var(--faint); font-weight: 500; }
-.quick-list-strip__toggle { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; color: var(--red-act); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.quick-list-strip__summary { min-width: 0; display: flex; align-items: baseline; gap: 6px 18px; overflow: hidden; font-size: 13.5px; }
+/* Пара макета .meta-strip: подпись приглушённая, значение жирное. */
+.quick-list-strip__pair { min-width: 0; flex: 0 1 auto; display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.quick-list-strip__pair > span { flex: none; color: var(--muted); }
+.quick-list-strip__pair > b { min-width: 0; overflow: hidden; color: var(--ink); font-weight: 600; text-overflow: ellipsis; }
+.quick-list-strip__pair > .quick-list-strip__empty { color: var(--faint); font-weight: 500; }
+.quick-list-strip__toggle { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; color: var(--ink); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .quick-list-strip__toggle svg { transition: transform .18s ease; }
 .quick-list-meta--open .quick-list-strip__toggle svg { transform: rotate(180deg); }
 .quick-list-meta__fields { display: grid; grid-template-columns: minmax(260px, 1.25fr) minmax(180px, .55fr) minmax(260px, 1fr); gap: 14px; padding: 14px 16px 16px; }
@@ -107,30 +128,32 @@
 .quick-list-meta .field > input { background: var(--sunk); }
 .quick-list-meta__venue { grid-column: 1 / 2; }
 .quick-list-meta__notes { grid-column: 2 / -1; }
-.quick-catalog-toolbar { flex: 0 0 auto; display: grid; grid-template-columns: minmax(240px, 1fr) repeat(2, minmax(180px, 240px)); gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+/* Минимумы колонок сжаты в с35: каталог стал уже (сетка 1,05 : 1 по макету), и
+   прежние 240 + 180 + 180 выталкивали второй селект за край панели на 1440. */
+.quick-catalog-toolbar { flex: 0 0 auto; display: grid; grid-template-columns: minmax(160px, 1fr) repeat(2, minmax(130px, 200px)); gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
 .quick-catalog-toolbar:not(:has(.app-select + .app-select)) { grid-template-columns: minmax(0, 1fr) 240px; }
 .quick-catalog-toolbar .search-field { width: 100%; max-width: none; min-width: 0; }
-.quick-selection-list { background: var(--sunk); }
-.quick-selection-item { background: var(--card); border-bottom: 1px solid var(--line); animation: slide-soft .18s ease both; }
-/* Пятая колонка — под иконку серийных номеров. Корзина прибита к последней
+.quick-selection-list { background: var(--card); }
+.quick-selection-item { background: var(--card); border-bottom: 1px solid var(--line-2); animation: slide-soft .18s ease both; }
+/* Порядкового номера нет (макет с31): красные «01, 02» спорили с главным действием.
+   Предпоследняя колонка — под иконку серийных номеров. Корзина прибита к последней
    колонке явно: у позиций без S/N слот пустует, но ряд корзин остаётся ровным. */
-.quick-selection-item__main { min-height: 66px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 34px 34px; align-items: center; gap: 10px; padding: 11px 14px; }
+.quick-selection-item__main { min-height: 64px; display: grid; grid-template-columns: minmax(0, 1fr) auto 40px 40px; align-items: center; gap: 8px; padding: 12px 16px; }
 .quick-selection-item__main > .icon-button:last-child { grid-column: -2; }
 
 .quick-selection-item__copy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.quick-selection-item__copy strong, .quick-selection-item__copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.quick-selection-item__copy strong { font-size: 14px; }
-.quick-selection-item__copy small { color: var(--faint); font-size: 12px; }
-.quick-inline-warning { display: flex; align-items: flex-start; gap: 6px; margin: -2px 14px 10px; padding: 8px 9px; border-radius: var(--r-sm); color: var(--warn); background: var(--warn-bg); font-size: 12px; line-height: 1.45; }
+.quick-selection-item__copy strong { display: -webkit-box; overflow: hidden; font-size: 14px; font-weight: 600; line-height: 1.3; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.quick-selection-item__copy small { overflow: hidden; color: var(--faint); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.quick-inline-warning { display: flex; align-items: flex-start; gap: 6px; margin: -2px 16px 10px; padding: 8px 9px; border-radius: var(--r-sm); color: var(--warn); background: var(--warn-bg); font-size: 12px; line-height: 1.45; }
 .quick-inline-warning svg { flex: 0 0 auto; margin-top: 1px; }
-.serial-button.is-open, .serial-button.is-open:hover:not(:disabled) { color: #fff; background: var(--red-act); }
-.serial-picker { margin: 0 14px 12px; padding: 10px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--sunk); }
-.serial-picker > p { margin: 0 0 9px; color: var(--faint); font-size: 11px; line-height: 1.45; }
+.serial-button.is-open, .serial-button.is-open:hover:not(:disabled) { color: #fff; background: var(--ink); }
+/* Чипы S/N по макету (.sn): моноширинный номер, выбранный — заливка --ink с ✓. */
+.serial-picker { margin: 0 16px 12px; }
+.serial-picker > p { margin: 0 0 8px; color: var(--faint); font-size: 12px; line-height: 1.45; }
 .serial-picker > div { display: flex; flex-wrap: wrap; gap: 6px; }
-.serial-picker button { min-height: 36px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid var(--ctl); border-radius: var(--r-sm); color: var(--muted); background: var(--card); font-family: inherit; font-size: 12px; }
-.serial-picker button > span { width: 14px; height: 14px; display: grid; place-items: center; border: 1px solid var(--ctl); border-radius: 4px; }
-.serial-picker button.active { border-color: color-mix(in srgb, var(--red) 38%, transparent); color: var(--ink); background: color-mix(in srgb, var(--red) 5%, transparent); }
-.serial-picker button.active > span { border-color: var(--red-act); color: #fff; background: var(--red-act); }
+.serial-picker button { min-height: 30px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--ctl); border-radius: var(--r-sm); color: var(--ink); background: var(--card); font: 500 12.5px/1 var(--f-mono); }
+.serial-picker button:hover { background: var(--hover); }
+.serial-picker button[aria-pressed='true'] { border-color: var(--ink); color: #fff; background: var(--ink); }
 .mobile-selection-bar { display: none; }
 
 .catalog-preview-drawer .equipment-thumb--large { margin: 22px 0 16px; }

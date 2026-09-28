@@ -44,6 +44,18 @@
 .status-dot--success { background: var(--ok-dot); }
 .status-dot--warning { background: var(--warn-dot); }
 .status-dot--danger { background: var(--bad-dot); }
+/* Пилюля и счётчик (макет с31) — переехали из home.css, когда их взял второй
+   экран (редактор списка, с35). */
+/* Пилюля состояния: точка + оттенок. Сплошной заливки у статусов нет — она у бренда. */
+.pill { min-height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px 0 8px; border-radius: 999px; font-size: 12.5px; font-weight: 600; line-height: 1; white-space: nowrap; }
+.pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill--warn { color: var(--warn); background: var(--warn-bg); }
+.pill--bad { color: var(--bad); background: var(--bad-bg); }
+/* Пунктир — «место есть, человека нет»: наём ещё предстоит, это не тревога. */
+.pill--dashed { border: 1.5px dashed var(--warn-dot); color: var(--warn); background: transparent; }
+.pill--dashed::before { display: none; }
+.count { min-width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0 7px; border-radius: 999px; color: #fff; background: var(--ink); font-size: 12px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.count--soft { color: var(--ink); background: var(--select); }
 /* Чипы (макет с31, .chip): фильтр с несколькими значениями в одну строку.
    Строка прокручивается вбок, а не режется: категорий больше, чем влезает.
    Паддинг 2 px — место под обводку фокуса внутри прокручиваемой полосы. */

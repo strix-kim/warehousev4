@@ -6,10 +6,11 @@ import { useLanguage } from '../../lib/i18n'
 import { useArmedAction } from '../../lib/useArmedAction'
 import type { ResolvedSelection } from './listDocument'
 
-// Половина редактора «В списке»: позиции с количеством и серийниками, итог и
-// очистка. Сама выборка живёт на странице — панель только просит её изменить.
-// Действия и строка состояния приходят готовыми узлами: тот же набор стоит в шапке.
-export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selectedCount, onChangeCount, onSetCount, onToggleSerialPicker, onToggleSerial, onClear, actions, status }: {
+// Половина редактора «Комплект»: позиции с количеством и серийниками, итог,
+// очистка и экспорт. Сама выборка живёт на странице — панель только просит её
+// изменить. Действия приходят готовыми узлами: экспорт — на всех ширинах,
+// mobileActions и строка состояния — только на телефоне, где шапочных действий нет.
+export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selectedCount, onChangeCount, onSetCount, onToggleSerialPicker, onToggleSerial, onClear, exportActions, mobileActions, status }: {
   panelRef: RefObject<HTMLElement | null>
   isMobileActive: boolean
   resolvedSelection: ResolvedSelection
@@ -19,7 +20,8 @@ export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selected
   onToggleSerialPicker: (key: string) => void
   onToggleSerial: (key: string, equipmentId: string) => void
   onClear: () => void
-  actions: ReactNode
+  exportActions: ReactNode
+  mobileActions: ReactNode
   status: ReactNode | null
 }) {
   const { tr, language } = useLanguage()
@@ -43,18 +45,17 @@ export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selected
   return (
     <section ref={panelRef} className={`data-panel selection-panel ${isMobileActive ? 'mobile-active' : ''}`}>
       <div className="panel-heading">
-        <div><h2>{tr('Рабочий список', 'Ish ro‘yxati')}</h2><p>{tr('Количество сейчас, серийные номера — при необходимости.', 'Hozir miqdor, zarur bo‘lsa seriya raqamlari.')}</p></div>
-        <strong className="selection-count">{selectedCount}</strong>
+        <div><h2>{tr('Комплект', 'Komplekt')}</h2><p>{tr('Количество сейчас, серийные номера — при необходимости', 'Hozir miqdor, zarur bo‘lsa seriya raqamlari')}</p></div>
+        <span className="count" title={tr('Позиций в комплекте', 'Komplektdagi pozitsiyalar')}>{resolvedSelection.length}</span>
       </div>
 
       <div className="selection-list quick-selection-list">
         {resolvedSelection.length === 0 && (
           <EmptyState art title={tr('Список пока пуст', 'Ro‘yxat hozircha bo‘sh')} text={tr('Нажмите на нужную модель в каталоге.', 'Katalogdagi kerakli modelni bosing.')} />
         )}
-        {resolvedSelection.map(({ item, group, label }, index) => (
+        {resolvedSelection.map(({ item, group, label }) => (
           <article className="quick-selection-item" key={item.key}>
             <div className="quick-selection-item__main">
-              <span className="equipment-row-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
               <div className="quick-selection-item__copy">
                 <strong>{label.brand} {label.model}</strong>
                 <small>{translateEquipmentTaxonomy(label.subtype, language)} · {group
@@ -96,7 +97,7 @@ export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selected
                 <p>{tr('Отметьте только те номера, которые точно поедут на мероприятие.', 'Tadbirga aniq olib boriladigan raqamlarni belgilang.')}</p>
                 <div>{group.serializedItems.map((equipmentItem) => {
                   const active = item.serialIds.includes(equipmentItem.id)
-                  return <button className={active ? 'active' : ''} onClick={() => onToggleSerial(item.key, equipmentItem.id)} key={equipmentItem.id} type="button"><span>{active && <Check size={13} />}</span>{equipmentItem.serialnumber || tr('Без номера', 'Raqamsiz')}</button>
+                  return <button aria-pressed={active} onClick={() => onToggleSerial(item.key, equipmentItem.id)} key={equipmentItem.id} type="button">{active && <Check size={13} strokeWidth={2.6} />}{equipmentItem.serialnumber || tr('Без номера', 'Raqamsiz')}</button>
                 })}</div>
               </div>
             )}
@@ -105,7 +106,7 @@ export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selected
       </div>
 
       <footer className="selection-footer">
-        <div>
+        <div className="selection-footer__summary">
           <span className="selection-footer__total">{tr('Всего единиц', 'Jami birliklar')} <strong>{selectedCount}</strong></span>
           {resolvedSelection.length > 0 && (
             <button
@@ -118,10 +119,11 @@ export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selected
               : tr('Очистить список', 'Ro‘yxatni tozalash')}</button>
           )}
         </div>
-        {/* Дубль действий для телефона: на десктопе он скрыт CSS, там кнопки живут в
-            липкой шапке. Сообщение о результате держим рядом с нажатой кнопкой. */}
+        <div className="selection-footer__export">{exportActions}</div>
+        {/* Только телефон: там шапочных действий нет. Сообщение о результате
+            держим рядом с нажатой кнопкой. */}
         <div className="selection-footer__mobile">
-          {actions}
+          {mobileActions}
           {status}
         </div>
       </footer>

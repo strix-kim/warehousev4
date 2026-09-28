@@ -78,8 +78,10 @@ export function CatalogPanel({ panelRef, isMobileActive, groups, equipmentCount,
   return (
     <section ref={panelRef} className={`data-panel catalog-picker ${isMobileActive ? 'mobile-active' : ''}`}>
       <div className="panel-heading">
-        <div><h2>{tr('Каталог по моделям', 'Modellar katalogi')}</h2><p>{tr('Одна модель — одна строка, независимо от количества серийных единиц.', 'Seriyali birliklar sonidan qat’i nazar, bir model — bir qator.')}</p></div>
-        <span className="read-only-label">{isLoading && groups.length === 0 ? tr('Загружаем каталог…', 'Katalog yuklanmoqda…') : `${groups.length} ${tr('моделей', 'model')}`}</span>
+        <div><h2>{tr('Каталог по моделям', 'Modellar katalogi')}</h2><p>{tr('Одна модель — одна строка', 'Bir model — bir qator')}</p></div>
+        {isLoading && groups.length === 0
+          ? <span className="read-only-label">{tr('Загружаем каталог…', 'Katalog yuklanmoqda…')}</span>
+          : <span className="count count--soft" title={tr('Моделей в каталоге', 'Katalogdagi modellar')}>{groups.length}</span>}
       </div>
       <div className="quick-catalog-toolbar">
         <label className="search-field">
@@ -141,7 +143,7 @@ export function CatalogPanel({ panelRef, isMobileActive, groups, equipmentCount,
                   <strong>{group.brand} {group.model}</strong>
                   <small>{translateEquipmentTaxonomy(group.subtype, language)} · {tracking}</small>
                 </span>
-                <span className={`picker-item__count ${group.availableCount === 0 ? 'picker-item__count--empty' : ''}`}>{group.availableCount > 0 ? `${tr('доступно', 'mavjud')} ${group.availableCount}` : tr('нет на складе', 'omborda yo‘q')}</span>
+                <span className={`picker-item__count ${group.availableCount === 0 ? 'picker-item__count--empty' : ''}`}>{group.availableCount > 0 ? <>{tr('доступно', 'mavjud')} <b>{group.availableCount}</b></> : tr('Нет на складе', 'Omborda yo‘q')}</span>
               </button>
               <button className="picker-item__action" type="button" onClick={() => onAdd(group)} aria-label={tr(`Добавить ещё ${group.brand} ${group.model}`, `${group.brand} ${group.model} yana qo‘shish`)}>
                 <Plus size={17} />

@@ -13,8 +13,8 @@ export type ListMetaField = RequisiteField | 'description' | 'eventDate'
 
 export type ListMetaValues = Record<ListMetaField, string>
 
-// Панель реквизитов документа: свёрнута в полосу «Название · дата · заказчик ·
-// площадка · Реквизиты ⌄», по нажатию раскрывается в сетку полей. Реквизиты не
+// Панель реквизитов документа: свёрнута в полосу «Дата · Заказчик · Площадка ·
+// Реквизиты ⌄», по нажатию раскрывается в сетку полей. Реквизиты не
 // нужны, чтобы собрать список, — они нужны документу на согласование, поэтому
 // по умолчанию не занимают первый экран. Состояние значений живёт на странице
 // (его читают сохранение, экспорт и автосейв), раскрытие — тоже: страница
@@ -30,7 +30,7 @@ export function ListEditorMeta({ panelRef, values, requisiteErrors, open, onTogg
   const { tr, locale } = useLanguage()
   const eventDate = parseDateValue(values.eventDate)
   const dateLabel = eventDate ? formatEventDate(eventDate, locale) : tr('дата не выбрана', 'sana tanlanmagan')
-  const empty = (text: ReactNode) => <span className="quick-list-strip__empty">{text}</span>
+  const empty = (text: ReactNode) => <b className="quick-list-strip__empty">{text}</b>
   const requiredHint = <small className="field-hint field-hint--error">{tr('Обязательно для согласования', 'Kelishuv uchun majburiy')}</small>
   // Незаполненные реквизиты обязаны быть видны и на СВЁРНУТОЙ полосе: поля с
   // подсветкой размонтированы, и без этого модификатора требование, на которое
@@ -42,13 +42,14 @@ export function ListEditorMeta({ panelRef, values, requisiteErrors, open, onTogg
       {/* aria-controls не ставим: поля существуют только в раскрытом состоянии,
           ссылка на отсутствующий id хуже, чем её отсутствие. */}
       <button className="quick-list-strip" type="button" onClick={onToggle} aria-expanded={open}>
+        {/* Пары «подпись — значение» по макету с31. Название здесь не повторяем —
+            оно в заголовке страницы; пара появляется, только когда экспорт указал
+            на пустое название, иначе требование не было бы видно на полосе. */}
         <span className="quick-list-strip__summary">
-          <strong>{values.name.trim() || empty(tr('Без названия — подставится дата', 'Nomsiz — sana qo‘yiladi'))}</strong>
-          <small>
-            <span>{dateLabel}</span>
-            <span>{values.clientName.trim() || empty(tr('заказчик не указан', 'buyurtmachi ko‘rsatilmagan'))}</span>
-            <span>{values.venue.trim() || empty(tr('площадка не указана', 'maydon ko‘rsatilmagan'))}</span>
-          </small>
+          {requisiteErrors.has('name') && <span className="quick-list-strip__pair"><span>{tr('Название', 'Nomi')}</span>{empty(tr('не указано', 'ko‘rsatilmagan'))}</span>}
+          <span className="quick-list-strip__pair"><span>{tr('Дата', 'Sana')}</span><b>{dateLabel}</b></span>
+          <span className="quick-list-strip__pair"><span>{tr('Заказчик', 'Buyurtmachi')}</span>{values.clientName.trim() ? <b>{values.clientName.trim()}</b> : empty(tr('не указан', 'ko‘rsatilmagan'))}</span>
+          <span className="quick-list-strip__pair"><span>{tr('Площадка', 'Maydon')}</span>{values.venue.trim() ? <b>{values.venue.trim()}</b> : empty(tr('не указана', 'ko‘rsatilmagan'))}</span>
         </span>
         <span className="quick-list-strip__toggle">
           {invalid ? tr('Заполнить', 'To‘ldirish') : tr('Реквизиты', 'Rekvizitlar')} <ChevronDown size={16} />
