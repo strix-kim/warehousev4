@@ -11,8 +11,9 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const CURRENT_STATE = 'docs/project/current-state.md'
 const HANDOFFS = 'docs/handoffs'
-// Временный порог: с30 файл весит ~39 КБ, диета впереди. После диеты — опустить, а не раздвигать.
-const BUDGET_KB = 40
+// Диета с30: 39,6 → 12,4 КБ (каноны уехали в canons.md). Порог с запасом на рост —
+// превышение режем, а не раздвигаем бюджет.
+const BUDGET_KB = 16
 const TAG = '[хук старта ARGO]'
 
 const git = (...args) =>
