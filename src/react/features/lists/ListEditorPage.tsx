@@ -32,7 +32,7 @@ import {
   type SelectedGroup,
 } from './listSelection'
 import { buildExportRows, buildListItems, resolveListName, resolveSelection, selectionFromList, serializeDocument } from './listDocument'
-import { useCountUp } from './useCountUp'
+import { useCountUp } from '../../lib/useCountUp'
 import { useListDraftAutosave } from './useListDraftAutosave'
 import { useListDraftRestore } from './useListDraftRestore'
 import type { ListDraft } from './api'
