@@ -5,11 +5,13 @@ import { createEmployee, employeeSaveErrorText, fetchEmployeeById, fetchEmployee
 import { EmployeeFileFields, emptyFileSelection, selectedFiles, type EmployeeFileSelection } from './EmployeeFileFields'
 import { EmployeeFilesList, EmployeeFilesSkeleton } from './EmployeeFilesList'
 import { employeeFileKindLabel, employeeFullName, type Employee, type EmployeeFile, type EmployeeFileKind } from './types'
+import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import { UploadQueue, type UploadItem } from '../../components/UploadQueue'
 import { compressPhoto } from '../../lib/compressPhoto'
 import { parseDateValue } from '../../lib/date'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import { useUnsavedGuard } from '../../lib/useUnsavedGuard'
 
 const emptyDraft: EmployeeInput = {
   last_name: '',
@@ -71,6 +73,10 @@ export function EmployeeFormPage() {
   const route = employeeId ? '/employees/:employeeId/edit' : '/employees/new'
 
   const [draft, setDraft] = useState<EmployeeInput>(emptyDraft)
+  // Поля в том виде, в каком они лежат в базе: на создании — пустая форма, в
+  // правке — загруженная карточка, после сохранения — сохранённое. С ним
+  // сравнивается черновик, чтобы решить, есть ли что терять при уходе.
+  const [baseline, setBaseline] = useState<EmployeeInput>(emptyDraft)
   const [files, setFiles] = useState<EmployeeFileSelection>(emptyFileSelection)
   // Найденные тёзки. null — проверки ещё не было; пустой массив — проверка прошла
   // и совпадений нет, повторно её не гоняем.
@@ -107,7 +113,9 @@ export function EmployeeFormPage() {
           setLoadState('missing')
           return
         }
-        setDraft(draftFromEmployee(employee))
+        const loaded = draftFromEmployee(employee)
+        setDraft(loaded)
+        setBaseline(loaded)
         setDocumentPhotoId(employee.document_photo_id)
         setLoadState('ready')
       })
@@ -162,6 +170,17 @@ export function EmployeeFormPage() {
       throw saveError
     }
   }
+
+  // На экране успеха (createdId) карточка уже в базе — терять нечего. Фото для
+  // документов и ответ про тёзок сюда не входят: первое уходит в базу сразу,
+  // второе — не ввод, а результат проверки.
+  const isDirty = !createdId && (
+    JSON.stringify(draft) !== JSON.stringify(baseline)
+    || selectedFiles(files).length > 0
+  )
+  // Пока идёт сохранение или догрузка файлов, защита снята: уход в карточку после
+  // успеха — это сама форма, а не человек.
+  const guard = useUnsavedGuard(isDirty && !isSaving && !isUploading)
 
   const canSave = Boolean(draft.last_name.trim() && draft.first_name.trim())
   const backTarget = employeeId ? `/employees?employee=${employeeId}` : '/employees'
@@ -239,6 +258,9 @@ export function EmployeeFormPage() {
       const queue = [...carried, ...fresh]
       if (employeeId) {
         await updateEmployee(employeeId, draft)
+        // Поля в базе — дальше «несохранённым» считается только то, что набрано
+        // после этого снимка.
+        setBaseline(draft)
         setUploads(queue)
         // Догружаем ДО ухода в карточку: навигация размонтирует страницу и
         // оборвала бы очередь на середине.
@@ -373,6 +395,16 @@ export function EmployeeFormPage() {
           <Save size={17} /> {saveLabel}
         </button>
       </header>
+
+      {guard.isBlocked && (
+        <UnsavedPrompt
+          message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+          stayLabel={tr('Остаться', 'Qolish')}
+          leaveLabel={tr('Уйти без сохранения', 'Saqlamasdan chiqish')}
+          onStay={guard.stay}
+          onLeave={guard.leave}
+        />
+      )}
 
       <section className="data-panel employee-form">
         <div className="form-section">
