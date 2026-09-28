@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
+import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import {
   countEquipmentModelUnits,
   fetchEquipmentById,
@@ -19,6 +20,8 @@ import { equipmentCode, equipmentIdentifier, formatUnitCount } from './format'
 import type { Equipment } from './types'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
+import { useArmedAction } from '../../lib/useArmedAction'
+import { useGuardedClose } from '../../lib/useGuardedClose'
 import { useModalLayer } from '../../lib/useModalLayer'
 
 // parseDateValue отдаёт null на мусоре в колонке: дата мероприятия nullable и
@@ -75,7 +78,6 @@ function toEditDraft(item: Equipment): EquipmentEditDraft {
 
 export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant = false }: { item: Equipment; onClose: () => void; onRefreshed: (item: Equipment) => void; onUpdated: (item: Equipment) => void; instant?: boolean }) {
   const { tr, locale, language } = useLanguage()
-  useModalLayer(onClose)
   // Замораживается на маунте: анимацию появления решает то, был ли слой уже
   // открыт В МОМЕНТ открытия карточки, а не поздние ререндеры родителя.
   const [skipEnterAnimation] = useState(instant)
@@ -119,6 +121,18 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
   const canSave = Boolean(brand.trim() && model.trim() && type.trim() && subtype.trim() && count >= 0)
   // Серийная единица в этих списках уже стоит — пикер блокирует их строки.
   const unitListIds = new Set(unitLists.map((list) => list.id))
+
+  // Сравнение с живым item, а не со снимком на открытии: после конфликта версий
+  // карточка перечитывается, и «несохранённое» — это отличие от того, что
+  // сейчас лежит в базе.
+  const isDirty = isEditing && JSON.stringify(draft) !== JSON.stringify(toEditDraft(item))
+  // Дровер живёт в адресе (?item=): закрытие — это setParams, и блокер ловит его
+  // наравне с «назад» браузера. Подтверждённое закрытие идёт мимо блокера.
+  const { requestClose, isPrompting, confirmClose, keepEditing } = useGuardedClose(isDirty && !isSaving, onClose)
+  useModalLayer(requestClose)
+  // «Отмена» при правках — взводом в самой кнопке: она стоит рядом с
+  // «Сохранить», и промах мимо стоил бы всего набранного.
+  const cancelArmed = useArmedAction()
 
   function changeDraft<K extends keyof EquipmentEditDraft>(field: K, value: EquipmentEditDraft[K]) {
     setDraft((current) => ({ ...current, [field]: value }))
@@ -341,7 +355,12 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
   }
 
   return (
-    <div className={`drawer-layer${skipEnterAnimation ? ' drawer-layer--instant' : ''}`} role="dialog" aria-modal="true" aria-label={tr('Карточка оборудования', 'Uskuna kartasi')} onMouseDown={onClose}>
+    <div className={`drawer-layer${skipEnterAnimation ? ' drawer-layer--instant' : ''}`} role="dialog" aria-modal="true" aria-label={tr('Карточка оборудования', 'Uskuna kartasi')} onMouseDown={(event) => {
+      // Без preventDefault нажатие на подложку увело бы фокус в body уже ПОСЛЕ
+      // того, как плашка его забрала, — и Enter перестал бы значить «продолжить».
+      event.preventDefault()
+      requestClose()
+    }}>
       <aside className="drawer" ref={drawerRef} onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
           <div>
@@ -350,9 +369,18 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
           </div>
           <div className="drawer__header-actions">
             {!isEditing && <button className="button button--secondary" onClick={() => { setIsEditing(true); setEditSuccess('') }}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>}
-            <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+            <button autoFocus className="icon-button icon-button--bordered" onClick={requestClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
           </div>
         </div>
+        {isPrompting && (
+          <UnsavedPrompt
+            message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+            stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
+            leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
+            onStay={keepEditing}
+            onLeave={confirmClose}
+          />
+        )}
         <span className={`badge badge--${status.tone}`}><i />{status.label}</span>
         {refreshState !== 'fresh' && (
           <p className="form-error"><CircleAlert size={15} /> {refreshState === 'missing'
@@ -403,7 +431,13 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
             <div className="equipment-edit-footer">
             {editError && <p className="form-error"><CircleAlert size={15} /> {editError}</p>}
             <div className="equipment-edit-actions">
-              <button className="button button--secondary" type="button" onClick={cancelEditing} disabled={isSaving}>{tr('Отмена', 'Bekor qilish')}</button>
+              <button
+                className="button button--secondary"
+                type="button"
+                onClick={() => (isDirty ? cancelArmed.fire(cancelEditing) : cancelEditing())}
+                onBlur={cancelArmed.disarm}
+                disabled={isSaving}
+              >{cancelArmed.armed ? tr('Отменить правки?', 'O‘zgarishlar bekor qilinsinmi?') : tr('Отмена', 'Bekor qilish')}</button>
               <button className="button button--primary" type="button" onClick={() => void saveChanges()} disabled={!canSave || isSaving}><Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить изменения', 'O‘zgarishlarni saqlash')}</button>
             </div>
             </div>

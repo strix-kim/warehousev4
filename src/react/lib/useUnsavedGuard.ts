@@ -61,7 +61,23 @@ export function useNavigationGuard(active: boolean) {
   const leave = useCallback(() => blocker.proceed?.(), [blocker])
   const stay = useCallback(() => blocker.reset?.(), [blocker])
 
-  return { isBlocked: blocker.state === 'blocked', leave, stay }
+  // Свой уход мимо блокера: на вопрос уже ответили «без сохранения», а уход
+  // сам оказался переходом — дровер оборудования живёт в адресе (?item=), и его
+  // закрытие есть setParams. Роутер спрашивает блокер синхронно, внутри
+  // navigate, — до рендера, в котором activeRef погас бы сам; без обхода дровер
+  // заблокировал бы собственное закрытие. Защита снимается ровно на время
+  // вызова: navigate(-1) так не пройдёт (его проверка — на popstate, позже).
+  const bypass = useCallback((action: () => void) => {
+    const wasActive = activeRef.current
+    activeRef.current = false
+    try {
+      action()
+    } finally {
+      activeRef.current = wasActive
+    }
+  }, [])
+
+  return { isBlocked: blocker.state === 'blocked', leave, stay, bypass }
 }
 
 export function useUnsavedGuard(active: boolean) {

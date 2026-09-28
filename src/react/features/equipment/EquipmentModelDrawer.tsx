@@ -1,11 +1,13 @@
 import { CircleAlert, PackagePlus, Save, X } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
+import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import { addEquipmentUnit, fetchEquipmentUnitsByModel, type EquipmentModelSummary } from './api'
 import { equipmentAvailabilityView, toEquipmentAvailability } from './availability'
 import type { Equipment } from './types'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
+import { useGuardedClose } from '../../lib/useGuardedClose'
 import { useModalLayer } from '../../lib/useModalLayer'
 
 /**
@@ -34,7 +36,6 @@ export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, 
   instant?: boolean
 }) {
   const { tr, language } = useLanguage()
-  useModalLayer(onClose)
   // Замораживается на маунте — поздние ререндеры родителя анимацию не решают.
   const [skipEnterAnimation] = useState(instant)
   const [units, setUnits] = useState<Equipment[]>([])
@@ -46,6 +47,15 @@ export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, 
   const [isAddSaving, setIsAddSaving] = useState(false)
   const [addError, setAddError] = useState('')
   const [addSuccess, setAddSuccess] = useState('')
+
+  // Терять есть что только в открытой форме добавления: сам дровер — справка.
+  // Открытая, но нетронутая форма (пустой номер, одна штука) — не потеря.
+  const isDirty = isAddOpen && (addSerial.trim() !== '' || addCount !== 1)
+  // Дровер живёт в адресе (?mbrand&mmodel): закрытие и переход в карточку
+  // единицы — это setParams, и блокер ловит их наравне с «назад» браузера.
+  // Поэтому оба идут через плашку, а подтверждённый уход — мимо блокера.
+  const { requestClose, requestLeave, isPrompting, confirmClose, keepEditing } = useGuardedClose(isDirty && !isAddSaving, onClose)
+  useModalLayer(requestClose)
 
   useEffect(() => {
     let current = true
@@ -114,7 +124,12 @@ export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, 
   }
 
   return (
-    <div className={`drawer-layer${skipEnterAnimation ? ' drawer-layer--instant' : ''}`} role="dialog" aria-modal="true" aria-label={tr('Модель оборудования', 'Uskuna modeli')} onMouseDown={onClose}>
+    <div className={`drawer-layer${skipEnterAnimation ? ' drawer-layer--instant' : ''}`} role="dialog" aria-modal="true" aria-label={tr('Модель оборудования', 'Uskuna modeli')} onMouseDown={(event) => {
+      // Без preventDefault нажатие на подложку увело бы фокус в body уже ПОСЛЕ
+      // того, как плашка его забрала, — и Enter перестал бы значить «продолжить».
+      event.preventDefault()
+      requestClose()
+    }}>
       <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
           <div>
@@ -122,9 +137,18 @@ export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, 
             <h2>{summary.brand} {summary.model}</h2>
           </div>
           <div className="drawer__header-actions">
-            <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+            <button autoFocus className="icon-button icon-button--bordered" onClick={requestClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
           </div>
         </div>
+        {isPrompting && (
+          <UnsavedPrompt
+            message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+            stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
+            leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
+            onStay={keepEditing}
+            onLeave={confirmClose}
+          />
+        )}
         <EquipmentVisual item={summary} size="large" alt={`${summary.brand} ${summary.model}`} />
         <div className="model-drawer-stats">
           <span className="badge badge--neutral"><i />{tr(`Всего: ${unitsTotal} шт.`, `Jami: ${unitsTotal} dona`)}</span>
@@ -189,7 +213,7 @@ export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, 
                     const isQuantity = unit.tracking_mode === 'quantity'
                     return (
                       <li key={unit.id}>
-                        <button type="button" onClick={() => onOpenUnit(unit)}>
+                        <button type="button" onClick={() => requestLeave(() => onOpenUnit(unit))}>
                           <span>
                             {isQuantity
                               ? <strong>{unit.inventory_code
