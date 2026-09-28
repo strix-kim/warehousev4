@@ -1,26 +1,36 @@
 
 .app-shell { min-height: calc(100vh / var(--app-zoom)); display: grid; grid-template-columns: 256px minmax(0, 1fr); transition: grid-template-columns .22s ease; }
-.sidebar { position: sticky; top: 0; height: calc(100vh / var(--app-zoom)); display: flex; flex-direction: column; overflow: hidden; padding: 22px 16px 16px; color: var(--on-night); background: var(--night); transition: padding .22s ease; }
-.sidebar__brand { display: flex; align-items: center; justify-content: space-between; padding: 0 6px 22px; border-bottom: 1px solid var(--night-line); }
+/* isolation — ради красной дымки внизу (::after, .u-side макета): она лежит на
+   z-index -1 над фоном сайдбара, но под всем содержимым, и клики не ловит. */
+.sidebar { position: sticky; top: 0; height: calc(100vh / var(--app-zoom)); display: flex; flex-direction: column; overflow: hidden; isolation: isolate; padding: 22px 16px 16px; color: var(--on-night); background: var(--night); transition: padding .22s ease; }
+.sidebar::after { content: ''; position: absolute; left: -40px; right: -40px; bottom: 0; z-index: -1; height: 260px; pointer-events: none; background: radial-gradient(ellipse 60% 80% at 20% 100%, color-mix(in srgb, var(--red) 16%, transparent), transparent 70%); }
+.sidebar__brand { display: flex; align-items: center; justify-content: space-between; padding: 0 6px 14px; }
+/* Бренд сайдбара — знак из точек (ArgoDots) и подпись «Склад», как в макете.
+   .brand-lockup ниже остался входу и загрузчику приложения. */
+.sidebar__home { display: flex; align-items: center; gap: 12px; margin: -4px; padding: 4px; border-radius: var(--r-md); color: var(--on-night); text-decoration: none; transition: background .18s ease; }
+.sidebar__home:hover { background: rgba(255,255,255,.055); }
+.sidebar__mark { display: block; width: 40px; height: 24px; }
+.sidebar__home small { color: var(--on-night-2); font: 600 11px/1 var(--f-text); letter-spacing: .14em; text-transform: uppercase; }
 .brand-lockup { display: flex; align-items: center; gap: 10px; color: var(--ink); }
 .brand-lockup--light { color: #fff; }
-.brand-lockup--home { margin: -4px; padding: 4px; border-radius: var(--r-md); text-decoration: none; transition: background .18s ease, transform .18s ease; }
-.brand-lockup--home:hover { background: rgba(255,255,255,.055); transform: translateY(-1px); }
-.brand-lockup--home:active { transform: translateY(0); }
-.brand-lockup--home .brand-mark { transition: transform .18s ease, box-shadow .18s ease; }
-.brand-lockup--home:hover .brand-mark { transform: scale(1.04); box-shadow: 0 6px 18px color-mix(in srgb, var(--red) 22%, transparent); }
 .brand-mark { width: 31px; height: 31px; display: grid; place-items: center; border-radius: var(--r-sm); color: #fff; background: var(--red); font-family: var(--f-display); font-size: 18px; font-weight: 800; }
 .brand-name { font-size: 19px; font-weight: 800; letter-spacing: .09em; }
-.sidebar__nav { flex: 0 0 auto; padding: 24px 0 10px; }
-.nav-section-label { margin: 0 10px 10px; color: var(--on-night-2); font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
-.sidebar__nav a { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; margin: 4px 0; padding: 0 12px; border-radius: var(--r-md); color: var(--on-night); text-decoration: none; font-size: 15px; font-weight: 500; transition: color .18s ease, background .18s ease; }
+.sidebar__nav { flex: 0 0 auto; padding: 0 0 4px; }
+/* Подпись группы меню (Склад / Люди и площадка / Инструменты) — размеры
+   .u-side__group макета. */
+.nav-section-label { margin: 18px 12px 8px; color: var(--on-night-2); font: 600 11px/1 var(--f-text); letter-spacing: .14em; text-transform: uppercase; }
+/* Пункт — 40 px и шаг 4, как .u-nav макета: с тремя группами 44-пиксельные
+   пункты не помещали подвал сайдбара в окно ноутбука 1440×900. */
+.sidebar__nav a { position: relative; display: flex; align-items: center; gap: 12px; min-height: 40px; margin: 2px 0; padding: 0 12px; border-radius: var(--r-md); color: var(--on-night); text-decoration: none; font-size: 14px; font-weight: 500; transition: color .18s ease, background .18s ease; }
+/* Счётчик раздела из сводки главной (useNavSummary в App.tsx). */
+.sidebar__count { margin-left: auto; color: var(--on-night-2); font: 600 12px/1 var(--f-text); font-style: normal; font-variant-numeric: tabular-nums; }
 .sidebar__nav a svg { color: var(--on-night-2); }
 .sidebar__nav a:hover { background: var(--night-2); }
 .sidebar__nav a.active { background: var(--night-3); font-weight: 600; }
 /* Полоска — у самого края сайдбара, как в макете: left гасит его боковой
    паддинг (16 px, у узкого сайдбара — 10, см. свёрнутый и блок 1050). Красный —
    --red, не --red-act: это метка, а не заливка под белым текстом. */
-.sidebar__nav a.active::before { content: ''; position: absolute; left: -16px; top: 11px; bottom: 11px; width: 3px; border-radius: 0 3px 3px 0; background: var(--red); }
+.sidebar__nav a.active::before { content: ''; position: absolute; left: -16px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--red); }
 .sidebar__nav a.active svg { color: #fff; }
 .sidebar__utility { display: grid; gap: 10px; margin: 14px 0 18px; }
 .sidebar__quick-action { min-height: 68px; display: grid; grid-template-columns: 38px minmax(0, 1fr) 16px; align-items: center; gap: 10px; padding: 10px; overflow: hidden; border: 1px solid var(--night-line); border-radius: var(--r-md); color: #fff; background: linear-gradient(135deg, rgba(255,255,255,.075), rgba(255,255,255,.025)); box-shadow: inset 0 1px rgba(255,255,255,.04); text-decoration: none; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
@@ -44,18 +54,23 @@
 .language-switch button.active { color: #fff; background: var(--red-act); box-shadow: 0 2px 7px color-mix(in srgb, var(--red) 18%, transparent); }
 .language-switch--compact { width: 100%; margin: 0; border-color: var(--night-line); background: rgba(255,255,255,.035); }
 .language-switch--compact button { color: var(--on-night-2); }
-.language-switch--compact button.active { color: #fff; }
-.sidebar__footer { display: grid; grid-template-columns: 36px minmax(0, 1fr) 34px; align-items: center; gap: 9px; padding: 15px 5px 2px; border-top: 1px solid var(--night-line); }
-.user-avatar { width: 36px; height: 36px; display: grid; place-items: center; overflow: hidden; border: 1px solid rgba(255,255,255,.14); border-radius: 50%; color: #fff; background: var(--night-2); }
-.user-avatar img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.user-copy { min-width: 0; display: flex; flex-direction: column; }
-.user-copy strong { overflow: hidden; color: #fff; font-size: 13px; text-overflow: ellipsis; }
-.user-copy span { overflow: hidden; color: var(--on-night-2); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+/* Выбранный язык в сайдбаре — светлая плашка, как .u-lang макета: красная
+   заливка здесь была бы вторым красным пятном рядом с «Новым списком» (V-13). */
+.language-switch--compact button.active { color: var(--ink); background: var(--card); box-shadow: none; }
+.sidebar__footer { display: grid; grid-template-columns: 34px minmax(0, 1fr) 34px; align-items: center; gap: 10px; padding: 12px 6px 2px; border-top: 1px solid var(--night-line); }
+.user-avatar { width: 34px; height: 34px; display: grid; place-items: center; overflow: hidden; border: 1px solid rgba(255,255,255,.14); border-radius: 50%; color: #fff; background: var(--night-3); font: 700 12px/1 var(--f-text); letter-spacing: .02em; }
+.user-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.user-copy strong { overflow: hidden; color: #fff; font-size: 13px; font-weight: 600; line-height: 1.2; text-overflow: ellipsis; }
+.user-copy span { overflow: hidden; color: var(--on-night-2); font-size: 12px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 
 .app-shell--sidebar-collapsed { grid-template-columns: 76px minmax(0, 1fr); }
 .app-shell--sidebar-collapsed .sidebar { padding-inline: 10px; }
 .app-shell--sidebar-collapsed .sidebar__brand { justify-content: center; }
-.app-shell--sidebar-collapsed .sidebar__brand .brand-lockup, .app-shell--sidebar-collapsed .nav-section-label, .app-shell--sidebar-collapsed .sidebar__nav a span, .app-shell--sidebar-collapsed .sidebar__scope span, .app-shell--sidebar-collapsed .user-copy { display: none; }
+.app-shell--sidebar-collapsed .sidebar__home, .app-shell--sidebar-collapsed .sidebar__nav a span, .app-shell--sidebar-collapsed .sidebar__count, .app-shell--sidebar-collapsed .sidebar__scope span, .app-shell--sidebar-collapsed .user-copy { display: none; }
+/* В узком сайдбаре подпись группы становится чертой: группы остаются видны,
+   а слово в 56 px не помещается. Первая черта лишняя — над ней только бренд. */
+.app-shell--sidebar-collapsed .nav-section-label { height: 1px; margin: 9px 12px; overflow: hidden; font-size: 0; background: var(--night-line); }
+.app-shell--sidebar-collapsed .nav-section-label:first-child { display: none; }
 .app-shell--sidebar-collapsed .sidebar__brand > button { display: grid; }
 .app-shell--sidebar-collapsed .sidebar__nav a { justify-content: center; padding: 0; }
 .app-shell--sidebar-collapsed .sidebar__nav a.active::before { left: -10px; }

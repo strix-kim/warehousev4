@@ -3,8 +3,10 @@ import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, m, type Transition } from 'motion/react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AppErrorBoundary } from '../components/AppErrorBoundary'
+import { ArgoDots } from '../components/ArgoDots'
 import { BottomSheet } from '../components/BottomSheet'
 import { useAuth } from '../features/auth/AuthProvider'
+import { fetchHomeSummary, readCachedHomeSummary, type HomeSummary } from '../features/home/api'
 import { hasUnsavedListDraft } from '../features/lists/cacheKeys'
 import { MOBILE_MEDIA_QUERY } from '../lib/breakpoints'
 import { LanguageSwitcher, useLanguage } from '../lib/i18n'
@@ -69,6 +71,37 @@ function phoneTabOf(pathname: string): PhoneTab {
 // нажатие — 0,97. Числа листа «Ещё» — в components/BottomSheet.tsx.
 const TAB_INDICATOR_TRANSITION: Transition = { duration: 0.2, ease: 'easeOut' }
 const TAB_PRESS = { scale: 0.97 }
+
+// Счётчики меню берутся из той же сводки, что и плитки главной (RPC home_summary,
+// ключ home:summary): второго источника чисел нет. Спрашиваем на каждой смене
+// раздела, но без bypass — в пределах минутного TTL это чтение кэша, а за ним
+// один запрос, общий с главной (cachedQuery склеивает запросы в полёте). Так
+// правка в разделе доезжает до меню не позже первого перехода после TTL.
+// Отказ — меню без чисел: счётчик здесь подсказка, а не факт, ради которого стоит
+// шуметь на экране; след остаётся в канале ошибок.
+function useNavSummary(pathname: string) {
+  const [summary, setSummary] = useState<HomeSummary | null>(() => readCachedHomeSummary())
+
+  useEffect(() => {
+    let isActive = true
+    fetchHomeSummary()
+      .then((value) => { if (isActive) setSummary(value) })
+      .catch((error: unknown) => {
+        if (isActive) setSummary(null)
+        reportAppError(error, { scope: 'loader', detail: { batch: 'nav-summary' } })
+      })
+    return () => { isActive = false }
+  }, [pathname])
+
+  return summary
+}
+
+// Инициалы для аватара — из почты: имени в профиле нет. «rls-test» → «RT»,
+// «ivanov» → «IV».
+function initialsOf(email: string) {
+  const [first = '', second = ''] = (email.split('@')[0] ?? '').split(/[._\-\s]+/).filter(Boolean)
+  return (second ? `${first.slice(0, 1)}${second.slice(0, 1)}` : first.slice(0, 2)).toUpperCase()
+}
 
 export function App() {
   const { isLoading, session } = useAuth()
@@ -137,12 +170,13 @@ function useSignOutConfirm(signOut: () => void) {
 
 function AppShell() {
   const { session, signOut } = useAuth()
-  const { tr } = useLanguage()
+  const { tr, locale } = useLanguage()
   const email = session?.user.email ?? tr('Сотрудник ARGO', 'ARGO xodimi')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('argo:sidebar-collapsed') === 'true')
   const [isMoreOpen, setMoreOpen] = useState(false)
   const [isPhone, setPhone] = useState(() => window.matchMedia(MOBILE_MEDIA_QUERY).matches)
   const { pathname } = useLocation()
+  const navSummary = useNavSummary(pathname)
   const signOutConfirm = useSignOutConfirm(() => void signOut())
   const signOutLabel = signOutConfirm.armed ? tr('Да, выйти', 'Ha, chiqish') : tr('Выйти', 'Chiqish')
   // Прогрев каталога — один раз на загрузку страницы, а не на каждый вход
@@ -276,14 +310,22 @@ function AppShell() {
   const tabIndicator = (tab: PhoneTab) => (isPhone && activeTab === tab
     ? <m.span layoutId="phone-tab-indicator" className="sidebar__tab-ind" transition={TAB_INDICATOR_TRANSITION} aria-hidden="true" />
     : null)
+  // Число у пункта меню; сводки нет — нет и элемента. <em>, а не <span>: подпись
+  // пункта — это span, и правила подписей в узком сайдбаре и в нижней панели
+  // (06-responsive-shell) не должны задевать счётчик.
+  const navCount = (value: number | undefined) => (value === undefined
+    ? null
+    : <em className="sidebar__count">{value.toLocaleString(locale)}</em>)
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`}>
       <aside className="sidebar">
         <div className="sidebar__brand">
-          <Link className="brand-lockup brand-lockup--light brand-lockup--home" to="/" aria-label={tr('Вернуться на главную', 'Bosh sahifaga qaytish')}>
-            <span className="brand-mark">A</span>
-            <span className="brand-name">ARGO</span>
+          {/* Знак — SVG из точек (ArgoDots), а не картинка: растровых ассетов в
+              продукте нет, и точки берут цвет из currentColor. */}
+          <Link className="sidebar__home" to="/" aria-label={tr('Вернуться на главную', 'Bosh sahifaga qaytish')}>
+            <ArgoDots className="sidebar__mark" />
+            <small>{tr('Склад', 'Ombor')}</small>
           </Link>
           <button
             className="icon-button icon-button--dark sidebar__toggle"
@@ -300,22 +342,29 @@ function AppShell() {
             прибавил бы к пути индикатора прокрутку страницы (смена раздела
             сбрасывает её между замерами). */}
         <m.nav className="sidebar__nav" layoutRoot={isPhone} aria-label={tr('Основная навигация', 'Asosiy navigatsiya')}>
+          {/* Три группы, как в макете. Подписи групп — только в широком сайдбаре:
+              в узком и в нижней панели их прячет 06-responsive-shell. */}
           <p className="nav-section-label">{tr('Склад', 'Ombor')}</p>
           <MotionNavLink to="/" end className={tabClass} whileTap={tabPress}>{tabIndicator('home')}<House size={19} /><span>{tr('Главная', 'Bosh sahifa')}</span></MotionNavLink>
           {/* На телефоне — «Техника»: в слоте шириной в пятую часть экрана
-              «Оборудование» слипалось с соседями (V-05 макета). */}
-          <MotionNavLink to="/equipment" className={tabClass} whileTap={tabPress}>{tabIndicator('equipment')}<Boxes size={19} /><span>{isPhone ? tr('Техника', 'Texnika') : tr('Оборудование', 'Uskunalar')}</span></MotionNavLink>
+              «Оборудование» слипалось с соседями (V-05 макета). Счётчик —
+              модели, а не строки: так считает сам каталог. */}
+          <MotionNavLink to="/equipment" className={tabClass} whileTap={tabPress}>{tabIndicator('equipment')}<Boxes size={19} /><span>{isPhone ? tr('Техника', 'Texnika') : tr('Оборудование', 'Uskunalar')}</span>{navCount(navSummary?.equipment.models)}</MotionNavLink>
+          {/* Счётчика у «Списков» нет: home_summary их не считает, а второй
+              источник числа ради меню не заводим. */}
           <MotionNavLink to="/lists" className={tabClass} whileTap={tabPress}>{tabIndicator('lists')}<ClipboardList size={19} /><span>{tr('Списки', 'Ro‘yxatlar')}</span></MotionNavLink>
+          <p className="nav-section-label">{tr('Люди и площадка', 'Odamlar va maydon')}</p>
           {/* Сотрудники, Автомобили и Задержки на телефоне в нижнюю панель не
               входят: там ровно пять вкладок (Главная, Техника, Списки, Залы, Ещё),
               шестая ужала бы подписи до слипания. На ≤820 эти ссылки прячутся
               (sidebar__nav-extra), а сами разделы живут в листе «Ещё». */}
-          <NavLink className="sidebar__nav-extra" to="/employees"><Users size={19} /><span>{tr('Сотрудники', 'Xodimlar')}</span></NavLink>
-          <NavLink className="sidebar__nav-extra" to="/vehicles"><CarFront size={19} /><span>{tr('Автомобили', 'Avtomobillar')}</span></NavLink>
+          <NavLink className="sidebar__nav-extra" to="/employees"><Users size={19} /><span>{tr('Сотрудники', 'Xodimlar')}</span>{navCount(navSummary?.employees.count)}</NavLink>
+          <NavLink className="sidebar__nav-extra" to="/vehicles"><CarFront size={19} /><span>{tr('Автомобили', 'Avtomobillar')}</span>{navCount(navSummary?.vehicles.count)}</NavLink>
           <MotionNavLink to="/halls" className={tabClass} whileTap={tabPress}>{tabIndicator('halls')}<Presentation size={19} /><span>{tr('Залы', 'Zallar')}</span></MotionNavLink>
-          {/* В сайдбаре — одно слово, как у соседей: полное «Задержка излучателей»
+          <p className="nav-section-label">{tr('Инструменты', 'Asboblar')}</p>
+          {/* В сайдбаре — «Задержки ITC», как в макете: полное «Задержка излучателей»
               ломалось на две строки. Полное имя — в заголовке страницы и в листе «Ещё». */}
-          <NavLink className="sidebar__nav-extra" to="/delay"><RadioTower size={19} /><span>{tr('Задержки', 'Kechikishlar')}</span></NavLink>
+          <NavLink className="sidebar__nav-extra" to="/delay"><RadioTower size={19} /><span>{tr('Задержки ITC', 'ITC kechikishlari')}</span></NavLink>
           {/* Пятый слот нижней панели, на десктопе скрыт: язык, аккаунт, быстрый
               переход в новый список и три раздела сверх пяти живут в сайдбаре,
               которого на телефоне нет. Горит и на адресах этих разделов. */}
@@ -350,7 +399,9 @@ function AppShell() {
         <div className="sidebar__language"><LanguageSwitcher compact /></div>
 
         <div className="sidebar__footer">
-          <div className="user-avatar"><img src="/brand/video-engineer-avatar.png" alt={tr('Видеоинженер', 'Video muhandis')} loading="eager" decoding="async" /></div>
+          {/* Инициалы вместо фото: растровых картинок в продукте нет, а чужой
+              портрет у каждого сотрудника врал бы. */}
+          <div className="user-avatar" aria-hidden="true">{initialsOf(email)}</div>
           <div className="user-copy">{signOutConfirm.armed
             ? <><strong>{tr('Выйти? Несохранённое пропадёт', 'Chiqasizmi? Saqlanmagan ish yo‘qoladi')}</strong><span>{tr('Нажмите ещё раз', 'Yana bir bor bosing')}</span></>
             : <><strong>{email.split('@')[0]}</strong><span>{email}</span></>}</div>
