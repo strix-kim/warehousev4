@@ -1,5 +1,4 @@
-import type { ReactNode, Ref } from 'react'
-import { useSyncExternalStore } from 'react'
+import { Children, useSyncExternalStore, type ReactNode, type Ref } from 'react'
 import { BottomSheet } from './BottomSheet'
 import { MOBILE_MEDIA_QUERY } from '../lib/breakpoints'
 
@@ -24,8 +23,11 @@ function isMobileNow() {
  * и открытые формы остаются. Esc, блокировку прокрутки и защиту несохранённого
  * держит вызывающий (useModalLayer + useGuardedClose) — в обоих вариантах
  * закрытие идёт через один и тот же onRequestClose.
+ *
+ * Тело без содержимого не рисуется вовсе: пустой прокручиваемый блок держал бы
+ * между шапкой и подвалом дыру (профиль машины без фото и файлов).
  */
-export function DrawerFrame({ ariaLabel, instant, onRequestClose, head, foot, bodyRef, children }: {
+export function DrawerFrame({ ariaLabel, instant, onRequestClose, head, foot, bodyRef, className, children }: {
   ariaLabel: string
   // true — слой уже был открыт (модель ↔ карточка): появление не анимируем.
   instant: boolean
@@ -34,20 +36,23 @@ export function DrawerFrame({ ariaLabel, instant, onRequestClose, head, foot, bo
   foot?: ReactNode
   // Тело — единственный скролл рамы: прокрутка к сообщению идёт по нему.
   bodyRef?: Ref<HTMLDivElement>
+  // Суффикс модификатора рамы: 'profile' даёт drawer--profile (ширина 500) на
+  // десктопе и sheet--profile на листе. Стили модификатора — у вызывающего.
+  className?: string
   children: ReactNode
 }) {
   const isMobile = useSyncExternalStore(subscribeMobile, isMobileNow)
   const content = (
     <>
       <div className="drawer__head">{head}</div>
-      <div className="drawer__body" ref={bodyRef}>{children}</div>
+      {Children.toArray(children).length > 0 && <div className="drawer__body" ref={bodyRef}>{children}</div>}
       {foot && <div className="drawer__foot">{foot}</div>}
     </>
   )
 
   if (isMobile) {
     return (
-      <BottomSheet ariaLabel={ariaLabel} onClose={onRequestClose} className="sheet--drawer" instant={instant}>
+      <BottomSheet ariaLabel={ariaLabel} onClose={onRequestClose} className={`sheet--drawer${className ? ` sheet--${className}` : ''}`} instant={instant}>
         {content}
       </BottomSheet>
     )
@@ -60,7 +65,7 @@ export function DrawerFrame({ ariaLabel, instant, onRequestClose, head, foot, bo
       event.preventDefault()
       onRequestClose()
     }}>
-      <aside className="drawer drawer--split" onMouseDown={(event) => event.stopPropagation()}>
+      <aside className={`drawer drawer--split${className ? ` drawer--${className}` : ''}`} onMouseDown={(event) => event.stopPropagation()}>
         {content}
       </aside>
     </div>

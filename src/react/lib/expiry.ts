@@ -4,15 +4,15 @@
 // действителен весь этот день целиком, включая 23:59 в Ташкенте.
 //
 // Пустое значение состояния НЕ имеет (решение прораба, с27): карточка показывает
-// только заполненные поля, и молчание про незаполненный срок честнее серого
-// бейджа «не указан» — тот выглядел бы как проверенный факт.
+// только заполненные поля, и молчание про незаполненный срок честнее серой
+// пилюли «не указан» — тот выглядел бы как проверенный факт.
 
 import { parseDateValue, toDateValue } from './date'
 
 export type ExpiryState = 'expired' | 'soon' | 'valid'
 
 // Порог «скоро истекает». Меньше — предупреждение приходит поздно, больше —
-// оранжевый бейдж висит месяцами и перестаёт что-либо значить.
+// оранжевая пилюля висит месяцами и перестаёт что-либо значить.
 const EXPIRY_SOON_DAYS = 30
 
 // Полных календарных дней от сегодня до срока. Отрицательное — срок позади.
@@ -45,9 +45,9 @@ export function expiryState(value: string | null | undefined, soonDays = EXPIRY_
   return days <= soonDays ? 'soon' : 'valid'
 }
 
-// Модификатор общего класса .badge. Сам .badge не трогаем — его потребляют
-// дроверы оборудования и каталог редактора списков.
-export function expiryBadgeClass(state: ExpiryState) {
-  if (state === 'expired') return 'badge badge--danger'
-  return state === 'soon' ? 'badge badge--warning' : 'badge badge--success'
+// Пилюля срока в шапке профиля: модификатор общего .pill (03-controls) — цвет
+// несёт состояние, слово в тексте пилюли его дублирует.
+export function expiryPillClass(state: ExpiryState) {
+  if (state === 'expired') return 'pill pill--bad'
+  return state === 'soon' ? 'pill pill--warn' : 'pill pill--ok'
 }

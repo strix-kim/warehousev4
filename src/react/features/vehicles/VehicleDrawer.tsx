@@ -1,30 +1,15 @@
-import { CarFront, CircleAlert, Palette, Pencil, UserRound, X } from 'lucide-react'
+import { CarFront, CircleAlert, Pencil } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { fetchVehicleFiles, getSignedUrls } from './api'
 import { Plate } from './Plate'
-import { VehicleFilesList, VehicleFilesSkeleton } from './VehicleFilesList'
-import { driverFullName, vehicleTitle, type Tr, type VehicleFile, type VehicleWithDrivers } from './types'
-import { ProfileHead, ProfileSections, type ProfileSection } from '../../components/ProfileCard'
+import { VehicleFilesList } from './VehicleFilesList'
+import { driverFullName, vehicleTitle, type VehicleFile, type VehicleWithDrivers } from './types'
+import { DrawerFrame } from '../../components/DrawerFrame'
+import { ProfileHead } from '../../components/ProfileCard'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import { useModalLayer } from '../../lib/useModalLayer'
-
-// Реквизиты карточки: показываем ТОЛЬКО заполненные — обязательных полей у машины
-// два (марка и номер), остальное добивается позже, и половина «—» превращала бы
-// карточку в бланк. Марки с моделью здесь нет намеренно: они стоят главным фактом
-// в шапке, и строкой это был бы второй показ тех же данных.
-function detailSections(vehicle: VehicleWithDrivers, tr: Tr): ProfileSection[] {
-  return [
-    {
-      key: 'specs',
-      title: tr('Характеристики', 'Xususiyatlar'),
-      fields: [
-        { key: 'color', label: tr('Цвет', 'Rang'), value: vehicle.color, icon: <Palette size={13} /> },
-      ],
-    },
-  ]
-}
 
 export function VehicleDrawer({ vehicle, photoUrl, onClose }: {
   vehicle: VehicleWithDrivers
@@ -70,70 +55,53 @@ export function VehicleDrawer({ vehicle, photoUrl, onClose }: {
     return () => { isCurrent = false }
   }, [vehicle.id])
 
-  const sections = detailSections(vehicle, tr)
   const title = vehicleTitle(vehicle.brand, vehicle.model)
+  // «Марка Модель · Цвет» одной приглушённой строкой под знаком: цвет один
+  // факт, отдельной секции «Характеристики» ради него нет.
+  const subtitle = [title, vehicle.color].filter(Boolean).join(' · ')
+  // Секция фото — только когда есть что показать или что-то сломалось: в проде
+  // vehicle_files пуста, и «Фото пока нет» с заголовком стояло бы единственным
+  // блоком карточки. Скелета нет намеренно: пока грузится, блока просто нет.
+  const hasPhotosBlock = hasError || (!isLoading && files.length > 0)
 
   return (
-    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Карточка машины', 'Mashina kartasi')} onMouseDown={onClose}>
-      <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="drawer__header">
-          {/* Надзаголовок называет КЛАСС записи, крупно стоит госномер — машину на
-              площадке опознают по номеру, а не по названию модели, — и марка с
-              моделью идут главным фактом под ним. */}
-          <ProfileHead
-            eyebrow={tr('Автомобиль', 'Avtomobil')}
-            title={<Plate value={vehicle.plate_number} size="lg" />}
-            copyValue={vehicle.plate_number}
-            fact={title}
-            photoUrl={photoUrl}
-            photoPlaceholder={<CarFront size={24} />}
-            photoShape="wide"
-          />
-          <div className="drawer__header-actions">
-            <button className="button button--secondary" onClick={() => navigate(`/vehicles/${vehicle.id}/edit`)}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>
-            <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
-          </div>
-        </div>
-
-        <ProfileSections sections={sections} />
-
-        <section className="unit-lists profile-section">
-          <h3 className="profile-section__title">{tr('Водители', 'Haydovchilar')}</h3>
-          <p className="profile-section__hint">{tr('Карточка сотрудника открывается в разделе «Сотрудники».', 'Xodim kartasi «Xodimlar» bo‘limida ochiladi.')}</p>
-          {vehicle.drivers.length === 0
-            ? <p className="muted">{tr('Водители не назначены.', 'Haydovchilar tayinlanmagan.')}</p>
-            : <ul className="unit-lists__items">
-              {vehicle.drivers.map((driver) => (
-                <li key={driver.id}>
-                  <Link to={`/employees?employee=${driver.id}`}>
-                    <UserRound size={17} />
-                    <span>
-                      <strong>{driverFullName(driver)}</strong>
-                      <small>{driver.phone || driver.position || tr('Телефон не указан', 'Telefon ko‘rsatilmagan')}</small>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>}
-        </section>
-        {/* Галерея идёт ПОСЛЕ водителей: опознание уехало в шапку (с27), а в
-            проде vehicle_files пуста — «Фото пока нет» стояло бы над единственным
-            содержательным блоком карточки. Появятся снимки — порядок останется
-            верным: несколько фото это подробность, а не ответ на «ту ли карточку
-            открыл». */}
-        <section className="unit-lists profile-section">
-          <h3 className="profile-section__title">{tr('Фото', 'Fotolar')}</h3>
-          <p className="profile-section__hint">{tr('Открываются по временной ссылке — она действует час.', 'Vaqtinchalik havola orqali ochiladi — u bir soat amal qiladi.')}</p>
+    <DrawerFrame
+      className="profile"
+      ariaLabel={tr('Карточка машины', 'Mashina kartasi')}
+      instant={false}
+      onRequestClose={onClose}
+      head={
+        // Надзаголовок называет КЛАСС записи, заголовком служит знак госномера —
+        // машину на площадке опознают по номеру, а не по названию модели.
+        <ProfileHead
+          eyebrow={tr('Автомобиль', 'Avtomobil')}
+          photo={{ url: photoUrl, placeholder: <CarFront size={34} />, shape: 'car' }}
+          subtitle={subtitle}
+          mainFact={{ value: vehicle.plate_number, label: tr('госномер', 'davlat raqami'), display: <Plate value={vehicle.plate_number} size="lg" /> }}
+          extra={vehicle.drivers.length === 0
+            ? <p className="profile-head__none">{tr('Водитель не назначен', 'Haydovchi tayinlanmagan')}</p>
+            : vehicle.drivers.map((driver) => (
+              <Link key={driver.id} className="chip" to={`/employees?employee=${driver.id}`} title={driverFullName(driver)}>
+                <span>{driverFullName(driver)}</span>
+                {(driver.phone || driver.position) && <em>{driver.phone || driver.position}</em>}
+              </Link>
+            ))}
+          onClose={onClose}
+        />
+      }
+      foot={<button className="button button--secondary" onClick={() => navigate(`/vehicles/${vehicle.id}/edit`)}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>}
+    >
+      {hasPhotosBlock && (
+        <section className="profile-section">
+          <h3 className="drawer-caps">{tr('Фото', 'Fotolar')}</h3>
           {hasError
             ? <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить фото машины.', 'Mashina fotolarini yuklab bo‘lmadi.')}</p>
-            : isLoading
-              ? <VehicleFilesSkeleton />
-              : files.length === 0
-                ? <p className="muted">{tr('Фото пока нет.', 'Hozircha fotolar yo‘q.')}</p>
-                : <VehicleFilesList files={files} urls={urls} photoAlt={title} />}
+            : <>
+              <VehicleFilesList files={files} urls={urls} photoAlt={title} />
+              <p className="profile-section__hint">{tr('Открываются по временной ссылке — она действует час.', 'Vaqtinchalik havola orqali ochiladi — u bir soat amal qiladi.')}</p>
+            </>}
         </section>
-
-      </aside>
-    </div>
+      )}
+    </DrawerFrame>
   )
 }

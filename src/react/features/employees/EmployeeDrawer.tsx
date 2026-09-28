@@ -1,12 +1,13 @@
-import { Cake, CalendarDays, CircleAlert, Hash, House, IdCard, Landmark, MapPin, Pencil, Phone, Shirt, UserRound, X } from 'lucide-react'
+import { CircleAlert, Pencil } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchEmployeeById, fetchEmployeeFiles, getSignedUrls, setEmployeeDocumentPhoto } from './api'
 import { EmployeeFilesList, EmployeeFilesSkeleton } from './EmployeeFilesList'
 import { employeeFullName, type Employee, type EmployeeFile, type EmployeeListItem, type Tr } from './types'
-import { ProfileBadges, ProfileHead, ProfileSections, type ProfileBadge, type ProfileSection } from '../../components/ProfileCard'
+import { DrawerFrame } from '../../components/DrawerFrame'
+import { ProfileHead, ProfileSections, type ProfileBadge, type ProfileSection } from '../../components/ProfileCard'
 import { formatEventDate, parseDateValue } from '../../lib/date'
-import { expiryBadgeClass, expiryState, type ExpiryState } from '../../lib/expiry'
+import { expiryPillClass, expiryState, type ExpiryState } from '../../lib/expiry'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import { useModalLayer } from '../../lib/useModalLayer'
@@ -19,22 +20,22 @@ function dateLabel(value: string | null, locale: string) {
   return date ? formatEventDate(date, locale) : value
 }
 
-// Сроки живут ТОЛЬКО бейджем: цвет отвечает на «можно ли ставить в работу», а
-// дата стоит тут же, поэтому отдельной строки в реквизитах им не нужно — это
-// был бы второй показ тех же данных. Срок не заполнен — бейджа нет вовсе
+// Сроки живут ТОЛЬКО пилюлей в шапке: цвет отвечает на «можно ли ставить в
+// работу», а дата стоит тут же, поэтому отдельной строки в реквизитах им не нужно —
+// это был бы второй показ тех же данных. Срок не заполнен — пилюли нет вовсе
 // (решение прораба, с27): молчание честнее серого «не указан», который выглядел
 // бы как проверенный факт.
 //
 // Слово, а не только цвет: «истёк», «истекает» и «действителен до» — три разных
 // текста. Один текст на три цвета читался бы одинаково и дальтоником, и любым,
 // кто смотрит на карточку мельком.
-function expiryBadges(employee: Employee, tr: Tr, locale: string): ProfileBadge[] {
+function expiryPills(employee: Employee, tr: Tr, locale: string): ProfileBadge[] {
   const badges: ProfileBadge[] = []
   const add = (key: string, value: string | null, labels: Record<ExpiryState, (date: string) => string>) => {
     const state = expiryState(value)
     const date = dateLabel(value, locale)
     if (!state || !date) return
-    badges.push({ key, className: expiryBadgeClass(state), label: labels[state](date) })
+    badges.push({ key, className: expiryPillClass(state), label: labels[state](date) })
   }
   // Узбекский принимает дату ПЕРЕД послелогом и пишет его слитно: formatEventDate
   // отдаёт «12-sentabr 2026-yil», отсюда «…2026-yilgacha» и «…2026-yilda».
@@ -51,60 +52,50 @@ function expiryBadges(employee: Employee, tr: Tr, locale: string): ProfileBadge[
   return badges
 }
 
-// Реквизиты секциями: человек ищет не «двенадцатую строку сверху», а телефон,
-// паспорт или прописку — и группа подсказывает, где смотреть.
+// Реквизиты секциями: человек ищет не «двенадцатую строку сверху», а паспорт или
+// прописку — и группа подсказывает, где смотреть. Телефон и должность стоят в
+// шапке, второй раз их здесь нет.
 function detailSections(employee: Employee, tr: Tr, locale: string): ProfileSection[] {
   const passport = [employee.passport_series, employee.passport_number].filter(Boolean).join(' ')
   return [
     {
-      key: 'contacts',
-      title: tr('Контакты', 'Aloqa'),
-      fields: [
-        { key: 'phone', label: tr('Телефон', 'Telefon'), value: employee.phone, icon: <Phone size={13} />, strong: true },
-      ],
-    },
-    {
       key: 'personal',
       title: tr('Личное', 'Shaxsiy ma’lumotlar'),
       fields: [
-        { key: 'birth_date', label: tr('Дата рождения', 'Tug‘ilgan sana'), value: dateLabel(employee.birth_date, locale), icon: <Cake size={13} /> },
-        { key: 't_shirt_size', label: tr('Размер футболки / худи', 'Futbolka / xudi o‘lchami'), value: employee.t_shirt_size, icon: <Shirt size={13} /> },
-        { key: 'birth_place', label: tr('Место рождения', 'Tug‘ilgan joyi'), value: employee.birth_place, icon: <MapPin size={13} /> },
+        { key: 'birth_date', label: tr('Дата рождения', 'Tug‘ilgan sana'), value: dateLabel(employee.birth_date, locale) },
+        { key: 'birth_place', label: tr('Место рождения', 'Tug‘ilgan joyi'), value: employee.birth_place },
+        { key: 't_shirt_size', label: tr('Футболка / худи', 'Futbolka / xudi'), value: employee.t_shirt_size, copy: false },
       ],
     },
     {
       key: 'documents',
       title: tr('Документы', 'Hujjatlar'),
       fields: [
-        { key: 'passport', label: tr('Паспорт', 'Pasport'), value: passport || null, icon: <IdCard size={13} />, strong: true },
-        { key: 'pinfl', label: tr('ПИНФЛ', 'JSHSHIR'), value: employee.pinfl, icon: <Hash size={13} /> },
-        { key: 'passport_issued_at', label: tr('Дата выдачи', 'Berilgan sana'), value: dateLabel(employee.passport_issued_at, locale), icon: <CalendarDays size={13} /> },
-        { key: 'passport_issued_by', label: tr('Кем выдан', 'Kim tomonidan berilgan'), value: employee.passport_issued_by, icon: <Landmark size={13} /> },
-        { key: 'residence_address', label: tr('Адрес прописки', 'Ro‘yxatdan o‘tgan manzil'), value: employee.residence_address, icon: <House size={13} /> },
+        { key: 'passport', label: tr('Паспорт', 'Pasport'), value: passport || null, mono: true },
+        { key: 'pinfl', label: tr('ПИНФЛ', 'JSHSHIR'), value: employee.pinfl, mono: true },
+        { key: 'passport_issued_at', label: tr('Дата выдачи', 'Berilgan sana'), value: dateLabel(employee.passport_issued_at, locale) },
+        { key: 'passport_issued_by', label: tr('Кем выдан', 'Kim tomonidan berilgan'), value: employee.passport_issued_by },
+        { key: 'residence_address', label: tr('Адрес прописки', 'Ro‘yxatdan o‘tgan manzil'), value: employee.residence_address },
       ],
     },
   ]
 }
 
-// Реквизиты, известные ДО запроса: они уже лежат в реестре, и прятать их за
-// скелетом только ради единообразия значит показать пустоту вместо того, что
-// у нас на руках.
-function knownSections(employee: EmployeeListItem, tr: Tr): ProfileSection[] {
-  return [
-    {
-      key: 'contacts',
-      title: tr('Контакты', 'Aloqa'),
-      fields: [
-        { key: 'phone', label: tr('Телефон', 'Telefon'), value: employee.phone, icon: <Phone size={13} />, strong: true },
-      ],
-    },
-  ]
+// Заглушка фото — силуэт макета (с31) на тёмном градиенте рамы фото; заливку даёт
+// CSS токеном --faint.
+function PortraitSilhouette() {
+  return (
+    <svg className="profile-head__silhouette" viewBox="0 0 108 128" aria-hidden="true">
+      <circle cx="54" cy="50" r="21" />
+      <path d="M12 128c3-25 20-39 42-39s39 14 42 39z" />
+    </svg>
+  )
 }
 
 export function EmployeeDrawer({ employee, photoUrl, onClose, onDocumentPhotoChange }: {
   // Строка РЕЕСТРА, а не полная карточка: паспорт, ПИНФЛ и адрес прописки в
   // кэше реестра не лежат (решение с26), поэтому дровер догружает их сам —
-  // шапка и контакты рисуются мгновенно, документы дорисовываются.
+  // шапка (имя, должность, телефон) рисуется мгновенно, документы дорисовываются.
   employee: EmployeeListItem
   // Подписанная ссылка на фото для документов — та же, что показывает строка
   // списка. Приходит готовой, чтобы шапка не ждала круга сети (с26).
@@ -184,59 +175,59 @@ export function EmployeeDrawer({ employee, photoUrl, onClose, onDocumentPhotoCha
   }
 
   const fullName = employeeFullName(employee)
-  // Пока карточка едет, показываем то, что уже есть в реестре, и добираем
-  // скелетом — так видно, что данные не кончились, а грузятся.
-  const sections = card ? detailSections(card, tr, locale) : knownSections(employee, tr)
-  const badges = card ? expiryBadges(card, tr, locale) : []
+  // Пока карточка едет, реквизитов нет — на их месте болванка: видно, что данные
+  // не кончились, а грузятся.
+  const sections = card ? detailSections(card, tr, locale) : []
+  const badges = card ? expiryPills(card, tr, locale) : []
 
   return (
-    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Карточка сотрудника', 'Xodim kartasi')} onMouseDown={onClose}>
-      <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="drawer__header">
-          {/* Надзаголовок называет КЛАСС записи, а должность стоит главным фактом
-              под именем: раньше она была и там, и строкой в реквизитах — один и
-              тот же факт дважды. */}
-          <ProfileHead
-            eyebrow={tr('Сотрудник', 'Xodim')}
-            title={fullName}
-            copyValue={fullName}
-            fact={employee.position}
-            photoUrl={photoUrl}
-            photoPlaceholder={<UserRound size={26} />}
-          />
-          <div className="drawer__header-actions">
-            <button className="button button--secondary" onClick={() => navigate(`/employees/${employee.id}/edit`)}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>
-            <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
-          </div>
-        </div>
+    <DrawerFrame
+      className="profile"
+      ariaLabel={tr('Карточка сотрудника', 'Xodim kartasi')}
+      instant={false}
+      onRequestClose={onClose}
+      head={/* Надзаголовок называет КЛАСС записи, должность стоит под именем, а
+                главным фактом идёт телефон: раньше должность была и там, и строкой
+                в реквизитах — один и тот же факт дважды. */
+        <ProfileHead
+          eyebrow={tr('Сотрудник', 'Xodim')}
+          photo={{ url: photoUrl, placeholder: <PortraitSilhouette />, shape: 'portrait' }}
+          title={fullName}
+          titleCopy={fullName}
+          subtitle={employee.position}
+          mainFact={{ value: employee.phone ?? '', label: tr('телефон', 'telefon') }}
+          badges={badges}
+          onClose={onClose}
+        />}
+      foot={<button className="button button--secondary" onClick={() => navigate(`/employees/${employee.id}/edit`)}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>}
+    >
+      <ProfileSections sections={sections} />
 
-        <ProfileBadges badges={badges} />
-        <ProfileSections sections={sections} />
+      {isCardLoading && <div className="detail-skeleton employee-card-skeleton" />}
+      {hasCardError && <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить документы карточки.', 'Karta hujjatlarini yuklab bo‘lmadi.')}</p>}
+      {!isCardLoading && !hasCardError && !employee.position && !employee.phone && badges.length === 0 && sections.every((section) => section.fields.every((field) => !field.value)) && (
+        <p className="muted">{tr('Кроме имени, в карточке пока ничего нет.', 'Kartada ismdan boshqa hozircha hech narsa yo‘q.')}</p>
+      )}
 
-        {isCardLoading && <div className="detail-skeleton employee-card-skeleton" />}
-        {hasCardError && <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить документы карточки.', 'Karta hujjatlarini yuklab bo‘lmadi.')}</p>}
-        {!isCardLoading && !hasCardError && !employee.position && badges.length === 0 && sections.every((section) => section.fields.every((field) => !field.value)) && (
-          <p className="muted">{tr('Кроме имени, в карточке пока ничего нет.', 'Kartada ismdan boshqa hozircha hech narsa yo‘q.')}</p>
-        )}
-
-        <section className="unit-lists profile-section">
-          <h3 className="profile-section__title">{tr('Файлы', 'Fayllar')}</h3>
-          <p className="profile-section__hint">{tr('Открываются по временной ссылке — она действует час.', 'Vaqtinchalik havola orqali ochiladi — u bir soat amal qiladi.')}</p>
-          {hasError
-            ? <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить файлы сотрудника.', 'Xodim fayllarini yuklab bo‘lmadi.')}</p>
-            : isLoading
-              ? <EmployeeFilesSkeleton />
-              : files.length === 0
-                ? <p className="muted">{tr('Файлов пока нет.', 'Hozircha fayllar yo‘q.')}</p>
-                : <EmployeeFilesList
+      <section className="profile-section">
+        <h3 className="drawer-caps">{tr('Файлы', 'Fayllar')}</h3>
+        {hasError
+          ? <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить файлы сотрудника.', 'Xodim fayllarini yuklab bo‘lmadi.')}</p>
+          : isLoading
+            ? <EmployeeFilesSkeleton />
+            : files.length === 0
+              ? <p className="muted">{tr('Файлов пока нет.', 'Hozircha fayllar yo‘q.')}</p>
+              : <>
+                <EmployeeFilesList
                   files={files}
                   urls={urls}
                   photoAlt={fullName}
                   documentPhotoId={employee.document_photo_id}
                   onChooseDocumentPhoto={chooseDocumentPhoto}
-                />}
-        </section>
-      </aside>
-    </div>
+                />
+                <p className="profile-section__hint">{tr('Открываются по временной ссылке — она действует час.', 'Vaqtinchalik havola orqali ochiladi — u bir soat amal qiladi.')}</p>
+              </>}
+      </section>
+    </DrawerFrame>
   )
 }

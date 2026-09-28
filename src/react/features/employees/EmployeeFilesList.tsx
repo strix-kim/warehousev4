@@ -6,6 +6,14 @@ import { PhotoThumb } from '../../components/PhotoThumb'
 import { toDownloadUrl } from '../../lib/signedUrlCache'
 import { useLanguage } from '../../lib/i18n'
 
+// Расширение для бирки плитки: «passport.PDF» → «PDF». Нет точки или расширение
+// длиннее четырёх знаков (мусор вместо типа) — общая бирка FILE.
+function fileExtension(name: string) {
+  const dot = name.lastIndexOf('.')
+  const ext = dot >= 0 ? name.slice(dot + 1) : ''
+  return /^[a-z0-9]{1,4}$/i.test(ext) ? ext.toUpperCase() : 'FILE'
+}
+
 // Уже загруженные файлы карточки — ТОЛЬКО на чтение: удаление запрещено
 // политиками бакета, поэтому кнопки «убрать» здесь нет ни в дровере, ни в форме.
 // Общий блок на оба места: дровер и режим правки показывают один и тот же список,
@@ -85,30 +93,25 @@ export function EmployeeFilesList({ files, urls, photoAlt, documentPhotoId, onCh
       )}
       {error && <p className="form-error employee-photos__error"><CircleAlert size={15} /> {error}</p>}
       {documents.length > 0 && (
-        <ul className="unit-lists__items">
+        // Плитка «бирка типа + название + имя файла» (макет с31, .file). Размера
+        // файла в схеме нет — вторая строка показывает имя.
+        <div className="files">
           {documents.map((file) => {
             const url = urls.get(file.storage_path)
-            return (
-              <li key={file.id}>
-                {url
-                  ? <a href={url} target="_blank" rel="noreferrer">
-                    <FileText size={17} />
-                    <span>
-                      <strong>{employeeFileKindLabel(file.kind, tr)}</strong>
-                      <small>{file.original_name ?? tr('Открыть', 'Ochish')}</small>
-                    </span>
-                  </a>
-                  : <button type="button" disabled>
-                    <FileText size={17} />
-                    <span>
-                      <strong>{employeeFileKindLabel(file.kind, tr)}</strong>
-                      <small>{tr('Ссылка не получена', 'Havola olinmadi')}</small>
-                    </span>
-                  </button>}
-              </li>
+            const tile = (
+              <>
+                <span className="file__tag" aria-hidden="true">{fileExtension(file.original_name ?? file.storage_path)}</span>
+                <span className="file__text">
+                  <strong>{employeeFileKindLabel(file.kind, tr)}</strong>
+                  <small>{url ? (file.original_name ?? tr('Открыть', 'Ochish')) : tr('Ссылка не получена', 'Havola olinmadi')}</small>
+                </span>
+              </>
             )
+            return url
+              ? <a key={file.id} className="file" href={url} target="_blank" rel="noreferrer" title={file.original_name ?? undefined}>{tile}</a>
+              : <div key={file.id} className="file file--off">{tile}</div>
           })}
-        </ul>
+        </div>
       )}
     </>
   )

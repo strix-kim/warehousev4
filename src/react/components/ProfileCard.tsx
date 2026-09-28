@@ -1,21 +1,20 @@
-import { Check, Copy } from 'lucide-react'
+import { Check, Copy, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { PhotoThumb } from './PhotoThumb'
 import { copyText } from '../lib/clipboard'
 import { useLanguage } from '../lib/i18n'
 
-// Карточка-профиль: общий контракт на дроверы сотрудника и машины (с27). До неё
-// обе карточки печатали ровный список пар «метка — значение», в котором ничего
-// не выделено: человек читал двенадцать одинаковых строк, чтобы найти одну.
+// Карточка-профиль: общий контракт на дроверы сотрудника и машины (с27; рама и
+// раскладка по макету с31 — с38). До неё обе карточки печатали ровный список пар
+// «метка — значение», в котором ничего не выделено: человек читал двенадцать
+// одинаковых строк, чтобы найти одну.
 //
 // Профиль отвечает на два вопроса по очереди. Сначала «тот ли это, кого я
 // искал» — за это отвечает шапка: фото, имя и один главный факт. Потом «что с
-// ним» — за это отвечают секции реквизитов и бейджи состояния.
+// ним» — за это отвечают секции реквизитов и пилюли сроков.
 //
-// Компонент НЕ рисует кнопки шапки: они остаются вторым потомком .drawer__header,
-// потому что на ширине до 520 px правило в 04-data.css раскладывает шапку по
-// структуре «первый div — текст, второй div — действия». Сломаем структуру —
-// молча поедет телефонная раскладка всех дроверов.
+// Шапка целиком лежит внутри .drawer__head рамы (DrawerFrame): крестик стоит
+// в её же строке надзаголовка, поэтому закрытие отдельным блоком не рисуется.
 
 // Копирование с подтверждением — один крючок на всю карточку. Ключ, а не булев
 // флаг: подтверждение обязано гореть ровно на нажатом месте, а не на всех сразу.
@@ -41,94 +40,99 @@ function useCopyFeedback() {
   return { copiedKey, failedKey, copy }
 }
 
-export function ProfileHead({ eyebrow, title, fact, copyValue, photoUrl, photoPlaceholder, photoShape = 'round' }: {
-  // Класс записи («Сотрудник», «Автомобиль»), а не повтор заголовка.
-  eyebrow: string
-  // Главный опознавательный признак: ФИО, госномер.
-  title: ReactNode
-  // Один главный факт под именем — должность, марка с моделью. Ровно один:
-  // второй превращает шапку в тот же список, от которого мы уходим.
-  fact?: string | null
-  // Что копировать по нажатию на заголовок. Госномер и ФИО переносят в чат и в
-  // документы не реже телефона, а живут они в шапке, где ячейки с копированием
-  // нет: без этого нажатие по самому заметному значению карточки не делало
-  // ничего (находка прораба, с27).
-  copyValue?: string | null
-  // Ссылка приезжает ГОТОВОЙ со страницы: там она уже подписана ради миниатюры
-  // в строке. Свой запрос за тем же файлом отложил бы шапку на круг сети и
-  // сломал бы первый кадр (с26).
-  photoUrl?: string
-  photoPlaceholder: ReactNode
-  // Круг — человек, прямоугольник — предмет. Третьей формы не заводим.
-  photoShape?: 'round' | 'wide'
-}) {
+// Подтверждение словом, а не только цветом; role=status даёт его и скринридеру,
+// которому подсветка не видна. Пусто, пока по ключу ничего не копировали.
+function CopyNote({ isCopied, hasFailed }: { isCopied: boolean, hasFailed: boolean }) {
   const { tr } = useLanguage()
-  const { copiedKey, failedKey, copy } = useCopyFeedback()
-
-  // Кнопка копирования рядом со значением шапки. Растянуть её на весь заголовок,
-  // как сделано в ячейке реквизитов, здесь нельзя: в шапке значение соседствует
-  // с надзаголовком и фактом, и цель во всю ширину ловила бы нажатия мимо.
-  function copyButton(key: string, value: string, what: string) {
-    const isCopied = copiedKey === key
-    const hasFailed = failedKey === key
-    return (
-      <>
-        <button
-          type="button"
-          className={`profile-head__copy${isCopied ? ' profile-head__copy--copied' : ''}`}
-          onClick={() => void copy(key, value)}
-          aria-label={tr(`Скопировать: ${what}`, `Nusxalash: ${what}`)}
-        >
-          {isCopied ? <Check size={14} /> : <Copy size={13} />}
-        </button>
-        {(isCopied || hasFailed) && (
-          <span className={`profile-head__copy-note${hasFailed ? ' profile-head__copy-note--failed' : ''}`} role="status">
-            {isCopied ? tr('Скопировано', 'Nusxalandi') : tr('Не скопировалось', 'Nusxalanmadi')}
-          </span>
-        )}
-      </>
-    )
-  }
-
+  if (!isCopied && !hasFailed) return null
   return (
-    <div className="profile-head">
-      {/* alt пустой намеренно: имя или госномер стоят строкой правее, и
-          скринридер прочитал бы их дважды. Фото здесь — опознание глазами. */}
-      <PhotoThumb
-        className={`profile-head__photo profile-head__photo--${photoShape}`}
-        url={photoUrl}
-        alt=""
-        placeholder={photoPlaceholder}
-      />
-      <div className="profile-head__text">
-        <p className="eyebrow">{eyebrow}</p>
-        <h2 className="profile-head__title">
-          {title}
-          {copyValue && copyButton('head:title', copyValue, tr('номер или имя карточки', 'karta raqami yoki ismi'))}
-        </h2>
-        {fact && (
-          <p className="profile-head__fact">
-            {fact}
-            {copyButton('head:fact', fact, fact)}
-          </p>
-        )}
-      </div>
-    </div>
+    <span className={`profile-note${hasFailed ? ' profile-note--failed' : ''}`} role="status">
+      {isCopied ? tr('Скопировано', 'Nusxalandi') : tr('Не скопировалось', 'Nusxalanmadi')}
+    </span>
   )
 }
 
-// Бейдж состояния: цвет несёт смысл, поэтому текст обязан повторять его словами —
-// «Допуск истёк», а не красная точка без подписи.
+// Пилюля состояния: цвет несёт смысл, поэтому текст обязан повторять его словами —
+// «Допуск истёк», а не красная точка без подписи. Класс приходит готовым
+// (`expiryPillClass`), точку рисует сама .pill.
 export type ProfileBadge = { key: string; className: string; label: string }
 
-export function ProfileBadges({ badges }: { badges: ProfileBadge[] }) {
-  if (badges.length === 0) return null
+export function ProfileHead({ eyebrow, photo, title, titleCopy, subtitle, mainFact, badges = [], extra, onClose }: {
+  // Класс записи («Сотрудник», «Автомобиль»), а не повтор заголовка.
+  eyebrow: string
+  // Ссылка приезжает ГОТОВОЙ со страницы: там она уже подписана ради миниатюры
+  // в строке. Свой запрос за тем же файлом отложил бы шапку на круг сети и
+  // сломал бы первый кадр (с26). Портрет — человек, car — предмет.
+  photo: { url?: string, placeholder: ReactNode, shape: 'portrait' | 'car' }
+  // Имя. У машины его нет: заголовком служит знак госномера в главном факте.
+  title?: string
+  // Что копировать по значку у имени. ФИО переносят в чат и в документы не
+  // реже телефона (находка прораба, с27).
+  titleCopy?: string | null
+  // Приглушённая строка под именем — должность, «Марка Модель · Цвет».
+  subtitle?: string | null
+  // Один главный факт: телефон, госномер. Ровно один — второй возвращает шапку
+  // к списку. `display` — как показать значение (знак номера), копируется `value`.
+  mainFact?: { value: string, label: string, display?: ReactNode } | null
+  badges?: ProfileBadge[]
+  // Чипы водителей у машины и т.п.
+  extra?: ReactNode
+  onClose: () => void
+}) {
+  const { tr } = useLanguage()
+  const { copiedKey, failedKey, copy } = useCopyFeedback()
+  const fact = mainFact?.value ? mainFact : null
+
   return (
-    <div className="profile-badges">
-      {badges.map((badge) => (
-        // Пустой <i /> обязателен — это точка-индикатор из общего правила .badge.
-        <span key={badge.key} className={badge.className}><i />{badge.label}</span>
-      ))}
+    <div className={`profile-head profile-head--${photo.shape}`}>
+      {/* alt пустой намеренно: имя или госномер стоят рядом, и скринридер
+          прочитал бы их дважды. Фото здесь — опознание глазами. */}
+      <PhotoThumb className="profile-head__photo" url={photo.url} alt="" placeholder={photo.placeholder} />
+      <div className="profile-head__top">
+        <p className="eyebrow">{eyebrow}</p>
+        <button autoFocus type="button" className="icon-button profile-head__close" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+      </div>
+      {title && (
+        <h2 className="profile-head__title">
+          {title}
+          {titleCopy && (
+            <button
+              type="button"
+              className="profile-head__copy"
+              onClick={() => void copy('head:title', titleCopy)}
+              aria-label={tr(`Скопировать: ${title}`, `Nusxalash: ${title}`)}
+            >
+              {copiedKey === 'head:title' ? <Check size={16} /> : <Copy size={16} />}
+            </button>
+          )}
+          <CopyNote isCopied={copiedKey === 'head:title'} hasFailed={failedKey === 'head:title'} />
+        </h2>
+      )}
+      {subtitle && <p className="profile-head__sub">{subtitle}</p>}
+      {fact && (
+        // Один DOM на десктоп и лист: на листе CSS растягивает .copy на весь
+        // .mainfact, прячет слово и оставляет значок — получается одна большая
+        // кнопка «значение + значок» (макет, .p-btn).
+        <div className="mainfact">
+          <b>{fact.display ?? fact.value}</b>
+          <button
+            type="button"
+            className={`copy${copiedKey === 'head:fact' ? ' copy--copied' : ''}`}
+            onClick={() => void copy('head:fact', fact.value)}
+            aria-label={tr(`Скопировать: ${fact.label}`, `Nusxalash: ${fact.label}`)}
+          >
+            {copiedKey === 'head:fact' ? <Check size={16} /> : <Copy size={16} />}
+            <span>{tr('Копировать', 'Nusxalash')}</span>
+          </button>
+          <CopyNote isCopied={copiedKey === 'head:fact'} hasFailed={failedKey === 'head:fact'} />
+        </div>
+      )}
+      {badges.length > 0 && (
+        <div className="profile-head__badges">
+          {badges.map((badge) => <span key={badge.key} className={badge.className}>{badge.label}</span>)}
+        </div>
+      )}
+      {extra && <div className="profile-head__extra">{extra}</div>}
     </div>
   )
 }
@@ -137,10 +141,10 @@ export type ProfileField = {
   key: string
   label: string
   value: string | null
-  icon?: ReactNode
-  // Ключевое значение секции — крупнее остальных. На секцию таких максимум одно,
-  // иначе акцент перестаёт быть акцентом.
-  strong?: boolean
+  // Моноширинное начертание — паспорт, ПИНФЛ: цифры сверяют глазами.
+  mono?: boolean
+  // По умолчанию строка копируется; false — размер футболки в чат не переносят.
+  copy?: boolean
 }
 
 export type ProfileSection = { key: string; title: string; fields: ProfileField[] }
@@ -149,10 +153,12 @@ export type ProfileSection = { key: string; title: string; fields: ProfileField[
 // канон проекта — показывать только заполненное, «—» на два десятка полей
 // превращает карточку в бланк.
 //
-// Каждое поле копируется нажатием. Телефон, ПИНФЛ и номер паспорта из карточки
-// переносят в чат, в договор и в таблицу — руками их перебивали с экрана, и
-// цифра в ПИНФЛ ошибается молча. Кнопка растянута на всю ячейку, а не спрятана
-// иконкой в углу: целиться в неё не нужно.
+// Строка копируется нажатием целиком. Паспорт и ПИНФЛ из карточки переносят в
+// чат, в договор и в таблицу — руками их перебивали с экрана, и цифра в ПИНФЛ
+// ошибается молча. Кнопка прозрачна и лежит поверх строки, а не спрятана значком
+// в углу: целиться в неё не нужно. Цена — выделить значение мышью больше нельзя,
+// и это осознанный размен: копирование нажатием и есть замена выделению. Значок
+// в третьей колонке — только метка «здесь копируется».
 export function ProfileSections({ sections }: { sections: ProfileSection[] }) {
   const { tr } = useLanguage()
   const { copiedKey, failedKey, copy } = useCopyFeedback()
@@ -165,43 +171,35 @@ export function ProfileSections({ sections }: { sections: ProfileSection[] }) {
     <>
       {filled.map((section) => (
         <section className="profile-section" key={section.key}>
-          <h3 className="profile-section__title">{section.title}</h3>
-          <dl className="detail-list detail-list--profile">
+          <h3 className="drawer-caps">{section.title}</h3>
+          <dl className="kv-list">
             {section.fields.map((field) => {
               const key = `${section.key}:${field.key}`
               const isCopied = copiedKey === key
-              const hasFailed = failedKey === key
+              const canCopy = field.copy !== false
               return (
-                <div key={field.key} className={`detail-list__cell${isCopied ? ' detail-list__cell--copied' : ''}`}>
-                  <dt>{field.icon}{field.label}</dt>
+                <div key={field.key} className={`kv${canCopy ? ' kv--copy' : ''}${field.mono ? ' kv--mono' : ''}${isCopied ? ' kv--copied' : ''}`}>
+                  <dt>{field.label}</dt>
                   {/* Кнопка, значок и подтверждение живут ВНУТРИ <dd>, а не
                       соседями dt/dd: по спецификации обёртка div внутри <dl>
-                      содержит только dt и dd, посторонние узлы там невалидны.
-                      На вид это не влияет — кнопка растянута по .detail-list__cell,
-                      а он и есть тот самый div с position: relative.
-
-                      Кнопка прозрачная и лежит поверх всей ячейки: нажатие куда
-                      угодно по ней копирует. Цена решения — выделить значение
-                      мышью больше нельзя, и это осознанный размен: копирование
-                      нажатием и есть замена выделению, а целиться не нужно. */}
-                  <dd className={field.strong ? 'detail-list__value--strong' : undefined}>
+                      содержит только dt и dd. На вид это не влияет — они
+                      позиционируются от .kv. */}
+                  <dd>
                     {field.value}
-                    <button
-                      type="button"
-                      className="detail-list__copy"
-                      onClick={() => void copy(key, field.value ?? '')}
-                      aria-label={tr(`Скопировать: ${field.label}`, `Nusxalash: ${field.label}`)}
-                    />
-                    <span className="detail-list__copy-mark" aria-hidden="true">
-                      {isCopied ? <Check size={14} /> : <Copy size={13} />}
-                    </span>
-                    {/* Подтверждение словом, а не только цветом; role=status даёт
-                        его и скринридеру, которому подсветка ячейки не видна. */}
-                    {(isCopied || hasFailed) && (
-                      <span className={`detail-list__copy-note${hasFailed ? ' detail-list__copy-note--failed' : ''}`} role="status">
-                        {isCopied ? tr('Скопировано', 'Nusxalandi') : tr('Не скопировалось', 'Nusxalanmadi')}
-                      </span>
+                    {canCopy && (
+                      <>
+                        <button
+                          type="button"
+                          className="kv__copy"
+                          onClick={() => void copy(key, field.value ?? '')}
+                          aria-label={tr(`Скопировать: ${field.label}`, `Nusxalash: ${field.label}`)}
+                        />
+                        <span className="kv__mark" aria-hidden="true">
+                          {isCopied ? <Check size={16} /> : <Copy size={16} />}
+                        </span>
+                      </>
                     )}
+                    <CopyNote isCopied={isCopied} hasFailed={failedKey === key} />
                   </dd>
                 </div>
               )
@@ -209,6 +207,9 @@ export function ProfileSections({ sections }: { sections: ProfileSection[] }) {
           </dl>
         </section>
       ))}
+      {/* Подсказка нужна только на листе (там значка копирования нет), CSS
+          показывает её лишь в .sheet--profile. */}
+      {filled.length > 0 && <p className="profile-hint">{tr('Нажмите на поле — значение скопируется.', 'Maydonni bosing — qiymat nusxalanadi.')}</p>}
     </>
   )
 }
