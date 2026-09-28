@@ -26,6 +26,7 @@
   --line-2: #E8EAEE;
   --ctl: #858A95;
   --red: #E52D27;
+  /* Заливка под белым текстом — --red-act, не --red: белый на --red 4,4:1, здесь 5,7:1. */
   --red-act: #C8201B;
   --red-press: #AE1B16;
   --red-tint: #FCEAE9;
@@ -53,31 +54,7 @@
   --r-sm: 8px;
   --ease-out: cubic-bezier(.2,.8,.2,1);
   --shadow-pop: 0 18px 48px rgba(15,17,21,.16), 0 2px 6px rgba(15,17,21,.06);
-
-  /* МОСТ СТАРЫХ ИМЁН — временный, на время CP2: компоненты ещё читают прежние
-     токены, здесь они только ссылаются на новые, своих значений не держат.
-     CP2 переводит обращения на новые имена и удаляет этот блок целиком.
-     Алиас вычисляется на :root: переопределение НОВОГО токена ниже по дереву
-     до старого имени не дойдёт — переопределять пока надо старое имя. */
-  --ink-soft: var(--muted);
-  --ink-faint: var(--faint);
-  --surface: var(--card);
-  --surface-soft: var(--sunk);
-  --line-strong: var(--ctl);
-  --sidebar: var(--night);
-  /* Не --red: белый на #E52D27 даёт 4,4:1, на --red-act — 5,7:1. */
-  --accent: var(--red-act);
-  --accent-strong: var(--red-press);
-  --success: var(--ok);
-  --success-bg: var(--ok-bg);
-  --warning: var(--warn);
-  --warning-bg: var(--warn-bg);
-  --danger: var(--bad);
-  --danger-bg: var(--bad-bg);
-  --radius-sm: var(--r-sm);
-  --radius-md: var(--r-md);
-  --radius-lg: var(--r-lg);
-  /* Геометрия прежняя, цвет — RGB --night. */
+  /* Тень карточек приложения. В макете её нет — своя: геометрия прежняя, цвет — RGB --night. */
   --shadow: 0 12px 32px rgba(15, 17, 21, 0.07);
 }
 
