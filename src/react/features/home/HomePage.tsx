@@ -15,9 +15,8 @@ export function HomePage() {
 
       {/* Два яруса, а не пять равных плиток (с25). Верхний — то, ради чего сюда
           заходят каждый день: собрать список и найти технику. Нижний — справочники
-          и планирование. До этого «Автомобили» и «Залы» лежали слим-баннерами во
-          всю ширину и читались вторым сортом просто потому, что арт для них ещё
-          не отдан, — иерархия шла от наличия картинки, а не от смысла. */}
+          и планирование. До с25 «Автомобили» и «Залы» лежали слим-баннерами во
+          всю ширину; теперь все пять плиток поддерживают одинаковую композицию. */}
       <div className="home-destinations">
         <div className="home-row home-row--work">
           {/* Плитка — <article>, а не <a>: подпись-действие ведёт своим адресом, а вложить
@@ -62,7 +61,7 @@ export function HomePage() {
           </article>
 
           <article className="home-destination home-destination--vehicles">
-            {/* Место под арт серии: сюда одной строкой встанет <img class="home-destination__art home-destination__art--vehicles" …>, когда прораб отдаст иллюстрацию */}
+            <img className="home-destination__art home-destination__art--vehicles" src="/illustrations/av-fleet.webp" alt="" aria-hidden="true" loading="eager" decoding="async" fetchPriority="high" />
             <Link className="home-destination__link" to="/vehicles">
               <span className="home-destination__icon"><CarFront size={34} /></span>
               <span className="home-destination__arrow"><ArrowUpRight size={24} /></span>
@@ -74,7 +73,7 @@ export function HomePage() {
           </article>
 
           <article className="home-destination home-destination--halls">
-            {/* Место под арт серии — как у автомобилей: сюда встанет <img class="home-destination__art home-destination__art--halls" …>, когда прораб отдаст иллюстрацию */}
+            <img className="home-destination__art home-destination__art--halls" src="/illustrations/av-halls.webp" alt="" aria-hidden="true" loading="eager" decoding="async" fetchPriority="high" />
             <Link className="home-destination__link" to="/halls">
               <span className="home-destination__icon"><Presentation size={34} /></span>
               <span className="home-destination__arrow"><ArrowUpRight size={24} /></span>

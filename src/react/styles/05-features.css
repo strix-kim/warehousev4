@@ -69,7 +69,9 @@
 .home-row--work { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .home-row--refs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .home-destination { position: relative; min-height: clamp(184px, 24vh, 360px); display: flex; flex-direction: column; align-items: flex-start; padding: clamp(16px, 2.2vh, 40px) clamp(25px, 3vw, 40px); overflow: hidden; border: 1px solid var(--line); border-radius: 16px; color: var(--ink); background: #fff; box-shadow: var(--shadow); text-decoration: none; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; animation: rise-in .38s .05s cubic-bezier(.2,.7,.2,1) both; }
-.home-destination::after { content: ''; position: absolute; right: -75px; bottom: -95px; width: 250px; height: 250px; border-radius: 50%; background: rgba(23,28,32,.035); transition: transform .25s ease; }
+/* Круг — фон плитки: без z-index он рисуется на слое арта, но позже по дереву,
+   и ложится ПОВЕРХ картинки. Порядок слоёв плитки: круг 0, арт 1, текст 2. */
+.home-destination::after { content: ''; position: absolute; z-index: 0; right: -75px; bottom: -95px; width: 250px; height: 250px; border-radius: 50%; background: rgba(23,28,32,.035); transition: transform .25s ease; }
 .home-destination:hover { transform: translateY(-4px); border-color: var(--line-strong); box-shadow: 0 20px 45px rgba(13,18,23,.11); }
 .home-destination:hover::after { transform: scale(1.12); }
 .home-destination--lists { color: #fff; border-color: #d90f30; background: var(--accent); animation-delay: .09s; }
@@ -101,22 +103,23 @@
    flex-start у плитки — иначе проценты в max-width считались бы от ширины ссылки. */
 .home-destination__link { position: static; width: 100%; display: flex; flex: 1; flex-direction: column; align-items: flex-start; color: inherit; text-decoration: none; }
 .home-destination__link::after { content: ''; position: absolute; inset: 0; z-index: 1; }
-.home-destination__art { position: absolute; z-index: 0; right: -4%; bottom: -5%; width: 63%; max-height: 78%; object-fit: contain; object-position: right bottom; pointer-events: none; transition: transform .28s ease, opacity .28s ease; }
+.home-destination__art { position: absolute; z-index: 1; right: -4%; bottom: -5%; width: 63%; max-height: 78%; object-fit: contain; object-position: right bottom; pointer-events: none; transition: transform .28s ease, opacity .28s ease; }
 .home-destination__art--equipment { width: 69%; opacity: .72; mask-image: linear-gradient(to right, transparent 0%, #000 28%, #000 100%); }
 .home-destination__art--lists { right: -6%; bottom: -10%; width: 68%; opacity: .58; }
 .home-destination__art--employees { right: -13%; bottom: -7%; width: 82%; opacity: .62; mask-image: linear-gradient(to right, transparent 0%, #000 20%, #000 100%); }
 .home-destination:hover .home-destination__art { transform: translateY(-5px) scale(1.025); }
-/* Автомобили и залы — равноправные плитки нижнего яруса (с25). Слим-баннерами
-   во всю ширину они были, пока для них не отдан арт, и полоса пустоты справа
-   читалась как «раздел второго сорта». */
+/* Автомобили и залы — равноправные плитки нижнего яруса (с25). Их арт —
+   предметы во весь кадр, а не люди в полный рост: по массе он совпадает с
+   «Сотрудниками» только при большей ширине, и тогда заходит под описание.
+   Отсюда растворение слева длиннее, чем у соседей, — под текстом картинки нет. */
 .home-destination--vehicles { border-color: #d5dde2; background: linear-gradient(145deg, #f2f5f7 0%, #e6ecf0 100%); animation-delay: .17s; }
 .home-destination--vehicles::after { background: rgba(16,22,27,.05); }
 .home-destination--vehicles .home-destination__icon { color: var(--accent); background: rgba(239,18,54,.09); }
-.home-destination__art--vehicles { right: -5%; bottom: -14%; width: 44%; opacity: .6; mask-image: linear-gradient(to right, transparent 0%, #000 22%, #000 100%); }
+.home-destination__art--vehicles { right: -5%; bottom: -5%; width: 76%; opacity: .6; mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.35) 26%, #000 44%, #000 100%); }
 .home-destination--halls { border-color: #dcd8e4; background: linear-gradient(145deg, #f5f3f8 0%, #eae6f1 100%); animation-delay: .21s; }
 .home-destination--halls::after { background: rgba(76,29,149,.05); }
 .home-destination--halls .home-destination__icon { color: var(--accent); background: rgba(239,18,54,.09); }
-.home-destination__art--halls { right: -5%; bottom: -14%; width: 44%; opacity: .6; mask-image: linear-gradient(to right, transparent 0%, #000 22%, #000 100%); }
+.home-destination__art--halls { right: -5%; bottom: -5%; width: 76%; opacity: .6; mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.35) 26%, #000 44%, #000 100%); }
 /* Нижний ярус ниже верхнего — там справочники, а не ежедневная работа. Число
    было жёстким (300px) и перебивало общий clamp по СПЕЦИФИЧНОСТИ: два класса
    против одного. На ноутбучном окне ровно оно и держало главную за краем
@@ -125,9 +128,7 @@
 .home-destination .eyebrow, .home-destination strong, .home-destination p, .home-destination__action, .home-destination__icon, .home-destination__arrow { position: relative; z-index: 2; }
 .home-destination__arrow { position: absolute; }
 .home-destination strong, .home-destination p, .home-destination__action { max-width: 58%; }
-/* Полоса справа резервируется под арт. Плитки без него (автомобили, залы —
-   до того, как прораб отдаст иллюстрации) держали 42% пустоты ни за чем;
-   :has снимает ограничение сам и вернёт его в тот день, когда появится <img>. */
+/* Полоса справа резервируется под арт; если картинку убрать, :has снимет ограничение текста. */
 .home-destination:not(:has(.home-destination__art)) :is(strong, p, .home-destination__action) { max-width: none; }
 
 .editor-header { display: grid; grid-template-columns: 42px 1fr auto; align-items: start; gap: 16px; margin-bottom: 22px; }

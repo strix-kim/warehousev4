@@ -21,6 +21,7 @@
   .home-row--refs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .home-row--refs > :last-child { grid-column: 1 / -1; }
   .home-destination__art--employees { right: -4%; bottom: -18%; width: 54%; max-height: 112%; }
+  .home-destination__art--vehicles, .home-destination__art--halls { right: -6%; bottom: -5%; width: 64%; }
 }
 
 /* Правило выше ломает нижний ярус в 2 + 1 ради ширины колонки, но платит за это

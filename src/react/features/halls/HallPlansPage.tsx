@@ -1,4 +1,4 @@
-import { CircleAlert, Copy, Ellipsis, PanelsTopLeft, Plus, Presentation, Search, Trash2, X } from 'lucide-react'
+import { CircleAlert, Copy, Ellipsis, PanelsTopLeft, Plus, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createHallPlan, deleteHallPlan, duplicateHallPlan, fetchHallPlans, readCachedHallPlans, readCachedHallPlansMeta, type HallPlanInput, type HallPlanWithHalls } from './api'
@@ -211,8 +211,8 @@ export function HallPlansPage() {
         )}
 
         {!isLoading && !hasError && plans.length === 0 && (
-          <div className="state-block">
-            <Presentation size={27} />
+          <div className="state-block state-block--illustrated state-block--roomy">
+            <img src="/illustrations/av-halls.webp" alt="" aria-hidden="true" />
             <strong>{tr('Планов пока нет', 'Hozircha rejalar yo‘q')}</strong>
             <span>{tr('Заведите план мероприятия — залы и позиции добавляются внутри.', 'Tadbir rejasini yarating — zallar va lavozimlar ichida qo‘shiladi.')}</span>
             <button className="button button--primary" onClick={() => setCreateOpen(true)}>

@@ -328,8 +328,8 @@ export function VehiclesPage() {
             </table>
 
             {!isLoading && vehicles.length === 0 && (
-              <div className="state-block">
-                <CarFront size={27} />
+              <div className="state-block state-block--illustrated state-block--roomy">
+                <img src="/illustrations/av-fleet.webp" alt="" aria-hidden="true" />
                 <strong>{tr('Машин пока нет', 'Hozircha mashinalar yo‘q')}</strong>
                 <span>{tr('Заведите первую карточку — данные можно добить позже.', 'Birinchi kartani yarating — ma’lumotlarni keyinroq to‘ldirish mumkin.')}</span>
                 <button className="button button--primary" onClick={() => navigate('/vehicles/new')}>
