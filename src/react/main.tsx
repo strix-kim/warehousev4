@@ -5,6 +5,7 @@ import { App } from './app/App'
 import { AppErrorBoundary } from './components/AppErrorBoundary'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { LanguageProvider } from './lib/i18n'
+import { MotionProvider } from './lib/motion'
 import { installGlobalErrorReporting, reportAppError } from './lib/reportAppError'
 import './styles.css'
 
@@ -29,7 +30,9 @@ const router = createBrowserRouter([
       <AppErrorBoundary variant="app">
         <LanguageProvider>
           <AuthProvider>
-            <App />
+            <MotionProvider>
+              <App />
+            </MotionProvider>
           </AuthProvider>
         </LanguageProvider>
       </AppErrorBoundary>

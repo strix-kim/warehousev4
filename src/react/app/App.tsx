@@ -1,9 +1,11 @@
 import { ArrowUpRight, Boxes, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Presentation, RadioTower, Users, Warehouse, X } from 'lucide-react'
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
+import { AnimatePresence, m, useDragControls, useIsPresent, type Transition } from 'motion/react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AppErrorBoundary } from '../components/AppErrorBoundary'
 import { useAuth } from '../features/auth/AuthProvider'
 import { hasUnsavedListDraft } from '../features/lists/cacheKeys'
+import { MOBILE_MEDIA_QUERY } from '../lib/breakpoints'
 import { LanguageSwitcher, useLanguage } from '../lib/i18n'
 import { lazyWithReload } from '../lib/lazyWithReload'
 import { reportAppError } from '../lib/reportAppError'
@@ -40,6 +42,37 @@ const HallPlanPage = lazyWithReload(loadHallPlanPage)
 const HallTvPage = lazyWithReload(loadHallTvPage)
 const HomePage = lazyWithReload(loadHomePage)
 const DelayCalculatorPage = lazyWithReload(loadDelayCalculatorPage)
+
+// Пункты нижней панели телефона — m-обёртка над NavLink ради whileTap: сжатие
+// должно ловиться по всей площади вкладки, а не только по значку.
+const MotionNavLink = m.create(NavLink)
+
+// Пять вкладок телефона (макет с31): четыре раздела и «Ещё». Сотрудники,
+// Автомобили и Задержки на ≤820 живут в листе «Ещё», и на их адресах
+// подсвечивается именно «Ещё».
+type PhoneTab = 'home' | 'equipment' | 'lists' | 'halls' | 'more'
+
+function isUnder(pathname: string, base: string) {
+  return pathname === base || pathname.startsWith(`${base}/`)
+}
+
+function phoneTabOf(pathname: string): PhoneTab {
+  if (pathname === '/') return 'home'
+  if (isUnder(pathname, '/equipment')) return 'equipment'
+  if (isUnder(pathname, '/lists')) return 'lists'
+  if (isUnder(pathname, '/halls')) return 'halls'
+  return 'more'
+}
+
+// Числа — из раздела «Решения» макета с31: индикатор вкладки переезжает за 200 мс,
+// нажатие — 0,97; лист выезжает пружиной bounce .18 / .4 с, уходит за 200 мс
+// ускорением. Порог свайпа — тоже макетный: 90 px или быстрый рывок (0,6 px/мс).
+const TAB_INDICATOR_TRANSITION: Transition = { duration: 0.2, ease: 'easeOut' }
+const TAB_PRESS = { scale: 0.97 }
+const SHEET_ENTER: Transition = { type: 'spring', bounce: 0.18, duration: 0.4 }
+const SHEET_EXIT: Transition = { duration: 0.2, ease: [0.4, 0, 1, 1] }
+const SHEET_CLOSE_OFFSET = 90
+const SHEET_CLOSE_VELOCITY = 600
 
 export function App() {
   const { isLoading, session } = useAuth()
@@ -112,6 +145,7 @@ function AppShell() {
   const email = session?.user.email ?? tr('Сотрудник ARGO', 'ARGO xodimi')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('argo:sidebar-collapsed') === 'true')
   const [isMoreOpen, setMoreOpen] = useState(false)
+  const [isPhone, setPhone] = useState(() => window.matchMedia(MOBILE_MEDIA_QUERY).matches)
   const { pathname } = useLocation()
   const signOutConfirm = useSignOutConfirm(() => void signOut())
   const signOutLabel = signOutConfirm.armed ? tr('Да, выйти', 'Ha, chiqish') : tr('Выйти', 'Chiqish')
@@ -124,6 +158,19 @@ function AppShell() {
   // жест «назад» увёл бы страницу из-под открытого листа, и он остался бы
   // висеть поверх чужого экрана.
   useEffect(() => { setMoreOpen(false) }, [pathname])
+
+  // Индикатор вкладки и подпись «Техника» — только телефонные, поэтому граница
+  // нужна в JS, а не одним CSS. Лист «Ещё» при переходе на десктоп закрывается:
+  // кнопки, которая его открыла, там нет.
+  useEffect(() => {
+    const media = window.matchMedia(MOBILE_MEDIA_QUERY)
+    const handleChange = () => {
+      setPhone(media.matches)
+      if (!media.matches) setMoreOpen(false)
+    }
+    media.addEventListener('change', handleChange)
+    return () => media.removeEventListener('change', handleChange)
+  }, [])
 
   useEffect(() => {
     window.localStorage.setItem('argo:sidebar-collapsed', String(sidebarCollapsed))
@@ -223,6 +270,17 @@ function AppShell() {
     return () => window.clearTimeout(editorDataTimer)
   }, [pathname])
 
+  // Открытый лист забирает подсветку себе, как в макете: индикатор уезжает на
+  // «Ещё», а вкладка текущего раздела гаснет до закрытия листа.
+  const activeTab: PhoneTab = isMoreOpen ? 'more' : phoneTabOf(pathname)
+  const tabClass = ({ isActive }: { isActive: boolean }) => (isActive && !isMoreOpen ? 'active' : '')
+  const tabPress = isPhone ? TAB_PRESS : undefined
+  // Один элемент с общим layoutId: motion переносит его из вкладки во вкладку.
+  // На десктопе его нет вовсе — там подсветку рисует .active, как и раньше.
+  const tabIndicator = (tab: PhoneTab) => (isPhone && activeTab === tab
+    ? <m.span layoutId="phone-tab-indicator" className="sidebar__tab-ind" transition={TAB_INDICATOR_TRANSITION} aria-hidden="true" />
+    : null)
+
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`}>
       <aside className="sidebar">
@@ -242,34 +300,40 @@ function AppShell() {
           </button>
         </div>
 
-        <nav className="sidebar__nav" aria-label={tr('Основная навигация', 'Asosiy navigatsiya')}>
+        {/* layoutRoot — только на телефоне: там панель fixed, и без него motion
+            прибавил бы к пути индикатора прокрутку страницы (смена раздела
+            сбрасывает её между замерами). */}
+        <m.nav className="sidebar__nav" layoutRoot={isPhone} aria-label={tr('Основная навигация', 'Asosiy navigatsiya')}>
           <p className="nav-section-label">{tr('Склад', 'Ombor')}</p>
-          <NavLink to="/" end><House size={19} /><span>{tr('Главная', 'Bosh sahifa')}</span></NavLink>
-          <NavLink to="/equipment"><Boxes size={19} /><span>{tr('Оборудование', 'Uskunalar')}</span></NavLink>
-          <NavLink to="/lists"><ClipboardList size={19} /><span>{tr('Списки', 'Ro‘yxatlar')}</span></NavLink>
-          <NavLink to="/employees"><Users size={19} /><span>{tr('Сотрудники', 'Xodimlar')}</span></NavLink>
-          <NavLink to="/vehicles"><CarFront size={19} /><span>{tr('Автомобили', 'Avtomobillar')}</span></NavLink>
-          {/* Шестой раздел на телефоне в нижнюю панель не влезает: слотов там
-              пять плюс «Ещё», и седьмой ужал бы каждый до сорока пикселей.
-              Поэтому на ≤820 ссылка прячется, а «Залы» уходят в лист «Ещё». */}
-          <NavLink className="sidebar__nav-extra" to="/halls"><Presentation size={19} /><span>{tr('Залы', 'Zallar')}</span></NavLink>
-          {/* Тот же случай, что у «Залов»: на телефоне слота нет, пункт живёт в листе «Ещё». */}
+          <MotionNavLink to="/" end className={tabClass} whileTap={tabPress}>{tabIndicator('home')}<House size={19} /><span>{tr('Главная', 'Bosh sahifa')}</span></MotionNavLink>
+          {/* На телефоне — «Техника»: в слоте шириной в пятую часть экрана
+              «Оборудование» слипалось с соседями (V-05 макета). */}
+          <MotionNavLink to="/equipment" className={tabClass} whileTap={tabPress}>{tabIndicator('equipment')}<Boxes size={19} /><span>{isPhone ? tr('Техника', 'Texnika') : tr('Оборудование', 'Uskunalar')}</span></MotionNavLink>
+          <MotionNavLink to="/lists" className={tabClass} whileTap={tabPress}>{tabIndicator('lists')}<ClipboardList size={19} /><span>{tr('Списки', 'Ro‘yxatlar')}</span></MotionNavLink>
+          {/* Сотрудники, Автомобили и Задержки на телефоне в нижнюю панель не
+              входят: там ровно пять вкладок (Главная, Техника, Списки, Залы, Ещё),
+              шестая ужала бы подписи до слипания. На ≤820 эти ссылки прячутся
+              (sidebar__nav-extra), а сами разделы живут в листе «Ещё». */}
+          <NavLink className="sidebar__nav-extra" to="/employees"><Users size={19} /><span>{tr('Сотрудники', 'Xodimlar')}</span></NavLink>
+          <NavLink className="sidebar__nav-extra" to="/vehicles"><CarFront size={19} /><span>{tr('Автомобили', 'Avtomobillar')}</span></NavLink>
+          <MotionNavLink to="/halls" className={tabClass} whileTap={tabPress}>{tabIndicator('halls')}<Presentation size={19} /><span>{tr('Залы', 'Zallar')}</span></MotionNavLink>
           {/* В сайдбаре — одно слово, как у соседей: полное «Задержка излучателей»
               ломалось на две строки. Полное имя — в заголовке страницы и в листе «Ещё». */}
           <NavLink className="sidebar__nav-extra" to="/delay"><RadioTower size={19} /><span>{tr('Задержки', 'Kechikishlar')}</span></NavLink>
-          {/* Четвёртый слот нижней панели, на десктопе скрыт: язык, аккаунт и
-              быстрый переход в новый список живут в сайдбаре, которого на
-              телефоне нет. Раньше этот слот занимал постоянный RU/UZ. */}
-          <button
+          {/* Пятый слот нижней панели, на десктопе скрыт: язык, аккаунт, быстрый
+              переход в новый список и три раздела сверх пяти живут в сайдбаре,
+              которого на телефоне нет. Горит и на адресах этих разделов. */}
+          <m.button
             type="button"
-            className={`sidebar__more ${isMoreOpen ? 'active' : ''}`}
+            className={`sidebar__more ${activeTab === 'more' ? 'active' : ''}`}
             onClick={() => setMoreOpen(true)}
+            whileTap={tabPress}
             aria-haspopup="dialog"
             aria-expanded={isMoreOpen}
           >
-            <Ellipsis size={19} /><span>{tr('Ещё', 'Yana')}</span>
-          </button>
-        </nav>
+            {tabIndicator('more')}<Ellipsis size={19} /><span>{tr('Ещё', 'Yana')}</span>
+          </m.button>
+        </m.nav>
 
         <div className="sidebar__utility">
           <NavLink className="sidebar__quick-action" to="/lists/new">
@@ -313,7 +377,10 @@ function AppShell() {
         <Outlet />
       </main>
 
-      {isMoreOpen && <MobileMoreSheet email={email} onSignOut={() => void signOut()} onClose={() => setMoreOpen(false)} />}
+      {/* AnimatePresence держит лист в DOM, пока он уезжает вниз. */}
+      <AnimatePresence>
+        {isMoreOpen && <MobileMoreSheet key="more" email={email} onSignOut={() => void signOut()} onClose={() => setMoreOpen(false)} />}
+      </AnimatePresence>
     </div>
   )
 }
@@ -326,33 +393,66 @@ function MobileMoreSheet({ email, onSignOut, onClose }: { email: string; onSignO
   useModalLayer(onClose)
   // Свой взвод, а не сайдбара: лист закрылся — взвод ушёл вместе с ним.
   const signOutConfirm = useSignOutConfirm(onSignOut)
+  // Тянуть лист можно только за хват: вся площадь листа — это ссылки и кнопки,
+  // и перетаскивание с любой точки съедало бы их нажатия.
+  const dragControls = useDragControls()
+  // Отпущенный после протяжки хват всё равно получает click (палец поднят над
+  // ним же — лист ехал вместе с пальцем). Без отметки протяжка вниз на 30 px с
+  // возвратом закрывала бы лист «кликом».
+  const draggedRef = useRef(false)
+  // Пока лист уезжает, слой ещё в DOM и накрывает экран: без этого первое
+  // нажатие после закрытия тонуло бы в уходящей подложке.
+  const isPresent = useIsPresent()
 
   return (
-    <div className="sheet-layer" role="dialog" aria-modal="true" aria-label={tr('Ещё', 'Yana')} onMouseDown={onClose}>
-      <div className="sheet" onMouseDown={(event) => event.stopPropagation()}>
+    <div className="sheet-layer" role="dialog" aria-modal="true" aria-label={tr('Ещё', 'Yana')} onMouseDown={onClose} style={isPresent ? undefined : { pointerEvents: 'none' }}>
+      <m.div className="sheet-layer__scrim" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.18 } }} exit={{ opacity: 0, transition: { duration: 0.16 } }} />
+      <m.div
+        className="sheet"
+        onMouseDown={(event) => event.stopPropagation()}
+        initial={{ y: '100%' }}
+        animate={{ y: 0, transition: SHEET_ENTER }}
+        exit={{ y: '100%', transition: SHEET_EXIT }}
+        drag="y"
+        dragControls={dragControls}
+        dragListener={false}
+        // Вниз лист идёт за пальцем один в один, вверх — упирается (четверть хода).
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0.25, bottom: 1 }}
+        onDragStart={() => { draggedRef.current = true }}
+        onDragEnd={(_event, info) => {
+          if (info.offset.y > SHEET_CLOSE_OFFSET || info.velocity.y > SHEET_CLOSE_VELOCITY) onClose()
+        }}
+      >
+        {/* Хват — только для пальца и мыши: с клавиатуры лист закрывают «Закрыть»
+            и Esc, второй такой же кнопке в порядке фокуса делать нечего. */}
+        <button
+          type="button"
+          className="sheet__grab"
+          tabIndex={-1}
+          aria-hidden="true"
+          onPointerDown={(event) => { draggedRef.current = false; dragControls.start(event) }}
+          onClick={() => { if (!draggedRef.current) onClose() }}
+        />
         <div className="sheet__header">
           <strong>{tr('Ещё', 'Yana')}</strong>
           <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
         </div>
         {/* Тот же путь, что у быстрого действия сайдбара: на телефоне сайдбар
-            скрыт, и одношаговый вход в сборку комплекта пропадал. */}
+            скрыт, и одношаговый вход в сборку комплекта пропадал. Единственный
+            красный значок листа — главное действие (V-17 макета). */}
         <Link className="sheet__action" to="/lists/new" onClick={onClose}>
           <span><ListPlus size={19} /></span>
           <div><strong>{tr('Новый список', 'Yangi ro‘yxat')}</strong><small>{tr('Собрать комплект', 'Jamlanma tuzish')}</small></div>
           <ArrowUpRight size={16} />
         </Link>
-        {/* «Залы» показываются только здесь: в нижней панели телефона для них
-            нет слота (см. sidebar__nav-extra). */}
-        <Link className="sheet__action" to="/halls" onClick={onClose}>
-          <span><Presentation size={19} /></span>
-          <div><strong>{tr('Залы', 'Zallar')}</strong><small>{tr('Расстановка по залам', 'Zallar bo‘yicha taqsimot')}</small></div>
-          <ArrowUpRight size={16} />
-        </Link>
-        <Link className="sheet__action" to="/delay" onClick={onClose}>
-          <span><RadioTower size={19} /></span>
-          <div><strong>{tr('Задержка излучателей', 'Nurlatgichlar kechikishi')}</strong><small>{tr('Расчёт для цепочки ITC', 'ITC zanjiri uchun hisob')}</small></div>
-          <ArrowUpRight size={16} />
-        </Link>
+        {/* Разделы, которым нет слота в нижней панели (см. sidebar__nav-extra).
+            Значки серые: красный остаётся за «Новым списком». */}
+        <nav className="sheet__nav" aria-label={tr('Другие разделы', 'Boshqa bo‘limlar')}>
+          <NavLink to="/employees" onClick={onClose}><span><Users size={19} /></span>{tr('Сотрудники', 'Xodimlar')}</NavLink>
+          <NavLink to="/vehicles" onClick={onClose}><span><CarFront size={19} /></span>{tr('Автомобили', 'Avtomobillar')}</NavLink>
+          <NavLink to="/delay" onClick={onClose}><span><RadioTower size={19} /></span>{tr('Задержка излучателей', 'Nurlatgichlar kechikishi')}</NavLink>
+        </nav>
         <div className="sheet__row">
           <span>{tr('Язык интерфейса', 'Interfeys tili')}</span>
           <LanguageSwitcher />
@@ -368,7 +468,7 @@ function MobileMoreSheet({ email, onSignOut, onClose }: { email: string; onSignO
             ? tr('Да, выйти — несохранённое пропадёт', 'Ha, chiqish — saqlanmagan ish yo‘qoladi')
             : tr('Выйти', 'Chiqish')}</button>
         </div>
-      </div>
+      </m.div>
     </div>
   )
 }
