@@ -247,6 +247,11 @@
 @media (max-width: 700px) {
   .editor-header { grid-template-columns: 44px 1fr; }
   .editor-header h1 { font-size: 22px; white-space: normal; }
+  /* Две длинные подписи рядом с текстом на телефон не помещаются — кнопки
+     уходят под вопрос столбиком, во всю ширину. */
+  .unsaved-prompt { flex-wrap: wrap; }
+  .unsaved-prompt__actions { flex: 1 1 100%; flex-direction: column; }
+  .unsaved-prompt__actions .button { width: 100%; }
   /* На телефоне действия живут в футере рабочего списка — рядом с тем, что
      собрал пользователь. Пара в шапке здесь была бы вторым таким же местом. */
   .editor-header--quick { position: static; margin: 0 0 22px; padding: 0; }

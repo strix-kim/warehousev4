@@ -322,6 +322,12 @@
 .editor-draft-notice > span { display: flex; flex: 1 1 auto; flex-direction: column; gap: 3px; min-width: 0; }
 .editor-draft-notice strong { font-size: 13px; }
 .editor-draft-notice small { color: var(--ink-faint); font-size: 12px; line-height: 1.45; }
+/* Вопрос «уйти без сохранения?» (UnsavedPrompt) — родня плашки черновика, но
+   красная: это не сведение, а остановленный переход. */
+.unsaved-prompt { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding: 12px 14px; border: 1px solid var(--danger); border-radius: var(--radius-md); background: var(--danger-bg); }
+.unsaved-prompt > svg { flex: 0 0 auto; color: var(--danger); }
+.unsaved-prompt > strong { flex: 1 1 auto; min-width: 0; font-size: 13px; }
+.unsaved-prompt__actions { display: flex; flex: 0 0 auto; gap: 8px; }
 .detail-skeleton { height: 58px; margin-bottom: 14px; border-radius: 9px; background: linear-gradient(90deg, #f0f2ef 25%, #f7f8f6 50%, #f0f2ef 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 /* Болванки загрузки под конкретные экраны. Блок стоит ПОСЛЕ .detail-skeleton
    намеренно: у модификаторов ровно один класс, то есть та же специфичность, и

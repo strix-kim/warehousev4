@@ -7,10 +7,12 @@ import { driverFullName, vehicleTitle, type VehicleDriver, type VehicleFile } fr
 import { fetchEmployeeBriefs } from '../employees/api'
 import { EmployeePicker } from '../../components/EmployeePicker'
 import { PhotoPickField } from '../../components/PhotoPickField'
+import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import { UploadQueue, type UploadItem } from '../../components/UploadQueue'
 import { compressPhoto } from '../../lib/compressPhoto'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import { useUnsavedGuard } from '../../lib/useUnsavedGuard'
 
 const emptyDraft: VehicleInput = {
   brand: '',
@@ -45,6 +47,10 @@ export function VehicleFormPage() {
   const route = vehicleId ? '/vehicles/:vehicleId/edit' : '/vehicles/new'
 
   const [draft, setDraft] = useState<VehicleInput>(emptyDraft)
+  // Поля в том виде, в каком они лежат в базе: на создании — пустая форма, в
+  // правке — загруженная карточка, после сохранения — сохранённое. С ним
+  // сравнивается черновик, чтобы решить, есть ли что терять при уходе.
+  const [baseline, setBaseline] = useState<VehicleInput>(emptyDraft)
   const [photos, setPhotos] = useState<File[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
@@ -90,7 +96,9 @@ export function VehicleFormPage() {
           setLoadState('missing')
           return
         }
-        setDraft(draftFromVehicle(vehicle))
+        const loaded = draftFromVehicle(vehicle)
+        setDraft(loaded)
+        setBaseline(loaded)
         setLoadedPlate(vehicle.plate_number)
         setDrivers(vehicle.drivers)
         setSavedDriverIds(vehicle.drivers.map((driver) => driver.id))
@@ -134,6 +142,17 @@ export function VehicleFormPage() {
   useDocumentTitle(isEditing
     ? loadedPlate ? tr(`${loadedPlate} — машина`, `${loadedPlate} — mashina`) : ''
     : tr('Добавить машину', 'Mashina qo‘shish'))
+
+  // На экране успеха (createdId) карточка уже в базе — терять нечего.
+  // Водители сравниваются набором: порядок чипов не правка.
+  const isDirty = !createdId && (
+    JSON.stringify(draft) !== JSON.stringify(baseline)
+    || photos.length > 0
+    || drivers.map((driver) => driver.id).sort().join() !== [...savedDriverIds].sort().join()
+  )
+  // Пока идёт сохранение или догрузка фото, защита снята: уход в карточку после
+  // успеха — это сама форма, а не человек.
+  const guard = useUnsavedGuard(isDirty && !isSaving && !isUploading)
 
   const canSave = Boolean(draft.brand.trim() && draft.plate_number.trim())
   const backTarget = vehicleId ? `/vehicles?vehicle=${vehicleId}` : '/vehicles'
@@ -237,6 +256,9 @@ export function VehicleFormPage() {
 
       if (vehicleId) {
         await updateVehicle(vehicleId, draft)
+        // Поля в базе — дальше «несохранённым» считается только то, что набрано
+        // после этого снимка.
+        setBaseline(draft)
         await saveVehicleDrivers(vehicleId, savedDriverIds, driverIds)
         // Связка уже в базе: повторное сохранение должно считать разницу от
         // ТЕКУЩЕГО состава, а не пытаться снять снятых второй раз.
@@ -372,6 +394,16 @@ export function VehicleFormPage() {
           <Save size={17} /> {saveLabel}
         </button>
       </header>
+
+      {guard.isBlocked && (
+        <UnsavedPrompt
+          message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+          stayLabel={tr('Остаться', 'Qolish')}
+          leaveLabel={tr('Уйти без сохранения', 'Saqlamasdan chiqish')}
+          onStay={guard.stay}
+          onLeave={guard.leave}
+        />
+      )}
 
       <section className="data-panel vehicle-form">
         <div className="form-section">
