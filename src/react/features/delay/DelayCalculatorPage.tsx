@@ -1,9 +1,11 @@
-import { Check, Copy, Cpu, Plus, Radio, RotateCcw, Trash2 } from 'lucide-react'
+import { Check, Copy, Minus, Play, Plus, RotateCcw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { copyText } from '../../lib/clipboard'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
-import { CABLE_NS_PER_METER, computeDelays, DELAY_STEP_NS, MAX_EMITTERS, parseLength, type EmitterDelay } from './delay'
+import { useChainLayout } from './chainLayout'
+import { CABLE_NS_PER_METER, computeDelays, DELAY_STEP_NS, MAX_EMITTERS, parseLength } from './delay'
+import { CountUp, DelayChain, type Row } from './DelayChain'
 import { useSignalAnimation } from './useSignalAnimation'
 
 // Калькулятор задержки излучателей ITC. Базы здесь нет вовсе: всё состояние —
@@ -14,12 +16,12 @@ const LENGTHS_PARAM = 'l'
 // Число с единицей не рвём по строкам: «5,6 нс/» на одной и «м» на другой (замечено на 1440).
 const NBSP = '\u00a0'
 const WJ = '\u2060'
-const DEFAULT_ROWS = 3
-
-type Row = { id: number; draft: string }
+// Нетронутый экран — один излучатель: в одной цепочке их обычно до шести, лишние
+// пустые ряды только мешали бы; остальные добавляют кнопкой.
+const DEFAULT_ROWS = 1
 
 // Ключ строки — не индекс: удаление из середины сдвинуло бы индексы, и React
-// переиспользовал бы чужие поля ввода вместе с их анимацией появления.
+// переиспользовал бы чужие поля ввода вместе с их фокусом.
 let rowSeq = 0
 function makeRow(draft: string): Row {
   rowSeq += 1
@@ -33,7 +35,7 @@ function rowsFromParam(value: string | null): Row[] {
 
 // В адрес уходит число с точкой, а не то, что набрано: запятая в адресе —
 // разделитель строк, и «12,5» превратилось бы в два излучателя. Нетронутый
-// экран (три пустые строки) адрес не пачкает.
+// экран (одна пустая строка) адрес не пачкает.
 function paramFromRows(rows: Row[]): string | null {
   if (rows.length === DEFAULT_ROWS && rows.every((row) => !row.draft.trim())) return null
   return rows.map((row) => {
@@ -41,6 +43,7 @@ function paramFromRows(rows: Row[]): string | null {
     return value === null ? '' : String(value)
   }).join(',')
 }
+
 
 export function DelayCalculatorPage() {
   const { tr, locale } = useLanguage()
@@ -86,12 +89,16 @@ export function DelayCalculatorPage() {
 
   const lengths = rows.map((row) => parseLength(row.draft) ?? 0)
   const delays = computeDelays(lengths)
-  useSignalAnimation(chainRef, lengths)
+  const { orientation, widths } = useChainLayout(chainRef, lengths)
+  const { play } = useSignalAnimation(chainRef, lengths, orientation)
 
   const totalMeters = lengths.reduce((sum, meters) => sum + meters, 0)
   const maxSteps = delays.reduce((max, delay) => Math.max(max, delay.steps), 0)
   const isPristine = paramFromRows(rows) === null
   const canAdd = rows.length < MAX_EMITTERS
+  // Кабеля нет — задержки нулевые, объяснять движением нечего.
+  const canPlay = totalMeters > 0
+  const meters = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
 
   function updateRow(id: number, draft: string) {
     setRows((current) => current.map((row) => (row.id === id ? { ...row, draft } : row)))
@@ -104,8 +111,8 @@ export function DelayCalculatorPage() {
     setRows((current) => [...current, row])
   }
 
-  function removeRow(id: number) {
-    setRows((current) => (current.length > 1 ? current.filter((row) => row.id !== id) : current))
+  function removeLast() {
+    setRows((current) => (current.length > 1 ? current.slice(0, -1) : current))
   }
 
   function reset() {
@@ -114,7 +121,9 @@ export function DelayCalculatorPage() {
   }
 
   async function copyForChat() {
-    const text = `${tr('Задержки ITC', 'ITC kechikishlari')}: ${delays.map((delay, index) => `${index + 1} — ${delay.steps}`).join(' · ')}`
+    const plain = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2, useGrouping: false })
+    const list = delays.map((delay, index) => `${tr('И', 'N')}${index + 1} — ${delay.steps}`).join(', ')
+    const text = `${tr('Задержки ITC', 'ITC kechikishlari')}: ${list} (${tr('кабели', 'kabellar')} ${lengths.map(plain).join('/')} ${tr('м', 'm')})`
     const ok = await copyText(text)
     window.clearTimeout(copyTimer.current)
     setCopyState(ok ? 'copied' : 'failed')
@@ -122,8 +131,14 @@ export function DelayCalculatorPage() {
     copyTimer.current = window.setTimeout(() => setCopyState('idle'), 1500)
   }
 
-  const meters = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
+  // Подтверждение цветом И словом, как у копирования в карточках: цвет без слова
+  // не прочтёт дальтоник, слово без цвета — тот, кто смотрит мельком. Одно
+  // состояние на обе кнопки (шапка на десктопе, панель на телефоне).
+  const copyLabel = (idle: string) => (copyState === 'copied' ? tr('Скопировано', 'Nusxalandi') : copyState === 'failed' ? tr('Не скопировалось', 'Nusxalanmadi') : idle)
+  const copyClass = copyState === 'idle' ? '' : ` delay-copy--${copyState}`
+
   const formulaNumbers = { perMeter: CABLE_NS_PER_METER.toLocaleString(locale), step: DELAY_STEP_NS.toLocaleString(locale) }
+  const lastNs = Math.round(delays[0]?.ns ?? 0)
 
   return (
     <>
@@ -131,222 +146,96 @@ export function DelayCalculatorPage() {
         <div>
           <p className="eyebrow">{tr('Расчёт для ITC', 'ITC uchun hisob')}</p>
           <h1>{tr('Задержка излучателей', 'Nurlatgichlar kechikishi')}</h1>
-          <p className="page-description">{tr(
-            'Процессор, кабель, излучатели — по цепочке. Впишите длины кабелей, и у каждого излучателя появится шаг задержки, при котором все излучают одновременно.',
-            'Protsessor, kabel, nurlatgichlar — zanjir bo‘ylab. Kabel uzunliklarini kiriting — har bir nurlatgich uchun hammasi bir vaqtda nurlatadigan kechikish qadami chiqadi.',
-          )}</p>
+        </div>
+        <div className="delay-head__actions">
+          <button type="button" className="button button--secondary" onClick={play} disabled={!canPlay}>
+            <Play size={16} fill="currentColor" /> {tr('Прогнать сигнал', 'Signalni yuborish')}
+          </button>
+          <button type="button" className={`button button--primary delay-copy${copyClass}`} onClick={() => void copyForChat()}>
+            {copyState === 'copied' ? <Check size={16} /> : <Copy size={16} />}
+            {/* aria-live, а не role="status": роль вырезала бы текст из имени
+                кнопки, и скринридер слышал бы безымянную кнопку. */}
+            <span aria-live="polite">{copyLabel(tr('Скопировать для чата', 'Chat uchun nusxalash'))}</span>
+          </button>
         </div>
       </header>
 
       <div className="delay-layout">
-        <div className="delay-main">
+        <div className="delay-stage">
           <section className="delay-summary" aria-label={tr('Сводка', 'Xulosa')}>
             <div>
+              <strong><CountUp value={rows.length} /></strong>
               <span>{tr('Излучателей', 'Nurlatgichlar')}</span>
-              <strong>{rows.length.toLocaleString(locale)}</strong>
             </div>
             <div>
+              <strong><CountUp value={Math.round(totalMeters * 100)} format={(shown) => meters(shown / 100)} /><small>{tr('м', 'm')}</small></strong>
               <span>{tr('Кабель всего', 'Jami kabel')}</span>
-              <strong>{meters(totalMeters)} <small>{tr('м', 'm')}</small></strong>
             </div>
-            <div className="delay-summary__max">
-              <span>{tr('Макс. задержка', 'Eng katta kechikish')}</span>
-              <strong>{maxSteps.toLocaleString(locale)}</strong>
+            <div>
+              <strong><CountUp value={maxSteps} /></strong>
+              <span>{tr('Макс. шаг задержки', 'Eng katta kechikish qadami')}</span>
+            </div>
+            <div className="delay-summary__ns">
+              <strong><CountUp value={lastNs} /><small>{tr('нс', 'ns')}</small></strong>
+              <span>{tr('Сигнал до последнего', 'Oxirgisigacha signal')}</span>
             </div>
           </section>
 
-          <div className="delay-actions">
-            {/* Подтверждение цветом И словом, как у копирования в карточках:
-                цвет без слова не прочтёт дальтоник, слово без цвета — тот,
-                кто смотрит мельком. */}
-            <button
-              type="button"
-              className={`button button--secondary delay-copy${copyState === 'idle' ? '' : ` delay-copy--${copyState}`}`}
-              onClick={() => void copyForChat()}
-            >
-              {copyState === 'copied' ? <Check size={16} /> : <Copy size={16} />}
-              {/* aria-live, а не role="status": роль вырезала бы текст из имени
-                  кнопки, и скринридер слышал бы безымянную кнопку. */}
-              <span aria-live="polite">
-                {copyState === 'copied' ? tr('Скопировано', 'Nusxalandi') : copyState === 'failed' ? tr('Не скопировалось', 'Nusxalanmadi') : tr('Скопировать для чата', 'Chat uchun nusxalash')}
-              </span>
+          <DelayChain
+            chainRef={chainRef}
+            rows={rows}
+            delays={delays}
+            maxSteps={maxSteps}
+            orientation={orientation}
+            widths={widths}
+            focusId={focusId}
+            onChange={updateRow}
+          />
+
+          <div className="delay-tools">
+            <button type="button" className="delay-quiet" onClick={addRow} disabled={!canAdd}>
+              <Plus size={16} /> {tr('Добавить излучатель', 'Nurlatgich qo‘shish')}
             </button>
-            <button type="button" className="button button--secondary" onClick={reset} disabled={isPristine}>
+            <button type="button" className="delay-quiet" onClick={removeLast} disabled={rows.length <= 1}>
+              <Minus size={16} /> {tr('Убрать последний', 'Oxirgisini olib tashlash')}
+            </button>
+            <button type="button" className="delay-quiet" onClick={reset} disabled={isPristine}>
               <RotateCcw size={16} /> {tr('Сбросить', 'Tozalash')}
             </button>
+            {!canAdd && <span className="delay-tools__limit">{tr(`Максимум ${MAX_EMITTERS} излучателей`, `Ko‘pi bilan ${MAX_EMITTERS} ta nurlatgich`)}</span>}
+            {!isPristine && (
+              <span className="delay-url">{tr('Длины живут в адресе', 'Uzunliklar manzilda saqlanadi')}: <span className="delay-url__value">?{LENGTHS_PARAM}={paramFromRows(rows)}</span></span>
+            )}
           </div>
-
-          <section className="delay-chain" ref={chainRef} aria-label={tr('Цепочка излучателей', 'Nurlatgichlar zanjiri')}>
-            <span className="delay-signal" data-signal-dot aria-hidden="true" />
-
-            <div className="delay-row delay-row--brain">
-              <div className="delay-rail">
-                <span className="delay-beacon delay-beacon--brain" data-signal-anchor aria-hidden="true">
-                  <span className="delay-beacon__glow" data-signal-glow />
-                  <span className="delay-beacon__icon" data-signal-icon><Cpu size={24} /></span>
-                </span>
-              </div>
-              <div className="delay-node">
-                <strong>{tr('Мозги', 'Protsessor')}</strong>
-                <span>{tr('Процессор — отсюда уходит сигнал', 'Signal shu yerdan chiqadi')}</span>
-              </div>
-            </div>
-
-            {rows.map((row, index) => (
-              <EmitterSegment
-                key={row.id}
-                row={row}
-                index={index}
-                delay={delays[index]}
-                isLast={index === rows.length - 1}
-                canRemove={rows.length > 1}
-                autoFocus={row.id === focusId}
-                onChange={(draft) => updateRow(row.id, draft)}
-                onRemove={() => removeRow(row.id)}
-              />
-            ))}
-
-            <div className="delay-row delay-row--add">
-              <div className="delay-rail" />
-              <div>
-                <button type="button" className="delay-add" onClick={addRow} disabled={!canAdd}>
-                  <Plus size={18} /> {tr('Излучатель', 'Nurlatgich')}
-                </button>
-                {!canAdd && <p className="delay-add__limit">{tr(`Максимум ${MAX_EMITTERS} излучателей`, `Ko‘pi bilan ${MAX_EMITTERS} ta nurlatgich`)}</p>}
-              </div>
-            </div>
-          </section>
         </div>
 
-        <aside className="delay-guide" aria-label={tr('Как читать', 'Qanday o‘qish kerak')}>
-          <p className="eyebrow">{tr('Как читать', 'Qanday o‘qish kerak')}</p>
-          <ol>
-            <li>{tr('Сигнал идёт от мозгов по цепочке и до ближних излучателей доходит раньше, чем до дальних.', 'Signal protsessordan zanjir bo‘ylab boradi va yaqin nurlatgichlarga uzoqdagilardan oldinroq yetadi.')}</li>
-            <li>{tr('Каждому излучателю ставим задержку — столько, сколько сигнал ещё идёт от него до последнего.', 'Har bir nurlatgichga kechikish qo‘yamiz — signal undan oxirgisigacha qancha yursa, shuncha.')}</li>
-            <li>{tr('Первый ждёт дольше всех, последний не ждёт вовсе — и все излучают одновременно.', 'Birinchisi hammadan uzoq kutadi, oxirgisi umuman kutmaydi — va hammasi bir vaqtda nurlatadi.')}</li>
-            <li>{tr('Кабель от мозгов до первого излучателя на задержки не влияет: он задерживает всех одинаково.', 'Protsessordan birinchi nurlatgichgacha bo‘lgan kabel kechikishlarga ta’sir qilmaydi: u hammani bir xil kechiktiradi.')}</li>
-          </ol>
-          <p className="delay-guide__formula">{tr(
-            `Шаг = кабель после излучателя, м × ${formulaNumbers.perMeter}${NBSP}нс/${WJ}м ÷ ${formulaNumbers.step}${NBSP}нс, с округлением вверх.`,
-            `Qadam = nurlatgichdan keyingi kabel, m × ${formulaNumbers.perMeter}${NBSP}ns/${WJ}m ÷ ${formulaNumbers.step}${NBSP}ns, yuqoriga yaxlitlanadi.`,
+        <div className="delay-side">
+          <aside className="delay-guide" aria-label={tr('Как читать', 'Qanday o‘qish kerak')}>
+            <p className="delay-guide__title">{tr('Как читать', 'Qanday o‘qish kerak')}</p>
+            <ol>
+              <li>{tr('Сигнал идёт от мозгов по цепочке и до ближних излучателей доходит раньше.', 'Signal protsessordan zanjir bo‘ylab boradi va yaqin nurlatgichlarga oldinroq yetadi.')}</li>
+              <li>{tr('Каждому ставим задержку — сколько сигнал ещё идёт от него до последнего.', 'Har biriga kechikish qo‘yamiz — signal undan oxirgisigacha qancha yursa, shuncha.')}</li>
+              <li>{tr('Первый ждёт дольше всех, последний не ждёт — все излучают одновременно.', 'Birinchisi hammadan uzoq kutadi, oxirgisi kutmaydi — hammasi bir vaqtda nurlatadi.')}</li>
+              <li>{tr('Кабель от мозгов до первого на задержки не влияет.', 'Protsessordan birinchisigacha bo‘lgan kabel kechikishlarga ta’sir qilmaydi.')}</li>
+            </ol>
+          </aside>
+          <p className="delay-formula">{tr(
+            `шаг = ⌈${NBSP}кабель после излучателя × ${formulaNumbers.perMeter}${NBSP}нс/${WJ}м ÷ ${formulaNumbers.step}${NBSP}нс${NBSP}⌉`,
+            `qadam = ⌈${NBSP}nurlatgichdan keyingi kabel × ${formulaNumbers.perMeter}${NBSP}ns/${WJ}m ÷ ${formulaNumbers.step}${NBSP}ns${NBSP}⌉`,
           )}</p>
-        </aside>
+        </div>
+      </div>
+
+      {/* Отдельным элементом в конце страницы, а не в шапке: у шапки анимация
+          появления с transform, и fixed внутри неё считался бы от шапки. */}
+      <div className="delay-dock">
+        <button type="button" className="button button--secondary" onClick={play} disabled={!canPlay}>
+          {tr('Сигнал', 'Signal')}
+        </button>
+        <button type="button" className={`button button--primary delay-copy${copyClass}`} onClick={() => void copyForChat()}>
+          <span aria-live="polite">{copyLabel(tr('В чат', 'Chatga'))}</span>
+        </button>
       </div>
     </>
-  )
-}
-
-// Отрезок цепочки: кабель до излучателя и сам излучатель. Одним узлом, чтобы
-// появление нового излучателя читалось как одно движение: кабель дорастает,
-// следом въезжает карточка.
-function EmitterSegment({ row, index, delay, isLast, canRemove, autoFocus, onChange, onRemove }: {
-  row: Row
-  index: number
-  delay: EmitterDelay | undefined
-  isLast: boolean
-  canRemove: boolean
-  autoFocus: boolean
-  onChange: (draft: string) => void
-  onRemove: () => void
-}) {
-  const { tr, locale } = useLanguage()
-  const number = index + 1
-  const isInvalid = row.draft.trim() !== '' && parseLength(row.draft) === null
-  const steps = delay?.steps ?? 0
-  const ns = Math.round(delay?.ns ?? 0)
-
-  return (
-    <div className={`delay-segment${isLast ? ' delay-segment--last' : ''}`}>
-      <div className="delay-row delay-row--cable">
-        <div className="delay-rail"><span className="delay-cable" /></div>
-        <div className="delay-link">
-          <label className={`delay-length${isInvalid ? ' delay-length--invalid' : ''}`}>
-            <input
-              value={row.draft}
-              onChange={(event) => onChange(event.target.value)}
-              inputMode="decimal"
-              autoComplete="off"
-              autoFocus={autoFocus}
-              placeholder="0"
-              maxLength={8}
-              aria-invalid={isInvalid}
-              aria-label={tr(`Длина кабеля до излучателя ${number}, м`, `${number}-nurlatgichgacha kabel uzunligi, m`)}
-            />
-            <span aria-hidden="true">{tr('м', 'm')}</span>
-          </label>
-          <span className={`delay-link__hint${isInvalid ? ' delay-link__hint--invalid' : ''}`}>
-            {isInvalid
-              ? tr('не число — считаем как 0', 'son emas — 0 deb hisoblanadi')
-              : index === 0
-                ? tr('от мозгов — на задержки не влияет', 'protsessordan — kechikishlarga ta’sir qilmaydi')
-                : tr(`от излучателя ${index}`, `${index}-nurlatgichdan`)}
-          </span>
-        </div>
-      </div>
-
-      <div className="delay-row delay-row--emitter">
-        <div className="delay-rail">
-          <span className="delay-beacon" data-signal-anchor aria-hidden="true">
-            <span className="delay-beacon__glow" data-signal-glow />
-            <span className="delay-signal-wave" data-signal-wave />
-            <span className="delay-signal-wave" data-signal-wave />
-            <span className="delay-ring">
-              {/* Кольцо ожидания — две половины, каждая открывается поворотом
-                  (только transform). Порядок в разметке — порядок заполнения:
-                  сначала правая, потом левая. */}
-              <span className="delay-ring__fill" data-ring-fill>
-                <span className="delay-ring__half delay-ring__half--right"><span className="delay-ring__sweep" data-ring-sweep><span className="delay-ring__semi"><i /></span></span></span>
-                <span className="delay-ring__half delay-ring__half--left"><span className="delay-ring__sweep" data-ring-sweep><span className="delay-ring__semi"><i /></span></span></span>
-              </span>
-            </span>
-            <span className="delay-beacon__icon" data-signal-icon><Radio size={20} /></span>
-          </span>
-        </div>
-        <article className="delay-emitter">
-          <div className="delay-emitter__head">
-            <span className="delay-emitter__index">{tr(`Излучатель ${number}`, `Nurlatgich ${number}`)}</span>
-            <button
-              type="button"
-              className="icon-button delay-emitter__remove"
-              onClick={onRemove}
-              disabled={!canRemove}
-              aria-label={tr(`Удалить излучатель ${number}`, `${number}-nurlatgichni o‘chirish`)}
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-          <div className="delay-emitter__value">
-            <DelaySteps steps={steps} />
-            <div>
-              <span>{tr('шаг задержки', 'kechikish qadami')}</span>
-              <small>{isLast ? tr('последний — не ждёт', 'oxirgisi — kutmaydi') : `≈ ${ns.toLocaleString(locale)} ${tr('нс', 'ns')}`}</small>
-            </div>
-          </div>
-        </article>
-      </div>
-    </div>
-  )
-}
-
-// Число задержки коротко подсвечивается при смене — глаз ловит, какие
-// излучатели задела правка длины. Прошлое значение помним в состоянии и
-// сверяем прямо в рендере (приём React «значение из прошлого рендера»):
-// эффект дал бы лишний кадр со старой подсветкой. Смена ключа перезапускает
-// CSS-анимацию; на первом рендере подсветки нет.
-function DelaySteps({ steps }: { steps: number }) {
-  const [shown, setShown] = useState(steps)
-  const [pulse, setPulse] = useState(0)
-  if (shown !== steps) {
-    setShown(steps)
-    setPulse(pulse + 1)
-  }
-
-  return (
-    <strong
-      key={pulse}
-      className={`delay-emitter__steps${pulse > 0 ? ' delay-emitter__steps--changed' : ''}${steps === 0 ? ' delay-emitter__steps--zero' : ''}`}
-    >
-      {steps}
-    </strong>
   )
 }
