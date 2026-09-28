@@ -1,4 +1,4 @@
-import { ArrowUpRight, Boxes, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Presentation, Users, Warehouse, X } from 'lucide-react'
+import { ArrowUpRight, Boxes, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Presentation, RadioTower, Users, Warehouse, X } from 'lucide-react'
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AppErrorBoundary } from '../components/AppErrorBoundary'
@@ -21,6 +21,7 @@ const loadHallPlansPage = () => import('../features/halls/HallPlansPage').then((
 const loadHallPlanPage = () => import('../features/halls/HallPlanPage').then((module) => ({ default: module.HallPlanPage }))
 const loadHallTvPage = () => import('../features/halls/HallTvPage').then((module) => ({ default: module.HallTvPage }))
 const loadHomePage = () => import('../features/home/HomePage').then((module) => ({ default: module.HomePage }))
+const loadDelayCalculatorPage = () => import('../features/delay/DelayCalculatorPage').then((module) => ({ default: module.DelayCalculatorPage }))
 
 const LoginPage = lazyWithReload(loadLoginPage)
 const EquipmentPage = lazyWithReload(loadEquipmentPage)
@@ -35,6 +36,7 @@ const HallPlansPage = lazyWithReload(loadHallPlansPage)
 const HallPlanPage = lazyWithReload(loadHallPlanPage)
 const HallTvPage = lazyWithReload(loadHallTvPage)
 const HomePage = lazyWithReload(loadHomePage)
+const DelayCalculatorPage = lazyWithReload(loadDelayCalculatorPage)
 
 export function App() {
   const { isLoading, session } = useAuth()
@@ -65,6 +67,7 @@ export function App() {
         <Route path="/vehicles/:vehicleId/edit" element={<RouteBoundary><VehicleFormPage /></RouteBoundary>} />
         <Route path="/halls" element={<RouteBoundary><HallPlansPage /></RouteBoundary>} />
         <Route path="/halls/:planId" element={<RouteBoundary><HallPlanPage /></RouteBoundary>} />
+        <Route path="/delay" element={<RouteBoundary><DelayCalculatorPage /></RouteBoundary>} />
       </Route>
       {/* ТВ-режим — вне AppShell: на экране в зале не нужны ни сайдбар, ни
           отступы приложения. Гейт сессии у маршрута свой, как у шелла. */}
@@ -120,6 +123,7 @@ function AppShell() {
         loadVehicleFormPage(),
         loadHallPlansPage(),
         loadHallPlanPage(),
+        loadDelayCalculatorPage(),
       ])
     }, 0)
     // Прогрев выдач всех шести разделов, а не только двух старых (решение прораба,
@@ -229,6 +233,10 @@ function AppShell() {
               пять плюс «Ещё», и седьмой ужал бы каждый до сорока пикселей.
               Поэтому на ≤820 ссылка прячется, а «Залы» уходят в лист «Ещё». */}
           <NavLink className="sidebar__nav-extra" to="/halls"><Presentation size={19} /><span>{tr('Залы', 'Zallar')}</span></NavLink>
+          {/* Тот же случай, что у «Залов»: на телефоне слота нет, пункт живёт в листе «Ещё». */}
+          {/* В сайдбаре — одно слово, как у соседей: полное «Задержка излучателей»
+              ломалось на две строки. Полное имя — в заголовке страницы и в листе «Ещё». */}
+          <NavLink className="sidebar__nav-extra" to="/delay"><RadioTower size={19} /><span>{tr('Задержки', 'Kechikishlar')}</span></NavLink>
           {/* Четвёртый слот нижней панели, на десктопе скрыт: язык, аккаунт и
               быстрый переход в новый список живут в сайдбаре, которого на
               телефоне нет. Раньше этот слот занимал постоянный RU/UZ. */}
@@ -303,6 +311,11 @@ function MobileMoreSheet({ email, onSignOut, onClose }: { email: string; onSignO
         <Link className="sheet__action" to="/halls" onClick={onClose}>
           <span><Presentation size={19} /></span>
           <div><strong>{tr('Залы', 'Zallar')}</strong><small>{tr('Расстановка по залам', 'Zallar bo‘yicha taqsimot')}</small></div>
+          <ArrowUpRight size={16} />
+        </Link>
+        <Link className="sheet__action" to="/delay" onClick={onClose}>
+          <span><RadioTower size={19} /></span>
+          <div><strong>{tr('Задержка излучателей', 'Nurlatgichlar kechikishi')}</strong><small>{tr('Расчёт для цепочки ITC', 'ITC zanjiri uchun hisob')}</small></div>
           <ArrowUpRight size={16} />
         </Link>
         <div className="sheet__row">

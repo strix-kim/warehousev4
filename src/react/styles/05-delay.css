@@ -1,0 +1,161 @@
+/* Калькулятор задержки излучателей ITC (с30). Своим куском, а не хвостом
+   05-features: фича самостоятельная, селекторы только delay-*.
+
+   Локальные @media внутри этого файла — осознанно, вопреки правилу «все
+   медиазапросы в 06»: у селекторов нет ни одного пересечения с чужими, и
+   каскаду не с чем спорить. Держать раскладку фичи рядом с её правилами
+   дешевле, чем разносить по двум файлам. Глобальное prefers-reduced-motion из
+   06 CSS-анимации здесь гасит само; WAAPI-анимацию сигнала гасит
+   useSignalAnimation.ts — до неё CSS не дотягивается.
+
+   Геометрия цепочки: две колонки — рельс (56 px, в нём кабель и узлы) и
+   содержимое. Кабель рисуется кусками по строкам без зазоров между ними,
+   поэтому у строк вертикальные отступы — padding, а не gap. */
+
+.delay-layout { display: grid; grid-template-columns: minmax(0, 720px) minmax(260px, 340px); align-items: start; gap: clamp(24px, 3vw, 44px); }
+.delay-main { min-width: 0; display: flex; flex-direction: column; gap: 16px; animation: rise-in .38s .08s cubic-bezier(.2,.7,.2,1) both; }
+
+/* Сводка: те же плитки, что на главной, только в строку. Максимум — красная
+   плитка: это число, ради которого страницу открывают. */
+.delay-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: var(--shadow); }
+.delay-summary > div { min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; padding: 16px 18px; box-shadow: 1px 0 0 var(--line); }
+.delay-summary span { color: var(--ink-faint); font-size: 12px; font-weight: 700; line-height: 1.25; }
+.delay-summary strong { font-size: clamp(24px, 3vw, 32px); font-weight: 800; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+.delay-summary small { color: var(--ink-faint); font-size: 14px; font-weight: 700; letter-spacing: 0; }
+.delay-summary__max { color: #fff; background: var(--accent); }
+.delay-summary .delay-summary__max span { color: rgba(255,255,255,.76); }
+
+.delay-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.delay-copy { transition: transform .15s ease, background .15s ease, border .15s ease, color .15s ease; }
+.delay-copy--copied { color: var(--success); border-color: var(--success); background: var(--success-bg); }
+.delay-copy--failed { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
+
+/* position: relative — точка сигнала считает координаты от цепочки
+   (useSignalAnimation, centerWithin идёт по offsetParent до неё). */
+.delay-chain { position: relative; display: flex; flex-direction: column; }
+.delay-row { display: grid; grid-template-columns: 56px minmax(0, 1fr); column-gap: 14px; }
+.delay-rail { position: relative; display: grid; place-items: center; }
+.delay-row--brain, .delay-row--emitter { padding: 4px 0; }
+.delay-row--cable { min-height: 76px; }
+
+/* Кабель: графитовая жила по оси рельса. У узлов — половинки над и под
+   иконкой; у мозгов сверху кабеля нет, у последнего излучателя — снизу. */
+.delay-cable, .delay-row--brain .delay-rail::after, .delay-row--emitter .delay-rail::before, .delay-row--emitter .delay-rail::after { content: ''; position: absolute; left: calc(50% - 1.5px); width: 3px; border-radius: 2px; background: #1d252b; }
+.delay-cable { top: 0; bottom: 0; transform-origin: top; }
+.delay-row--brain .delay-rail::after, .delay-row--emitter .delay-rail::after { top: 50%; bottom: 0; }
+.delay-row--emitter .delay-rail::before { top: 0; bottom: 50%; }
+.delay-segment--last .delay-row--emitter .delay-rail::after { display: none; }
+
+/* Узел: иконка, подсветка, кольцо ожидания, волны. Все слои — абсолютные
+   поверх квадрата 56 × 56; его центр и есть точка, куда бежит сигнал. */
+.delay-beacon { position: relative; z-index: 2; width: 56px; height: 56px; display: block; }
+.delay-beacon__icon { position: absolute; z-index: 3; inset: 6px; display: grid; place-items: center; border-radius: 50%; color: var(--accent); background: #10161b; box-shadow: 0 6px 16px rgba(13,18,23,.18); }
+.delay-beacon--brain .delay-beacon__icon { inset: 3px; border-radius: 14px; }
+.delay-beacon__glow { position: absolute; z-index: 0; inset: 2px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 22px 4px rgba(239,18,54,.45); opacity: 0; }
+.delay-beacon--brain .delay-beacon__glow { border-radius: 16px; }
+.delay-signal-wave { position: absolute; z-index: 0; inset: 0; border: 2px solid var(--accent); border-radius: 50%; opacity: 0; pointer-events: none; }
+
+/* Кольцо ожидания: дорожка всегда видна бледной, заливка открывается двумя
+   половинами. Каждая половина — окно на полкруга; внутри него крутится
+   «метла» с полукольцом, которое при повороте на 180° заезжает в окно.
+   Только transform — conic-gradient или stroke-dashoffset анимировались бы
+   мимо композитора. */
+.delay-ring { position: absolute; z-index: 1; inset: 0; border-radius: 50%; }
+.delay-ring::before { content: ''; position: absolute; inset: 0; border: 3px solid var(--line); border-radius: 50%; }
+.delay-ring__fill { position: absolute; inset: 0; }
+.delay-ring__half { position: absolute; top: 0; width: 50%; height: 100%; overflow: hidden; }
+.delay-ring__half--right { left: 50%; }
+.delay-ring__half--left { left: 0; }
+.delay-ring__sweep { position: absolute; top: 0; width: 200%; height: 100%; transform-origin: 50% 50%; }
+.delay-ring__half--right .delay-ring__sweep { left: -100%; }
+.delay-ring__half--left .delay-ring__sweep { left: 0; }
+.delay-ring__semi { position: absolute; top: 0; width: 50%; height: 100%; overflow: hidden; }
+.delay-ring__half--right .delay-ring__semi { left: 0; }
+.delay-ring__half--left .delay-ring__semi { left: 50%; }
+.delay-ring__semi i { position: absolute; top: 0; width: 200%; height: 100%; border: 3px solid var(--accent); border-radius: 50%; }
+.delay-ring__half--right .delay-ring__semi i { left: 0; }
+.delay-ring__half--left .delay-ring__semi i { left: -100%; }
+
+/* Точка сигнала. Координаты задаёт только анимация; под узлами (z-index 1
+   против 2), чтобы «входить» в иконку, а не проезжать по ней поверх. */
+.delay-signal { position: absolute; z-index: 1; top: 0; left: 0; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(239,18,54,.18), 0 0 16px 4px rgba(239,18,54,.55); opacity: 0; pointer-events: none; }
+
+/* Карточки. Мозги — графитовые, как плитка оборудования на главной; излучатели
+   — белые, как карточки профиля. z-index выше узлов: волны вспышки уходят под
+   карточку, а не поверх текста. */
+.delay-node, .delay-emitter { position: relative; z-index: 3; min-width: 0; border-radius: 14px; }
+.delay-node { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-height: 60px; padding: 12px 16px; color: #fff; background: radial-gradient(circle at 90% 80%, rgba(239,18,54,.18), transparent 50%), #10161b; box-shadow: var(--shadow); }
+.delay-node strong { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+.delay-node span { color: rgba(255,255,255,.62); font-size: 12px; }
+
+.delay-emitter { display: flex; flex-direction: column; gap: 6px; padding: 10px 10px 12px 16px; border: 1px solid var(--line); background: #fff; box-shadow: 0 3px 18px rgba(15,22,28,.05); }
+.delay-emitter__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; }
+.delay-emitter__index { color: #7b858c; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.delay-emitter__remove { width: 36px; height: 36px; color: var(--ink-faint); }
+.delay-emitter__remove:hover:not(:disabled) { color: var(--danger); background: var(--danger-bg); }
+.delay-emitter__value { display: flex; align-items: flex-end; gap: 12px; }
+.delay-emitter__value > div { display: flex; flex-direction: column; gap: 2px; padding-bottom: 4px; }
+.delay-emitter__value span { color: var(--ink-soft); font-size: 13px; font-weight: 700; }
+.delay-emitter__value small { color: var(--ink-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.delay-emitter__steps { position: relative; min-width: 1.4ch; font-size: 44px; font-weight: 800; letter-spacing: -.045em; line-height: 1; font-variant-numeric: tabular-nums; }
+.delay-emitter__steps--zero { color: var(--ink-faint); }
+/* Подсветка смены значения: красная подложка гаснет, число «оседает». */
+.delay-emitter__steps::after { content: ''; position: absolute; z-index: -1; inset: -2px -8px; border-radius: 8px; background: rgba(239,18,54,.14); opacity: 0; }
+.delay-emitter__steps--changed { animation: delay-steps-settle .5s cubic-bezier(.2,.7,.2,1); }
+.delay-emitter__steps--changed::after { animation: delay-steps-flash .9s ease-out; }
+
+/* Поле длины — пилюля на кабеле: короткий отвод от жилы к полю. Кегль 16 px
+   везде, а не только на ≤820: iOS Safari зумит страницу на меньшем. */
+.delay-link { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 5px; padding: 10px 0; }
+.delay-length { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 16px 0 6px; border: 1px solid var(--line-strong); border-radius: 999px; background: #fff; box-shadow: 0 2px 8px rgba(15,22,28,.05); transition: border-color .15s ease, box-shadow .15s ease; }
+/* Отвод тянется от оси рельса (28 px) через зазор колонок (14 px) до поля. */
+.delay-length::before { content: ''; position: absolute; top: calc(50% - 1px); left: -43px; width: 42px; height: 2px; background: #1d252b; }
+.delay-length:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(239,18,54,.14); }
+.delay-length input { width: 72px; height: 40px; padding: 0 0 0 10px; border: 0; border-radius: 999px; color: var(--ink); background: transparent; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+.delay-length input:focus-visible { outline: none; }
+.delay-length input::placeholder { color: var(--ink-faint); font-weight: 600; }
+.delay-length > span { color: var(--ink-soft); font-size: 14px; font-weight: 700; }
+.delay-length--invalid { border-color: var(--danger); background: var(--danger-bg); }
+.delay-link__hint { padding-left: 4px; color: var(--ink-faint); font-size: 12px; line-height: 1.35; }
+.delay-link__hint--invalid { color: var(--danger); font-weight: 700; }
+
+.delay-row--add { padding-top: 10px; }
+.delay-add { min-height: 48px; display: inline-flex; align-items: center; gap: 8px; padding: 0 18px; border: 1.5px dashed var(--line-strong); border-radius: 999px; color: var(--ink); background: transparent; font-size: 14px; font-weight: 800; transition: border-color .15s ease, color .15s ease, background .15s ease; }
+.delay-add:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: rgba(239,18,54,.05); }
+.delay-add__limit { margin: 6px 0 0 4px; color: var(--ink-faint); font-size: 12px; }
+
+/* Памятка: карточка сбоку, прилипает при прокрутке длинной цепочки. */
+.delay-guide { position: sticky; top: 24px; padding: 20px 22px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(145deg, #f5f6f3 0%, #eceee9 100%); animation: rise-in .38s .14s cubic-bezier(.2,.7,.2,1) both; }
+.delay-guide ol { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: delay-guide; }
+.delay-guide li { position: relative; padding-left: 34px; color: var(--ink-soft); font-size: 14px; line-height: 1.5; counter-increment: delay-guide; }
+.delay-guide li::before { content: counter(delay-guide); position: absolute; top: 0; left: 0; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #10161b; font-size: 12px; font-weight: 800; }
+.delay-guide__formula { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line-strong); color: var(--ink); font-size: 13px; font-weight: 700; line-height: 1.5; }
+
+/* Появление нового излучателя: кабель дорастает сверху, следом въезжает узел
+   и карточка. На первом кадре страницы так же — цепочка «собирается». */
+.delay-segment .delay-cable { animation: delay-cable-grow .36s cubic-bezier(.2,.7,.2,1) both; }
+.delay-segment .delay-beacon { animation: delay-beacon-pop .32s .2s cubic-bezier(.2,.7,.2,1) both; }
+.delay-segment .delay-emitter { animation: rise-in .36s .22s cubic-bezier(.2,.7,.2,1) both; }
+.delay-segment .delay-length { animation: soft-in .3s .1s ease both; }
+
+@keyframes delay-cable-grow { from { transform: scaleY(0); } }
+@keyframes delay-beacon-pop { from { opacity: 0; transform: scale(.6); } }
+@keyframes delay-steps-settle { from { transform: scale(1.14); } }
+@keyframes delay-steps-flash { from { opacity: 1; } }
+
+@media (max-width: 1100px) {
+  .delay-layout { grid-template-columns: minmax(0, 1fr); max-width: 720px; }
+  .delay-guide { position: static; }
+}
+
+@media (max-width: 820px) {
+  .delay-summary > div { padding: 12px 12px 14px; }
+  .delay-summary span { font-size: 11px; }
+  /* Копирование забирает остаток строки, «Сбросить» — по содержимому: поровну
+     надпись копирования ломалась в две строки. */
+  .delay-actions > .button { flex: 0 0 auto; padding-inline: 12px; white-space: nowrap; }
+  .delay-actions > .delay-copy { flex: 1 1 auto; min-width: 0; }
+  .delay-emitter__remove { width: 44px; height: 44px; }
+  .delay-emitter__steps { font-size: 40px; }
+  .delay-add { width: 100%; justify-content: center; }
+}
