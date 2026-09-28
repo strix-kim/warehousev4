@@ -68,6 +68,7 @@
   .sidebar__brand { justify-content: center; }
   .sidebar .brand-name, .sidebar__brand > button, .nav-section-label, .sidebar__nav a span, .sidebar__scope span, .user-copy { display: none; }
   .sidebar__nav a { justify-content: center; padding: 0; }
+  .sidebar__nav a.active::before { left: -10px; }
   .sidebar__scope { justify-content: center; padding: 12px 0; }
   .sidebar__footer { grid-template-columns: 1fr; justify-items: center; }
   .sidebar__utility { display: none; }
@@ -102,7 +103,7 @@
   .sidebar__nav a { width: auto; min-width: 0; height: 50px; margin: 0; flex: 1; flex-direction: column; gap: 2px; font-size: 11px; }
   .sidebar__nav a span { display: block; }
   .app-shell--sidebar-collapsed .sidebar__nav a span { display: block; }
-  .sidebar__nav a.active::before { left: 50%; top: -7px; width: 30px; height: 3px; transform: translateX(-50%); }
+  .sidebar__nav a.active::before { left: 50%; top: -7px; width: 30px; height: 3px; border-radius: 4px; transform: translateX(-50%); }
   /* RU/UZ уехал в лист «Ещё»: постоянный слот под два символа стоил четверти
      ширины панели, а язык переключают раз в жизни. */
   .sidebar__language { display: none; }
@@ -111,9 +112,11 @@
      ради специфичности: голый класс проигрывал `.sidebar__nav a { display: flex }`
      из 02-shell, и «Залы» стояли в нижней панели седьмым слотом (найдено в с30). */
   .sidebar__nav a.sidebar__nav-extra { display: none; }
-  .sidebar__more { width: auto; min-width: 0; height: 50px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; margin: 0; padding: 0; border: 0; border-radius: var(--r-md); color: var(--on-night-2); background: transparent; font-size: 11px; font-weight: 600; }
-  .sidebar__more.active { color: #fff; background: color-mix(in srgb, var(--red) 14%, transparent); }
-  .sidebar__more.active svg { color: var(--red-act); }
+  .sidebar__more { width: auto; min-width: 0; height: 50px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; margin: 0; padding: 0; border: 0; border-radius: var(--r-md); color: var(--on-night); background: transparent; font-size: 11px; font-weight: 500; }
+  /* «Ещё» стоит в одном ряду с пунктами меню — и выглядит как они (02-shell). */
+  .sidebar__more svg { color: var(--on-night-2); }
+  .sidebar__more.active { background: var(--night-3); font-weight: 600; }
+  .sidebar__more.active svg { color: #fff; }
   .language-switch--compact, .app-shell--sidebar-collapsed .language-switch--compact { height: 50px; grid-template-columns: 1fr 1fr; align-content: center; border: 0; background: transparent; }
   .language-switch--compact button { min-width: 0; height: 44px; padding: 0; width: 100%; font-size: 11px; }
   .app-content { padding: 25px 15px calc(90px + env(safe-area-inset-bottom)); }
@@ -297,4 +300,9 @@
   .mobile-selection-bar > span:last-child { color: var(--on-night); }
   .mobile-selection-bar strong { min-width: 27px; height: 27px; display: inline-grid; place-items: center; border-radius: var(--r-sm); color: #fff; background: var(--red-act); font-family: inherit; }
   .mobile-selection-bar > span:last-child svg { transform: rotate(-90deg); }
+}
+
+/* Сетка фона — декор экрана, на бумаге ей не место (02-shell, .gridfield). */
+@media print {
+  .gridfield::before, .gridfield::after { display: none; }
 }

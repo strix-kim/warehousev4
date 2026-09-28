@@ -307,7 +307,9 @@ function AppShell() {
         </div>
       </aside>
 
-      <main className="app-content">
+      {/* Сетку фона включает оболочка, а не страница: поле — вся колонка, а
+          .home-page кончается на паддингах .app-content, и линии обрывались бы. */}
+      <main className={`app-content${pathname === '/' ? ' gridfield' : ''}`}>
         <Outlet />
       </main>
 

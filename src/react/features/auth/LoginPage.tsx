@@ -69,7 +69,7 @@ export function LoginPage() {
         <p className="login-version">WAREHOUSE · 2026</p>
       </section>
 
-      <section className="login-form-panel">
+      <section className="login-form-panel gridfield">
         <form className="login-card" onSubmit={handleSubmit}>
           <LanguageSwitcher />
           <div className="login-icon" aria-hidden="true"><LockKeyhole size={22} /></div>
