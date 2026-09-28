@@ -17,10 +17,10 @@
 
 /* Сводка: те же плитки, что на главной, только в строку. Максимум — красная
    плитка: это число, ради которого страницу открывают. */
-.delay-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: var(--shadow); }
+.delay-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-card); }
 .delay-summary > div { min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; padding: 16px 18px; box-shadow: 1px 0 0 var(--line); }
 .delay-summary span { color: var(--faint); font-size: 12px; font-weight: 700; line-height: 1.25; }
-.delay-summary strong { font-size: clamp(24px, 3vw, 32px); font-weight: 800; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+.delay-summary strong { font-size: clamp(24px, 3vw, 32px); font-weight: 700; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
 .delay-summary small { color: var(--faint); font-size: 14px; font-weight: 700; letter-spacing: 0; }
 .delay-summary__max { color: #fff; background: var(--red-act); }
 .delay-summary .delay-summary__max span { color: rgba(255,255,255,.76); }
@@ -50,9 +50,9 @@
    поверх квадрата 56 × 56; его центр и есть точка, куда бежит сигнал. */
 .delay-beacon { position: relative; z-index: 2; width: 56px; height: 56px; display: block; }
 .delay-beacon__icon { position: absolute; z-index: 3; inset: 6px; display: grid; place-items: center; border-radius: 50%; color: var(--red-act); background: var(--night); box-shadow: 0 6px 16px rgba(15,17,21,.18); }
-.delay-beacon--brain .delay-beacon__icon { inset: 3px; border-radius: 14px; }
+.delay-beacon--brain .delay-beacon__icon { inset: 3px; border-radius: var(--r-lg); }
 .delay-beacon__glow { position: absolute; z-index: 0; inset: 2px; border-radius: 50%; background: var(--red-act); box-shadow: 0 0 22px 4px color-mix(in srgb, var(--red) 45%, transparent); opacity: 0; }
-.delay-beacon--brain .delay-beacon__glow { border-radius: 16px; }
+.delay-beacon--brain .delay-beacon__glow { border-radius: var(--r-lg); }
 .delay-signal-wave { position: absolute; z-index: 0; inset: 0; border: 2px solid var(--red-act); border-radius: 50%; opacity: 0; pointer-events: none; }
 
 /* Кольцо ожидания: дорожка всегда видна бледной, заливка открывается двумя
@@ -83,24 +83,24 @@
 /* Карточки. Мозги — графитовые, как плитка оборудования на главной; излучатели
    — белые, как карточки профиля. z-index выше узлов: волны вспышки уходят под
    карточку, а не поверх текста. */
-.delay-node, .delay-emitter { position: relative; z-index: 3; min-width: 0; border-radius: 14px; }
-.delay-node { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-height: 60px; padding: 12px 16px; color: #fff; background: radial-gradient(circle at 90% 80%, color-mix(in srgb, var(--red) 18%, transparent), transparent 50%), var(--night); box-shadow: var(--shadow); }
-.delay-node strong { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+.delay-node, .delay-emitter { position: relative; z-index: 3; min-width: 0; border-radius: var(--r-lg); }
+.delay-node { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-height: 60px; padding: 12px 16px; color: #fff; background: radial-gradient(circle at 90% 80%, color-mix(in srgb, var(--red) 18%, transparent), transparent 50%), var(--night); box-shadow: var(--shadow-card); }
+.delay-node strong { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
 .delay-node span { color: rgba(255,255,255,.62); font-size: 12px; }
 
 .delay-emitter { display: flex; flex-direction: column; gap: 6px; padding: 10px 10px 12px 16px; border: 1px solid var(--line); background: var(--card); box-shadow: 0 3px 18px rgba(15,17,21,.05); }
 .delay-emitter__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; }
-.delay-emitter__index { color: var(--faint); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.delay-emitter__index { color: var(--faint); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .delay-emitter__remove { width: 36px; height: 36px; color: var(--faint); }
 .delay-emitter__remove:hover:not(:disabled) { color: var(--bad); background: var(--bad-bg); }
 .delay-emitter__value { display: flex; align-items: flex-end; gap: 12px; }
 .delay-emitter__value > div { display: flex; flex-direction: column; gap: 2px; padding-bottom: 4px; }
 .delay-emitter__value span { color: var(--muted); font-size: 13px; font-weight: 700; }
 .delay-emitter__value small { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
-.delay-emitter__steps { position: relative; min-width: 1.4ch; font-size: 44px; font-weight: 800; letter-spacing: -.045em; line-height: 1; font-variant-numeric: tabular-nums; }
+.delay-emitter__steps { position: relative; min-width: 1.4ch; font-size: 44px; font-weight: 700; letter-spacing: -.045em; line-height: 1; font-variant-numeric: tabular-nums; }
 .delay-emitter__steps--zero { color: var(--faint); }
 /* Подсветка смены значения: красная подложка гаснет, число «оседает». */
-.delay-emitter__steps::after { content: ''; position: absolute; z-index: -1; inset: -2px -8px; border-radius: 8px; background: color-mix(in srgb, var(--red) 14%, transparent); opacity: 0; }
+.delay-emitter__steps::after { content: ''; position: absolute; z-index: -1; inset: -2px -8px; border-radius: var(--r-sm); background: color-mix(in srgb, var(--red) 14%, transparent); opacity: 0; }
 .delay-emitter__steps--changed { animation: delay-steps-settle .5s cubic-bezier(.2,.7,.2,1); }
 .delay-emitter__steps--changed::after { animation: delay-steps-flash .9s ease-out; }
 
@@ -111,7 +111,7 @@
 /* Отвод тянется от оси рельса (28 px) через зазор колонок (14 px) до поля. */
 .delay-length::before { content: ''; position: absolute; top: calc(50% - 1px); left: -43px; width: 42px; height: 2px; background: var(--night-2); }
 .delay-length:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
-.delay-length input { width: 72px; height: 40px; padding: 0 0 0 10px; border: 0; border-radius: 999px; color: var(--ink); background: transparent; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+.delay-length input { width: 72px; height: 40px; padding: 0 0 0 10px; border: 0; border-radius: 999px; color: var(--ink); background: transparent; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
 .delay-length input:focus-visible { outline: none; }
 .delay-length input::placeholder { color: var(--faint); font-weight: 600; }
 .delay-length > span { color: var(--muted); font-size: 14px; font-weight: 700; }
@@ -120,15 +120,15 @@
 .delay-link__hint--invalid { color: var(--bad); font-weight: 700; }
 
 .delay-row--add { padding-top: 10px; }
-.delay-add { min-height: 48px; display: inline-flex; align-items: center; gap: 8px; padding: 0 18px; border: 1.5px dashed var(--ctl); border-radius: 999px; color: var(--ink); background: transparent; font-size: 14px; font-weight: 800; transition: border-color .15s ease, color .15s ease, background .15s ease; }
+.delay-add { min-height: 48px; display: inline-flex; align-items: center; gap: 8px; padding: 0 18px; border: 1.5px dashed var(--ctl); border-radius: 999px; color: var(--ink); background: transparent; font-size: 14px; font-weight: 700; transition: border-color .15s ease, color .15s ease, background .15s ease; }
 .delay-add:hover:not(:disabled) { border-color: var(--red-act); color: var(--red-act); background: color-mix(in srgb, var(--red) 5%, transparent); }
 .delay-add__limit { margin: 6px 0 0 4px; color: var(--faint); font-size: 12px; }
 
 /* Памятка: карточка сбоку, прилипает при прокрутке длинной цепочки. */
-.delay-guide { position: sticky; top: 24px; padding: 20px 22px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(145deg, var(--sunk) 0%, var(--select) 100%); animation: rise-in .38s .14s cubic-bezier(.2,.7,.2,1) both; }
+.delay-guide { position: sticky; top: 24px; padding: 20px 22px; border: 1px solid var(--line); border-radius: var(--r-lg); background: linear-gradient(145deg, var(--sunk) 0%, var(--select) 100%); animation: rise-in .38s .14s cubic-bezier(.2,.7,.2,1) both; }
 .delay-guide ol { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: delay-guide; }
 .delay-guide li { position: relative; padding-left: 34px; color: var(--muted); font-size: 14px; line-height: 1.5; counter-increment: delay-guide; }
-.delay-guide li::before { content: counter(delay-guide); position: absolute; top: 0; left: 0; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: var(--night); font-size: 12px; font-weight: 800; }
+.delay-guide li::before { content: counter(delay-guide); position: absolute; top: 0; left: 0; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: var(--night); font-size: 12px; font-weight: 700; }
 .delay-guide__formula { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--ctl); color: var(--ink); font-size: 13px; font-weight: 700; line-height: 1.5; }
 
 /* Появление нового излучателя: кабель дорастает сверху, следом въезжает узел

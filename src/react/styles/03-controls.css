@@ -1,12 +1,12 @@
 
-.button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 0 16px; border: 1px solid transparent; border-radius: var(--r-sm); font-size: 14px; font-weight: 700; transition: transform .15s ease, background .15s ease, border .15s ease; }
+.button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 0 16px; border: 1px solid transparent; border-radius: var(--r-md); font-size: 14px; font-weight: 700; transition: transform .15s ease, background .15s ease, border .15s ease; }
 .button:not(:disabled):hover { transform: translateY(-1px); }
 .button:not(:disabled):active { transform: translateY(1px) scale(.99); }
 .button--primary { color: #fff; background: var(--red-act); border-color: var(--red-act); }
 .button--primary:not(:disabled):hover { background: var(--red-press); border-color: var(--red-press); }
 .button--secondary { color: var(--ink); background: var(--card); border-color: var(--ctl); }
 .button--wide { width: 100%; }
-.icon-button { width: 40px; height: 40px; display: inline-grid; flex: 0 0 auto; place-items: center; padding: 0; border: 0; border-radius: 7px; color: var(--muted); background: transparent; }
+.icon-button { width: 40px; height: 40px; display: inline-grid; flex: 0 0 auto; place-items: center; padding: 0; border: 0; border-radius: var(--r-sm); color: var(--muted); background: transparent; }
 .icon-button:hover:not(:disabled) { color: var(--ink); background: var(--hover); }
 .icon-button--dark { color: var(--on-night-2); }
 .icon-button--dark:hover:not(:disabled) { color: #fff; background: rgba(255,255,255,.08); }
@@ -23,23 +23,27 @@
 .toolbar--catalog .search-field { min-width: 200px; }
 .toolbar--catalog .app-select { width: min(200px, 100%); }
 .data-age { flex: 0 0 auto; margin-left: auto; display: inline-flex; align-items: center; gap: 10px; color: var(--faint); font-size: 13px; }
-.data-age button { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: var(--muted); background: transparent; font-size: 13px; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+.data-age button { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: var(--muted); background: transparent; font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .data-age button:disabled { color: var(--faint); text-decoration: none; }
 .toolbar__count { flex: 0 0 auto; color: var(--faint); font-size: 13px; white-space: nowrap; }
-.search-field { max-width: 510px; min-width: 260px; flex: 1; height: 42px; display: flex; align-items: center; gap: 10px; padding: 0 10px 0 13px; border: 1px solid var(--ctl); border-radius: 8px; color: var(--faint); background: var(--card); }
+.search-field { max-width: 510px; min-width: 260px; flex: 1; height: 42px; display: flex; align-items: center; gap: 10px; padding: 0 10px 0 13px; border: 1px solid var(--ctl); border-radius: var(--r-md); color: var(--faint); background: var(--card); transition: border-color .16s ease, background .16s ease; }
+.search-field:hover { border-color: var(--muted); background: var(--hover); }
 .search-field:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 .search-field input { min-width: 0; flex: 1; height: 100%; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 14px; }
 .search-field input::placeholder { color: var(--faint); }
 .app-select { position: relative; width: min(260px, 100%); height: 42px; flex: 0 0 auto; }
-.app-select__trigger { width: 100%; height: 100%; display: flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid var(--ctl); border-radius: 8px; color: var(--ink); background: var(--card); font-size: 14px; font-weight: 650; text-align: left; transition: border-color .16s ease, box-shadow .16s ease, background .16s ease; }
-.app-select__trigger:hover, .app-select__trigger[aria-expanded='true'] { border-color: var(--ctl); background: var(--hover); }
+.app-select__trigger { width: 100%; height: 100%; display: flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid var(--ctl); border-radius: var(--r-md); color: var(--ink); background: var(--card); font-size: 14px; font-weight: 600; text-align: left; transition: border-color .16s ease, box-shadow .16s ease, background .16s ease; }
+/* Наведение на контролы (с32): рамка в покое — уже --ctl, поэтому отклик — темнее
+   (--muted, 6,1:1 к белому против 3,5:1 у --ctl) плюс фон --hover. Макет hover
+   поля не задаёт; правило одно на селект, датапикер, поиск и поля .field. */
+.app-select__trigger:hover, .app-select__trigger[aria-expanded='true'] { border-color: var(--muted); background: var(--hover); }
 .app-select__trigger[aria-expanded='true'] { box-shadow: 0 0 0 3px rgba(15,17,21,.055); }
 .app-select__trigger > span:not(.app-select__icon) { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-select__icon { display: grid; place-items: center; color: var(--muted); }
 .app-select__trigger > svg { flex: 0 0 auto; color: var(--faint); transition: transform .16s ease; }
 .app-select__trigger > svg.is-open { transform: rotate(180deg); }
-.app-select__popover { position: fixed; z-index: 70; max-height: min(330px, calc(100dvh - 24px)); padding: 6px; overflow-y: auto; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.98); box-shadow: 0 18px 46px rgba(15,17,21,.18), 0 2px 8px rgba(15,17,21,.08); backdrop-filter: blur(16px); animation: popover-in .16s ease-out; }
-.app-select__popover button { width: 100%; min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 650; text-align: left; }
+.app-select__popover { position: fixed; z-index: 70; max-height: min(330px, calc(100dvh - 24px)); padding: 6px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-md); background: rgba(255,255,255,.98); box-shadow: var(--shadow-pop); backdrop-filter: blur(16px); animation: popover-in .16s ease-out; }
+.app-select__popover button { width: 100%; min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 0; border-radius: var(--r-sm); color: var(--muted); background: transparent; font-size: 13px; font-weight: 600; text-align: left; }
 
 /* Меню действий. Внешний вид попапа общий с AppSelect, отличается содержимое
    пункта: иконка + название + подсказка в две строки, без галочки «выбрано». */
@@ -50,30 +54,30 @@
 .action-menu__popover button { align-items: flex-start; justify-content: flex-start; min-height: 46px; }
 .action-menu__popover button > svg { flex: 0 0 auto; margin-top: 2px; color: var(--faint); }
 .action-menu__label { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
-.action-menu__label small { color: var(--faint); font-size: 11px; font-weight: 550; }.app-select__popover button:hover { color: var(--ink); background: var(--sunk); }
+.action-menu__label small { color: var(--faint); font-size: 11px; font-weight: 500; }.app-select__popover button:hover { color: var(--ink); background: var(--sunk); }
 .app-select__popover button.is-selected { color: var(--ink); background: color-mix(in srgb, var(--red) 7%, transparent); }
 .app-select__popover button.is-selected svg { flex: 0 0 auto; color: var(--red-act); }
 .field > .app-select { width: 100%; height: 45px; }
 
-.app-date-picker__trigger { width: 100%; height: 45px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 13px; border: 1px solid var(--ctl); border-radius: 8px; color: var(--faint); background: var(--sunk); font-size: 14px; font-weight: 550; text-align: left; transition: border-color .16s ease, box-shadow .16s ease; }
+.app-date-picker__trigger { width: 100%; height: 45px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 13px; border: 1px solid var(--ctl); border-radius: var(--r-md); color: var(--faint); background: var(--sunk); font-size: 14px; font-weight: 500; text-align: left; transition: border-color .16s ease, box-shadow .16s ease, background .16s ease; }
 .app-date-picker__trigger.has-value { color: var(--ink); }
-.app-date-picker__trigger:hover, .app-date-picker__trigger[aria-expanded='true'] { border-color: var(--ctl); }
+.app-date-picker__trigger:hover, .app-date-picker__trigger[aria-expanded='true'] { border-color: var(--muted); background: var(--hover); }
 .app-date-picker__trigger[aria-expanded='true'] { box-shadow: 0 0 0 3px rgba(15,17,21,.055); }
 .app-date-picker__trigger svg { flex: 0 0 auto; color: var(--red-act); }
-.app-date-picker__popover { position: fixed; z-index: 70; padding: 13px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.985); box-shadow: 0 22px 55px rgba(15,17,21,.2), 0 2px 10px rgba(15,17,21,.08); backdrop-filter: blur(18px); animation: popover-in .16s ease-out; }
+.app-date-picker__popover { position: fixed; z-index: 70; padding: 13px; border: 1px solid var(--line); border-radius: var(--r-lg); background: rgba(255,255,255,.985); box-shadow: var(--shadow-pop); backdrop-filter: blur(18px); animation: popover-in .16s ease-out; }
 .app-date-picker__header { height: 42px; display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; margin-bottom: 8px; }
 .app-date-picker__header strong { text-align: center; text-transform: capitalize; font-family: inherit; font-size: 15px; }
-.app-date-picker__header button { width: 38px; height: 38px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: var(--card); }
+.app-date-picker__header button { width: 38px; height: 38px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--muted); background: var(--card); }
 .app-date-picker__header button:hover { color: var(--ink); background: var(--sunk); }
 .app-date-picker__weekdays, .app-date-picker__days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
 .app-date-picker__weekdays { margin-bottom: 4px; }
-.app-date-picker__weekdays span { height: 26px; display: grid; place-items: center; color: var(--faint); font-size: 10px; font-weight: 800; text-transform: uppercase; }
-.app-date-picker__days > span, .app-date-picker__days button { aspect-ratio: 1; min-width: 0; display: grid; place-items: center; padding: 0; border: 0; border-radius: 8px; color: var(--ink); background: transparent; font-size: 12px; font-weight: 700; }
+.app-date-picker__weekdays span { height: 26px; display: grid; place-items: center; color: var(--faint); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.app-date-picker__days > span, .app-date-picker__days button { aspect-ratio: 1; min-width: 0; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-sm); color: var(--ink); background: transparent; font-size: 12px; font-weight: 700; }
 .app-date-picker__days button { position: relative; }
 .app-date-picker__days button:hover { background: var(--sunk); }
 .app-date-picker__days button.is-today { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 32%, transparent); color: var(--red-act); }
 .app-date-picker__days button.is-selected { color: #fff; background: var(--red-act); box-shadow: 0 5px 13px color-mix(in srgb, var(--red) 20%, transparent); }
 .app-date-picker__days button.is-selected svg { position: absolute; right: 3px; bottom: 3px; }
 .app-date-picker__footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
-.app-date-picker__footer button { min-height: 36px; padding: 0 10px; border: 0; border-radius: 7px; color: var(--red-act); background: color-mix(in srgb, var(--red) 6%, transparent); font-size: 12px; font-weight: 800; }
+.app-date-picker__footer button { min-height: 36px; padding: 0 10px; border: 0; border-radius: var(--r-sm); color: var(--red-act); background: color-mix(in srgb, var(--red) 6%, transparent); font-size: 12px; font-weight: 700; }
 .app-date-picker__footer button:last-child { color: var(--muted); background: var(--sunk); }

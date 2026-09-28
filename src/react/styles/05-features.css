@@ -8,10 +8,10 @@
 /* Дата мероприятия и заказчик — первичный идентификатор списка вместо названия:
    название у всех дефолтное, а «форум в Hyatt 25 августа» человек помнит. */
 .list-card__identity { min-width: 0; }
-.list-card__date { font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; }
+.list-card__date { font-size: 17px; font-weight: 700; letter-spacing: -.02em; line-height: 1.25; }
 .list-card__client { margin-top: 3px; color: var(--muted); font-size: 13px; }
 .list-card__identity p { overflow: hidden; text-overflow: ellipsis; }
-.list-card h3 { margin-bottom: 7px; color: var(--muted); font-size: 14px; font-weight: 650; }
+.list-card h3 { margin-bottom: 7px; color: var(--muted); font-size: 14px; font-weight: 600; }
 /* Кламп адресован ОПИСАНИЮ, а не любому <p> в карточке: дата и заказчик — тоже
    абзацы, и общий селектор бил их специфичностью, навязывая цвет и две строки. */
 .list-card__description { display: -webkit-box; margin: 0; overflow: hidden; color: var(--muted); font-size: 13px; line-height: 1.5; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -20,7 +20,7 @@
 /* Черновик — тот же тайл, но приглушённой заливкой: карточка обязана читаться как
    своя работа, а не как ещё один сохранённый документ. */
 .list-card--draft { background: var(--sunk); }
-.list-card__draft-badge { flex: 0 0 auto; padding: 3px 9px; border-radius: 999px; color: var(--warn); background: var(--warn-bg); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.list-card__draft-badge { flex: 0 0 auto; padding: 3px 9px; border-radius: 999px; color: var(--warn); background: var(--warn-bg); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .list-card--loading { min-height: 250px; background: linear-gradient(90deg, var(--sunk) 25%, var(--card) 50%, var(--sunk) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 .list-card__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .list-card__actions .button { min-width: 0; padding-inline: 10px; font-size: 12px; }
@@ -68,7 +68,7 @@
 .home-row { min-height: 0; display: grid; gap: clamp(10px, 1.6vh, 18px); }
 .home-row--work { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .home-row--refs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.home-destination { position: relative; min-height: clamp(184px, 24vh, 360px); display: flex; flex-direction: column; align-items: flex-start; padding: clamp(16px, 2.2vh, 40px) clamp(25px, 3vw, 40px); overflow: hidden; border: 1px solid var(--line); border-radius: 16px; color: var(--ink); background: var(--card); box-shadow: var(--shadow); text-decoration: none; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; animation: rise-in .38s .05s cubic-bezier(.2,.7,.2,1) both; }
+.home-destination { position: relative; min-height: clamp(184px, 24vh, 360px); display: flex; flex-direction: column; align-items: flex-start; padding: clamp(16px, 2.2vh, 40px) clamp(25px, 3vw, 40px); overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-xl); color: var(--ink); background: var(--card); box-shadow: var(--shadow-card); text-decoration: none; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; animation: rise-in .38s .05s cubic-bezier(.2,.7,.2,1) both; }
 /* Круг — фон плитки: без z-index он рисуется на слое арта, но позже по дереву,
    и ложится ПОВЕРХ картинки. Порядок слоёв плитки: круг 0, арт 1, текст 2. */
 .home-destination::after { content: ''; position: absolute; z-index: 0; right: -75px; bottom: -95px; width: 250px; height: 250px; border-radius: 50%; background: rgba(15,17,21,.035); transition: transform .25s ease; }
@@ -81,7 +81,7 @@
 .home-destination--lists::after { background: rgba(255,255,255,.09); }
 .home-destination--equipment::after { background: rgba(255,255,255,.05); }
 .home-destination--employees::after { background: color-mix(in srgb, var(--red) 5.5%, transparent); }
-.home-destination__icon { width: clamp(44px, 5.6vh, 62px); height: clamp(44px, 5.6vh, 62px); display: grid; place-items: center; margin-bottom: auto; border-radius: 14px; color: var(--red-act); background: color-mix(in srgb, var(--red) 8%, transparent); }
+.home-destination__icon { width: clamp(44px, 5.6vh, 62px); height: clamp(44px, 5.6vh, 62px); display: grid; place-items: center; margin-bottom: auto; border-radius: var(--r-lg); color: var(--red-act); background: color-mix(in srgb, var(--red) 8%, transparent); }
 .home-destination--lists .home-destination__icon { color: #fff; background: rgba(255,255,255,.14); }
 .home-destination--equipment .home-destination__icon { color: #fff; background: rgba(255,255,255,.1); }
 .home-destination--employees .home-destination__icon { color: var(--red-act); background: color-mix(in srgb, var(--red) 9%, transparent); }
@@ -91,12 +91,12 @@
 .home-destination .eyebrow { margin-top: clamp(10px, 2.2vh, 42px); }
 .home-destination--lists .eyebrow { color: rgba(255,255,255,.72); }
 .home-destination--equipment .eyebrow { color: rgba(255,255,255,.62); }
-.home-destination strong { position: relative; z-index: 1; margin: clamp(3px, .7vh, 6px) 0 clamp(4px, 1.1vh, 10px); font-family: inherit; font-size: clamp(21px, calc(1.2vh + 1.5vw), 39px); font-weight: 800; letter-spacing: -.045em; }
+.home-destination strong { position: relative; z-index: 1; margin: clamp(3px, .7vh, 6px) 0 clamp(4px, 1.1vh, 10px); font-family: inherit; font-size: clamp(21px, calc(1.2vh + 1.5vw), 39px); font-weight: 700; letter-spacing: -.045em; }
 .home-destination p { position: relative; z-index: 1; max-width: 440px; margin: 0; color: var(--muted); font-size: clamp(12px, 1.6vh, 14px); line-height: 1.55; }
 .home-destination--lists p { color: rgba(255,255,255,.76); }
 .home-destination--equipment p { color: rgba(255,255,255,.7); }
 /* color/text-decoration — потому что у списков действие теперь ссылка, а не span */
-.home-destination__action { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; margin-top: clamp(10px, 1.9vh, 28px); color: inherit; font-size: 13px; font-weight: 800; text-decoration: none; }
+.home-destination__action { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; margin-top: clamp(10px, 1.9vh, 28px); color: inherit; font-size: 13px; font-weight: 700; text-decoration: none; }
 /* Тело плитки — растянутая ссылка: у неё position: static, поэтому её ::after считает
    inset: 0 от самой плитки и кликается вся площадь, а подпись-действие остаётся
    отдельной целью поверх (z-index 2). width: 100% обязателен из-за align-items:
@@ -127,7 +127,9 @@
 .home-row--refs .home-destination { min-height: clamp(150px, 20vh, 300px); }
 .home-destination .eyebrow, .home-destination strong, .home-destination p, .home-destination__action, .home-destination__icon, .home-destination__arrow { position: relative; z-index: 2; }
 .home-destination__arrow { position: absolute; }
-.home-destination strong, .home-destination p, .home-destination__action { max-width: 58%; }
+/* 60, а не 58 % (с32): Inter шире системного шрифта, и описание «Автомобилей» на
+   1440×900 уходило в шестую строку — ярусы росли, главная прокручивалась на 23 px. */
+.home-destination strong, .home-destination p, .home-destination__action { max-width: 60%; }
 /* Полоса справа резервируется под арт; если картинку убрать, :has снимет ограничение текста. */
 .home-destination:not(:has(.home-destination__art)) :is(strong, p, .home-destination__action) { max-width: none; }
 
@@ -181,7 +183,7 @@
 .picker-item__copy small { overflow: hidden; color: var(--faint); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .picker-item__count { color: var(--muted); font-size: 12px; font-weight: 700; }
 .picker-item__count--empty { color: var(--warn); }
-.picker-item__action { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 7px; color: #fff; background: var(--red-act); }
+.picker-item__action { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-sm); color: #fff; background: var(--red-act); }
 .picker-item--selected .picker-item__action { color: var(--ok); background: var(--ok-bg); }
 .picker-item--grouped.picker-item--selected { opacity: 1; background: var(--red-tint); }
 .picker-item--grouped.picker-item--selected .picker-item__action { color: #fff; background: var(--red-act); }
@@ -194,9 +196,9 @@
 .picker-skeleton { height: 64px; margin: 1px 0; background: linear-gradient(90deg, var(--sunk) 25%, var(--card) 50%, var(--sunk) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 .picker-load-more { display: grid; place-items: center; padding: 16px; background: var(--sunk); }
 .picker-load-more .button { min-width: 180px; }
-.selection-count { min-width: 34px; height: 34px; display: grid; place-items: center; border-radius: 8px; color: #fff; background: var(--red-act); font-family: inherit; font-size: 14px; }
+.selection-count { min-width: 34px; height: 34px; display: grid; place-items: center; border-radius: var(--r-sm); color: #fff; background: var(--red-act); font-family: inherit; font-size: 14px; }
 .selection-list { max-height: none; }
-.quantity-stepper { height: 32px; display: grid; grid-template-columns: 30px 34px 30px; align-items: center; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.quantity-stepper { height: 32px; display: grid; grid-template-columns: 30px 34px 30px; align-items: center; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
 .quantity-stepper button { height: 100%; display: grid; place-items: center; padding: 0; border: 0; color: var(--muted); background: var(--sunk); }
 .quantity-stepper button:hover { color: var(--ink); background: var(--hover); }
 .quantity-stepper input { width: 100%; height: 100%; padding: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 13px; font-weight: 700; text-align: center; }
@@ -207,11 +209,11 @@
 .selection-footer > div strong { color: var(--ink); font-family: inherit; font-size: 18px; }
 .selection-footer__total { display: inline-flex; align-items: center; gap: 8px; }
 .selection-footer__mobile { display: none; }
-.availability-warning { display: flex; align-items: flex-start; gap: 7px; margin: 0; padding: 10px; border-radius: 8px; color: var(--warn); background: var(--warn-bg); font-size: 12px; line-height: 1.5; }
+.availability-warning { display: flex; align-items: flex-start; gap: 7px; margin: 0; padding: 10px; border-radius: var(--r-sm); color: var(--warn); background: var(--warn-bg); font-size: 12px; line-height: 1.5; }
 .availability-warning svg { flex: 0 0 auto; margin-top: 1px; }
 .clear-selection { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: var(--bad); background: transparent; font-size: 12px; font-weight: 700; white-space: nowrap; }
 /* Взведённое подтверждение: кнопка меняет вид, а не открывает модалку. */
-.clear-selection--armed { padding: 6px 10px; border-radius: 7px; color: #fff; background: var(--bad); }
+.clear-selection--armed { padding: 6px 10px; border-radius: var(--r-sm); color: #fff; background: var(--bad); }
 
 /* Реквизиты — полоса в одну строку, по нажатию раскрывается в сетку полей.
    scroll-margin — чтобы прокрутка к панели при пустых реквизитах не прятала её
@@ -233,7 +235,7 @@
 .quick-list-strip__summary small > span { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
 .quick-list-strip__summary small > span + span::before { content: ' · '; }
 .quick-list-strip__empty { color: var(--faint); font-weight: 500; }
-.quick-list-strip__toggle { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; color: var(--red-act); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.quick-list-strip__toggle { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; color: var(--red-act); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .quick-list-strip__toggle svg { transition: transform .18s ease; }
 .quick-list-meta--open .quick-list-strip__toggle svg { transform: rotate(180deg); }
 .quick-list-meta__fields { display: grid; grid-template-columns: minmax(260px, 1.25fr) minmax(180px, .55fr) minmax(260px, 1fr); gap: 14px; padding: 14px 16px 16px; }
@@ -253,23 +255,23 @@
    колонке явно: у позиций без S/N слот пустует, но ряд корзин остаётся ровным. */
 .quick-selection-item__main { min-height: 66px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 34px 34px; align-items: center; gap: 10px; padding: 11px 14px; }
 .quick-selection-item__main > .icon-button:last-child { grid-column: -2; }
-.equipment-row-index { width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 10px; color: #fff; background: var(--red-act); box-shadow: 0 7px 18px color-mix(in srgb, var(--red) 20%, transparent); font-size: 15px; font-weight: 850; font-variant-numeric: tabular-nums; letter-spacing: -.04em; line-height: 1; }
+.equipment-row-index { width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 auto; border-radius: var(--r-md); color: #fff; background: var(--red-act); box-shadow: 0 7px 18px color-mix(in srgb, var(--red) 20%, transparent); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.04em; line-height: 1; }
 .quick-selection-item__copy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .quick-selection-item__copy strong, .quick-selection-item__copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quick-selection-item__copy strong { font-size: 14px; }
 .quick-selection-item__copy small { color: var(--faint); font-size: 12px; }
-.quick-inline-warning { display: flex; align-items: flex-start; gap: 6px; margin: -2px 14px 10px; padding: 8px 9px; border-radius: 7px; color: var(--warn); background: var(--warn-bg); font-size: 12px; line-height: 1.45; }
+.quick-inline-warning { display: flex; align-items: flex-start; gap: 6px; margin: -2px 14px 10px; padding: 8px 9px; border-radius: var(--r-sm); color: var(--warn); background: var(--warn-bg); font-size: 12px; line-height: 1.45; }
 .quick-inline-warning svg { flex: 0 0 auto; margin-top: 1px; }
 .serial-button.is-open, .serial-button.is-open:hover:not(:disabled) { color: #fff; background: var(--red-act); }
-.serial-picker { margin: 0 14px 12px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--sunk); }
+.serial-picker { margin: 0 14px 12px; padding: 10px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--sunk); }
 .serial-picker > p { margin: 0 0 9px; color: var(--faint); font-size: 11px; line-height: 1.45; }
 .serial-picker > div { display: flex; flex-wrap: wrap; gap: 6px; }
-.serial-picker button { min-height: 36px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid var(--ctl); border-radius: 6px; color: var(--muted); background: var(--card); font-family: inherit; font-size: 12px; }
+.serial-picker button { min-height: 36px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid var(--ctl); border-radius: var(--r-sm); color: var(--muted); background: var(--card); font-family: inherit; font-size: 12px; }
 .serial-picker button > span { width: 14px; height: 14px; display: grid; place-items: center; border: 1px solid var(--ctl); border-radius: 4px; }
 .serial-picker button.active { border-color: color-mix(in srgb, var(--red) 38%, transparent); color: var(--ink); background: color-mix(in srgb, var(--red) 5%, transparent); }
 .serial-picker button.active > span { border-color: var(--red-act); color: #fff; background: var(--red-act); }
 .mobile-selection-bar { display: none; }
-.form-success { display: flex; align-items: center; gap: 6px; margin: 0; padding: 9px 10px; border-radius: 7px; color: var(--ok); background: var(--ok-bg); font-size: 12px; line-height: 1.45; }
+.form-success { display: flex; align-items: center; gap: 6px; margin: 0; padding: 9px 10px; border-radius: var(--r-sm); color: var(--ok); background: var(--ok-bg); font-size: 12px; line-height: 1.45; }
 .list-export-error { display: flex; align-items: center; gap: 7px; margin: 12px 14px 0; }
 .catalog-preview-drawer .equipment-thumb--large { margin: 22px 0 16px; }
 .catalog-preview-drawer__add { width: 100%; }
@@ -279,7 +281,7 @@
 .reservation-drawer__top { flex: 0 0 auto; padding: 28px 30px 0; }
 .reservation-drawer__body { min-height: 0; flex: 1 1 auto; padding: 0 30px 18px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .reservation-drawer__footer { position: relative; z-index: 1; flex: 0 0 auto; padding: 15px 30px max(18px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(255,255,255,.98); box-shadow: 0 -10px 28px rgba(15,17,21,.07); }
-.reservation-summary { display: flex; align-items: center; gap: 12px; margin: 22px 0 14px; padding: 15px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunk); }
+.reservation-summary { display: flex; align-items: center; gap: 12px; margin: 22px 0 14px; padding: 15px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--sunk); }
 .reservation-summary > svg { flex: 0 0 auto; color: var(--red-act); }
 .reservation-summary > div { display: flex; flex-direction: column; gap: 4px; }
 .reservation-summary strong { font-size: 14px; }
@@ -287,11 +289,11 @@
 /* Через потомка, а не голым классом: .reservation-summary span специфичнее и перебил бы его */
 .reservation-summary .reservation-summary__meta { color: var(--muted); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
 .drawer__lead { margin: 6px 0 0; color: var(--faint); font-size: 12px; font-weight: 500; line-height: 1.45; }
-.saved-list-contents { margin: 0 0 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--card); overflow: hidden; }
+.saved-list-contents { margin: 0 0 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card); overflow: hidden; }
 .saved-list-contents__heading { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 15px; border-bottom: 1px solid var(--line); background: var(--sunk); }
 .saved-list-contents__heading h3 { margin: 0 0 3px; font-size: 15px; }
 .saved-list-contents__heading p { margin: 0; color: var(--faint); font-size: 12px; }
-.saved-list-contents__heading > strong { min-width: 34px; height: 34px; display: grid; place-items: center; border-radius: 8px; color: #fff; background: var(--ink); font-size: 13px; }
+.saved-list-contents__heading > strong { min-width: 34px; height: 34px; display: grid; place-items: center; border-radius: var(--r-sm); color: #fff; background: var(--ink); font-size: 13px; }
 .saved-list-items { max-height: 310px; overflow-y: auto; scrollbar-gutter: stable; }
 .reservation-drawer .saved-list-contents { margin-bottom: 0; }
 .reservation-drawer .saved-list-items { max-height: none; overflow: visible; scrollbar-gutter: auto; }
@@ -309,7 +311,7 @@
 .button--danger-ghost { border-color: color-mix(in srgb, var(--red) 22%, transparent); color: var(--red-act); background: color-mix(in srgb, var(--red) 4%, transparent); }
 .button--danger-ghost:not(:disabled):hover { border-color: color-mix(in srgb, var(--red) 38%, transparent); background: color-mix(in srgb, var(--red) 8%, transparent); }
 .saved-list-delete { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
-.saved-list-delete--open { padding: 14px; border: 1px solid color-mix(in srgb, var(--red) 18%, transparent); border-radius: 11px; background: color-mix(in srgb, var(--red) 3.5%, transparent); }
+.saved-list-delete--open { padding: 14px; border: 1px solid color-mix(in srgb, var(--red) 18%, transparent); border-radius: var(--r-md); background: color-mix(in srgb, var(--red) 3.5%, transparent); }
 .saved-list-delete--open > div:first-child { display: flex; align-items: flex-start; gap: 10px; }
 .saved-list-delete--open > div:first-child > svg { flex: 0 0 auto; color: var(--red-act); }
 .saved-list-delete--open span { display: flex; flex-direction: column; gap: 4px; }
@@ -334,7 +336,7 @@
 .drawer .unsaved-prompt { flex-wrap: wrap; }
 .drawer .unsaved-prompt__actions { flex: 1 1 100%; flex-wrap: wrap; }
 .drawer .unsaved-prompt__actions .button { flex: 1 1 auto; }
-.detail-skeleton { height: 58px; margin-bottom: 14px; border-radius: 9px; background: linear-gradient(90deg, var(--hover) 25%, var(--sunk) 50%, var(--hover) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+.detail-skeleton { height: 58px; margin-bottom: 14px; border-radius: var(--r-md); background: linear-gradient(90deg, var(--hover) 25%, var(--sunk) 50%, var(--hover) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 /* Болванки загрузки под конкретные экраны. Блок стоит ПОСЛЕ .detail-skeleton
    намеренно: у модификаторов ровно один класс, то есть та же специфичность, и
    высоту с отступом переопределяет последний по порядку. Перенесёшь выше —
@@ -356,11 +358,11 @@
 .employee-files-skeleton { margin-top: 10px; }
 /* Строка файла в .unit-lists__items — это 10px падинга плюс 17px иконки, около 44px,
    радиус 10px, разделены строки gap: 8px. Базовые 58px/14px дают скачок при подмене списком. */
-.employee-files-skeleton__row { height: 44px; margin-bottom: 8px; border-radius: 10px; }
+.employee-files-skeleton__row { height: 44px; margin-bottom: 8px; border-radius: var(--r-md); }
 .employee-files-skeleton__row:last-child { margin-bottom: 0; }
 /* Болванка поля формы: подпись 13px + gap 8 + input 45 = 66px. Отступов нет —
    элемент лежит прямым ребёнком .form-grid и живёт её gap: 16px. */
-.field-skeleton { height: 66px; border-radius: 9px; background: linear-gradient(90deg, var(--hover) 25%, var(--sunk) 50%, var(--hover) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+.field-skeleton { height: 66px; border-radius: var(--r-md); background: linear-gradient(90deg, var(--hover) 25%, var(--sunk) 50%, var(--hover) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 .history-section { margin-top: 22px; border-top: 1px solid var(--line); }
 .history-section .panel-heading { padding-inline: 0; }
 .history-section .panel-heading h3 { margin: 0 0 3px; font-size: 16px; }
@@ -379,13 +381,13 @@
 .form-section { padding: 24px; border-bottom: 1px solid var(--line); }
 .form-section:last-of-type { border-bottom: 0; }
 .form-section__heading { display: flex; gap: 12px; margin-bottom: 20px; }
-.form-section__heading > span { width: 30px; height: 30px; display: grid; flex: 0 0 auto; place-items: center; border-radius: 7px; color: var(--red-act); background: color-mix(in srgb, var(--red) 8%, transparent); font-family: inherit; font-size: 12px; font-weight: 700; }
+.form-section__heading > span { width: 30px; height: 30px; display: grid; flex: 0 0 auto; place-items: center; border-radius: var(--r-sm); color: var(--red-act); background: color-mix(in srgb, var(--red) 8%, transparent); font-family: inherit; font-size: 12px; font-weight: 700; }
 .form-section__heading h2 { margin: 0 0 4px; font-size: 18px; }
 .form-section__heading p { margin: 0; color: var(--faint); font-size: 12px; }
 /* auto-fit вместо 1fr 1fr: карточек стало три (U34-L), на узкой колонке они
    складываются в столбик, на широкой встают в ряд. */
 .record-kind-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
-.record-kind-grid > button { min-height: 86px; display: grid; grid-template-columns: 26px 1fr 22px; align-items: start; gap: 10px; padding: 15px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: var(--sunk); text-align: left; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
+.record-kind-grid > button { min-height: 86px; display: grid; grid-template-columns: 26px 1fr 22px; align-items: start; gap: 10px; padding: 15px; border: 1px solid var(--line); border-radius: var(--r-md); color: var(--muted); background: var(--sunk); text-align: left; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
 .record-kind-grid > button:hover { transform: translateY(-1px); border-color: var(--ctl); }
 .record-kind-grid > button.active { border-color: color-mix(in srgb, var(--red) 45%, transparent); color: var(--ink); background: color-mix(in srgb, var(--red) 3.5%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 5%, transparent); }
 .record-kind-grid > button > svg { margin-top: 2px; color: var(--red-act); }
@@ -396,7 +398,7 @@
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .form-grid .field { margin: 0; }
 .form-grid__wide { grid-column: 1 / -1; }
-.field > select, .field > textarea { width: 100%; padding: 11px 13px; border: 1px solid var(--ctl); border-radius: 8px; outline: 0; color: var(--ink); background: var(--card); font-size: 14px; font-weight: 500; resize: vertical; }
+.field > select, .field > textarea { width: 100%; padding: 11px 13px; border: 1px solid var(--ctl); border-radius: var(--r-md); outline: 0; color: var(--ink); background: var(--card); font-size: 14px; font-weight: 500; resize: vertical; }
 .field > select { height: 45px; padding-block: 0; }
 .field > textarea:focus, .field > select:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
 .field input:disabled { color: var(--faint); background: var(--hover); }
@@ -444,18 +446,20 @@
 .login-brand-illustration { position: absolute; z-index: 1; right: -15%; bottom: -7%; width: 78%; max-height: 55%; object-fit: contain; object-position: right bottom; opacity: .38; mask-image: linear-gradient(to right, transparent 0%, #000 30%, #000 100%); pointer-events: none; }
 .login-form-panel { display: grid; place-items: center; padding: 32px; }
 .login-card { width: min(390px, 100%); }
-.login-icon { width: 44px; height: 44px; display: grid; place-items: center; margin-bottom: 30px; border-radius: 10px; color: var(--ink); background: var(--red-act); }
+.login-icon { width: 44px; height: 44px; display: grid; place-items: center; margin-bottom: 30px; border-radius: var(--r-md); color: var(--ink); background: var(--red-act); }
 .login-card h2 { margin-bottom: 8px; font-size: 29px; }
 .login-card > .muted { margin-bottom: 32px; font-size: 13px; }
 .field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; color: var(--muted); font-size: 13px; font-weight: 700; }
-.field > input, .password-field > input { width: 100%; height: 45px; padding: 0 13px; border: 1px solid var(--ctl); border-radius: 8px; outline: 0; color: var(--ink); background: var(--card); font-size: 15px; font-weight: 500; }
+.field > input, .password-field > input { width: 100%; height: 45px; padding: 0 13px; border: 1px solid var(--ctl); border-radius: var(--r-md); outline: 0; color: var(--ink); background: var(--card); font-size: 15px; font-weight: 500; }
 .field input:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Наведение — как у селекта (см. 03-controls). Рамку ошибки не перебиваем. */
+:is(.field > input, .password-field > input, .field > select, .field > textarea):not(:disabled, .input-error):hover { border-color: var(--muted); background: var(--hover); }
 .password-field { position: relative; display: block; }
 .password-field > input { padding-right: 45px; }
-.form-error { margin: -2px 0 14px; padding: 10px 12px; border-radius: 7px; color: var(--bad); background: var(--bad-bg); font-size: 13px; }
+.form-error { margin: -2px 0 14px; padding: 10px 12px; border-radius: var(--r-sm); color: var(--bad); background: var(--bad-bg); font-size: 13px; }
 .login-help { margin: 14px 0 0; color: var(--faint); font-size: 12px; line-height: 1.5; }
 /* Причина выхода: сведение, а не ошибка — поэтому нейтральная, а не красная. */
-.login-notice { margin: -16px 0 20px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); background: var(--card); font-size: 13px; line-height: 1.5; }
+.login-notice { margin: -16px 0 20px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--muted); background: var(--card); font-size: 13px; line-height: 1.5; }
 
 /* Сотрудники (с17). Форма — та же панель, что у оборудования, но без колонки
    предпросмотра; overflow visible нужен ей ради выпадающего datalist. */
@@ -464,16 +468,16 @@
 .employee-avatar img { width: 100%; height: 100%; display: block; object-fit: cover; }
 /* Выбранные, но ещё не отправленные файлы: список под полем выбора. */
 .employee-file-picks { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.employee-file-picks li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--sunk); font-size: 12px; font-weight: 500; }
+.employee-file-picks li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--sunk); font-size: 12px; font-weight: 500; }
 .employee-file-picks span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Очередь загрузки на экране успеха: карточка уже сохранена, файлы едут после неё. */
 .employee-upload-list { display: flex; flex-direction: column; gap: 8px; margin: 24px 0 0; padding: 0; list-style: none; text-align: left; }
-.employee-upload-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunk); font-size: 13px; }
+.employee-upload-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--sunk); font-size: 13px; }
 .employee-upload-list > li > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Правый ряд кнопок формы сотрудника: подтверждение тёзок и повтор загрузки. */
 .employee-form-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 12px; }
 .employee-photos { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-.employee-photos a, .employee-photos__missing { width: 92px; height: 116px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; color: var(--faint); background: var(--sunk); }
+.employee-photos a, .employee-photos__missing { width: 92px; height: 116px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-md); color: var(--faint); background: var(--sunk); }
 .employee-photos img { width: 100%; height: 100%; display: block; object-fit: cover; }
 /* Обёртка появления обязана занять весь бокс 92×116: без размеров grid-элемент
    считает высоту по картинке, которой ещё нет, и плитка схлопывалась бы до
@@ -485,7 +489,7 @@
    лица в 92 px ширины не читается вовсе. */
 .employee-photos__item { width: 92px; display: flex; flex-direction: column; gap: 6px; }
 .employee-photos__item--document a, .employee-photos__item--document .employee-photos__missing { border-color: var(--red-act); box-shadow: 0 0 0 2px color-mix(in srgb, var(--red) 12%, transparent); }
-.employee-photos__badge { color: var(--red-act); font-size: 10px; font-weight: 800; line-height: 1.3; }
+.employee-photos__badge { color: var(--red-act); font-size: 10px; font-weight: 700; line-height: 1.3; }
 .employee-photos__pick { padding: 0; border: 0; color: var(--muted); background: transparent; font-size: 10px; font-weight: 700; line-height: 1.3; text-align: left; text-decoration: underline; text-underline-offset: 2px; }
 .employee-photos__pick:disabled { color: var(--faint); text-decoration: none; }
 .employee-photos__error { display: flex; align-items: center; gap: 7px; margin: 12px 0 0; }
@@ -501,16 +505,16 @@
 .data-table td.select-cell input, .select-all input { width: 17px; height: 17px; accent-color: var(--red-act); cursor: pointer; }
 .data-table tbody tr.is-selected { background: color-mix(in srgb, var(--red) 5%, transparent); }
 .data-table tbody tr.is-selected:hover { background: color-mix(in srgb, var(--red) 8%, transparent); }
-.select-all { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 650; cursor: pointer; }
+.select-all { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; }
 .select-all input:disabled { cursor: default; }
 
 /* Панель действий над выбранным составом. Левый край считаем от сайдбара, а не
    от окна: fixed не знает про сетку оболочки, и по центру ЭКРАНА панель заезжала
    бы под меню. transition повторяет анимацию сворачивания сайдбара. */
-.bulk-bar { position: fixed; z-index: 14; left: 256px; right: 0; bottom: 22px; width: max-content; max-width: calc(100vw - 300px); margin-inline: auto; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid rgba(255,255,255,.16); border-radius: 12px; color: #fff; background: rgba(15,17,21,.96); box-shadow: 0 14px 36px rgba(15,17,21,.28); backdrop-filter: blur(14px); transition: left .22s ease; animation: slide-soft .2s ease both; }
+.bulk-bar { position: fixed; z-index: 14; left: 256px; right: 0; bottom: 22px; width: max-content; max-width: calc(100vw - 300px); margin-inline: auto; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid rgba(255,255,255,.16); border-radius: var(--r-lg); color: #fff; background: rgba(15,17,21,.96); box-shadow: 0 14px 36px rgba(15,17,21,.28); backdrop-filter: blur(14px); transition: left .22s ease; animation: slide-soft .2s ease both; }
 .app-shell--sidebar-collapsed .bulk-bar { left: 76px; max-width: calc(100vw - 120px); }
-.bulk-bar > span { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 650; }
-.bulk-bar strong { min-width: 26px; height: 26px; display: inline-grid; place-items: center; border-radius: 7px; background: var(--red-act); font-family: inherit; font-size: 13px; }
+.bulk-bar > span { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; }
+.bulk-bar strong { min-width: 26px; height: 26px; display: inline-grid; place-items: center; border-radius: var(--r-sm); background: var(--red-act); font-family: inherit; font-size: 13px; }
 .bulk-bar .button { min-height: 38px; }
 .bulk-bar .button--secondary { color: #fff; background: transparent; border-color: rgba(255,255,255,.24); }
 .bulk-bar .button--secondary:not(:disabled):hover { color: #fff; background: rgba(255,255,255,.08); }
@@ -522,7 +526,7 @@
 .event-document-fields { margin: 22px 0 0; }
 .event-document-fields .field { margin-bottom: 14px; }
 .event-document-fields .language-switch { margin: 0; }
-.event-export-summary { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunk); }
+.event-export-summary { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--sunk); }
 .event-export-summary strong { font-size: 13px; }
 .event-export-summary small { color: var(--faint); font-size: 11px; line-height: 1.5; }
 .event-export-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 18px; }
@@ -531,7 +535,7 @@
    моноширинным и посажен на подложку: цифры и буквы читаются как на жестянке,
    а колонка таблицы не пляшет по ширине. Класс .mono не годится — он прибивает
    размер 13px через !important, а в шапке дровера номер стоит крупно. */
-.plate-badge { display: inline-block; padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--sunk); font-family: var(--f-mono); font-size: 13px; font-weight: 500; letter-spacing: .06em; white-space: nowrap; }
+.plate-badge { display: inline-block; padding: 3px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--sunk); font-family: var(--f-mono); font-size: 13px; font-weight: 500; letter-spacing: .06em; white-space: nowrap; }
 .plate-badge--lg { padding: 5px 11px; font-size: 21px; }
 /* Моноширинное ПОЛЕ ВВОДА — паспорт, ПИНФЛ, госномер, серийники. Отдельный
    класс от .mono по одной причине: тот прибивает 13px через !important, а
@@ -547,10 +551,10 @@
    под инпутом, поэтому обёртке нужен position: relative. */
 .employee-picker { position: relative; }
 .employee-picker .field { margin-bottom: 0; }
-.employee-picker__panel { position: absolute; z-index: 40; top: calc(100% + 5px); right: 0; left: 0; max-height: 300px; padding: 6px; overflow-y: auto; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.98); box-shadow: 0 18px 46px rgba(15,17,21,.18), 0 2px 8px rgba(15,17,21,.08); backdrop-filter: blur(16px); animation: popover-in .16s ease-out; }
-.employee-picker__panel > button { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 650; text-align: left; }
+.employee-picker__panel { position: absolute; z-index: 40; top: calc(100% + 5px); right: 0; left: 0; max-height: 300px; padding: 6px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-md); background: rgba(255,255,255,.98); box-shadow: var(--shadow-pop); backdrop-filter: blur(16px); animation: popover-in .16s ease-out; }
+.employee-picker__panel > button { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px; border: 0; border-radius: var(--r-sm); color: var(--muted); background: transparent; font-size: 13px; font-weight: 600; text-align: left; }
 .employee-picker__panel > button:hover { color: var(--ink); background: var(--sunk); }
-.employee-picker__panel > button small { color: var(--faint); font-size: 11px; font-weight: 550; }
+.employee-picker__panel > button small { color: var(--faint); font-size: 11px; font-weight: 500; }
 .employee-picker__panel > .muted, .employee-picker__panel > div { padding: 8px 10px; font-size: 13px; }
 .employee-picker__footer { display: flex; align-items: center; gap: 6px; margin: 4px 0 0; padding: 9px 10px 3px; border-top: 1px solid var(--line); color: var(--faint); font-size: 12px; }
 /* Выбранные водители — чипами над полем поиска: добавленный виден сразу, панель
@@ -560,7 +564,7 @@
 
 .app-loader { min-height: 100vh; display: grid; place-content: center; gap: 18px; background: var(--bg); }
 .route-loader { min-height: min(520px, calc(100vh - 96px)); display: grid; align-content: start; gap: 16px; padding-top: 4px; }
-.route-loader__title, .route-loader__panel { overflow: hidden; border-radius: 10px; background: linear-gradient(90deg, var(--select) 25%, var(--sunk) 50%, var(--select) 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+.route-loader__title, .route-loader__panel { overflow: hidden; border-radius: var(--r-md); background: linear-gradient(90deg, var(--select) 25%, var(--sunk) 50%, var(--select) 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
 .route-loader__title { width: min(360px, 72%); height: 52px; }
 .route-loader__panel { width: 100%; height: 320px; border: 1px solid var(--line); }
 .loader-line { width: 120px; height: 2px; overflow: hidden; background: var(--line); }
@@ -578,7 +582,7 @@
 /* Круг — человек, прямоугольник — предмет: форма отвечает на «что за запись»
    раньше, чем прочитан надзаголовок. */
 .profile-head__photo--round { width: 64px; height: 64px; border-radius: 50%; }
-.profile-head__photo--wide { width: 92px; height: 64px; border-radius: 10px; }
+.profile-head__photo--wide { width: 92px; height: 64px; border-radius: var(--r-md); }
 .profile-head__photo img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .profile-head__text { min-width: 0; }
 .profile-head__text .eyebrow { margin-bottom: 5px; }
@@ -599,7 +603,7 @@
    держит однострочные статусы в трёх других дроверах. */
 .profile-badges .badge { max-width: 100%; white-space: normal; text-align: left; }
 .profile-section { margin: 22px 0; }
-.profile-section__title { margin: 0 0 9px; color: var(--faint); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.profile-section__title { margin: 0 0 9px; color: var(--faint); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 /* Сетка секции — та же .detail-list, без её внешних отступов: расстояние между
    секциями задаёт сама секция, иначе два отступа складываются. */
 .profile-section .detail-list { margin: 0; }
@@ -637,7 +641,7 @@
    мельком. */
 .detail-list__cell--copied { background: var(--ok-bg); }
 .detail-list__cell--copied .detail-list__copy-mark { color: var(--ok); opacity: 1; }
-.detail-list__copy-note { position: absolute; top: 7px; right: 32px; max-width: 55%; padding: 2px 6px; border-radius: 6px; color: var(--ok); background: var(--ok-bg); font-size: 11px; font-weight: 800; letter-spacing: .02em; pointer-events: none; animation: fade-in .14s ease-out; }
+.detail-list__copy-note { position: absolute; top: 7px; right: 32px; max-width: 55%; padding: 2px 6px; border-radius: var(--r-sm); color: var(--ok); background: var(--ok-bg); font-size: 11px; font-weight: 700; letter-spacing: .02em; pointer-events: none; animation: fade-in .14s ease-out; }
 .detail-list__copy-note--failed { color: var(--bad); background: var(--bad-bg); }
 @media (prefers-reduced-motion: reduce) {
   .detail-list__copy-mark { transition: none; }
@@ -655,11 +659,11 @@
    РЯДОМ со значением, а не поверх него: в шапке значение соседствует с
    надзаголовком и фактом, и цель во всю ширину ловила бы нажатия мимо. */
 .profile-head__title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.profile-head__copy { flex: 0 0 auto; width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 7px; color: var(--faint); background: var(--card); opacity: .5; transition: opacity .14s ease, color .14s ease; }
+.profile-head__copy { flex: 0 0 auto; width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--faint); background: var(--card); opacity: .5; transition: opacity .14s ease, color .14s ease; }
 .profile-head:hover .profile-head__copy, .profile-head__copy:focus-visible { opacity: 1; }
 .profile-head__copy:hover { color: var(--ink); }
 .profile-head__copy--copied { color: var(--ok); border-color: var(--ok); opacity: 1; }
-.profile-head__copy-note { color: var(--ok); font-size: 11px; font-weight: 800; animation: fade-in .14s ease-out; }
+.profile-head__copy-note { color: var(--ok); font-size: 11px; font-weight: 700; animation: fade-in .14s ease-out; }
 .profile-head__copy-note--failed { color: var(--bad); }
 @media (prefers-reduced-motion: reduce) {
   .profile-head__copy { transition: none; }

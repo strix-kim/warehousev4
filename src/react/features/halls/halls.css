@@ -13,7 +13,7 @@
    Цвет точки приходит инлайном из базы (--hall-color); fallback нужен на
    случай строки, которую не отдала политика. */
 .hall-plan-dots { display: flex; flex-wrap: wrap; gap: 6px 12px; }
-.hall-plan-dot { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--muted); font-size: 12px; font-weight: 650; }
+.hall-plan-dot { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--muted); font-size: 12px; font-weight: 600; }
 .hall-plan-dot i { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; background: var(--hall-color, var(--faint)); }
 .hall-plan-dots__empty { color: var(--faint); font-size: 12px; }
 
@@ -29,11 +29,11 @@
 /* Степпер количества залов в дровере. Своя высота 45 px, а не общий
    .quantity-stepper на 32: он живёт в строке таблицы, а здесь поле формы и
    стоять оно должно в один рост с соседними полями. */
-.hall-count-stepper { width: 148px; height: 45px; display: grid; grid-template-columns: 45px 1fr 45px; align-items: center; border: 1px solid var(--ctl); border-radius: 8px; overflow: hidden; }
+.hall-count-stepper { width: 148px; height: 45px; display: grid; grid-template-columns: 45px 1fr 45px; align-items: center; border: 1px solid var(--ctl); border-radius: var(--r-md); overflow: hidden; }
 .hall-count-stepper button { height: 100%; display: grid; place-items: center; padding: 0; border: 0; color: var(--muted); background: var(--sunk); }
 .hall-count-stepper button:hover:not(:disabled) { color: var(--ink); background: var(--hover); }
 .hall-count-stepper button:disabled { color: var(--faint); opacity: .55; }
-.hall-count-stepper output { color: var(--ink); font-size: 16px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+.hall-count-stepper output { color: var(--ink); font-size: 16px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 820px) {
   .hall-count-stepper { width: 100%; }
@@ -46,9 +46,9 @@
 
 /* Статус автосохранения в шапке. Ширина не фиксирована, но текст не переносится:
    «Сохраняем…» и «Сохранено 12:41» разной длины, а прыгать шапке нельзя. */
-.hall-save { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--faint); font-size: 12.5px; font-weight: 650; white-space: nowrap; }
+.hall-save { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--faint); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
 .hall-save--failed { color: var(--bad); }
-.hall-save button { padding: 0; border: 0; color: inherit; background: none; font: inherit; font-weight: 800; text-decoration: underline; }
+.hall-save button { padding: 0; border: 0; color: inherit; background: none; font: inherit; font-weight: 700; text-decoration: underline; }
 
 /* Счётчики под шапкой — сводка бригады одной строкой. «Свободно» красным: это
    единственное число здесь, которое требует действия. */
@@ -56,8 +56,8 @@
    узком — друг под другом. До этого оба блока висели голыми абзацами между
    шапкой и панелью, чего в доме нет нигде. */
 .hall-summary { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 20px; margin: 0 0 12px; }
-.hall-counts { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0; color: var(--muted); font-size: 14px; font-weight: 650; }
-.hall-counts strong { color: var(--ink); font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.hall-counts { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0; color: var(--muted); font-size: 14px; font-weight: 600; }
+.hall-counts strong { color: var(--ink); font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* Кто ещё не расставлен — строкой под счётчиками. Тон вторичный: это не цифра
    плана, а подсказка «кем добирать», и спорить со счётчиками ей нельзя. Пара со
@@ -88,7 +88,7 @@
 
 /* Липкость: шапка держится за верх контейнера, первая колонка — за левый край.
    Угол липнет к обоим, поэтому лежит выше остальных по z. */
-.hall-matrix__corner { position: sticky; top: 0; left: 0; z-index: 3; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 10px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--sunk); color: var(--muted); font-size: 13px; font-weight: 800; }
+.hall-matrix__corner { position: sticky; top: 0; left: 0; z-index: 3; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 10px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--sunk); color: var(--muted); font-size: 13px; font-weight: 700; }
 .hall-matrix__corner small { color: var(--faint); font-size: 11px; font-weight: 600; line-height: 1.3; }
 
 /* Шапка колонки залита цветом зала; белый текст держит палитра. «Держит» здесь
@@ -102,7 +102,7 @@
    и белые цифры на ней дают 3.37–4.31 на ВСЕХ восьми цветах — то есть замена
    трёх провальных цветов эту половину не чинит. Чёрный .18 держит минимум 6.34
    (с24). */
-.hall-matrix__number { flex: 0 0 auto; min-width: 22px; height: 22px; display: inline-grid; place-items: center; padding: 0 5px; border-radius: 6px; background: rgba(0,0,0,.18); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.hall-matrix__number { flex: 0 0 auto; min-width: 22px; height: 22px; display: inline-grid; place-items: center; padding: 0 5px; border-radius: var(--r-sm); background: rgba(0,0,0,.18); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* Меню зала — только иконка: подпись и шеврон в цветной шапке лишние, а сам
    .action-menu__trigger растянут на всю ширину общими стилями. */
@@ -113,7 +113,7 @@
 .hall-matrix__menu .action-menu__trigger > svg:last-child { display: none; }
 /* Взведённое удаление зала: подтверждение белой кнопкой поверх цвета — красным
    на цветной шапке предупреждение бы утонуло. */
-.hall-matrix__confirm { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border: 0; border-radius: 7px; color: var(--bad); background: var(--card); font-size: 11.5px; font-weight: 750; white-space: nowrap; }
+.hall-matrix__confirm { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border: 0; border-radius: var(--r-sm); color: var(--bad); background: var(--card); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
 
 /* Полоса свотчей под шапкой. Кружки, а не пункты меню: восемь строк с подписями
    цвета читались бы дольше, чем выбирается сам цвет. */
@@ -128,11 +128,11 @@
 /* Роль строки — иконка без подписи (с21): слово «Видеоинженер» под каждой
    позицией дублировало очевидное. Иконка тусклая, потому что это служебный
    переключатель счётчиков, а не содержимое строки; имя роли — в title. */
-.hall-role { flex: 0 0 auto; width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: 6px; color: var(--faint); background: none; }
+.hall-role { flex: 0 0 auto; width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-sm); color: var(--faint); background: none; }
 .hall-role:hover { color: var(--ink); background: var(--card); }
-.hall-matrix__row-delete { flex: 0 0 auto; width: 26px; height: 26px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: 6px; color: var(--faint); background: none; }
+.hall-matrix__row-delete { flex: 0 0 auto; width: 26px; height: 26px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-sm); color: var(--faint); background: none; }
 .hall-matrix__row-delete:hover { color: var(--bad); background: var(--bad-bg); }
-.hall-matrix__row-delete--armed { width: auto; height: auto; padding: 4px 8px; color: var(--bad); background: var(--bad-bg); font-size: 11px; font-weight: 750; line-height: 1.25; text-align: left; white-space: normal; }
+.hall-matrix__row-delete--armed { width: auto; height: auto; padding: 4px 8px; color: var(--bad); background: var(--bad-bg); font-size: 11px; font-weight: 700; line-height: 1.25; text-align: left; white-space: normal; }
 
 /* Клетка — один человек или пустота. Тонирована цветом своего зала (с21): на
    десятке колонок шапка уезжает за верх прокрутки, и белая клетка переставала
@@ -151,16 +151,16 @@
 .hall-matrix__empty:disabled { opacity: .5; }
 .hall-matrix__empty-hint { display: inline-grid; place-items: center; opacity: 0; }
 .hall-matrix__empty:hover:not(:disabled) .hall-matrix__empty-hint { opacity: 1; }
-.hall-matrix__empty-busy { font-size: 13px; font-weight: 650; }
+.hall-matrix__empty-busy { font-size: 13px; font-weight: 600; }
 .hall-matrix__dash { font-weight: 700; }
 
 /* Занятая клетка: имя во всю ширину — клик по нему меняет человека. */
-.hall-matrix__person { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 5px; padding: 8px 2px 8px 9px; border: 0; color: var(--ink); background: none; font-size: 14px; font-weight: 650; text-align: left; }
+.hall-matrix__person { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 5px; padding: 8px 2px 8px 9px; border: 0; color: var(--ink); background: none; font-size: 14px; font-weight: 600; text-align: left; }
 .hall-matrix__person:hover:not(:disabled) { background: color-mix(in srgb, var(--hall-color, var(--ink)) 15%, var(--card)); }
 .hall-matrix__person:disabled { opacity: .55; }
 .hall-matrix__person-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* ×N — человек стоит в плане несколько раз (страховка на все залы). */
-.hall-matrix__badge { flex: 0 0 auto; padding: 0 5px; border-radius: 999px; color: var(--muted); background: var(--sunk); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.hall-matrix__badge { flex: 0 0 auto; padding: 0 5px; border-radius: 999px; color: var(--muted); background: var(--sunk); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 /* Скрепка — человек ведёт в ЭТОМ зале ещё и другие позиции: на бумаге это
    объединённая ячейка. Отличается от ×N и смыслом (зал, а не план), и местом
    (слева от имени, а не справа). */
@@ -176,7 +176,7 @@
    Пунктирный чип ВНУТРИ клетки, а не текст во всю ширину, как у человека, —
    разница должна ловиться боковым зрением, иначе «Наём» читают как фамилию.
    Кегль тот же (14px), тон приглушённый: слот это обещание, а не бригада. */
-.hall-matrix__slot { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; margin: 6px 2px 6px 8px; padding: 4px 8px; border: 1px dashed var(--ctl); border-radius: 8px; color: var(--muted); background: none; font-size: 14px; font-weight: 650; text-align: left; }
+.hall-matrix__slot { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; margin: 6px 2px 6px 8px; padding: 4px 8px; border: 1px dashed var(--ctl); border-radius: var(--r-sm); color: var(--muted); background: none; font-size: 14px; font-weight: 600; text-align: left; }
 .hall-matrix__slot:hover:not(:disabled) { border-color: var(--faint); color: var(--ink); background: var(--card); }
 .hall-matrix__slot:disabled { opacity: .55; }
 .hall-matrix__slot-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -200,13 +200,13 @@
 .position-suggestions + .hall-add-position { margin-top: 8px; }
 
 .position-chip { max-width: 100%; display: inline-flex; align-items: center; border: 1px solid var(--ctl); border-radius: 999px; background: var(--card); }
-.position-chip__add { min-width: 0; display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 8px; border: 0; border-radius: 999px 0 0 999px; color: var(--muted); background: none; font-size: 13px; font-weight: 650; }
+.position-chip__add { min-width: 0; display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 8px; border: 0; border-radius: 999px 0 0 999px; color: var(--muted); background: none; font-size: 13px; font-weight: 600; }
 .position-chip__add:hover:not(:disabled) { color: var(--ink); }
 .position-chip__add:disabled { opacity: .55; }
 .position-chip__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Сколько таких строк уже в плане: чип не исчезает, а считает. */
-.position-chip__count { flex: 0 0 auto; color: var(--faint); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.position-chip__drop { flex: 0 0 auto; height: 20px; display: inline-grid; place-items: center; padding: 0 4px; border: 0; border-radius: 999px; color: var(--faint); background: none; font-size: 11px; font-weight: 750; white-space: nowrap; }
+.position-chip__count { flex: 0 0 auto; color: var(--faint); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.position-chip__drop { flex: 0 0 auto; height: 20px; display: inline-grid; place-items: center; padding: 0 4px; border: 0; border-radius: 999px; color: var(--faint); background: none; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .position-chip__drop:hover { color: var(--bad); background: var(--bad-bg); }
 /* Взведённый крестик красит весь чип: следующий клик уносит позицию из общего
    справочника — у всех и во всех будущих планах. */
@@ -216,7 +216,7 @@
 /* Поле быстрого набора строк. Пунктир вместо сплошной рамки — это не поле
    формы, а строка, которой ещё нет. */
 .hall-add-position { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--faint); }
-.hall-add-position input { width: 100%; max-width: 420px; min-width: 0; padding: 7px 10px; border: 1px dashed var(--ctl); border-radius: 8px; color: var(--ink); background: var(--card); font-size: 14px; }
+.hall-add-position input { width: 100%; max-width: 420px; min-width: 0; padding: 7px 10px; border: 1px dashed var(--ctl); border-radius: var(--r-sm); color: var(--ink); background: var(--card); font-size: 14px; }
 .hall-add-position input::placeholder { color: var(--faint); }
 .hall-add-position input:focus { border-style: solid; border-color: var(--faint); background: var(--card); }
 
@@ -225,7 +225,7 @@
 /* z-index 70 — тот же слой, что у остальных порталов проекта (.app-select__popover,
    .app-date-picker__popover): поповеры не должны перекрывать друг друга через раз.
    Своя подложка нужна инпуту: он висит над матрицей, а не в форме. */
-.hall-cell-picker { position: fixed; z-index: 70; padding: 9px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.98); box-shadow: 0 18px 46px rgba(15,17,21,.18), 0 2px 8px rgba(15,17,21,.08); backdrop-filter: blur(16px); animation: popover-in .16s ease-out; }
+.hall-cell-picker { position: fixed; z-index: 70; padding: 9px; border: 1px solid var(--line); border-radius: var(--r-lg); background: rgba(255,255,255,.98); box-shadow: var(--shadow-pop); backdrop-filter: blur(16px); animation: popover-in .16s ease-out; }
 .hall-cell-picker .field { margin: 0; }
 /* «Наём» — отдельная строка над поиском, вторичной кнопкой: это альтернатива
    всему списку, а не одна из его строк. Отступ снизу свой — .field в поповере
@@ -234,11 +234,11 @@
 .hall-cell-picker__hire { min-height: 38px; margin-bottom: 8px; }
 
 /* Правка имени на месте: в покое — обычный текст, под курсором — намёк рамкой. */
-.inline-text { min-width: 0; max-width: 100%; overflow: hidden; padding: 3px 6px; border: 1px solid transparent; border-radius: 6px; color: inherit; background: none; font: inherit; font-size: 14px; font-weight: 650; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.inline-text { min-width: 0; max-width: 100%; overflow: hidden; padding: 3px 6px; border: 1px solid transparent; border-radius: var(--r-sm); color: inherit; background: none; font: inherit; font-size: 14px; font-weight: 600; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .inline-text:hover { border-color: var(--ctl); background: var(--card); }
 .inline-text--editing { width: 100%; border-color: var(--faint); background: var(--card); }
 /* В цветной шапке те же состояния, но светлые: серая рамка на синем не видна. */
-.inline-text--head { flex: 1 1 auto; font-size: 15px; font-weight: 800; }
+.inline-text--head { flex: 1 1 auto; font-size: 15px; font-weight: 700; }
 .inline-text--head:hover { border-color: rgba(255,255,255,.5); background: rgba(255,255,255,.16); }
 .inline-text--head.inline-text--editing { border-color: rgba(255,255,255,.7); color: var(--ink); background: var(--card); }
 
@@ -419,7 +419,7 @@
 .hall-skeleton__colhead { display: flex; align-items: center; min-width: 0; padding: 7px 8px; border-bottom: 1px solid var(--line); }
 .hall-skeleton__rowhead { display: flex; align-items: center; min-width: 0; padding: 8px 10px; border-right: 1px solid var(--line); border-top: 1px solid var(--line); background: var(--sunk); }
 .hall-skeleton__cell { display: flex; align-items: center; min-width: 0; padding: 8px 9px; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
-.hall-skeleton span { width: 100%; height: 26px; border-radius: 7px; background: linear-gradient(90deg, var(--hover) 25%, var(--sunk) 50%, var(--hover) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+.hall-skeleton span { width: 100%; height: 26px; border-radius: var(--r-sm); background: linear-gradient(90deg, var(--hover) 25%, var(--sunk) 50%, var(--hover) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 
 /* Первая колонка ужимается вместе с настоящей — иначе на телефоне болванка
    листалась бы вбок там, где матрица помещается. */

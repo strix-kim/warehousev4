@@ -59,9 +59,12 @@
   --r-md: 12px;
   --r-sm: 8px;
   --ease-out: cubic-bezier(.2,.8,.2,1);
+  /* Тени (с32). --shadow-pop — поповеры, --shadow-drawer — боковые дроверы: обе
+     дословно из макета. --shadow-card — мягкая тень карточки; в макете её нет,
+     поэтому своя: геометрия прежнего --shadow, цвет — RGB --night. */
   --shadow-pop: 0 18px 48px rgba(15,17,21,.16), 0 2px 6px rgba(15,17,21,.06);
-  /* Тень карточек приложения. В макете её нет — своя: геометрия прежняя, цвет — RGB --night. */
-  --shadow: 0 12px 32px rgba(15, 17, 21, 0.07);
+  --shadow-drawer: -24px 0 60px rgba(15,17,21,.18);
+  --shadow-card: 0 12px 32px rgba(15, 17, 21, 0.07);
 }
 
 * { box-sizing: border-box; }
@@ -82,6 +85,8 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .sidebar :focus-visible, .login-brand-panel :focus-visible, .hall-tv :focus-visible { outline-color: #fff; }
 h1, h2, h3, p { margin-top: 0; }
-h1, h2, h3, .brand-name { font-family: var(--f-display); font-weight: 750; }
-h1 { margin-bottom: 8px; font-size: clamp(28px, 3vw, 40px); line-height: 1.08; letter-spacing: -0.035em; }
+/* Display-начертания макета: h1 и бренд — 800, h2/h3 — 700. 800 в системе живёт
+   только у Manrope; текстовый Inter — 400/500/600/700. */
+h1, h2, h3, .brand-name { font-family: var(--f-display); font-weight: 700; }
+h1 { margin-bottom: 8px; font-weight: 800; font-size: clamp(28px, 3vw, 40px); line-height: 1.08; letter-spacing: -0.035em; }
 h2 { letter-spacing: -0.025em; }
