@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from 'react'
 import { pickDocumentPhoto, type EmployeePhotoRef } from './api'
 import { employeeFullName, type EmployeeListItem } from './types'
 import { EventDocumentFields } from '../../components/EventDocumentFields'
+import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import { todayDateValue } from '../../lib/date'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import { useGuardedClose } from '../../lib/useGuardedClose'
 import { useModalLayer } from '../../lib/useModalLayer'
 import type { EventDocumentMeta } from '../../lib/xlsx/eventDocument'
 
@@ -37,10 +39,13 @@ export function EmployeeEventExportDrawer({ employees, photos, photosKnown, onCl
   onExport?: EmployeeEventExportRun
 }) {
   const { tr, locale } = useLanguage()
-  useModalLayer(onClose)
+  // Дата открытия дровера — точка отсчёта для «человек поменял дату начала».
+  // Снимком, а не todayDateValue() в сравнении: дровер, открытый до полуночи,
+  // иначе стал бы «несохранённым» сам по себе.
+  const [initialDateFrom] = useState(todayDateValue)
   // Язык документа по умолчанию UZ: бумагу на объект подают по-узбекски, а
   // интерфейс у большинства русский — совпадать этим двум незачем.
-  const [meta, setMeta] = useState<EventDocumentMeta>({ name: '', dateFrom: todayDateValue(), dateTo: null, language: 'uz' })
+  const [meta, setMeta] = useState<EventDocumentMeta>({ name: '', dateFrom: initialDateFrom, dateTo: null, language: 'uz' })
   // Пустое название подсвечиваем не сразу: красное поле на только что открытом
   // дровере читается как отказ, а человек ещё ничего не сделал.
   const [nameTouched, setNameTouched] = useState(false)
@@ -54,6 +59,15 @@ export function EmployeeEventExportDrawer({ employees, photos, photosKnown, onCl
   // Даты — строки YYYY-MM-DD, поэтому сравниваются как есть, без разбора в Date.
   const rangeError = Boolean(meta.dateTo && meta.dateFrom && meta.dateTo < meta.dateFrom)
   const canExport = !nameEmpty && !rangeError && Boolean(meta.dateFrom)
+
+  // Терять есть что, пока набранные реквизиты не ушли в скачанный файл. Язык
+  // документа сюда не входит: переключатель — выбор, а не набранная работа.
+  const isDirty = phase.kind !== 'done'
+    && (meta.name.trim() !== '' || meta.dateTo !== null || meta.dateFrom !== initialDateFrom)
+  // Во время сборки не спрашиваем: закрытие здесь — отмена скачивания, и она
+  // гасит очередь загрузок штатно.
+  const { requestClose, isPrompting, confirmClose, keepEditing } = useGuardedClose(isDirty && phase.kind !== 'preparing', onClose)
+  useModalLayer(requestClose)
 
   // Кого в документе покажет пустая рамка вместо лица — считаем тем же правилом,
   // что и миниатюры списка, чтобы сводка не расходилась с бумагой.
@@ -83,7 +97,12 @@ export function EmployeeEventExportDrawer({ employees, photos, photosKnown, onCl
   }
 
   return (
-    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Список на мероприятие', 'Tadbir uchun ro‘yxat')} onMouseDown={onClose}>
+    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Список на мероприятие', 'Tadbir uchun ro‘yxat')} onMouseDown={(event) => {
+      // Без preventDefault нажатие на подложку увело бы фокус в body уже ПОСЛЕ
+      // того, как плашка его забрала, — и Enter перестал бы значить «продолжить».
+      event.preventDefault()
+      requestClose()
+    }}>
       <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
           <div>
@@ -92,9 +111,19 @@ export function EmployeeEventExportDrawer({ employees, photos, photosKnown, onCl
             <p className="drawer__lead">{tr('Сотрудников', 'Xodimlar')}: {employees.length.toLocaleString(locale)}</p>
           </div>
           <div className="drawer__header-actions">
-            <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+            <button autoFocus className="icon-button icon-button--bordered" onClick={requestClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
           </div>
         </div>
+
+        {isPrompting && (
+          <UnsavedPrompt
+            message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+            stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
+            leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
+            onStay={keepEditing}
+            onLeave={confirmClose}
+          />
+        )}
 
         {/* onBlur ловим на обёртке: React пускает его вверх по дереву, и одного
             обработчика хватает на все поля блока — «человек уже потрогал форму». */}

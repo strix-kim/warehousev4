@@ -3,7 +3,9 @@ import { useState } from 'react'
 import { hallPlanErrorText, type HallPlanInput } from './api'
 import type { HallPlan } from './types'
 import { AppDatePicker } from '../../components/AppDatePicker'
+import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import { useLanguage } from '../../lib/i18n'
+import { useGuardedClose } from '../../lib/useGuardedClose'
 import { useModalLayer } from '../../lib/useModalLayer'
 
 // Сколько залов предлагаем по умолчанию и в каких границах. Двенадцать — не
@@ -23,14 +25,17 @@ export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
   onSubmit: (input: HallPlanInput, hallCount: number) => Promise<void>
 }) {
   const { tr, locale } = useLanguage()
-  useModalLayer(onClose)
   const isEditing = Boolean(plan)
 
-  const [draft, setDraft] = useState<HallPlanInput>({
+  // Снимок на момент открытия, а не живой plan: план в редакторе может
+  // обновиться, пока дровер открыт, и «несохранённое» не должно от этого
+  // появляться или исчезать.
+  const [initialDraft] = useState<HallPlanInput>(() => ({
     name: plan?.name ?? '',
     eventFrom: plan?.event_from ?? '',
     eventTo: plan?.event_to ?? '',
-  })
+  }))
+  const [draft, setDraft] = useState<HallPlanInput>(initialDraft)
   const [hallCount, setHallCount] = useState(DEFAULT_HALL_COUNT)
   const [isSaving, setIsSaving] = useState(false)
   // Текст отказа базы. Строка, а не флаг: она уже собрана hallPlanErrorText и
@@ -45,6 +50,16 @@ export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
   const nameEmpty = !draft.name.trim()
   const rangeError = Boolean(draft.eventFrom && draft.eventTo && draft.eventTo < draft.eventFrom)
   const endWithoutStart = Boolean(draft.eventTo && !draft.eventFrom)
+
+  const isDirty = draft.name !== initialDraft.name
+    || draft.eventFrom !== initialDraft.eventFrom
+    || draft.eventTo !== initialDraft.eventTo
+    || (!isEditing && hallCount !== DEFAULT_HALL_COUNT)
+  // Пока идёт сохранение, защита снята — и после успеха тоже (isSaving остаётся
+  // поднятым, см. save): HallPlansPage.createPlan уводит в редактор нового плана,
+  // и этот переход — сам дровер, а не потеря ввода.
+  const { requestClose, isPrompting, confirmClose, keepEditing } = useGuardedClose(isDirty && !isSaving, onClose)
+  useModalLayer(requestClose)
 
   async function save() {
     if (nameEmpty || isSaving) return
@@ -66,7 +81,12 @@ export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
       role="dialog"
       aria-modal="true"
       aria-label={isEditing ? tr('Изменить план', 'Rejani o‘zgartirish') : tr('Новый план залов', 'Yangi zallar rejasi')}
-      onMouseDown={onClose}
+      onMouseDown={(event) => {
+        // Без preventDefault нажатие на подложку увело бы фокус в body уже ПОСЛЕ
+        // того, как плашка его забрала, — и Enter перестал бы значить «продолжить».
+        event.preventDefault()
+        requestClose()
+      }}
     >
       <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer__header">
@@ -75,9 +95,19 @@ export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
             <h2>{isEditing ? tr('Изменить план', 'Rejani o‘zgartirish') : tr('Новый план', 'Yangi reja')}</h2>
           </div>
           <div className="drawer__header-actions">
-            <button className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+            <button className="icon-button icon-button--bordered" onClick={requestClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
           </div>
         </div>
+
+        {isPrompting && (
+          <UnsavedPrompt
+            message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+            stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
+            leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
+            onStay={keepEditing}
+            onLeave={confirmClose}
+          />
+        )}
 
         <label className="field">
           <span>{tr('Название', 'Nomi')} *</span>

@@ -328,6 +328,12 @@
 .unsaved-prompt > svg { flex: 0 0 auto; color: var(--danger); }
 .unsaved-prompt > strong { flex: 1 1 auto; min-width: 0; font-size: 13px; }
 .unsaved-prompt__actions { display: flex; flex: 0 0 auto; gap: 8px; }
+/* В дровере полезной ширины ~420px: вопрос и две длинные кнопки в строку не
+   влезают — текст сжимался бы в столбик по слову. Кнопки уходят второй строкой
+   и сами переносятся друг под друга, если не помещаются рядом. */
+.drawer .unsaved-prompt { flex-wrap: wrap; }
+.drawer .unsaved-prompt__actions { flex: 1 1 100%; flex-wrap: wrap; }
+.drawer .unsaved-prompt__actions .button { flex: 1 1 auto; }
 .detail-skeleton { height: 58px; margin-bottom: 14px; border-radius: 9px; background: linear-gradient(90deg, #f0f2ef 25%, #f7f8f6 50%, #f0f2ef 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 /* Болванки загрузки под конкретные экраны. Блок стоит ПОСЛЕ .detail-skeleton
    намеренно: у модификаторов ровно один класс, то есть та же специфичность, и
