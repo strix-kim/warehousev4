@@ -2,6 +2,7 @@ import { ArrowRight, Eye, EyeOff, LockKeyhole } from 'lucide-react'
 import { FormEvent, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './AuthProvider'
+import { ArgoDots } from '../../components/ArgoDots'
 import { LanguageSwitcher, useLanguage } from '../../lib/i18n'
 import { isSupabaseConfigured } from '../../lib/supabase'
 
@@ -65,7 +66,7 @@ export function LoginPage() {
           <h1>{tr('Оборудование всегда под контролем.', 'Uskunalar doimo nazorat ostida.')}</h1>
           <p>{tr('Каталог, комплектация и документы для каждого проекта — в одном рабочем пространстве.', 'Har bir loyiha uchun katalog, jamlanma va hujjatlar — bitta ish maydonida.')}</p>
         </div>
-        <img className="login-brand-illustration" src="/illustrations/av-warehouse.webp" alt="" aria-hidden="true" loading="eager" decoding="async" fetchPriority="high" />
+        <ArgoDots className="login-brand-dots" />
         <p className="login-version">WAREHOUSE · 2026</p>
       </section>
 

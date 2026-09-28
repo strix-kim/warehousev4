@@ -83,5 +83,5 @@
 .page-header h1 { margin-bottom: 8px; }
 .page-description { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.55; }
 .eyebrow { margin-bottom: 8px; color: var(--faint); font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
-.eyebrow--light { color: var(--red-act); }
+.eyebrow--light { color: var(--on-night-2); }
 .muted { color: var(--muted); }
