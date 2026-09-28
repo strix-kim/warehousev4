@@ -260,7 +260,7 @@ function HallPlanCard({ plan, isDeleting, isCopying, onOpen, onCopy, onDelete }:
     // Карточка плана — та же .list-card, что у списков (с25): жанр один
     // (работа со своей идентичностью и двумя действиями), и второй экземпляр
     // уже успел разъехаться с оригиналом по высоте и анимации. Своё у плана
-    // только одно — ряд цветных точек на месте описания.
+    // только одно — ряд цветных меток залов на месте описания.
     <article className="list-card list-card--plan">
       <div className="list-card__top">
         <div className="list-card__identity">
@@ -276,9 +276,11 @@ function HallPlanCard({ plan, isDeleting, isCopying, onOpen, onCopy, onDelete }:
       <div className="hall-plan-dots">
         {halls.length === 0
           ? <span className="hall-plan-dots__empty">{tr('Залов пока нет', 'Hozircha zallar yo‘q')}</span>
-          : halls.map((hall) => (
+          // Номер в метке — индекс после sortHalls, то есть номер колонки в
+          // редакторе и на ТВ: по нему зал и ищут глазами (макет с31).
+          : halls.map((hall, index) => (
             <span className="hall-plan-dot" key={hall.id} style={{ '--hall-color': hall.color } as CSSProperties}>
-              <i aria-hidden="true" />{hall.name}
+              <i aria-hidden="true">{index + 1}</i>{hall.name}
             </span>
           ))}
       </div>

@@ -37,10 +37,11 @@ export function HallMatrix({ editor }: { editor: HallPlanEditor }) {
   // repeat(0, …) — недопустимое значение, и при плане без залов сетка сложилась
   // бы в ноль колонок вместо одной с заголовками строк.
   // Минимум колонки — переменной, а не числом: на печати (halls.css, @media
-  // print) его обнуляют, иначе 180px × десяток залов уносит правые колонки за
-  // поля листа. На экране минимум держит клетку шире пикера.
+  // print) его обнуляют, иначе 158px × десяток залов уносит правые колонки за
+  // поля листа. 158 — ширина колонки макета с31: восемь залов с первой колонкой
+  // 210 встают на 1920 целиком, а на 1440 матрица листается вбок сама.
   const columns = editor.halls.length > 0
-    ? `var(--hall-head-w) repeat(${editor.halls.length}, minmax(var(--hall-col-min, 180px), 1fr))`
+    ? `var(--hall-head-w) repeat(${editor.halls.length}, minmax(var(--hall-col-min, 158px), 1fr))`
     : 'var(--hall-head-w)'
 
   return (
@@ -50,7 +51,6 @@ export function HallMatrix({ editor }: { editor: HallPlanEditor }) {
           <div className="hall-matrix" style={{ gridTemplateColumns: columns } as CSSProperties}>
             <div className="hall-matrix__corner">
               <span>{tr('Позиция', 'Lavozim')}</span>
-              <small>{tr('строки — позиции, колонки — залы', 'qatorlar — lavozimlar, ustunlar — zallar')}</small>
             </div>
 
             {editor.halls.map((hall, index) => (
@@ -85,10 +85,6 @@ export function HallMatrix({ editor }: { editor: HallPlanEditor }) {
                     // строке операторов (решение прораба с21).
                     positionRole={position.role}
                     hallName={hall.name}
-                    // Цвет колонки — в саму клетку: тонировка держит колонку
-                    // вместе на десятке залов, где шапка уже уехала за верх
-                    // прокрутки (с21).
-                    hallColor={hall.color}
                     cell={editor.cellMap.get(cellKeyOf({ hallId: hall.id, positionId: position.id }))}
                     editor={editor}
                   />

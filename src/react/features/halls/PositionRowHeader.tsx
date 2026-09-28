@@ -20,19 +20,15 @@ export function PositionRowHeader({ position, cellCount, onRename, onCycleRole, 
   return (
     <div className="hall-matrix__rowhead">
       <div className="hall-matrix__rowhead-main">
-        <InlineText
-          value={position.name}
-          onSave={onRename}
-          ariaLabel={tr('Название позиции', 'Lavozim nomi')}
-        />
-
         {/* Роль перебирается кликом, а не выбирается из списка: значений три,
             и круг техник → оператор → другое короче любого выпадающего меню.
             Роль стоит у СТРОКИ, а не у ячейки: «Операторы» — это оператор во
             всех залах сразу, и держать её в каждой клетке было бы дублем.
             Подписи у чипа нет (с21): «Видеоинженер» под «Millumin» дублировал
             очевидное — роль это служебное поле счётчиков, а не текст строки.
-            Имя роли осталось в подсказке. */}
+            Имя роли осталось в подсказке. Стоит ПЕРЕД именем (макет с31):
+            иконки выравниваются в столбик, и имена строк начинаются с одной
+            вертикали, а не прыгают за хвостом разной длины. */}
         <button
           type="button"
           className={`hall-role hall-role--${position.role}`}
@@ -44,6 +40,12 @@ export function PositionRowHeader({ position, cellCount, onRename, onCycleRole, 
           {position.role === 'operator' && <Video size={13} />}
           {position.role !== 'technician' && position.role !== 'operator' && <Asterisk size={13} />}
         </button>
+
+        <InlineText
+          value={position.name}
+          onSave={onRename}
+          ariaLabel={tr('Название позиции', 'Lavozim nomi')}
+        />
       </div>
 
       {armed.armed ? (

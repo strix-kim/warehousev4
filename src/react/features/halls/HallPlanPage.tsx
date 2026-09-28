@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, CircleAlert, Copy, LayoutGrid, MonitorPlay, Pencil, Plus, Presentation } from 'lucide-react'
+import { ArrowLeft, Check, Copy, LayoutGrid, MonitorPlay, Pencil, Plus, Presentation } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { HallMatrix } from './HallMatrix'
@@ -110,8 +110,9 @@ export function HallPlanPage() {
           </button>
           {/* Обычная навигация, не новая вкладка: на самом ТВ адрес открывают
               браузером телевизора, а здесь кнопка нужна, чтобы посмотреть
-              витрину и вернуться Esc-ом. */}
-          <button className="button button--secondary" onClick={() => navigate(`/halls/${plan.id}/tv`)}>
+              витрину и вернуться Esc-ом. Тёмная (макет с31): ТВ — вход в
+              тёмную витрину, и кнопка заранее говорит, куда ведёт. */}
+          <button className="button button--secondary hall-tv-link" onClick={() => navigate(`/halls/${plan.id}/tv`)}>
             <MonitorPlay size={16} /> {tr('ТВ', 'TV')}
           </button>
         </div>
@@ -251,7 +252,7 @@ function CopyPlanButton({ editor }: { editor: HallPlanEditor }) {
       {state === 'done' ? <Check size={16} /> : <Copy size={16} />}
       {state === 'done' && tr('Скопировано', 'Nusxalandi')}
       {state === 'failed' && tr('Не вышло', 'Bo‘lmadi')}
-      {state === 'idle' && tr('Копировать', 'Nusxalash')}
+      {state === 'idle' && tr('Копировать для чата', 'Chat uchun nusxalash')}
     </button>
   )
 }
@@ -266,10 +267,12 @@ function SaveState({ state, savedAt, errorText, onRetry }: {
 }) {
   const { tr, locale } = useLanguage()
 
+  // Точка слева — общий .status-dot, как у статуса редактора списков: цвет
+  // читается боковым зрением раньше слов (макет с31).
   if (state === 'failed') {
     return (
       <p className="hall-save hall-save--failed" role="status" title={errorText}>
-        <CircleAlert size={14} />
+        <i className="status-dot status-dot--danger" aria-hidden="true" />
         {tr('Не сохранилось', 'Saqlanmadi')}
         {/* «Повторить» — полная перезагрузка плана, а не повтор упавшего запроса:
             после отказа локальная копия разошлась с базой, и вернуть их в одно
@@ -281,6 +284,7 @@ function SaveState({ state, savedAt, errorText, onRetry }: {
 
   return (
     <p className="hall-save" role="status">
+      <i className={`status-dot ${state === 'saving' ? 'status-dot--warning' : 'status-dot--success'}`} aria-hidden="true" />
       {state === 'saving' && tr('Сохраняем…', 'Saqlanmoqda…')}
       {state === 'saved' && (savedAt
         ? tr(`Сохранено ${formatTime(savedAt, locale)}`, `${formatTime(savedAt, locale)} da saqlandi`)
@@ -301,17 +305,24 @@ function PlanCounts({ counts }: { counts: { technicians: number; operators: numb
   const { tr, locale } = useLanguage()
 
   return (
-    // Форма «метка: число», а не «7 видеоинженеров»: на единице выходило
+    // Число над подписью, а не «7 видеоинженеров»: на единице выходило
     // «1 операторов». Своего словаря окончаний в проекте нет намеренно
     // (lib/date.ts, formatAge) — вести его на два языка дороже, чем набрать
-    // сводку формой, которая не склоняется вовсе. Ровно так же подписан
-    // подвал ТВ, и теперь эти две сводки читаются одинаково.
+    // сводку формой, которая не склоняется вовсе: подпись капсом — это имя
+    // столбца, а не часть фразы. Так же подписаны счётчики ТВ.
     <div className="hall-counts">
-      <span>{tr('Людей', 'Odamlar')}: <strong>{counts.totalPeople.toLocaleString(locale)}</strong></span>
-      <span>{tr('Видеоинженеры', 'Videoinjenerlar')}: <strong>{counts.technicians.toLocaleString(locale)}</strong></span>
-      <span>{tr('Операторы', 'Operatorlar')}: <strong>{counts.operators.toLocaleString(locale)}</strong></span>
-      {counts.others > 0 && <span>{tr('Прочие', 'Boshqalar')}: <strong>{counts.others.toLocaleString(locale)}</strong></span>}
-      {counts.hired > 0 && <span>{tr('Наём', 'Yollash')}: <strong>{counts.hired.toLocaleString(locale)}</strong></span>}
+      <div className="hall-count"><strong>{counts.totalPeople.toLocaleString(locale)}</strong><span>{tr('Людей', 'Odamlar')}</span></div>
+      <div className="hall-count"><strong>{counts.technicians.toLocaleString(locale)}</strong><span>{tr('Видеоинженеры', 'Videoinjenerlar')}</span></div>
+      <div className="hall-count"><strong>{counts.operators.toLocaleString(locale)}</strong><span>{tr('Операторы', 'Operatorlar')}</span></div>
+      {counts.others > 0 && <div className="hall-count"><strong>{counts.others.toLocaleString(locale)}</strong><span>{tr('Прочие', 'Boshqalar')}</span></div>}
+      {/* «Наём» отделён чертой: это не люди бригады, а сколько ещё брать со
+          стороны, и число у него цвета предупреждения. */}
+      {counts.hired > 0 && (
+        <>
+          <span className="hall-counts__sep" aria-hidden="true" />
+          <div className="hall-count hall-count--hire"><strong>{counts.hired.toLocaleString(locale)}</strong><span>{tr('Наём', 'Yollash')}</span></div>
+        </>
+      )}
     </div>
   )
 }
@@ -349,14 +360,16 @@ function FreeEmployees({ editor }: { editor: HallPlanEditor }) {
   // расстановка начиналась ниже сгиба. На БУМАГЕ обрезать нельзя — лист несут
   // на планёрку, и «и ещё 9» там ничего не значит. Поэтому вариантов два, и
   // печать показывает свой (см. @media print).
-  const shown = isExpanded ? all : all.slice(0, VISIBLE_FREE)
+  // На экране имена — чипами (макет с31): свободного ищут глазами по имени,
+  // и отдельная плашка читается быстрее строки через запятую.
+  const shown = isExpanded ? free : free.slice(0, VISIBLE_FREE)
   const rest = all.length - shown.length
 
   return (
     <p className="hall-free" title={names}>
       <span className="hall-free__screen">
-        {tr(`Свободны: ${count} — `, `Bo‘sh: ${count} — `)}
-        {shown.join(', ')}
+        <span>{tr('Свободны', 'Bo‘sh')}: <strong>{count}</strong></span>
+        {shown.map((employee) => <span className="chip" key={employee.id}>{employeeDisplayName(employee)}</span>)}
         {rest > 0 && (
           <button type="button" className="hall-free__more" onClick={() => setExpanded(true)}>
             {tr(`и ещё ${rest}`, `va yana ${rest}`)}
