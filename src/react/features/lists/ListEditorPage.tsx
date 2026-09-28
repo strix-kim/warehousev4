@@ -1,4 +1,4 @@
-import { ArrowDown, FileCheck2, FileSpreadsheet, ListChecks, Save } from 'lucide-react'
+import { Save } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ErrorState } from '../../components/ErrorState'
@@ -12,9 +12,12 @@ import {
 } from './api'
 import { buildCatalogGroups, type CatalogGroup } from './catalogGroups'
 import { CatalogPanel, CatalogPreviewDrawer } from './ListEditorCatalog'
+import { ExportChoice, type ExportChoiceProps } from './ExportChoice'
 import { ListEditorDraftNotice } from './ListEditorDraftNotice'
 import { ListEditorHeader, type EditorStatusDot } from './ListEditorHeader'
 import { KitPanel } from './ListEditorKit'
+import { ListExportSheet } from './ListExportSheet'
+import { ListStickyBar } from './ListStickyBar'
 import { ListEditorMeta, type ListMetaField, type RequisiteField } from './ListEditorMeta'
 import { useEditorChrome } from './useEditorChrome'
 import { useEditorCatalog } from './useEditorCatalog'
@@ -33,6 +36,10 @@ import { useListDraftAutosave } from './useListDraftAutosave'
 import { useListDraftRestore } from './useListDraftRestore'
 import type { ListDraft } from './api'
 import { downloadEquipmentListXlsx } from './xlsxExport'
+
+// Телефонная раскладка редактора. Пара — медиазапрос 700px в
+// 06-responsive-editor.css и export-choice.css; правится руками синхронно.
+const EDITOR_PHONE_MEDIA_QUERY = '(max-width: 700px)'
 
 export function ListEditorPage() {
   const navigate = useNavigate()
@@ -62,6 +69,8 @@ export function ListEditorPage() {
   // согласование. Подсветка снимается с поля, как только его начали править.
   const [requisiteErrors, setRequisiteErrors] = useState<Set<RequisiteField>>(() => new Set())
   const [previewGroup, setPreviewGroup] = useState<CatalogGroup | null>(null)
+  // Лист выбора формата — только телефонный: открывает его липкая плашка.
+  const [isExportSheetOpen, setExportSheetOpen] = useState(false)
   const { mobilePanel, moveToMobilePanel, catalogRef, selectionRef } = useMobilePanels()
   // Панель реквизитов свёрнута по умолчанию: список собирают без неё, а документу
   // на согласование страница раскроет её сама (см. exportList).
@@ -173,6 +182,15 @@ export function ListEditorPage() {
     window.addEventListener('beforeunload', warnOnUnload)
     return () => window.removeEventListener('beforeunload', warnOnUnload)
   }, [isDirty, listId])
+
+  // Шире 700 плашки, открывшей лист, нет — формат там выбирают карточками в
+  // подвале комплекта. Лист закрываем, как лист «Ещё» в App.tsx.
+  useEffect(() => {
+    const media = window.matchMedia(EDITOR_PHONE_MEDIA_QUERY)
+    const handleChange = () => { if (!media.matches) setExportSheetOpen(false) }
+    media.addEventListener('change', handleChange)
+    return () => media.removeEventListener('change', handleChange)
+  }, [])
 
   // Сброс несохранённой работы. У /lists/new это «Начать заново» — форма пустеет.
   // У открытого списка пустеть нечему: откатываем к строке из базы, для чего
@@ -356,23 +374,21 @@ export function ListEditorPage() {
 
   const isBusy = isSaving || isExporting !== ''
   // Сохранение — тихое действие с подписью «необязательно»: продукт экрана —
-  // файл. На десктопе кнопка в шапке, на телефоне — в подвале комплекта (шапочные
-  // действия там скрыты). Экспорт живёт в подвале комплекта на всех ширинах.
+  // файл. На десктопе кнопка в шапке, на телефоне — третьей кнопкой в листе
+  // формата. Формат выбирают карточками ExportChoice: в подвале комплекта шире
+  // 700 и в том же листе на телефоне — одни пропсы на обе точки монтажа.
   const saveButton = (
     <button className="button editor-save-button" onClick={() => void saveList()} disabled={!canSubmit || isBusy}>
       <Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить в системе', 'Tizimda saqlash')}
     </button>
   )
-  const exportButtons = (
-    <>
-      <button className="button button--secondary" onClick={() => exportList('working')} disabled={!canSubmit || isBusy} title={tr('Только список оборудования — для команды и работы', 'Faqat uskunalar ro‘yxati — jamoa va ish uchun')}>
-        <FileSpreadsheet size={17} />{isExporting === 'working' ? tr('Готовим…', 'Tayyorlanmoqda…') : tr('Рабочий Excel', 'Ishchi Excel')}
-      </button>
-      <button className="button button--primary" onClick={() => exportList('approval')} disabled={!canSubmit || isBusy} title={tr('Документ для заказчика: с реквизитами и подписями', 'Buyurtmachi uchun hujjat: rekvizitlar va imzolar bilan')}>
-        <FileCheck2 size={17} />{isExporting === 'approval' ? tr('Готовим…', 'Tayyorlanmoqda…') : tr('С реквизитами', 'Rekvizitlar bilan')}
-      </button>
-    </>
-  )
+  const exportChoice: ExportChoiceProps = {
+    onWorking: () => exportList('working'),
+    onApproval: () => exportList('approval'),
+    disabled: !canSubmit || isBusy,
+    exporting: isExporting,
+    requisitesFilled: [name, clientName, venue].filter((value) => value.trim()).length,
+  }
 
   // Строка состояния занимает место eyebrow и имеет фиксированную высоту: результат
   // действия сменяет нейтральный статус, не двигая раскладку и не заводя тостов.
@@ -446,20 +462,25 @@ export function ListEditorPage() {
           onToggleSerialPicker={toggleSerialPicker}
           onToggleSerial={toggleSerial}
           onClear={clearSelection}
-          exportActions={exportButtons}
-          mobileActions={saveButton}
+          exportActions={<ExportChoice {...exportChoice} />}
           status={statusTone !== '' ? <p className={`editor-status editor-status--${statusTone} editor-status--inline`}>{statusBody}</p> : null}
         />
       </div>
 
-      {selectedCount > 0 && mobilePanel === 'catalog' && (
-        <button className="mobile-selection-bar" type="button" onClick={() => moveToMobilePanel('selection')}>
-          <span><ListChecks size={18} /> {tr('Добавлено в список', 'Ro‘yxatga qo‘shildi')} <strong>{selectedCount}</strong></span>
-          <span>{tr('Открыть', 'Ochish')} <ArrowDown size={16} /></span>
-        </button>
-      )}
-
       {previewGroup && <CatalogPreviewDrawer group={previewGroup} onClose={() => setPreviewGroup(null)} onAdd={() => { addGroup(previewGroup); setPreviewGroup(null) }} />}
+
+      {/* Плашка и лист — последними и вне .editor-grid/.data-panel: у тех анимация
+          с transform, и position: fixed уехал бы вместе с панелью. Счётчик единиц
+          на плашке — и обратная связь «добавлено» на вкладке каталога. */}
+      <ListStickyBar unitCount={selectedCount} onOpen={() => setExportSheetOpen(true)} disabled={selectedCount === 0} />
+      <ListExportSheet
+        open={isExportSheetOpen}
+        onClose={() => setExportSheetOpen(false)}
+        choice={exportChoice}
+        onSave={() => void saveList()}
+        saveDisabled={!canSubmit || isBusy}
+        saving={isSaving}
+      />
     </>
   )
 }

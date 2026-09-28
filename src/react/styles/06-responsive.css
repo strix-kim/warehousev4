@@ -153,6 +153,11 @@
 @media (max-width: 700px) {
   .editor-header { grid-template-columns: 44px 1fr; }
   .editor-header h1 { font-size: 22px; white-space: normal; }
+  /* Режим «задача» (редактор списка): нижней панели нет, поповер даты встаёт у
+     кромки окна. Поповер живёт в портале на body, вне .app-shell, поэтому
+     режим ловится через :has. z-index 70 выше липкой плашки редактора (14) —
+     плашку он накрывает, а не прячется под неё. */
+  body:has(.app-shell--task) .app-date-picker__popover { bottom: calc(12px + env(safe-area-inset-bottom)); }
 }
 
 /* Сетка фона — декор экрана, на бумаге ей не место (02-shell, .gridfield). */

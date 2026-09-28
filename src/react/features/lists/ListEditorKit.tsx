@@ -8,9 +8,9 @@ import type { ResolvedSelection } from './listDocument'
 
 // Половина редактора «Комплект»: позиции с количеством и серийниками, итог,
 // очистка и экспорт. Сама выборка живёт на странице — панель только просит её
-// изменить. Действия приходят готовыми узлами: экспорт — на всех ширинах,
-// mobileActions и строка состояния — только на телефоне, где шапочных действий нет.
-export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selectedCount, onChangeCount, onSetCount, onToggleSerialPicker, onToggleSerial, onClear, exportActions, mobileActions, status }: {
+// изменить. Выбор формата приходит готовым узлом (ExportChoice; на телефоне
+// скрыт — там его показывает лист). Строка состояния — только на телефоне.
+export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selectedCount, onChangeCount, onSetCount, onToggleSerialPicker, onToggleSerial, onClear, exportActions, status }: {
   panelRef: RefObject<HTMLElement | null>
   isMobileActive: boolean
   resolvedSelection: ResolvedSelection
@@ -21,7 +21,6 @@ export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selected
   onToggleSerial: (key: string, equipmentId: string) => void
   onClear: () => void
   exportActions: ReactNode
-  mobileActions: ReactNode
   status: ReactNode | null
 }) {
   const { tr, language } = useLanguage()
@@ -120,12 +119,10 @@ export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selected
           )}
         </div>
         <div className="selection-footer__export">{exportActions}</div>
-        {/* Только телефон: там шапочных действий нет. Сообщение о результате
-            держим рядом с нажатой кнопкой. */}
-        <div className="selection-footer__mobile">
-          {mobileActions}
-          {status}
-        </div>
+        {/* Результат действия на телефоне: шапка со строкой состояния там
+            уезжает вверх, а экспорт и сохранение жмут из листа внизу. Шире 700
+            узел скрыт — там тот же текст стоит в липкой шапке. */}
+        {status}
       </footer>
     </section>
   )

@@ -88,10 +88,11 @@
 .selection-footer__summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .selection-footer__total { display: inline-flex; align-items: baseline; gap: 10px; color: var(--muted); font-size: 13px; }
 .selection-footer__total strong { color: var(--ink); font: 800 30px/1 var(--f-display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-/* Экспорт — в подвале комплекта на всех ширинах, рядом с тем, что собрано. */
-.selection-footer__export { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.selection-footer__export .button { min-width: 0; padding-inline: 12px; }
-.selection-footer__mobile { display: none; }
+/* Выбор формата (ExportChoice) — в подвале комплекта, рядом с тем, что собрано.
+   На телефоне скрыт: там формат выбирают в листе от липкой плашки. */
+.selection-footer__export { min-width: 0; }
+/* Строка результата в подвале — только телефонная (06-responsive-editor). */
+.editor-status--inline { display: none; }
 
 .clear-selection { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: var(--bad); background: transparent; font-size: 12px; font-weight: 700; white-space: nowrap; }
 /* Взведённое подтверждение: кнопка меняет вид, а не открывает модалку. */
@@ -154,7 +155,6 @@
 .serial-picker button { min-height: 30px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--ctl); border-radius: var(--r-sm); color: var(--ink); background: var(--card); font: 500 12.5px/1 var(--f-mono); }
 .serial-picker button:hover { background: var(--hover); }
 .serial-picker button[aria-pressed='true'] { border-color: var(--ink); color: #fff; background: var(--ink); }
-.mobile-selection-bar { display: none; }
 
 .catalog-preview-drawer .equipment-thumb--large { margin: 22px 0 16px; }
 .catalog-preview-drawer__add { width: 100%; }
