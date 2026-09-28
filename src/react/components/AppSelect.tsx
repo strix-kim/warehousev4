@@ -34,7 +34,7 @@ export function AppSelect<T extends string>({
 
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return
-    setPosition(computePopoverPosition(triggerRef.current.getBoundingClientRect(), options.length))
+    setPosition(computePopoverPosition(triggerRef.current, options.length))
   }, [open, options.length])
 
   usePopoverLayer(open, () => setOpen(false), [rootRef, popoverRef])

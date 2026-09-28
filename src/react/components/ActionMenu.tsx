@@ -45,7 +45,7 @@ export function ActionMenu({
 
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return
-    setPosition(computePopoverPosition(triggerRef.current.getBoundingClientRect(), items.length))
+    setPosition(computePopoverPosition(triggerRef.current, items.length))
   }, [open, items.length])
 
   usePopoverLayer(open, () => setOpen(false), [rootRef, popoverRef])

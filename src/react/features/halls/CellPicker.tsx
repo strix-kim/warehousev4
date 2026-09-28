@@ -47,7 +47,7 @@ export function CellPicker({ anchor, exclude, editor, onPick, onHire, onClose }:
   useLayoutEffect(() => {
     // Восьми строк хватает, чтобы оценка высоты упёрлась в потолок расчёта:
     // выдача пикера всё равно длиннее экрана и прокручивается своей панелью.
-    setPosition(computePopoverPosition(anchor.getBoundingClientRect(), 8, 260))
+    setPosition(computePopoverPosition(anchor, 8, 260))
   }, [anchor])
 
   usePopoverLayer(true, onClose, [popoverRef, anchorRef])

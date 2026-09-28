@@ -65,11 +65,16 @@
   --shadow-pop: 0 18px 48px rgba(15,17,21,.16), 0 2px 6px rgba(15,17,21,.06);
   --shadow-drawer: -24px 0 60px rgba(15,17,21,.18);
   --shadow-card: 0 12px 32px rgba(15, 17, 21, 0.07);
+  /* Масштаб интерфейса (с33): 1 везде, 1.125 на широком экране — там же, в
+     06-responsive, он и включается. Под CSS-zoom единицы vh/vw умножаются вместе
+     со всем остальным, и 100vh превращается в 112,5 % окна; поэтому всё, что
+     обязано совпасть с краем окна, пишется как calc(100vh / var(--app-zoom)). */
+  --app-zoom: 1;
 }
 
 * { box-sizing: border-box; }
 html { min-width: 320px; background: var(--bg); }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
+body { margin: 0; min-width: 320px; min-height: calc(100vh / var(--app-zoom)); }
 * { scrollbar-width: thin; scrollbar-color: var(--soft) transparent; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-track { background: transparent; }

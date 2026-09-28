@@ -78,7 +78,7 @@
    странице: залов бывает дюжина, и страница шире вьюпорта не становится ни при
    каком их числе. Высота ограничена, иначе position: sticky у шапки не за что
    зацепиться — липнуть можно только к границе прокручиваемого предка. */
-.hall-matrix-scroll { max-height: calc(100vh - 260px); min-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card); }
+.hall-matrix-scroll { max-height: calc(100vh / var(--app-zoom) - 260px); min-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card); }
 
 /* Матрица и плитка «+ Зал» — одна полоса: кнопка стоит справа от последнего
    зала и уезжает вместе с ним. min-width: 100% растягивает полосу на контейнер,

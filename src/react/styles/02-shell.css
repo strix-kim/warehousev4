@@ -1,6 +1,6 @@
 
-.app-shell { min-height: 100vh; display: grid; grid-template-columns: 256px minmax(0, 1fr); transition: grid-template-columns .22s ease; }
-.sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; padding: 22px 16px 16px; color: var(--on-night); background: var(--night); transition: padding .22s ease; }
+.app-shell { min-height: calc(100vh / var(--app-zoom)); display: grid; grid-template-columns: 256px minmax(0, 1fr); transition: grid-template-columns .22s ease; }
+.sidebar { position: sticky; top: 0; height: calc(100vh / var(--app-zoom)); display: flex; flex-direction: column; overflow: hidden; padding: 22px 16px 16px; color: var(--on-night); background: var(--night); transition: padding .22s ease; }
 .sidebar__brand { display: flex; align-items: center; justify-content: space-between; padding: 0 6px 22px; border-bottom: 1px solid var(--night-line); }
 .brand-lockup { display: flex; align-items: center; gap: 10px; color: var(--ink); }
 .brand-lockup--light { color: #fff; }

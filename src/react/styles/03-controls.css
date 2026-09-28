@@ -42,7 +42,7 @@
 .app-select__icon { display: grid; place-items: center; color: var(--muted); }
 .app-select__trigger > svg { flex: 0 0 auto; color: var(--faint); transition: transform .16s ease; }
 .app-select__trigger > svg.is-open { transform: rotate(180deg); }
-.app-select__popover { position: fixed; z-index: 70; max-height: min(330px, calc(100dvh - 24px)); padding: 6px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-md); background: rgba(255,255,255,.98); box-shadow: var(--shadow-pop); backdrop-filter: blur(16px); animation: popover-in .16s ease-out; }
+.app-select__popover { position: fixed; z-index: 70; max-height: min(330px, calc(100dvh / var(--app-zoom) - 24px)); padding: 6px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-md); background: rgba(255,255,255,.98); box-shadow: var(--shadow-pop); backdrop-filter: blur(16px); animation: popover-in .16s ease-out; }
 .app-select__popover button { width: 100%; min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 0; border-radius: var(--r-sm); color: var(--muted); background: transparent; font-size: 13px; font-weight: 600; text-align: left; }
 
 /* Меню действий. Внешний вид попапа общий с AppSelect, отличается содержимое

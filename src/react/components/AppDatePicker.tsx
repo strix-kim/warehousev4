@@ -2,6 +2,7 @@ import { CalendarDays, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { formatEventDate, formatMonthTitle, parseDateValue, toDateValue } from '../lib/date'
+import { measureAnchor } from '../lib/popoverPosition'
 import { usePopoverLayer } from '../lib/usePopoverLayer'
 
 const uzbekWeekdays = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya']
@@ -49,12 +50,12 @@ export function AppDatePicker({
 
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return
-    const rect = triggerRef.current.getBoundingClientRect()
-    const width = Math.min(320, window.innerWidth - 24)
-    const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))
+    const { rect, viewportWidth, viewportHeight } = measureAnchor(triggerRef.current)
+    const width = Math.min(320, viewportWidth - 24)
+    const left = Math.max(12, Math.min(rect.left, viewportWidth - width - 12))
     const estimatedHeight = 390
     const below = rect.bottom + 8
-    const top = below + estimatedHeight <= window.innerHeight ? below : Math.max(12, rect.top - estimatedHeight - 8)
+    const top = below + estimatedHeight <= viewportHeight ? below : Math.max(12, rect.top - estimatedHeight - 8)
     setPosition({ top, left, width })
   }, [open])
 
