@@ -34,7 +34,10 @@ export default defineConfig(({ command, mode }) => {
           // React и Supabase из кэша у всех сотрудников
           manualChunks(id) {
             if (!id.includes('node_modules')) return
-            if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) return 'react-vendor'
+            // Роутер своим чанком: data router (с31) тяжелее, и вместе с React
+            // вендор переваливал порог 250 кБ — порог не поднимаем, режем
+            if (/[\\/]node_modules[\\/](react-router|react-router-dom)[\\/]/.test(id)) return 'router'
+            if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react-vendor'
             if (/[\\/]node_modules[\\/]@supabase[\\/]/.test(id)) return 'supabase'
             return
           },
