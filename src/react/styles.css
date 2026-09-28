@@ -38,8 +38,9 @@
  *
  * ДВА ЗНАЧЕНИЯ ПРОДУБЛИРОВАНЫ В JS И ПРАВЯТСЯ СИНХРОННО РУКАМИ:
  *   820 px  ↔  lib/breakpoints.ts (единственная граница, которую читает JS);
- *   57 px   ↔  MOBILE_TABS_HEIGHT в ListEditorPage.tsx (высота липких вкладок,
- *              на неё опирается .quick-catalog-toolbar { top }).
+ *   57 px   ↔  MOBILE_TABS_HEIGHT в features/lists/useMobilePanels.ts (высота
+ *              липких вкладок, на неё опирается .quick-catalog-toolbar { top }
+ *              в 06-responsive-editor).
  *
  * У каждого правила ОДНО место объявления: хвостовой readability-блок влит в
  * исходные правила в с5. «Финальный размер определяется порядком каскада»
@@ -49,7 +50,7 @@
  * ЧИСТЫМ ПЕРЕНОСОМ: ни один селектор не переписан и ни одно правило не
  * переставлено. Куски идут строго в исходном порядке — каскад держится на нём,
  * у медиазапросов та же специфичность, и побеждает последний. Поэтому
- * 06-responsive.css обязан импортироваться ПОСЛЕДНИМ, а порядок ниже —
+ * слой 06 обязан импортироваться ПОСЛЕДНИМ, а порядок ниже —
  * не стилистика, а работающий код.
  *
  *   00-fonts       @font-face самохостных шрифтов (с32) — только объявления
@@ -57,10 +58,12 @@
  *   02-shell       оболочка: сайдбар, .app-content, шапка страницы
  *   03-controls    кнопки, тулбар, поиск, AppSelect, ActionMenu, датапикер
  *   04-data        .data-panel, таблица, миниатюры, дровер, .detail-list
- *   05-features    карточки списков, главная, редактор, формы, люди, машины
+ *   05-features    карточки списков, главная, формы, люди, машины
+ *   05-editor      редактор списка (с35, ListEditor*.tsx) — сразу после 05-features
  *   05-delay       калькулятор задержки излучателей ITC (с30, селекторы delay-*)
  *   06-responsive-shell  медиазапросы оболочки (сайдбар, нижняя панель; с35)
- *   06-responsive  остальные медиазапросы и prefers-reduced-motion — последним
+ *   06-responsive  остальные медиазапросы и prefers-reduced-motion
+ *   06-responsive-editor  медиазапросы редактора списка (с35) — последним
  *
  * Внутри кусков остались локальные @media (520, hover, reduced-motion внутри
  * блоков) — они там и были; вынос их в 06 переставил бы каскад.
@@ -77,6 +80,8 @@
 @import './styles/03-controls.css';
 @import './styles/04-data.css';
 @import './styles/05-features.css';
+@import './styles/05-editor.css';
 @import './styles/05-delay.css';
 @import './styles/06-responsive-shell.css';
 @import './styles/06-responsive.css';
+@import './styles/06-responsive-editor.css';

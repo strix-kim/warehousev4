@@ -44,139 +44,13 @@
 .editor-header__save { align-self: center; }
 .editor-header__actions { align-self: center; display: flex; gap: 8px; }
 .editor-header__actions .button { flex: 0 0 auto; white-space: nowrap; }
-/* Шапка редактора липкая: сетка ниже занимает весь экран, и кнопки «Сохранить»/
-   «Скачать» должны оставаться на виду. Отрицательный margin гасит собственный
-   padding, поэтому геометрия (шапка 58 + зазор 22 до реквизитов) не меняется. */
-.editor-header--quick { position: sticky; z-index: 9; top: 0; margin: -12px 0 10px; padding: 12px 0; background: var(--bg); }
-/* Строка состояния на месте eyebrow. Высота фиксирована высотой eyebrow: смена
-   текста на результат действия не должна двигать заголовок и сетку под ним. */
-.editor-status { min-height: 15px; margin: 0 0 8px; overflow: hidden; color: var(--faint); font-size: 13px; line-height: 15px; text-overflow: ellipsis; white-space: nowrap; }
-.editor-status a { color: inherit; font-weight: 700; }
-.editor-status--success { color: var(--ok); }
-.editor-status--error { color: var(--bad); }
-.mobile-editor-tabs { display: none; }
-.editor-grid { height: clamp(520px, calc(100dvh / var(--app-zoom) - 380px), 760px); min-height: 0; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px, .85fr); gap: 18px; }
-/* Запасное значение на один кадр до измерения: 40 top + 58 шапка + 22 + 50 полоса
-   реквизитов + 18 + 56 нижний отступ. Живое ставит useEditorChrome инлайном,
-   измеряя всё, что реально стоит над сеткой (баннеры, раскрытые реквизиты). */
-.editor-grid--quick { --editor-chrome: 244px; height: clamp(420px, calc(100dvh / var(--app-zoom) - var(--editor-chrome)), 900px); }
-.catalog-picker, .selection-panel { min-height: 0; height: 100%; display: flex; flex-direction: column; }
-.catalog-picker .panel-heading, .selection-panel .panel-heading { flex: 0 0 auto; }
-/* Тело каталожной панели: до 1800 — только результаты, с 1800 слева встаёт рельс
-   категорий. Прокручиваются они по отдельности, иначе длинный список моделей
-   уносил бы категории за верх. */
-.catalog-picker__body { min-height: 0; flex: 1 1 auto; display: flex; }
-.catalog-picker__body > .picker-results { flex: 1 1 auto; }
-.picker-results, .selection-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
-.picker-results { max-height: none; }
-.picker-item { width: 100%; min-height: 72px; display: grid; grid-template-columns: minmax(0, 1fr) 38px; align-items: center; gap: 10px; padding: 0 14px 0 0; border-bottom: 1px solid var(--line); color: inherit; background: var(--card); }
-/* Наведение — только там, где есть настоящий курсор: на тач-экране :hover
-   залипал после тапа, и «+» оставался повёрнутым на 90°. */
-@media (hover: hover) and (pointer: fine) {
-  .picker-item:hover { background: var(--sunk); }
-  .picker-item:hover .picker-item__action > svg { transform: rotate(90deg); }
-}
-.picker-item--selected { opacity: .62; background: var(--sunk); }
-.picker-item__preview { min-width: 0; min-height: 71px; display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 10px 0 10px 14px; border: 0; color: inherit; background: transparent; text-align: left; }
-.picker-item__preview:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
-.picker-item__copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.picker-item__copy strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.picker-item__copy small { overflow: hidden; color: var(--faint); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.picker-item__count { color: var(--muted); font-size: 12px; font-weight: 700; }
-.picker-item__count--empty { color: var(--warn); }
-.picker-item__action { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-sm); color: #fff; background: var(--red-act); }
-.picker-item--selected .picker-item__action { color: var(--ok); background: var(--ok-bg); }
-.picker-item--grouped.picker-item--selected { opacity: 1; background: var(--red-tint); }
-.picker-item--grouped.picker-item--selected .picker-item__action { color: #fff; background: var(--red-act); }
-.picker-item .picker-item__action { width: auto; min-width: 36px; display: flex; align-items: center; padding: 0 7px; gap: 2px; }
-/* Кнопка с бейджем шире пустой: в колонке 38px плюс и цифра делили место, и
-   иконка схлопывалась в вертикальную чёрточку. */
-.picker-item:has(.picker-item__action span) { grid-template-columns: minmax(0, 1fr) 58px; }
-.picker-item__action > svg { flex: 0 0 auto; }
-.picker-item__action span { flex: 0 0 auto; min-width: 19px; height: 19px; display: inline-grid; place-items: center; border-radius: 5px; color: var(--red-act); background: var(--card); font-family: inherit; font-size: 11px; line-height: 1; }
-.picker-skeleton { height: 64px; margin: 1px 0; background: linear-gradient(90deg, var(--sunk) 25%, var(--card) 50%, var(--sunk) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
-.picker-load-more { display: grid; place-items: center; padding: 16px; background: var(--sunk); }
-.picker-load-more .button { min-width: 180px; }
-.selection-count { min-width: 34px; height: 34px; display: grid; place-items: center; border-radius: var(--r-sm); color: #fff; background: var(--red-act); font-family: inherit; font-size: 14px; }
-.selection-list { max-height: none; }
-.quantity-stepper { height: 32px; display: grid; grid-template-columns: 30px 34px 30px; align-items: center; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
-.quantity-stepper button { height: 100%; display: grid; place-items: center; padding: 0; border: 0; color: var(--muted); background: var(--sunk); }
-.quantity-stepper button:hover { color: var(--ink); background: var(--hover); }
-.quantity-stepper input { width: 100%; height: 100%; padding: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 13px; font-weight: 700; text-align: center; }
-/* Обводка фокуса ушла бы под overflow: hidden степпера — уводим её внутрь. */
-.quantity-stepper input:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
-.selection-footer { flex: 0 0 auto; display: flex; flex-direction: column; gap: 11px; padding: 15px; border-top: 1px solid var(--line); background: var(--sunk); }
-.selection-footer > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 13px; }
-.selection-footer > div strong { color: var(--ink); font-family: inherit; font-size: 18px; }
-.selection-footer__total { display: inline-flex; align-items: center; gap: 8px; }
-.selection-footer__mobile { display: none; }
+/* Редактор списка (--quick, сетка, подборка, S/N) — 05-editor.css. Здесь — то, что
+   он делит с формами, залами и деталями списка. */
 .availability-warning { display: flex; align-items: flex-start; gap: 7px; margin: 0; padding: 10px; border-radius: var(--r-sm); color: var(--warn); background: var(--warn-bg); font-size: 12px; line-height: 1.5; }
 .availability-warning svg { flex: 0 0 auto; margin-top: 1px; }
-.clear-selection { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: var(--bad); background: transparent; font-size: 12px; font-weight: 700; white-space: nowrap; }
-/* Взведённое подтверждение: кнопка меняет вид, а не открывает модалку. */
-.clear-selection--armed { padding: 6px 10px; border-radius: var(--r-sm); color: #fff; background: var(--bad); }
-
-/* Реквизиты — полоса в одну строку, по нажатию раскрывается в сетку полей.
-   scroll-margin — чтобы прокрутка к панели при пустых реквизитах не прятала её
-   под липкой шапкой. Попап даты живёт в портале с position: fixed, поэтому
-   overflow: hidden от .data-panel ему не мешает и снят быть не должен: он держит
-   фон полосы при :hover внутри скруглённой рамки. */
-.quick-list-meta { margin-bottom: 18px; scroll-margin-top: 100px; }
-/* Экспорт на согласование указал на пустые поля — полоса обязана показывать это
-   и в свёрнутом виде: сами поля с подсветкой сейчас размонтированы. */
-.quick-list-meta--invalid { border-color: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 7%, transparent); }
-.quick-list-meta--invalid .quick-list-strip__empty { color: var(--bad); font-weight: 700; }
-.quick-list-meta--invalid .quick-list-strip__toggle { color: var(--bad); }
-.quick-list-strip { width: 100%; min-height: 50px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 16px; border: 0; border-radius: var(--r-md); color: inherit; background: transparent; text-align: left; }
-.quick-list-strip:hover { background: var(--sunk); }
-.quick-list-meta--open .quick-list-strip { border-bottom: 1px solid var(--line); border-radius: var(--r-md) var(--r-md) 0 0; }
-.quick-list-strip__summary { min-width: 0; display: flex; align-items: baseline; gap: 12px; }
-.quick-list-strip__summary strong { min-width: 0; flex: 0 1 auto; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.quick-list-strip__summary small { min-width: 0; flex: 1 1 auto; display: flex; overflow: hidden; color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
-.quick-list-strip__summary small > span { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
-.quick-list-strip__summary small > span + span::before { content: ' · '; }
-.quick-list-strip__empty { color: var(--faint); font-weight: 500; }
-.quick-list-strip__toggle { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; color: var(--red-act); font-size: 12px; font-weight: 700; white-space: nowrap; }
-.quick-list-strip__toggle svg { transition: transform .18s ease; }
-.quick-list-meta--open .quick-list-strip__toggle svg { transform: rotate(180deg); }
-.quick-list-meta__fields { display: grid; grid-template-columns: minmax(260px, 1.25fr) minmax(180px, .55fr) minmax(260px, 1fr); gap: 14px; padding: 14px 16px 16px; }
-.quick-list-meta .field { margin: 0; }
-.quick-list-meta .field > span { min-height: 15px; display: flex; align-items: center; gap: 5px; }
-.quick-list-meta .field > span svg { color: var(--red-act); }
-.quick-list-meta .field > span small { color: var(--faint); font-size: 11px; font-weight: 600; }
-.quick-list-meta .field > input { background: var(--sunk); }
-.quick-list-meta__venue { grid-column: 1 / 2; }
-.quick-list-meta__notes { grid-column: 2 / -1; }
-.quick-catalog-toolbar { flex: 0 0 auto; display: grid; grid-template-columns: minmax(240px, 1fr) repeat(2, minmax(180px, 240px)); gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
-.quick-catalog-toolbar:not(:has(.app-select + .app-select)) { grid-template-columns: minmax(0, 1fr) 240px; }
-.quick-catalog-toolbar .search-field { width: 100%; max-width: none; min-width: 0; }
-.quick-selection-list { background: var(--sunk); }
-.quick-selection-item { background: var(--card); border-bottom: 1px solid var(--line); animation: slide-soft .18s ease both; }
-/* Пятая колонка — под иконку серийных номеров. Корзина прибита к последней
-   колонке явно: у позиций без S/N слот пустует, но ряд корзин остаётся ровным. */
-.quick-selection-item__main { min-height: 66px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 34px 34px; align-items: center; gap: 10px; padding: 11px 14px; }
-.quick-selection-item__main > .icon-button:last-child { grid-column: -2; }
 .equipment-row-index { width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 auto; border-radius: var(--r-md); color: #fff; background: var(--red-act); box-shadow: 0 7px 18px color-mix(in srgb, var(--red) 20%, transparent); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.04em; line-height: 1; }
-.quick-selection-item__copy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.quick-selection-item__copy strong, .quick-selection-item__copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.quick-selection-item__copy strong { font-size: 14px; }
-.quick-selection-item__copy small { color: var(--faint); font-size: 12px; }
-.quick-inline-warning { display: flex; align-items: flex-start; gap: 6px; margin: -2px 14px 10px; padding: 8px 9px; border-radius: var(--r-sm); color: var(--warn); background: var(--warn-bg); font-size: 12px; line-height: 1.45; }
-.quick-inline-warning svg { flex: 0 0 auto; margin-top: 1px; }
-.serial-button.is-open, .serial-button.is-open:hover:not(:disabled) { color: #fff; background: var(--red-act); }
-.serial-picker { margin: 0 14px 12px; padding: 10px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--sunk); }
-.serial-picker > p { margin: 0 0 9px; color: var(--faint); font-size: 11px; line-height: 1.45; }
-.serial-picker > div { display: flex; flex-wrap: wrap; gap: 6px; }
-.serial-picker button { min-height: 36px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid var(--ctl); border-radius: var(--r-sm); color: var(--muted); background: var(--card); font-family: inherit; font-size: 12px; }
-.serial-picker button > span { width: 14px; height: 14px; display: grid; place-items: center; border: 1px solid var(--ctl); border-radius: 4px; }
-.serial-picker button.active { border-color: color-mix(in srgb, var(--red) 38%, transparent); color: var(--ink); background: color-mix(in srgb, var(--red) 5%, transparent); }
-.serial-picker button.active > span { border-color: var(--red-act); color: #fff; background: var(--red-act); }
-.mobile-selection-bar { display: none; }
 .form-success { display: flex; align-items: center; gap: 6px; margin: 0; padding: 9px 10px; border-radius: var(--r-sm); color: var(--ok); background: var(--ok-bg); font-size: 12px; line-height: 1.45; }
 .list-export-error { display: flex; align-items: center; gap: 7px; margin: 12px 14px 0; }
-.catalog-preview-drawer .equipment-thumb--large { margin: 22px 0 16px; }
-.catalog-preview-drawer__add { width: 100%; }
-.catalog-preview-drawer__footer { margin-top: 18px; }
 
 .reservation-drawer { width: min(640px, 100%); height: calc(100dvh / var(--app-zoom)); display: flex; flex-direction: column; padding: 0; overflow: hidden; animation-duration: .18s; backface-visibility: hidden; }
 .reservation-drawer__top { flex: 0 0 auto; padding: 28px 30px 0; }
@@ -219,12 +93,6 @@
 .saved-list-delete--open strong { font-size: 13px; }
 .saved-list-delete--open small { color: var(--muted); font-size: 12px; line-height: 1.45; }
 .saved-list-delete__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-.editor-open-error { margin-bottom: 18px; }
-.editor-draft-notice { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--sunk); }
-.editor-draft-notice > svg { flex: 0 0 auto; color: var(--red-act); }
-.editor-draft-notice > span { display: flex; flex: 1 1 auto; flex-direction: column; gap: 3px; min-width: 0; }
-.editor-draft-notice strong { font-size: 13px; }
-.editor-draft-notice small { color: var(--faint); font-size: 12px; line-height: 1.45; }
 .detail-skeleton { height: 58px; margin-bottom: 14px; border-radius: var(--r-md); background: linear-gradient(90deg, var(--hover) 25%, var(--sunk) 50%, var(--hover) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 /* Болванки загрузки под конкретные экраны. Блок стоит ПОСЛЕ .detail-skeleton
    намеренно: у модификаторов ровно один класс, то есть та же специфичность, и
@@ -319,8 +187,6 @@
 .list-card:nth-child(4) { animation-delay: .075s; }
 .list-card:nth-child(5) { animation-delay: .1s; }
 .list-card:nth-child(6) { animation-delay: .125s; }
-.picker-item__action { transition: background .14s ease; }
-.picker-item__action > svg { transition: transform .14s ease; }
 @keyframes rise-in { from { opacity: 0; transform: translateY(8px); } }
 @keyframes soft-in { from { opacity: 0; } }
 @keyframes slide-soft { from { opacity: 0; transform: translateX(8px); } }

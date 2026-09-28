@@ -1,0 +1,95 @@
+/* Медиазапросы РЕДАКТОРА СПИСКА (рельс категорий 1800, 1050, планшет 701–1050,
+   тач-размеры 820, телефонная раскладка 700). Вынесены из 06-responsive чистым
+   переносом в с35, в исходном взаимном порядке. Импортируется ПОСЛЕДНИМ: правила
+   ниже перебивают базу 05-editor той же специфичностью, а с правилами
+   06-responsive не пересекаются, поэтому их общий порядок каскад не меняет. */
+
+/* U44: на 1920 строка каталога несла ~700 px пустоты, а категорию выбирали через
+   попап селекта. Пара к WIDE_EDITOR_BREAKPOINT в lib/breakpoints.ts — правится
+   руками синхронно. Селект категории при этом убирается ИЗ РАЗМЕТКИ, а не
+   стилями: тулбар считает колонки через :has(.app-select + .app-select). */
+@media (min-width: 1800px) {
+  .catalog-rail { flex: 0 0 210px; display: flex; flex-direction: column; gap: 2px; min-height: 0; padding: 10px; overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--line); }
+  .catalog-rail button { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; padding: 0 10px; border: 0; border-radius: var(--r-sm); color: var(--muted); background: transparent; font-size: 13px; font-weight: 600; text-align: left; }
+  .catalog-rail button:hover { color: var(--ink); background: var(--sunk); }
+  .catalog-rail button.active { color: var(--ink); background: color-mix(in srgb, var(--red) 8%, transparent); box-shadow: inset 2px 0 var(--red-act); }
+  .catalog-rail button > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .catalog-rail button > small { flex: 0 0 auto; color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+}
+
+@media (max-width: 1050px) {
+  .quick-list-meta__fields { grid-template-columns: 1fr 1fr; }
+  .quick-list-meta__notes { grid-column: 1 / -1; }
+  .editor-grid { grid-template-columns: 1fr; }
+  .editor-grid { height: auto; }
+  .catalog-picker, .selection-panel { min-height: 520px; height: 520px; }
+}
+
+/* Планшет: панели редактора остаются рядом, а не столбиком по 520 px. Столбиком
+   каталог уезжал бы за экран, и обратной связи «добавлено» пользователь не видел
+   бы — плавающая полоса живёт только на телефоне. */
+@media (min-width: 701px) and (max-width: 1050px) {
+  .editor-grid { grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr); }
+}
+
+@media (max-width: 820px) {
+  .quantity-stepper { height: 46px; grid-template-columns: 44px 38px 44px; }
+  .serial-picker button { min-height: 44px; }
+  .clear-selection { min-height: 44px; padding: 0 10px; }
+  .picker-item { grid-template-columns: minmax(0, 1fr) 44px; }
+  .picker-item .picker-item__action { width: auto; min-width: 44px; height: 44px; padding-inline: 8px; }
+  .picker-item:has(.picker-item__action span) { grid-template-columns: minmax(0, 1fr) 56px; }
+}
+
+/* Телефонная раскладка РЕДАКТОРА живёт отдельно от оболочки: у неё своя граница
+   700, потому что на 820 (iPad портретом) две панели рядом ещё помещаются, а
+   табы, одна колонка и 400 px пустоты в строке — уже нет. Оболочка (нижняя
+   навигация, карточки таблиц, тач-размеры 44/46/56 и шрифт 16px) осталась
+   на 820: там граница про палец, а не про ширину сетки. */
+@media (max-width: 700px) {
+  /* На телефоне действия живут в футере рабочего списка — рядом с тем, что
+     собрал пользователь. Пара в шапке здесь была бы вторым таким же местом. */
+  .editor-header--quick { position: static; margin: 0 0 22px; padding: 0; }
+  .editor-header--quick .editor-header__actions { display: none; }
+  /* На телефоне формулы высоты нет — строке состояния можно переноситься, а не резаться. */
+  .editor-header--quick .editor-status { min-height: 0; line-height: 1.35; white-space: normal; }
+  /* Реквизиты — под панелями: первый экран телефона отдан оборудованию, заказчика и
+     площадку уточняют, когда список собран. Порядок задаёт flex-контейнер страницы
+     (JSX общий с десктопом), :has ограничивает правило редактором. */
+  .app-content:has(.editor-grid--quick) { display: flex; flex-direction: column; }
+  .quick-list-meta { order: 1; scroll-margin-top: 64px; }
+  /* Плавающая полоса «добавлено в список» не должна накрывать последний блок страницы */
+  .app-content:has(.mobile-selection-bar) .quick-list-meta { margin-bottom: 94px; }
+  .quick-list-strip { min-height: 56px; padding: 0 14px; }
+  .quick-list-strip__summary { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .quick-list-strip__summary strong, .quick-list-strip__summary small { max-width: 100%; }
+  .quick-list-strip__summary small { flex-wrap: wrap; white-space: normal; }
+  .quick-list-meta__fields { grid-template-columns: 1fr; padding: 12px 14px 14px; }
+  .quick-list-meta__venue, .quick-list-meta__notes { grid-column: auto; }
+  /* Полоса табов вынесена за поля страницы и прилипает к самой кромке: при
+     top: 8px в просвете над ней проезжало содержимое. Итоговая высота — 57px
+     (8 + кнопка 44 + 4 + рамка 1), от неё считаются top тулбара каталога и
+     поправка прокрутки в moveToMobilePanel. */
+  .mobile-editor-tabs { position: sticky; z-index: 8; top: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin: 0 -15px 10px; padding: 8px 15px 4px; border: 1px solid var(--line); border-width: 0 0 1px; border-radius: 0; background: rgba(255,255,255,.92); box-shadow: var(--shadow-card); backdrop-filter: blur(10px); }
+  .mobile-editor-tabs button { min-height: 44px; border: 0; border-radius: var(--r-sm); color: var(--muted); background: transparent; font-size: 12px; font-weight: 700; }
+  .mobile-editor-tabs button.active { color: #fff; background: var(--red-act); }
+  .mobile-editor-tabs strong { min-width: 18px; display: inline-grid; place-items: center; margin-left: 4px; border-radius: 99px; color: var(--ink); background: var(--card); }
+  .editor-grid .catalog-picker, .editor-grid .selection-panel { display: none; min-height: 0; height: auto; overflow: visible; }
+  .editor-grid .catalog-picker.mobile-active, .editor-grid .selection-panel.mobile-active { display: flex; }
+  .quick-catalog-toolbar, .quick-catalog-toolbar:not(:has(.app-select + .app-select)) { position: sticky; z-index: 7; top: 57px; grid-template-columns: 1fr; background: rgba(255,255,255,.96); backdrop-filter: blur(12px); }
+  .quick-catalog-toolbar .app-select { width: 100%; }
+  .picker-results, .selection-list { max-height: none; flex: 0 0 auto; overflow: visible; overscroll-behavior: auto; scrollbar-gutter: auto; }
+  .quick-selection-item__main { grid-template-columns: 38px minmax(0, 1fr) 40px 40px; }
+  .quick-selection-item__copy strong, .quick-selection-item__copy small { white-space: normal; }
+  .quick-selection-item__main > .quantity-stepper { grid-column: 2 / -1; grid-row: 2; justify-self: start; }
+  .quick-selection-item__main > .serial-button { grid-column: 3; grid-row: 1; }
+  .quick-selection-item__main > .icon-button:last-child { grid-column: 4; grid-row: 1; }
+  .selection-footer__mobile { display: grid; gap: 8px; }
+  .selection-footer__mobile .button { width: 100%; }
+  .editor-status--inline { min-height: 0; margin: 0; line-height: 1.45; white-space: normal; }
+  .mobile-selection-bar { position: fixed; z-index: 14; right: 15px; bottom: calc(76px + env(safe-area-inset-bottom)); left: 15px; min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 14px; border: 1px solid rgba(255,255,255,.16); border-radius: var(--r-md); color: #fff; background: rgba(15,17,21,.96); box-shadow: 0 14px 36px rgba(15,17,21,.28); backdrop-filter: blur(14px); animation: slide-soft .2s ease both; }
+  .mobile-selection-bar > span { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; }
+  .mobile-selection-bar > span:last-child { color: var(--on-night); }
+  .mobile-selection-bar strong { min-width: 27px; height: 27px; display: inline-grid; place-items: center; border-radius: var(--r-sm); color: #fff; background: var(--red-act); font-family: inherit; }
+  .mobile-selection-bar > span:last-child svg { transform: rotate(-90deg); }
+}
