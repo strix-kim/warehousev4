@@ -16,6 +16,14 @@
          платили за неё 69 КБ и получали от Chromium «preloaded but not used».
          Обе страницы, которым она нужна, грузят её сами: loading="eager" плюс
          fetchPriority="high" на самом <img>. -->
+    <!-- Предзагружаем ровно два шрифта — Inter latin и Inter cyrillic: основной
+         текст на ВСЕХ адресах, без предзагрузки браузер узнаёт о них только после
+         разбора CSS. latin нужен и русскому интерфейсу — цифры, пробелы и
+         пунктуация лежат в нём. Manrope (заголовки), Mono (коды) и cyrillic-ext
+         грузятся по требованию: не на каждой странице они есть. Путь — исходник;
+         Vite при сборке переписывает его на тот же хэшированный файл, что в CSS. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/src/react/assets/fonts/inter-latin-wght-normal.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/src/react/assets/fonts/inter-cyrillic-wght-normal.woff2" />
     <title>ARGO · Учёт оборудования</title>
   </head>
   <body>

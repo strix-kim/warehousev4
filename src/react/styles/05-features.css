@@ -531,7 +531,7 @@
    моноширинным и посажен на подложку: цифры и буквы читаются как на жестянке,
    а колонка таблицы не пляшет по ширине. Класс .mono не годится — он прибивает
    размер 13px через !important, а в шапке дровера номер стоит крупно. */
-.plate-badge { display: inline-block; padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--sunk); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
+.plate-badge { display: inline-block; padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--sunk); font-family: var(--f-mono); font-size: 13px; font-weight: 500; letter-spacing: .06em; white-space: nowrap; }
 .plate-badge--lg { padding: 5px 11px; font-size: 21px; }
 /* Моноширинное ПОЛЕ ВВОДА — паспорт, ПИНФЛ, госномер, серийники. Отдельный
    класс от .mono по одной причине: тот прибивает 13px через !important, а
@@ -539,7 +539,7 @@
    и iOS Safari зумил страницу на фокусе, не возвращая её обратно (с24).
    Здесь размера НЕТ вовсе: кегль наследуется от .field > input, то есть 15px
    на десктопе и 16px на телефоне, ровно как у соседних полей строки. */
-.input-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; letter-spacing: .04em; }
+.input-mono { font-family: var(--f-mono); font-weight: 500; letter-spacing: .04em; }
 /* Форма машины — та же панель, что у сотрудника: overflow visible нужен ей ради
    выпадающей выдачи водителей, которая выходит за край секции. */
 .vehicle-form { overflow: visible; }
