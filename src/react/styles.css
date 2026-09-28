@@ -59,7 +59,8 @@
  *   04-data        .data-panel, таблица, миниатюры, дровер, .detail-list
  *   05-features    карточки списков, главная, редактор, формы, люди, машины
  *   05-delay       калькулятор задержки излучателей ITC (с30, селекторы delay-*)
- *   06-responsive  ВСЕ медиазапросы и prefers-reduced-motion — последним
+ *   06-responsive-shell  медиазапросы оболочки (сайдбар, нижняя панель; с35)
+ *   06-responsive  остальные медиазапросы и prefers-reduced-motion — последним
  *
  * Внутри кусков остались локальные @media (520, hover, reduced-motion внутри
  * блоков) — они там и были; вынос их в 06 переставил бы каскад.
@@ -77,4 +78,5 @@
 @import './styles/04-data.css';
 @import './styles/05-features.css';
 @import './styles/05-delay.css';
+@import './styles/06-responsive-shell.css';
 @import './styles/06-responsive.css';
