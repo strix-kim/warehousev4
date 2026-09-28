@@ -1,20 +1,42 @@
-/* Медиазапросы РЕЕСТРОВ сотрудников и машин (≤820): карточка с галкой, панель
-   выбора над нижней навигацией. Вынесено из хвоста блока 820 в 06-responsive
-   чистым переносом в с37; импортируется сразу после него. */
+/* Медиазапросы РЕЕСТРОВ сотрудников и машин (≤820): инструменты в столбик, строка —
+   строка списка (галка · аватар · имя и должность · шеврон, как .p-row каталога;
+   .p-row живёт в ленивом home.css, поэтому своя раскладка), панель выбора над
+   нижней навигацией. Вынесено из 06-responsive в с37, переделано в с38. */
 @media (max-width: 820px) {
-  /* Галка выбора остаётся в строке слева: на телефоне строка — карточка, и
-     ярлык-подпись ей не нужен (там галка, а не значение поля). */
-  .data-table--selectable tbody tr { grid-template-columns: 46px minmax(0, 1fr); }
-  .data-table--selectable td.select-cell { grid-row: 1; grid-column: 1; min-height: 64px; align-items: center; justify-content: center; border-top: 0; }
-  .data-table--selectable td:nth-child(2) { grid-row: 1; grid-column: 2; min-height: 64px; border-top: 0; }
-  .data-table--selectable td.select-cell::before, .data-table--selectable td:nth-child(2)::before { display: none; }
-  .data-table--selectable tbody td:nth-child(n + 3) { grid-column: 1 / -1; }
-  .data-table td.select-cell input { width: 21px; height: 21px; }
+  .registry-layout, .registry-tools { gap: 10px; }
+  .registry-tools .search-field--xl { flex: 1 0 100%; max-width: none; height: 48px; }
+  .registry-tools .app-select { flex: 1 1 0; width: auto; min-width: 0; }
+  .registry-tools .data-age { flex: 1 0 100%; margin-left: 0; justify-content: space-between; }
   .select-all { min-height: 44px; }
-  .select-all input { width: 21px; height: 21px; }
+
+  /* Карточка-список: бордюр даёт .data-panel, строки разделены линией, а не
+     зазором (общие правила .data-table рисуют отдельные карточки на сером). */
+  .data-table.data-table--registry tbody { gap: 0; padding: 0; background: var(--card); }
+  .data-table.data-table--registry tbody tr { grid-template-columns: 44px minmax(0, 1fr); padding: 0 14px 0 4px; border: 0; border-bottom: 1px solid var(--line-2); border-radius: 0; box-shadow: none; }
+  .data-table.data-table--registry tbody tr:last-child { border-bottom: 0; }
+  .data-table.data-table--registry tbody tr td { height: auto; min-height: 0; padding: 0; border: 0; }
+  .data-table.data-table--registry tbody tr td::before { display: none; }
+  .data-table.data-table--registry tbody tr td.select-cell { grid-row: 1; grid-column: 1; min-height: 68px; align-items: center; justify-content: center; }
+  .select-zone { width: 44px; height: 44px; min-height: 0; }
+  .select-zone input { width: 22px; height: 22px; }
+  .data-table.data-table--registry tbody tr td:nth-child(2) { grid-row: 1; grid-column: 2; min-height: 68px; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
+  .data-table.data-table--registry tbody tr td:nth-child(2)::after { content: ''; width: 8px; height: 8px; flex: none; border: solid var(--faint); border-width: 2px 2px 0 0; transform: rotate(45deg); }
+  .data-table--registry .equipment-cell { flex: 1; min-width: 0; gap: 12px; }
+  .data-table--registry .equipment-cell strong { font-size: 15px; font-weight: 600; }
+  .data-table--registry .registry-sub { display: block; font-size: 13px; }
+  .registry-avatar { width: 44px; height: 44px; }
+  .registry-avatar--car { width: 60px; height: 44px; }
+  .registry-avatar { font-size: 14px; }
+  /* Остальные ячейки — второй и третьей строкой под названием, без подписей;
+     должность уже стоит под именем, пустые значения не рисуем. */
+  .data-table.data-table--registry tbody tr td:nth-child(n + 3) { grid-column: 2; padding-bottom: 12px; color: var(--muted); font-size: 13px; }
+  .data-table.data-table--registry tbody tr td:nth-child(n + 3) strong { font-size: 13px; }
+  .data-table.data-table--registry tbody tr td.registry-only-desktop, .data-table.data-table--registry tbody tr td.registry-empty { display: none; }
+  .data-table.data-table--registry tbody tr td:nth-child(n + 3):not(.registry-only-desktop):not(.registry-empty) { align-items: flex-start; }
   /* Над нижней навигацией (её высота 64 px), тем же отступом, что у полосы выбора
      в редакторе, — две панели не должны стоять на разной высоте. */
   .bulk-bar, .app-shell--sidebar-collapsed .bulk-bar { left: 15px; right: 15px; bottom: calc(76px + env(safe-area-inset-bottom)); width: auto; max-width: none; margin: 0; flex-wrap: wrap; }
   .bulk-bar .button { flex: 1 1 40%; }
-  .app-content:has(.bulk-bar) { padding-bottom: calc(170px + env(safe-area-inset-bottom)); }
+  /* Панель в две строки (счётчик · «Снять» · «Список») — 110 px плюс 76 от низа. */
+  .app-content:has(.bulk-bar) { padding-bottom: calc(200px + env(safe-area-inset-bottom)); }
 }

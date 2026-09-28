@@ -1,20 +1,40 @@
-/* Реестры сотрудников и машин (с37): аватар строки, колонка галок, панель выбора.
-   Вынесено из 05-features ЧИСТЫМ ПЕРЕНОСОМ; импортируется после 05-profile. */
+/* Реестры сотрудников и машин (с37, макет с31 «Профиль»/people): сводка над
+   таблицей, инструменты поверх карточки, аватар строки, колонка галок, панель
+   выбора. Вынесено из 05-features чистым переносом, в с38 переделано по макету;
+   импортируется после 05-profile. Глобальные .toolbar и .data-table не трогаем —
+   расширяем модификаторами (канон «Стили»). */
 
-.employee-avatar { width: 36px; height: 36px; display: grid; flex: 0 0 auto; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 50%; color: var(--faint); background: var(--sunk); }
-.employee-avatar img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.registry-layout { min-width: 0; display: grid; gap: 12px; }
+/* Как .catalog-tools каталога: поиск — крупное поле до 520, фильтр, «выбрать
+   всех» и возраст данных в одну строку. */
+.registry-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.registry-tools .search-field { flex: 1 1 320px; max-width: 520px; }
+.registry-tools .app-select { width: 220px; }
+.data-panel--registry { border-radius: var(--r-lg); }
 
-/* Выбор состава на мероприятие (с19). Колонка галок добавляет таблице первый
-   столбец, поэтому проценты остальных сдвинуты своим набором: общие правила
-   .data-table th:nth-child раздали бы 34% под галку. */
-.data-table--selectable th:nth-child(1) { width: 52px; }
-.data-table--selectable th:nth-child(2) { width: 34%; }
-.data-table--selectable th:nth-child(3) { width: 22%; }
-.data-table--selectable th:nth-child(4) { width: 18%; }
-.data-table th.select-cell, .data-table td.select-cell { padding-inline: 0; text-align: center; }
-.data-table td.select-cell input, .select-all input { width: 17px; height: 17px; accent-color: var(--red-act); cursor: pointer; }
-.data-table tbody tr.is-selected { background: color-mix(in srgb, var(--red) 5%, transparent); }
-.data-table tbody tr.is-selected:hover { background: color-mix(in srgb, var(--red) 8%, transparent); }
+/* Аватар строки: фото, а без него инициалы (машина — широкая плитка со значком).
+   Заливка заглушки — тёмная, как у фото профиля. */
+.registry-avatar { width: 34px; height: 34px; display: grid; flex: 0 0 auto; place-items: center; overflow: hidden; border-radius: 50%; color: #fff; background: var(--night-3); font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+.registry-avatar img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.registry-avatar--car { width: 52px; height: 36px; border-radius: 10px; color: var(--on-night-2); background: linear-gradient(160deg, var(--night-3), var(--night)); }
+
+/* Выбор состава на мероприятие (с19). Колонки заданы <colgroup> (52 | авто | 220 |
+   190), поэтому процентные ширины общих .data-table th:nth-child сбрасываем, а
+   минимальную ширину 1050 снимаем: при ней на 1280 появлялась горизонтальная
+   прокрутка. */
+.data-table.data-table--registry { min-width: 0; }
+.data-table--registry th:nth-child(n) { width: auto; }
+.data-table--registry td { height: 60px; padding-block: 6px; }
+.data-table--registry td strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.data-table--registry .registry-sub { display: none; }
+/* Открытый профиль — строка в цвет выбранной и полоска слева; отмеченные галкой
+   строки фоном НЕ выделяются: галка — про состав списка, а не про «где я». */
+.data-table--registry tbody tr.is-open td { background: var(--select); }
+.data-table--registry tbody tr.is-open td:first-child { box-shadow: inset 3px 0 0 var(--ink); }
+.data-table th.select-cell, .data-table td.select-cell { padding: 0; text-align: center; }
+/* Зона галки — вся ячейка: label растянут на ней, клик мимо квадрата тоже отмечает. */
+.select-zone { min-height: 59px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.select-zone input, .select-all input { width: 20px; height: 20px; accent-color: var(--ink); cursor: pointer; }
 .select-all { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; }
 .select-all input:disabled { cursor: default; }
 

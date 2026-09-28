@@ -212,16 +212,23 @@ export function VehiclesPage() {
         <div>
           <p className="eyebrow">{tr('Транспорт', 'Transport')}</p>
           <h1>{tr('Автомобили', 'Avtomobillar')}</h1>
-          <p className="page-description">{tr('Машины компании: госномера, водители и фото.', 'Kompaniya mashinalari: davlat raqamlari, haydovchilar va fotolar.')}</p>
+          {/* Счётчик отвечает на один вопрос: без фильтра — сколько машин всего,
+              с фильтром — сколько нашлось из скольких. */}
+          <p className="catalog-summary">
+            {isFiltered
+              ? tr(`Найдено: ${visible.length.toLocaleString(locale)} из ${vehicles.length.toLocaleString(locale)}`, `Topildi: ${vehicles.length.toLocaleString(locale)} tadan ${visible.length.toLocaleString(locale)} tasi`)
+              : `${tr('Машин', 'Mashinalar')}: ${vehicles.length.toLocaleString(locale)}`}
+            {' · '}{tr('выберите галками для списка на пропуск', 'ruxsatnoma ro‘yxati uchun belgilang')}
+          </p>
         </div>
         <button className="button button--primary" onClick={() => navigate('/vehicles/new')}>
           <Plus size={18} /> {tr('Добавить машину', 'Mashina qo‘shish')}
         </button>
       </header>
 
-      <section className="data-panel">
-        <div className="toolbar">
-          <label className="search-field">
+      <div className="registry-layout">
+        <div className="registry-tools">
+          <label className="search-field search-field--xl">
             <Search size={18} />
             <input
               value={search}
@@ -245,117 +252,121 @@ export function VehiclesPage() {
           <label className="select-all">
             <input type="checkbox" checked={allShownSelected} disabled={visible.length === 0} onChange={toggleAllShown} />
             {/* Числа в подписи нет намеренно: сколько сейчас показано, печатает
-                один toolbar__count — два счётчика рядом расходились бы в глазах. */}
+                одна сводка в шапке — два счётчика рядом расходились бы в глазах. */}
             <span>{tr('Выбрать всех показанных', 'Ko‘rsatilganlarning barchasini tanlash')}</span>
           </label>
-          {/* Счётчик отвечает на один вопрос: без фильтра — сколько машин всего,
-              с фильтром — сколько нашлось из скольких. Прежняя строка печатала
-              visible в обоих случаях, и общее число просто пропадало. */}
-          <span className="toolbar__count">
-            {isFiltered
-              ? tr(`Найдено: ${visible.length.toLocaleString(locale)} из ${vehicles.length.toLocaleString(locale)}`, `Topildi: ${vehicles.length.toLocaleString(locale)} tadan ${visible.length.toLocaleString(locale)} tasi`)
-              : `${tr('Машин', 'Mashinalar')}: ${vehicles.length.toLocaleString(locale)}`}
-          </span>
           {/* Рядом с блоком «Ошибка загрузки» бейдж не рисуем: на экране оказались
               бы два разных предложения обновиться. */}
           {!hasError && <DataAge touchedAt={dataAt} isRefreshing={isFetching} failed={lastFetchFailed} onRefresh={() => setReloadKey((value) => value + 1)} />}
         </div>
 
-        {hasError ? (
-          <ErrorState
-            title={tr('Не удалось загрузить машины', 'Mashinalarni yuklab bo‘lmadi')}
-            text={tr('Проверьте интернет и повторите. Карточки машин на месте — их просто не удалось показать.', 'Internetni tekshiring va qayta urinib ko‘ring. Mashina kartalari joyida — ularni shunchaki ko‘rsatib bo‘lmadi.')}
-            action={<RetryButton onClick={() => setReloadKey((value) => value + 1)} />}
-          />
-        ) : (
-          <div className="table-scroll" aria-busy={isLoading}>
-            <table className="data-table data-table--selectable">
-              <thead>
-                <tr>
-                  <th className="select-cell" aria-label={tr('Выбор', 'Tanlash')} />
-                  <th>{tr('Машина', 'Mashina')}</th>
-                  <th>{tr('Госномер', 'Davlat raqami')}</th>
-                  <th>{tr('Водители', 'Haydovchilar')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading && vehicles.length === 0
-                  ? Array.from({ length: 6 }, (_, index) => (
-                      <tr key={index} className="skeleton-row">
-                        <td colSpan={4}><span /></td>
-                      </tr>
-                    ))
-                  : visible.map((vehicle) => {
-                      const photo = photoUrls.get(vehicle.id)
-                      return (
-                        <tr
-                          key={vehicle.id}
-                          className={selected.has(vehicle.id) ? 'is-selected' : undefined}
-                          onClick={() => openVehicle(vehicle)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault()
-                              openVehicle(vehicle)
-                            }
-                          }}
-                          tabIndex={0}
-                        >
-                          {/* Ячейка выбора гасит всплытие: иначе галка заодно
-                              открывала бы карточку. Остальная строка — открывает. */}
-                          <td className="select-cell" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                            <input
-                              type="checkbox"
-                              checked={selected.has(vehicle.id)}
-                              onChange={() => toggleSelected(vehicle.id)}
-                              aria-label={vehicleTitle(vehicle.brand, vehicle.model)}
-                            />
-                          </td>
-                          <td>
-                            <div className="equipment-cell">
-                              <PhotoThumb className="employee-avatar" url={photo} placeholder={<CarFront size={18} />} />
-                              <span>
-                                <strong>{vehicleTitle(vehicle.brand, vehicle.model)}</strong>
-                                <small>{vehicle.color || tr('Цвет не указан', 'Rang ko‘rsatilmagan')}</small>
-                              </span>
-                            </div>
-                          </td>
-                          <td data-label={tr('Госномер', 'Davlat raqami')}><Plate value={vehicle.plate_number} /></td>
-                          <td data-label={tr('Водители', 'Haydovchilar')}>
-                            {vehicle.drivers.length > 0 ? vehicle.drivers.map(employeeShortName).join(', ') : '—'}
-                          </td>
+        <section className="data-panel data-panel--registry">
+          {hasError ? (
+            <ErrorState
+              title={tr('Не удалось загрузить машины', 'Mashinalarni yuklab bo‘lmadi')}
+              text={tr('Проверьте интернет и повторите. Карточки машин на месте — их просто не удалось показать.', 'Internetni tekshiring va qayta urinib ko‘ring. Mashina kartalari joyida — ularni shunchaki ko‘rsatib bo‘lmadi.')}
+              action={<RetryButton onClick={() => setReloadKey((value) => value + 1)} />}
+            />
+          ) : (
+            <div className="table-scroll" aria-busy={isLoading}>
+              <table className="data-table data-table--registry">
+                <colgroup>
+                  <col style={{ width: 52 }} />
+                  <col />
+                  <col style={{ width: 220 }} />
+                  <col style={{ width: 190 }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th className="select-cell" aria-label={tr('Выбор', 'Tanlash')} />
+                    <th>{tr('Машина', 'Mashina')}</th>
+                    <th>{tr('Госномер', 'Davlat raqami')}</th>
+                    <th>{tr('Водители', 'Haydovchilar')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading && vehicles.length === 0
+                    ? Array.from({ length: 6 }, (_, index) => (
+                        <tr key={index} className="skeleton-row">
+                          <td colSpan={4}><span /></td>
                         </tr>
-                      )
-                    })}
-              </tbody>
-            </table>
+                      ))
+                    : visible.map((vehicle) => {
+                        const photo = photoUrls.get(vehicle.id)
+                        return (
+                          <tr
+                            key={vehicle.id}
+                            className={vehicle.id === vehicleId ? 'is-open' : undefined}
+                            onClick={() => openVehicle(vehicle)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault()
+                                openVehicle(vehicle)
+                              }
+                            }}
+                            tabIndex={0}
+                          >
+                            {/* Ячейка выбора гасит всплытие: иначе галка заодно
+                                открывала бы карточку. Остальная строка — открывает. */}
+                            <td className="select-cell" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                              <label className="select-zone">
+                                <input
+                                  type="checkbox"
+                                  checked={selected.has(vehicle.id)}
+                                  onChange={() => toggleSelected(vehicle.id)}
+                                  aria-label={vehicleTitle(vehicle.brand, vehicle.model)}
+                                />
+                              </label>
+                            </td>
+                            <td>
+                              <div className="equipment-cell">
+                                <PhotoThumb className="registry-avatar registry-avatar--car" url={photo} placeholder={<CarFront size={20} />} />
+                                <span>
+                                  <strong title={vehicleTitle(vehicle.brand, vehicle.model)}>{vehicleTitle(vehicle.brand, vehicle.model)}</strong>
+                                  <small>{vehicle.color || tr('Цвет не указан', 'Rang ko‘rsatilmagan')}</small>
+                                </span>
+                              </div>
+                            </td>
+                            <td><Plate value={vehicle.plate_number} /></td>
+                            {/* На телефоне водителей в строке нет: строка вырастала до 139 px,
+                                а водители и так чипами в профиле машины. */}
+                            <td className="registry-only-desktop">
+                              {vehicle.drivers.length > 0 ? vehicle.drivers.map(employeeShortName).join(', ') : '—'}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                </tbody>
+              </table>
 
-            {!isLoading && vehicles.length === 0 && (
-              <EmptyState
-                art
-                roomy
-                title={tr('Машин пока нет', 'Hozircha mashinalar yo‘q')}
-                text={tr('Заведите первую карточку — данные можно добить позже.', 'Birinchi kartani yarating — ma’lumotlarni keyinroq to‘ldirish mumkin.')}
-                action={(
-                  <button className="button button--secondary" onClick={() => navigate('/vehicles/new')}>
-                    <Plus size={18} /> {tr('Добавить машину', 'Mashina qo‘shish')}
-                  </button>
-                )}
-              />
-            )}
+              {!isLoading && vehicles.length === 0 && (
+                <EmptyState
+                  art
+                  roomy
+                  title={tr('Машин пока нет', 'Hozircha mashinalar yo‘q')}
+                  text={tr('Заведите первую карточку — данные можно добить позже.', 'Birinchi kartani yarating — ma’lumotlarni keyinroq to‘ldirish mumkin.')}
+                  action={(
+                    <button className="button button--secondary" onClick={() => navigate('/vehicles/new')}>
+                      <Plus size={18} /> {tr('Добавить машину', 'Mashina qo‘shish')}
+                    </button>
+                  )}
+                />
+              )}
 
-            {!isLoading && vehicles.length > 0 && visible.length === 0 && (
-              <EmptyState
-                icon={<Search size={27} />}
-                title={query
-                  ? tr(`Ничего не найдено по «${query}»`, `«${query}» bo‘yicha hech narsa topilmadi`)
-                  : tr('Ничего не найдено', 'Hech narsa topilmadi')}
-                text={tr('Проверьте написание номера или снимите фильтр по марке — пробелы в номере не важны.', 'Raqam yozilishini tekshiring yoki marka filtrini oling — raqamdagi bo‘shliqlar muhim emas.')}
-                action={<button className="button button--secondary" onClick={resetFilters}>{tr('Сбросить фильтры', 'Filtrlarni tozalash')}</button>}
-              />
-            )}
-          </div>
-        )}
-      </section>
+              {!isLoading && vehicles.length > 0 && visible.length === 0 && (
+                <EmptyState
+                  icon={<Search size={27} />}
+                  title={query
+                    ? tr(`Ничего не найдено по «${query}»`, `«${query}» bo‘yicha hech narsa topilmadi`)
+                    : tr('Ничего не найдено', 'Hech narsa topilmadi')}
+                  text={tr('Проверьте написание номера или снимите фильтр по марке — пробелы в номере не важны.', 'Raqam yozilishini tekshiring yoki marka filtrini oling — raqamdagi bo‘shliqlar muhim emas.')}
+                  action={<button className="button button--secondary" onClick={resetFilters}>{tr('Сбросить фильтры', 'Filtrlarni tozalash')}</button>}
+                />
+              )}
+            </div>
+          )}
+        </section>
+      </div>
 
       {selected.size > 0 && (
         <div className="bulk-bar">

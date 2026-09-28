@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, FileSpreadsheet, Plus, Search, UserRound, X } from 'lucide-react'
+import { BriefcaseBusiness, FileSpreadsheet, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchEmployeeList, fetchEmployeePhotos, fetchEmployeesByIds, getSignedUrls, pickDocumentPhoto, readCachedEmployeeList, readCachedEmployeeListMeta, readCachedEmployeePhotos, type EmployeePhotoRef } from './api'
@@ -25,6 +25,11 @@ function normalized(value: string) {
 // голове у человека — слитно («901234567»).
 function digitsOnly(value: string) {
   return value.replace(/\D+/g, '')
+}
+
+// Инициалы для аватара без фото: первые буквы фамилии и имени.
+function employeeInitials(employee: EmployeeListItem) {
+  return [employee.last_name, employee.first_name].map((part) => part?.trim().slice(0, 1).toUpperCase() ?? '').join('')
 }
 
 function matchesSearch(employee: EmployeeListItem, query: string, digits: string) {
@@ -260,18 +265,25 @@ export function EmployeesPage() {
     <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">{tr('Люди', 'Odamlar')}</p>
+          <p className="eyebrow">{tr('Команда на площадке', 'Maydondagi jamoa')}</p>
           <h1>{tr('Сотрудники', 'Xodimlar')}</h1>
-          <p className="page-description">{tr('Карточки сотрудников: контакты, документы и сканы.', 'Xodimlar kartalari: kontaktlar, hujjatlar va nusxalar.')}</p>
+          {/* Счётчик и подсказка одной строкой, как у каталога: без фильтра — сколько
+              людей всего, с фильтром — сколько нашлось из скольких. */}
+          <p className="catalog-summary">
+            {isFiltered
+              ? tr(`Найдено: ${visible.length.toLocaleString(locale)} из ${employees.length.toLocaleString(locale)}`, `Topildi: ${employees.length.toLocaleString(locale)} tadan ${visible.length.toLocaleString(locale)} tasi`)
+              : `${tr('Сотрудников', 'Xodimlar')}: ${employees.length.toLocaleString(locale)}`}
+            {' · '}{tr('выберите галками для списка на пропуск', 'ruxsatnoma ro‘yxati uchun belgilang')}
+          </p>
         </div>
         <button className="button button--primary" onClick={() => navigate('/employees/new')}>
           <Plus size={18} /> {tr('Добавить сотрудника', 'Xodim qo‘shish')}
         </button>
       </header>
 
-      <section className="data-panel">
-        <div className="toolbar">
-          <label className="search-field">
+      <div className="registry-layout">
+        <div className="registry-tools">
+          <label className="search-field search-field--xl">
             <Search size={18} />
             <input
               value={search}
@@ -295,116 +307,123 @@ export function EmployeesPage() {
           <label className="select-all">
             <input type="checkbox" checked={allShownSelected} disabled={visible.length === 0} onChange={toggleAllShown} />
             {/* Числа в подписи нет намеренно: сколько сейчас показано, печатает
-                один toolbar__count — два счётчика рядом расходились бы в глазах. */}
+                одна сводка в шапке — два счётчика рядом расходились бы в глазах. */}
             <span>{tr('Выбрать всех показанных', 'Ko‘rsatilganlarning barchasini tanlash')}</span>
           </label>
-          <span className="toolbar__count">
-            {isFiltered
-              ? tr(`Найдено: ${visible.length.toLocaleString(locale)} из ${employees.length.toLocaleString(locale)}`, `Topildi: ${employees.length.toLocaleString(locale)} tadan ${visible.length.toLocaleString(locale)} tasi`)
-              : `${tr('Сотрудников', 'Xodimlar')}: ${employees.length.toLocaleString(locale)}`}
-          </span>
           {/* Рядом с блоком «Ошибка загрузки» бейдж не рисуем: на экране оказались
               бы два разных предложения обновиться. */}
           {!hasError && <DataAge touchedAt={dataAt} isRefreshing={isFetching} failed={lastFetchFailed} onRefresh={() => setReloadKey((value) => value + 1)} />}
         </div>
 
-        {hasError ? (
-          <ErrorState
-            title={tr('Не удалось загрузить сотрудников', 'Xodimlarni yuklab bo‘lmadi')}
-            text={tr('Проверьте интернет и повторите. Карточки сотрудников на месте — их просто не удалось показать.', 'Internetni tekshiring va qayta urinib ko‘ring. Xodimlar kartalari joyida — ularni shunchaki ko‘rsatib bo‘lmadi.')}
-            action={<RetryButton onClick={() => setReloadKey((value) => value + 1)} />}
-          />
-        ) : (
-          <div className="table-scroll" aria-busy={isLoading}>
-            <table className="data-table data-table--selectable">
-              <thead>
-                <tr>
-                  <th className="select-cell" aria-label={tr('Выбор', 'Tanlash')} />
-                  <th>{tr('Сотрудник', 'Xodim')}</th>
-                  <th>{tr('Должность', 'Lavozim')}</th>
-                  <th>{tr('Телефон', 'Telefon')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading && employees.length === 0
-                  ? Array.from({ length: 8 }, (_, index) => (
-                      <tr key={index} className="skeleton-row">
-                        <td colSpan={4}><span /></td>
-                      </tr>
-                    ))
-                  : visible.map((employee) => {
-                      const photo = pickDocumentPhoto(employee, photos.get(employee.id))
-                      const url = photo ? photoUrls.get(photo.storage_path) : undefined
-                      const fullName = employeeFullName(employee)
-                      return (
-                        <tr
-                          key={employee.id}
-                          className={selected.has(employee.id) ? 'is-selected' : undefined}
-                          onClick={() => openEmployee(employee)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault()
-                              openEmployee(employee)
-                            }
-                          }}
-                          tabIndex={0}
-                        >
-                          {/* Ячейка выбора гасит всплытие: иначе галка заодно
-                              открывала бы карточку. Остальная строка — открывает. */}
-                          <td className="select-cell" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                            <input
-                              type="checkbox"
-                              checked={selected.has(employee.id)}
-                              onChange={() => toggleSelected(employee.id)}
-                              aria-label={fullName}
-                            />
-                          </td>
-                          <td>
-                            <div className="equipment-cell">
-                              <PhotoThumb className="employee-avatar" url={url} placeholder={<UserRound size={18} />} />
-                              <span>
-                                <strong>{fullName}</strong>
-                                <small>{employee.position || tr('Должность не указана', 'Lavozim ko‘rsatilmagan')}</small>
-                              </span>
-                            </div>
-                          </td>
-                          <td data-label={tr('Должность', 'Lavozim')}>{employee.position || '—'}</td>
-                          <td data-label={tr('Телефон', 'Telefon')}>{employee.phone || '—'}</td>
+        <section className="data-panel data-panel--registry">
+          {hasError ? (
+            <ErrorState
+              title={tr('Не удалось загрузить сотрудников', 'Xodimlarni yuklab bo‘lmadi')}
+              text={tr('Проверьте интернет и повторите. Карточки сотрудников на месте — их просто не удалось показать.', 'Internetni tekshiring va qayta urinib ko‘ring. Xodimlar kartalari joyida — ularni shunchaki ko‘rsatib bo‘lmadi.')}
+              action={<RetryButton onClick={() => setReloadKey((value) => value + 1)} />}
+            />
+          ) : (
+            <div className="table-scroll" aria-busy={isLoading}>
+              <table className="data-table data-table--registry">
+                <colgroup>
+                  <col style={{ width: 52 }} />
+                  <col />
+                  <col style={{ width: 220 }} />
+                  <col style={{ width: 190 }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th className="select-cell" aria-label={tr('Выбор', 'Tanlash')} />
+                    <th>{tr('Сотрудник', 'Xodim')}</th>
+                    <th>{tr('Должность', 'Lavozim')}</th>
+                    <th>{tr('Телефон', 'Telefon')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading && employees.length === 0
+                    ? Array.from({ length: 8 }, (_, index) => (
+                        <tr key={index} className="skeleton-row">
+                          <td colSpan={4}><span /></td>
                         </tr>
-                      )
-                    })}
-              </tbody>
-            </table>
+                      ))
+                    : visible.map((employee) => {
+                        const photo = pickDocumentPhoto(employee, photos.get(employee.id))
+                        const url = photo ? photoUrls.get(photo.storage_path) : undefined
+                        const fullName = employeeFullName(employee)
+                        return (
+                          <tr
+                            key={employee.id}
+                            className={employee.id === employeeId ? 'is-open' : undefined}
+                            onClick={() => openEmployee(employee)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault()
+                                openEmployee(employee)
+                              }
+                            }}
+                            tabIndex={0}
+                          >
+                            {/* Ячейка выбора гасит всплытие: иначе галка заодно
+                                открывала бы карточку. Остальная строка — открывает. */}
+                            <td className="select-cell" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                              <label className="select-zone">
+                                <input
+                                  type="checkbox"
+                                  checked={selected.has(employee.id)}
+                                  onChange={() => toggleSelected(employee.id)}
+                                  aria-label={fullName}
+                                />
+                              </label>
+                            </td>
+                            <td>
+                              <div className="equipment-cell">
+                                <PhotoThumb className="registry-avatar" url={url} placeholder={<span aria-hidden="true">{employeeInitials(employee)}</span>} />
+                                <span>
+                                  <strong title={fullName}>{fullName}</strong>
+                                  {/* Должность в этой ячейке — только на телефоне: на десктопе
+                                      у неё своя колонка, дубль в строке был бы шумом (V-10). */}
+                                  <small className="registry-sub">{employee.position || tr('Должность не указана', 'Lavozim ko‘rsatilmagan')}</small>
+                                </span>
+                              </div>
+                            </td>
+                            <td className="registry-only-desktop">{employee.position || '—'}</td>
+                            <td className={employee.phone ? undefined : 'registry-empty'}>{employee.phone || '—'}</td>
+                          </tr>
+                        )
+                      })}
+                </tbody>
+              </table>
 
-            {!isLoading && employees.length === 0 && (
-              <EmptyState
-                art
-                roomy
-                title={tr('Сотрудников пока нет', 'Hozircha xodimlar yo‘q')}
-                text={tr('Заведите первую карточку — паспортные данные и сканы можно добить позже.', 'Birinchi kartani yarating — pasport ma’lumotlari va nusxalarni keyinroq to‘ldirish mumkin.')}
-                action={(
-                  <button className="button button--secondary" onClick={() => navigate('/employees/new')}>
-                    <Plus size={18} /> {tr('Добавить сотрудника', 'Xodim qo‘shish')}
-                  </button>
-                )}
-              />
-            )}
+              {!isLoading && employees.length === 0 && (
+                <EmptyState
+                  art
+                  roomy
+                  title={tr('Сотрудников пока нет', 'Hozircha xodimlar yo‘q')}
+                  text={tr('Заведите первую карточку — паспортные данные и сканы можно добить позже.', 'Birinchi kartani yarating — pasport ma’lumotlari va nusxalarni keyinroq to‘ldirish mumkin.')}
+                  action={(
+                    <button className="button button--secondary" onClick={() => navigate('/employees/new')}>
+                      <Plus size={18} /> {tr('Добавить сотрудника', 'Xodim qo‘shish')}
+                    </button>
+                  )}
+                />
+              )}
 
-            {!isLoading && employees.length > 0 && visible.length === 0 && (
-              <EmptyState
-                icon={<Search size={27} />}
-                // Пусто может быть и от одной должности, без единой буквы в поиске —
-                // тогда заголовок с пустыми кавычками врал бы про запрос.
-                title={search.trim()
-                  ? tr(`Ничего не найдено по «${search.trim()}»`, `«${search.trim()}» bo‘yicha hech narsa topilmadi`)
-                  : tr('Ничего не найдено', 'Hech narsa topilmadi')}
-                text={tr('Проверьте написание фамилии или снимите фильтр по должности — телефон можно набрать и одними цифрами.', 'Familiya yozilishini tekshiring yoki lavozim filtrini oling — telefonni faqat raqamlar bilan ham kiritish mumkin.')}
-                action={<button className="button button--secondary" onClick={resetFilters}>{tr('Сбросить фильтры', 'Filtrlarni tozalash')}</button>}
-              />
-            )}
-          </div>
-        )}
-      </section>
+              {!isLoading && employees.length > 0 && visible.length === 0 && (
+                <EmptyState
+                  icon={<Search size={27} />}
+                  // Пусто может быть и от одной должности, без единой буквы в поиске —
+                  // тогда заголовок с пустыми кавычками врал бы про запрос.
+                  title={search.trim()
+                    ? tr(`Ничего не найдено по «${search.trim()}»`, `«${search.trim()}» bo‘yicha hech narsa topilmadi`)
+                    : tr('Ничего не найдено', 'Hech narsa topilmadi')}
+                  text={tr('Проверьте написание фамилии или снимите фильтр по должности — телефон можно набрать и одними цифрами.', 'Familiya yozilishini tekshiring yoki lavozim filtrini oling — telefonni faqat raqamlar bilan ham kiritish mumkin.')}
+                  action={<button className="button button--secondary" onClick={resetFilters}>{tr('Сбросить фильтры', 'Filtrlarni tozalash')}</button>}
+                />
+              )}
+            </div>
+          )}
+        </section>
+      </div>
 
       {selected.size > 0 && (
         <div className="bulk-bar">
