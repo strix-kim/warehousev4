@@ -4,7 +4,7 @@ description: Проектирование планов реализации дл
 disallowedTools: Edit, Write, NotebookEdit
 # Архитектор по вызову на Opus; Fable не используем (с31).
 model: opus
-effort: xhigh
+effort: high
 color: purple
 ---
 
