@@ -18,6 +18,7 @@
 | Роутинг | `react-router-dom` | 7.18.2 |
 | Данные | `@supabase/supabase-js` | 2.50.2 |
 | Иконки | `lucide-react` | 0.468.0 |
+| Анимация | `motion` (шпаргалка `libs/motion.md`) | 13.4.4 |
 | Типы | `@types/react` / `@types/react-dom` | 19.2.18 / 19.2.4 |
 
 Хостинг — Vercel. База, Auth и Data API — Supabase (Postgres).

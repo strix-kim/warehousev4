@@ -38,8 +38,8 @@
   `database.types.ts` 1057 (генерируется + правки руками, не пилим),
   `ListEditorPage.tsx` 813. Ближайшие: `05-features.css` 671, `EquipmentPage.tsx` 606,
   `EquipmentDrawer.tsx` 568. Роутер — data router (с31, канон в `canons.md`).
-- **Стек:** React 19 + TypeScript 5.9 + Vite 7 + Supabase + Vercel; Node 22.x. Пять
-  рантайм-зависимостей, без UI-кита, state-менеджера и react-query. Свой OOXML.
+- **Стек:** React 19 + TypeScript 5.9 + Vite 7 + Supabase + Vercel; Node 22.x. Шесть
+  рантайм-зависимостей, без UI-кита, state-менеджера и react-query (шестая — `motion`, с33). Свой OOXML.
 - **Локально:** `npm run dev` → `http://localhost:5180/` (strictPort).
 - **Данные прода** (с22, перепроверено с26): `equipment` 1482 (218 моделей;
   1432 серийных, 46 со штампом импорта, 4 без кода), `employees` 12 (сроки пусты у
