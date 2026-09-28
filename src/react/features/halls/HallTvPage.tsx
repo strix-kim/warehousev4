@@ -119,6 +119,18 @@ export function HallTvPage() {
           <h1>{editor.plan?.name ?? tr('План залов', 'Zallar rejasi')}</h1>
           {editor.plan && <p>{formatPlanPeriod(editor.plan, locale, tr)}</p>}
         </div>
+        {editor.loadState === 'ready' && (
+          <div className="hall-tv__counts">
+            <TvCount value={editor.counts.totalPeople} label={tr('Людей', 'Odamlar')} />
+            <TvCount value={editor.counts.technicians} label={tr('Видеоинженеры', 'Videoinjenerlar')} />
+            <TvCount value={editor.counts.operators} label={tr('Операторы', 'Operatorlar')} />
+            {/* Наём — только при N > 0: это не бригада, а сколько внешних ещё
+                предстоит взять, и нуля в шапке быть не должно. */}
+            {editor.counts.hired > 0 && (
+              <TvCount value={editor.counts.hired} label={tr('Наём', 'Yollash')} hire />
+            )}
+          </div>
+        )}
         <div className="hall-tv__head-side">
           {editor.loadState === 'ready' && <TvSaveState editor={editor} />}
           {editor.loadState === 'ready' && (
@@ -171,19 +183,19 @@ export function HallTvPage() {
           </div>
         )
         : <TvBoard editor={editor} />)}
+    </div>
+  )
+}
 
-      {editor.loadState === 'ready' && (
-        <footer className="hall-tv__foot">
-          <span>{tr('Людей:', 'Odamlar:')} <strong>{editor.counts.totalPeople.toLocaleString(locale)}</strong></span>
-          <span>{tr('Видеоинженеры:', 'Videoinjenerlar:')} <strong>{editor.counts.technicians.toLocaleString(locale)}</strong></span>
-          <span>{tr('Операторы:', 'Operatorlar:')} <strong>{editor.counts.operators.toLocaleString(locale)}</strong></span>
-          {/* Наём — только при N > 0: это не бригада, а сколько внешних ещё
-              предстоит взять, и нуля в строке быть не должно. */}
-          {editor.counts.hired > 0 && (
-            <span>{tr('Наём:', 'Yollash:')} <strong>{editor.counts.hired.toLocaleString(locale)}</strong></span>
-          )}
-        </footer>
-      )}
+// Счётчик шапки: число крупно, подпись под ним. «Наём» — янтарным числом, как
+// слот на доске: это не люди бригады, а сколько ещё предстоит взять.
+function TvCount({ value, label, hire = false }: { value: number, label: string, hire?: boolean }) {
+  const { locale } = useLanguage()
+
+  return (
+    <div className={`hall-tv__count ${hire ? 'hall-tv__count--hire' : ''}`}>
+      <strong>{value.toLocaleString(locale)}</strong>
+      <span>{label}</span>
     </div>
   )
 }
@@ -222,7 +234,10 @@ function TvBoard({ editor }: { editor: HallPlanEditor }) {
   const { halls, positions } = editor
 
   const layout = {
-    gridTemplateColumns: `minmax(0, .72fr) repeat(${halls.length}, minmax(0, 1fr))`,
+    // Колонка позиций — по длиннейшему названию, но не шире 5.4 кегля (с36):
+    // .72fr резал «Операторы», а шире — не влезал «Александр» в колонку зала на
+    // 1280 (Samarkand); длинное название переносится на вторую строку.
+    gridTemplateColumns: `fit-content(5.4em) repeat(${halls.length}, minmax(0, 1fr))`,
     gridTemplateRows: `auto repeat(${positions.length}, minmax(0, 1fr))`,
     // Делитель формулы кегля: ноль строк сюда не приходит (пустой план отбит
     // выше), но деление на ноль обнулило бы весь расчёт молча.
@@ -256,7 +271,6 @@ function TvBoard({ editor }: { editor: HallPlanEditor }) {
               // то же правило, что в редакторе, и живёт оно на клиенте.
               positionRole={position.role}
               hallName={hall.name}
-              hallColor={hall.color}
               cell={editor.cellMap.get(cellKeyOf({ hallId: hall.id, positionId: position.id }))}
               editor={editor}
             />
@@ -280,8 +294,12 @@ function TvBoardSkeleton() {
 
   // Раскладка ровно та же, что у настоящей доски: те же доли колонок и строк и
   // те же --rows/--cols, от которых считается кегль.
+  // Кроме первой колонки: у настоящей она по длине названий (fit-content), а у
+  // болванки названий нет. Трек в vw, а не в em: кегль болванки считается от её
+  // четырёх колонок и крупнее настоящего, и em уводил бы колонку на +75 px.
+  // 8.68vw — замер колонки Samarkand (5.4 кегля при восьми залах) на 1280/1920/2560.
   const layout = {
-    gridTemplateColumns: `minmax(0, .72fr) repeat(${SKELETON_COLS}, minmax(0, 1fr))`,
+    gridTemplateColumns: `8.68vw repeat(${SKELETON_COLS}, minmax(0, 1fr))`,
     gridTemplateRows: `auto repeat(${SKELETON_ROWS}, minmax(0, 1fr))`,
     '--rows': SKELETON_ROWS,
     '--cols': SKELETON_COLS,
@@ -315,13 +333,12 @@ function TvBoardSkeleton() {
 // стоит», а связка внутри зала — деталь планировщика. А вот бейдж ×N вернулся
 // решением прораба: перегруженного человека нужно увидеть именно на общем
 // экране, до того как его поставят в четвёртый зал.
-function TvCell({ hallId, positionId, positionName, positionRole, hallName, hallColor, cell, editor }: {
+function TvCell({ hallId, positionId, positionName, positionRole, hallName, cell, editor }: {
   hallId: string
   positionId: string
   positionName: string
   positionRole: string
   hallName: string
-  hallColor: string
   cell: AssignmentWithEmployee | undefined
   editor: HallPlanEditor
 }) {
@@ -329,7 +346,6 @@ function TvCell({ hallId, positionId, positionName, positionRole, hallName, hall
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const armed = useArmedAction()
   const isBusy = editor.addingCell === cellKeyOf({ hallId, positionId })
-  const tint = { '--hall-color': hallColor } as CSSProperties
 
   // Слот узнаём по отсутствию человека, а не по is_external: равенство держит
   // CHECK базы, а TS сужает тип именно по null.
@@ -361,7 +377,7 @@ function TvCell({ hallId, positionId, positionName, positionRole, hallName, hall
 
   if (!cell) {
     return (
-      <div className="hall-tv__cell" style={tint}>
+      <div className="hall-tv__cell hall-tv__cell--none">
         {/* Вся пустая клетка — одна кнопка: целиться в маленький «+» на экране
             за несколько метров от мыши человек будет дольше, чем расставлять. */}
         <button
@@ -382,7 +398,7 @@ function TvCell({ hallId, positionId, positionName, positionRole, hallName, hall
 
   if (cell.employee_id === null) {
     return (
-      <div className={`hall-tv__cell ${armed.armed ? 'is-armed' : ''}`} style={tint}>
+      <div className={`hall-tv__cell hall-tv__cell--hire ${armed.armed ? 'is-armed' : ''}`}>
         <button
           type="button"
           className="hall-tv__pick"
@@ -418,8 +434,15 @@ function TvCell({ hallId, positionId, positionName, positionRole, hallName, hall
   const last = person && person.first_name ? person.last_name : ''
   const fullName = person ? employeeFullName(person) : first
 
+  // ×N — по ВСЕМУ плану: страховка на четыре зала это одна фамилия в четырёх
+  // клетках разных залов, и на планёрке это единственный способ увидеть
+  // перегруженного человека. Стоит в строке фамилии, нет фамилии — в строке имени.
+  const badge = planCount > 1 && (
+    <span className="hall-tv__badge" title={tr(`В плане ${planCount} раз`, `Rejada ${planCount} marta`)}>×{planCount}</span>
+  )
+
   return (
-    <div className={`hall-tv__cell ${armed.armed ? 'is-armed' : ''}`} style={tint}>
+    <div className={`hall-tv__cell ${armed.armed ? 'is-armed' : ''}`}>
       {/* Имя занимает всю клетку и само же открывает замену: клик по человеку в
           расстановке всегда означает «поставить сюда другого». */}
       <button
@@ -433,18 +456,22 @@ function TvCell({ hallId, positionId, positionName, positionRole, hallName, hall
         {isBusy
           ? <span className="hall-tv__busy">{tr('Меняем…', 'O‘zgartirilmoqda…')}</span>
           : (
-            <>
-              <span className="hall-tv__name-row">
-                <span className="hall-tv__first">{first}</span>
-                {planCount > 1 && (
-                  // ×N — по ВСЕМУ плану: страховка на четыре зала это одна
-                  // фамилия в четырёх клетках разных залов, и на планёрке это
-                  // единственный способ увидеть перегруженного человека.
-                  <span className="hall-tv__badge" title={tr(`В плане ${planCount} раз`, `Rejada ${planCount} marta`)}>×{planCount}</span>
-                )}
-              </span>
-              {last && <span className="hall-tv__last">{last}</span>}
-            </>
+            last
+              ? (
+                <>
+                  <span className="hall-tv__first">{first}</span>
+                  <span className="hall-tv__last-row">
+                    <span className="hall-tv__last">{last}</span>
+                    {badge}
+                  </span>
+                </>
+              )
+              : (
+                <span className="hall-tv__name-row">
+                  <span className="hall-tv__first">{first}</span>
+                  {badge}
+                </span>
+              )
           )}
       </button>
       <TvClearButton
