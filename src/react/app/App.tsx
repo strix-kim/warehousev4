@@ -3,9 +3,12 @@ import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AppErrorBoundary } from '../components/AppErrorBoundary'
 import { useAuth } from '../features/auth/AuthProvider'
+import { hasUnsavedListDraft } from '../features/lists/cacheKeys'
 import { LanguageSwitcher, useLanguage } from '../lib/i18n'
 import { lazyWithReload } from '../lib/lazyWithReload'
 import { reportAppError } from '../lib/reportAppError'
+import { hasUnsavedWork } from '../lib/unsavedRegistry'
+import { useArmedAction } from '../lib/useArmedAction'
 import { useModalLayer } from '../lib/useModalLayer'
 
 const loadLoginPage = () => import('../features/auth/LoginPage').then((module) => ({ default: module.LoginPage }))
@@ -88,6 +91,21 @@ function LoginRedirect() {
   return <Navigate to="/login" replace state={isInternal ? { from: target } : undefined} />
 }
 
+// Выход с подтверждением, если что-то пропадёт. Взвод — единственная защита:
+// форма на выходе просто размонтируется, и ни блокер роутера, ни beforeunload её
+// не спросят, а черновик списка стирается вместе с кэшем (purgeCacheScope).
+// Без несохранённого выход, как и был, — с первого нажатия.
+function useSignOutConfirm(signOut: () => void) {
+  const { armed, fire, disarm } = useArmedAction()
+
+  function requestSignOut() {
+    if (armed || hasUnsavedListDraft() || hasUnsavedWork()) fire(signOut)
+    else signOut()
+  }
+
+  return { armed, requestSignOut, disarm }
+}
+
 function AppShell() {
   const { session, signOut } = useAuth()
   const { tr } = useLanguage()
@@ -95,6 +113,8 @@ function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('argo:sidebar-collapsed') === 'true')
   const [isMoreOpen, setMoreOpen] = useState(false)
   const { pathname } = useLocation()
+  const signOutConfirm = useSignOutConfirm(() => void signOut())
+  const signOutLabel = signOutConfirm.armed ? tr('Да, выйти', 'Ha, chiqish') : tr('Выйти', 'Chiqish')
   // Прогрев каталога — один раз на загрузку страницы, а не на каждый вход
   // в раздел: сама выгрузка кэшируется в памяти, но повторные заходы не должны
   // заново заводить таймер.
@@ -271,8 +291,19 @@ function AppShell() {
 
         <div className="sidebar__footer">
           <div className="user-avatar"><img src="/brand/video-engineer-avatar.png" alt={tr('Видеоинженер', 'Video muhandis')} loading="eager" decoding="async" /></div>
-          <div className="user-copy"><strong>{email.split('@')[0]}</strong><span>{email}</span></div>
-          <button className="icon-button icon-button--dark" onClick={() => void signOut()} aria-label={tr('Выйти', 'Chiqish')}><LogOut size={18} /></button>
+          <div className="user-copy">{signOutConfirm.armed
+            ? <><strong>{tr('Выйти? Несохранённое пропадёт', 'Chiqasizmi? Saqlanmagan ish yo‘qoladi')}</strong><span>{tr('Нажмите ещё раз', 'Yana bir bor bosing')}</span></>
+            : <><strong>{email.split('@')[0]}</strong><span>{email}</span></>}</div>
+          {/* onMouseDown — Safari: иначе onBlur гасит взвод раньше второго click
+              (gotchas §6). title — для свёрнутого сайдбара, где .user-copy скрыт. */}
+          <button
+            className="icon-button icon-button--dark"
+            onClick={signOutConfirm.requestSignOut}
+            onBlur={signOutConfirm.disarm}
+            onMouseDown={(event) => { if (signOutConfirm.armed) event.preventDefault() }}
+            aria-label={signOutLabel}
+            title={signOutConfirm.armed ? signOutLabel : undefined}
+          ><LogOut size={18} /></button>
         </div>
       </aside>
 
@@ -291,6 +322,8 @@ function AppShell() {
 function MobileMoreSheet({ email, onSignOut, onClose }: { email: string; onSignOut: () => void; onClose: () => void }) {
   const { tr } = useLanguage()
   useModalLayer(onClose)
+  // Свой взвод, а не сайдбара: лист закрылся — взвод ушёл вместе с ним.
+  const signOutConfirm = useSignOutConfirm(onSignOut)
 
   return (
     <div className="sheet-layer" role="dialog" aria-modal="true" aria-label={tr('Ещё', 'Yana')} onMouseDown={onClose}>
@@ -324,7 +357,14 @@ function MobileMoreSheet({ email, onSignOut, onClose }: { email: string; onSignO
         </div>
         <div className="sheet__account">
           <span>{email}</span>
-          <button className="button button--secondary" onClick={onSignOut}><LogOut size={16} />{tr('Выйти', 'Chiqish')}</button>
+          <button
+            className="button button--secondary"
+            onClick={signOutConfirm.requestSignOut}
+            onBlur={signOutConfirm.disarm}
+            onMouseDown={(event) => { if (signOutConfirm.armed) event.preventDefault() }}
+          ><LogOut size={16} />{signOutConfirm.armed
+            ? tr('Да, выйти — несохранённое пропадёт', 'Ha, chiqish — saqlanmagan ish yo‘qoladi')
+            : tr('Выйти', 'Chiqish')}</button>
         </div>
       </div>
     </div>

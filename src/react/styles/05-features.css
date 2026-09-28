@@ -454,6 +454,8 @@
 .password-field > input { padding-right: 45px; }
 .form-error { margin: -2px 0 14px; padding: 10px 12px; border-radius: 7px; color: var(--danger); background: var(--danger-bg); font-size: 13px; }
 .login-help { margin: 14px 0 0; color: var(--ink-faint); font-size: 12px; line-height: 1.5; }
+/* Причина выхода: сведение, а не ошибка — поэтому нейтральная, а не красная. */
+.login-notice { margin: -16px 0 20px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink-soft); background: var(--surface); font-size: 13px; line-height: 1.5; }
 
 /* Сотрудники (с17). Форма — та же панель, что у оборудования, но без колонки
    предпросмотра; overflow visible нужен ей ради выпадающего datalist. */

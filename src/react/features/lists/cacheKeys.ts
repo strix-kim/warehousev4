@@ -1,4 +1,4 @@
-import { invalidateCachePrefix } from '../../lib/persistentCache'
+import { hasCachedPrefix, invalidateCachePrefix } from '../../lib/persistentCache'
 
 // ЛИСТОВОЙ модуль: импортирует только persistentCache и ничего больше.
 // Здесь живёт ключ кэша состава списка — владелец у фичи lists, но сбрасывать
@@ -35,4 +35,12 @@ export const LIST_DRAFT_TTL_MS = 24 * 60 * 60 * 1000
 // именно его и не должна показывать правки уже сохранённых списков.
 export function listDraftCacheKey(listId?: string) {
   return listId ? `list-draft:${listId}` : LIST_DRAFT_CACHE_KEY
+}
+
+// Есть ли несохранённый черновик — нового списка или правок открытого. Спрашивает
+// выход из системы: он стирает кэш целиком, и черновик ушёл бы вместе с ним.
+// Вечным «несохранённое» не станет: черновик стирается при сохранении, при
+// «Отбросить», автосейвом при совпадении с базой и сам протухает через сутки.
+export function hasUnsavedListDraft() {
+  return hasCachedPrefix('list-draft:')
 }

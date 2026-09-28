@@ -15,7 +15,7 @@ function readReturnPath(value: unknown) {
 }
 
 export function LoginPage() {
-  const { session, signIn } = useAuth()
+  const { session, signIn, signOutReason } = useAuth()
   const { tr } = useLanguage()
   const location = useLocation()
   const returnPath = readReturnPath((location.state as { from?: unknown } | null)?.from)
@@ -76,6 +76,15 @@ export function LoginPage() {
           <p className="eyebrow">{tr('Доступ сотрудника', 'Xodim kirishi')}</p>
           <h2>{tr('Вход в систему', 'Tizimga kirish')}</h2>
           <p className="muted">{tr('Используйте учётную запись ARGO Media.', 'ARGO Media hisobidan foydalaning.')}</p>
+
+          {/* Почему человек снова на входе. Без объяснения выкинутый посреди работы
+              думает, что сломалось приложение (аудит с30, U-10). */}
+          {signOutReason && <p className="login-notice" role="status">{signOutReason === 'manual'
+            ? tr('Вы вышли из системы.', 'Siz tizimdan chiqdingiz.')
+            : tr(
+              'Сеанс завершён: срок входа истёк или выход выполнен в другой вкладке. Войдите снова.',
+              'Seans yakunlandi: kirish muddati tugagan yoki boshqa oynada chiqilgan. Qayta kiring.',
+            )}</p>}
 
           <label className="field">
             <span>{tr('Электронная почта', 'Elektron pochta')}</span>

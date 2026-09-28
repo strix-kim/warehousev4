@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useBlocker, type BlockerFunction } from 'react-router-dom'
+import { registerUnsavedWork } from './unsavedRegistry'
 
 // Защита несохранённого ввода. Два канала, потому что уход бывает двух родов:
 // переход внутри приложения ловит роутер (useBlocker), а перезагрузку и закрытие
@@ -51,6 +52,12 @@ export function useNavigationGuard(active: boolean) {
     && (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search)
   ), [])
   const blocker = useBlocker(shouldBlock)
+
+  // Выход из системы уводит мимо блокера — он спрашивает реестр (App.tsx).
+  useEffect(() => {
+    if (!active) return
+    return registerUnsavedWork()
+  }, [active])
 
   // Пока плашка висела, несохранённое исчезло (например, нажали «Сохранить») —
   // вопрос больше не актуален, переход отменяем и плашку снимаем.

@@ -226,6 +226,32 @@ export async function cachedQuery<T>(
   return load
 }
 
+// Есть ли под префиксом хоть одна живая запись. Только чтение: ни память, ни
+// поколение кэша не трогает. Нужен выходу из системы — он стирает кэш владельца
+// целиком (purgeCacheScope), и черновик, лежащий только здесь, пропадёт вместе с ним.
+export function hasCachedPrefix(prefix: string): boolean {
+  const now = Date.now()
+  for (const [key, entry] of memoryCache) {
+    if (key.startsWith(prefix) && entry.expiresAt > now) return true
+  }
+  if (typeof window === 'undefined') return false
+
+  const storedPrefix = storageKey(prefix)
+  if (!storedPrefix) return false
+
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index)
+    if (!key?.startsWith(storedPrefix)) continue
+    try {
+      const entry = JSON.parse(window.localStorage.getItem(key) ?? '') as Partial<CacheEntry<unknown>>
+      if (typeof entry?.expiresAt === 'number' && entry.expiresAt > now) return true
+    } catch {
+      // Битая запись — не черновик: readEntry её тоже не отдаст.
+    }
+  }
+  return false
+}
+
 export function invalidateCachePrefix(prefix: string) {
   // Поколение растёт до чистки: ответы, летящие прямо сейчас, в кэш уже не попадут.
   cacheGeneration += 1
