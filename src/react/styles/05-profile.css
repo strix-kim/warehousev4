@@ -1,0 +1,131 @@
+/* Профили сотрудника и машины (с37): карточка-профиль, фото и файлы, болванки.
+   Вынесено из 05-features ЧИСТЫМ ПЕРЕНОСОМ; импортируется сразу после него. */
+
+/* Карточка-профиль: шапка с фото и главным фактом, секции реквизитов, бейджи
+   состояния, копирование поля нажатием (с27). Общие .detail-list и .badge из
+   04-data НЕ переписываются — их потребляют дроверы оборудования, дровер модели
+   и каталог редактора; здесь только модификаторы, и они обязаны лежать ПОСЛЕ
+   базы, то есть в этом слое. */
+.profile-head { min-width: 0; display: flex; align-items: center; gap: 14px; }
+.profile-head__photo { flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); color: var(--faint); background: var(--sunk); }
+/* Круг — человек, прямоугольник — предмет: форма отвечает на «что за запись»
+   раньше, чем прочитан надзаголовок. */
+.profile-head__photo--round { width: 64px; height: 64px; border-radius: 50%; }
+.profile-head__photo--wide { width: 92px; height: 64px; border-radius: var(--r-md); }
+.profile-head__photo img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.profile-head__text { min-width: 0; }
+.profile-head__text .eyebrow { margin-bottom: 5px; }
+.profile-head__fact { margin: 6px 0 0; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.4; }
+
+/* Кнопки шапки уезжают на свою строку, как только в шапке появилось фото.
+   Дровер шириной 480 px: фото 92 + имя + «Редактировать» с крестиком в один ряд
+   не помещаются, и госномер (он nowrap) уходил под кнопки. Раскладка та же, что
+   даёт правило до 520 px в 04-data.css, — просто теперь она включается и на
+   широком экране, потому что тесно здесь не окну, а дроверу. */
+.drawer__header:has(.profile-head) { flex-wrap: wrap; }
+.drawer__header:has(.profile-head) .profile-head { flex: 1 1 100%; }
+.drawer__header:has(.profile-head) .drawer__header-actions { width: 100%; justify-content: flex-end; }
+
+.profile-badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+/* Тексты сроков длиннее любого статуса оборудования, а общий .badge не
+   переносится. Разрешаем перенос только здесь: править .badge нельзя — он
+   держит однострочные статусы в трёх других дроверах. */
+.profile-badges .badge { max-width: 100%; white-space: normal; text-align: left; }
+.profile-section { margin: 22px 0; }
+.profile-section__title { margin: 0 0 9px; color: var(--faint); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+/* Сетка секции — та же .detail-list, без её внешних отступов: расстояние между
+   секциями задаёт сама секция, иначе два отступа складываются. */
+.profile-section .detail-list { margin: 0; }
+/* ОДНА колонка. Две давали серую дыру на любом нечётном числе полей: подложка
+   .detail-list просвечивает там, где ячейки нет, и «Цвет» в одиночестве выглядел
+   как половина пустой таблицы. Чинить это правилом на чётность нельзя — поля
+   фильтруются по заполненности, и чётность меняется от записи к записи. Плата за
+   надёжность — карточка выше; взамен адрес прописки и «кем выдан» впервые
+   получают полную ширину вместо ~200 px. */
+.detail-list--profile { grid-template-columns: 1fr; }
+.detail-list--profile > div { min-height: 0; gap: 5px; padding: 11px 13px; }
+.detail-list--profile dt { display: flex; align-items: center; gap: 6px; }
+.detail-list--profile dt svg { flex: 0 0 auto; color: var(--faint); }
+.detail-list--profile .detail-list__value--strong { font-size: 15px; font-weight: 700; }
+
+/* Ячейка копируется нажатием: кнопка прозрачна и растянута на всю ячейку, чтобы
+   в неё не нужно было целиться. Выделение значения мышью при этом теряется —
+   размен осознанный, копирование нажатием его и заменяет. */
+.detail-list__cell { position: relative; }
+.detail-list__copy { position: absolute; inset: 0; width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; }
+/* Своё кольцо кнопки гасим и рисуем его на ячейке ВНУТРЬ: у .detail-list стоит
+   overflow: hidden ради скруглённых углов, и наружная обводка срезалась
+   начисто — обход с клавиатуры шёл вслепую. */
+.detail-list__copy:focus-visible { outline: none; }
+.detail-list__cell:has(.detail-list__copy:focus-visible) { outline: 2px solid var(--focus); outline-offset: -2px; }
+.detail-list__cell:hover { background: var(--sunk); }
+.detail-list__cell:has(.detail-list__copy:focus-visible) { background: var(--sunk); }
+/* Значок копирования проявляется под курсором и при обходе с клавиатуры: висеть
+   на всех ячейках сразу он не должен — это шум, а не подсказка. */
+.detail-list__copy-mark { position: absolute; top: 10px; right: 11px; display: grid; place-items: center; color: var(--faint); opacity: 0; transition: opacity .14s ease; pointer-events: none; }
+.detail-list__cell:hover .detail-list__copy-mark,
+.detail-list__cell:has(.detail-list__copy:focus-visible) .detail-list__copy-mark { opacity: 1; }
+/* Подтверждение: ячейка коротко зеленеет, а рядом со значком встаёт слово.
+   Цвет без слова не прочитал бы дальтоник, слово без цвета — тот, кто смотрит
+   мельком. */
+.detail-list__cell--copied { background: var(--ok-bg); }
+.detail-list__cell--copied .detail-list__copy-mark { color: var(--ok); opacity: 1; }
+.detail-list__copy-note { position: absolute; top: 7px; right: 32px; max-width: 55%; padding: 2px 6px; border-radius: var(--r-sm); color: var(--ok); background: var(--ok-bg); font-size: 11px; font-weight: 700; letter-spacing: .02em; pointer-events: none; animation: fade-in .14s ease-out; }
+.detail-list__copy-note--failed { color: var(--bad); background: var(--bad-bg); }
+@media (prefers-reduced-motion: reduce) {
+  .detail-list__copy-mark { transition: none; }
+  .detail-list__copy-note { animation: none; }
+}
+
+/* Заголовки секций внутри профиля — один язык на всю карточку. Раньше «Файлы»,
+   «Фото» и «Водители» несли .panel-heading: крупный заголовок с рамкой и
+   отступом 20 px внутрь, из-за чего в одной карточке жили два разных
+   заголовочных стиля. .panel-heading НЕ трогаем — он остаётся у оборудования,
+   модели и каталога; профиль просто перестал им пользоваться. */
+.profile-section__hint { margin: -4px 0 10px; color: var(--faint); font-size: 12px; line-height: 1.45; }
+
+/* Копирование значений шапки: госномер, ФИО, главный факт (с27). Кнопка стоит
+   РЯДОМ со значением, а не поверх него: в шапке значение соседствует с
+   надзаголовком и фактом, и цель во всю ширину ловила бы нажатия мимо. */
+.profile-head__title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.profile-head__copy { flex: 0 0 auto; width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--faint); background: var(--card); opacity: .5; transition: opacity .14s ease, color .14s ease; }
+.profile-head:hover .profile-head__copy, .profile-head__copy:focus-visible { opacity: 1; }
+.profile-head__copy:hover { color: var(--ink); }
+.profile-head__copy--copied { color: var(--ok); border-color: var(--ok); opacity: 1; }
+.profile-head__copy-note { color: var(--ok); font-size: 11px; font-weight: 700; animation: fade-in .14s ease-out; }
+.profile-head__copy-note--failed { color: var(--bad); }
+@media (prefers-reduced-motion: reduce) {
+  .profile-head__copy { transition: none; }
+  .profile-head__copy-note { animation: none; }
+}
+
+
+.employee-photos { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.employee-photos a, .employee-photos__missing { width: 92px; height: 116px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-md); color: var(--faint); background: var(--sunk); }
+.employee-photos img { width: 100%; height: 100%; display: block; object-fit: cover; }
+/* Обёртка появления обязана занять весь бокс 92×116: без размеров grid-элемент
+   считает высоту по картинке, которой ещё нет, и плитка схлопывалась бы до
+   нуля ровно на то время, ради которого плавное появление и делалось. */
+.employee-photos a > .photo-thumb { width: 100%; height: 100%; }
+
+/* Фото для документов (с19): выбор живёт под превью — бейдж у выбранного, кнопка
+   у остальных. Подпись ПОД тайлом, а не поверх: «последнее загруженное» поверх
+   лица в 92 px ширины не читается вовсе. */
+.employee-photos__item { width: 92px; display: flex; flex-direction: column; gap: 6px; }
+.employee-photos__item--document a, .employee-photos__item--document .employee-photos__missing { border-color: var(--red-act); box-shadow: 0 0 0 2px color-mix(in srgb, var(--red) 12%, transparent); }
+.employee-photos__badge { color: var(--red-act); font-size: 10px; font-weight: 700; line-height: 1.3; }
+.employee-photos__pick { padding: 0; border: 0; color: var(--muted); background: transparent; font-size: 10px; font-weight: 700; line-height: 1.3; text-align: left; text-decoration: underline; text-underline-offset: 2px; }
+.employee-photos__pick:disabled { color: var(--faint); text-decoration: none; }
+.employee-photos__error { display: flex; align-items: center; gap: 7px; margin: 12px 0 0; }
+
+/* Болванка паспортного блока в дровере сотрудника: реестр отдал должность и
+   телефон сразу, а паспорт, ПИНФЛ и адрес едут отдельным запросом (с26). Высота
+   на две строки списка — столько же занимает пришедший блок, поэтому карточка
+   не прыгает, когда данные встают на место. */
+.employee-card-skeleton { height: 96px; }
+/* Заглушка списка файлов встаёт на место .unit-lists__items / .muted — отступ от заголовка тот же. */
+.employee-files-skeleton { margin-top: 10px; }
+/* Строка файла в .unit-lists__items — это 10px падинга плюс 17px иконки, около 44px,
+   радиус 10px, разделены строки gap: 8px. Базовые 58px/14px дают скачок при подмене списком. */
+.employee-files-skeleton__row { height: 44px; margin-bottom: 8px; border-radius: var(--r-md); }
+.employee-files-skeleton__row:last-child { margin-bottom: 0; }

@@ -236,7 +236,7 @@
 .drawer { width: min(480px, 100%); height: 100%; padding: 30px; background: var(--card); box-shadow: var(--shadow-drawer); overflow-y: auto; animation: slide-in .22s ease-out; }
 .drawer__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 14px; }
 .drawer__header h2 { margin-bottom: 0; font-size: 25px; }
-/* Рама дроверов оборудования (EquipmentDrawerFrame, макет с31): шапка, тело со
+/* Рама дроверов оборудования (components/DrawerFrame, макет с31): шапка, тело со
    своим скроллом, подвал с действиями. На десктопе — модификатор бокового
    дровера, на телефоне — тот же набор классов внутри .sheet--drawer. */
 .drawer--split { width: min(460px, 100%); display: flex; flex-direction: column; padding: 0; overflow: hidden; }

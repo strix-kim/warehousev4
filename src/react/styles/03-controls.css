@@ -5,6 +5,10 @@
 .button--primary { color: #fff; background: var(--red-act); border-color: var(--red-act); }
 .button--primary:not(:disabled):hover { background: var(--red-press); border-color: var(--red-press); }
 .button--secondary { color: var(--ink); background: var(--card); border-color: var(--ctl); }
+/* Тёмная кнопка (макет с31, .btn--ink): главное действие там, где красный занят
+   брендом или тревогой, — например подвал профиля на телефоне. */
+.button--ink { color: #fff; background: var(--ink); border-color: var(--ink); }
+.button--ink:not(:disabled):hover { background: var(--night); border-color: var(--night); }
 .button--wide { width: 100%; }
 .icon-button { width: 40px; height: 40px; display: inline-grid; flex: 0 0 auto; place-items: center; padding: 0; border: 0; border-radius: var(--r-sm); color: var(--muted); background: transparent; }
 .icon-button:hover:not(:disabled) { color: var(--ink); background: var(--hover); }
@@ -51,6 +55,7 @@
 .pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .pill--warn { color: var(--warn); background: var(--warn-bg); }
 .pill--bad { color: var(--bad); background: var(--bad-bg); }
+.pill--ok { color: var(--ok); background: var(--ok-bg); }
 /* Пунктир — «место есть, человека нет»: наём ещё предстоит, это не тревога. */
 .pill--dashed { border: 1.5px dashed var(--warn-dot); color: var(--warn); background: transparent; }
 .pill--dashed::before { display: none; }
@@ -64,6 +69,22 @@
 .chip { flex: none; min-height: 34px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: var(--card); font-size: 13px; font-weight: 500; white-space: nowrap; }
 .chip:hover { border-color: var(--ctl); }
 .chip[aria-pressed='true'] { border-color: var(--ink); color: #fff; background: var(--ink); }
+/* Госномер знаком (макет с31, .plate): регион | серия и номер | флаг «UZ».
+   Переехал из home.css (с34), когда его взял второй экран — профиль и реестр
+   машин (с37, features/vehicles/Plate.tsx); правила перенесены как есть.
+   Госномер — узнаваемый объект Узбекистана, а не серая плашка: регион, номер,
+   флаг. Цвета флага — литералы, как печатная шкала залов: это не тема. */
+.plate { width: max-content; height: 30px; display: inline-flex; align-items: stretch; overflow: hidden; border: 2px solid var(--ink); border-radius: 6px; color: var(--ink); background: #fff; font-family: var(--f-mono); font-size: 16px; font-weight: 600; line-height: 1; letter-spacing: .02em; white-space: nowrap; }
+.plate b { display: grid; place-items: center; padding: 0 7px; border-right: 2px solid var(--ink); font-weight: 600; }
+.plate span { display: grid; place-items: center; padding: 0 9px; }
+.plate i { display: grid; grid-template-rows: 1fr auto; align-items: center; justify-items: center; padding: 3px 5px 2px; font-family: var(--f-text); font-size: 7px; font-style: normal; font-weight: 700; }
+.plate i::before { content: ''; width: 14px; height: 9px; display: block; border: .5px solid var(--line); background: linear-gradient(#1EB5E6 0 33%, #fff 33% 38%, var(--red) 38% 42%, #fff 42% 58%, var(--red) 58% 62%, #fff 62% 67%, #1EB53A 67%); }
+/* Крупный знак — шапка профиля машины. */
+.plate--lg { height: 44px; border-width: 2.5px; border-radius: var(--r-sm); font-size: 24px; }
+.plate--lg b { padding: 0 10px; border-right-width: 2.5px; }
+.plate--lg span { padding: 0 12px; }
+.plate--lg i { padding: 5px 8px 4px; font-size: 9px; }
+.plate--lg i::before { width: 20px; height: 13px; }
 .app-select { position: relative; width: min(260px, 100%); height: 42px; flex: 0 0 auto; }
 .app-select__trigger { width: 100%; height: 100%; display: flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid var(--ctl); border-radius: var(--r-md); color: var(--ink); background: var(--card); font-size: 14px; font-weight: 600; text-align: left; transition: border-color .16s ease, box-shadow .16s ease, background .16s ease; }
 /* Наведение на контролы (с32): рамка в покое — уже --ctl, поэтому отклик — темнее

@@ -1,0 +1,20 @@
+/* Медиазапросы РЕЕСТРОВ сотрудников и машин (≤820): карточка с галкой, панель
+   выбора над нижней навигацией. Вынесено из хвоста блока 820 в 06-responsive
+   чистым переносом в с37; импортируется сразу после него. */
+@media (max-width: 820px) {
+  /* Галка выбора остаётся в строке слева: на телефоне строка — карточка, и
+     ярлык-подпись ей не нужен (там галка, а не значение поля). */
+  .data-table--selectable tbody tr { grid-template-columns: 46px minmax(0, 1fr); }
+  .data-table--selectable td.select-cell { grid-row: 1; grid-column: 1; min-height: 64px; align-items: center; justify-content: center; border-top: 0; }
+  .data-table--selectable td:nth-child(2) { grid-row: 1; grid-column: 2; min-height: 64px; border-top: 0; }
+  .data-table--selectable td.select-cell::before, .data-table--selectable td:nth-child(2)::before { display: none; }
+  .data-table--selectable tbody td:nth-child(n + 3) { grid-column: 1 / -1; }
+  .data-table td.select-cell input { width: 21px; height: 21px; }
+  .select-all { min-height: 44px; }
+  .select-all input { width: 21px; height: 21px; }
+  /* Над нижней навигацией (её высота 64 px), тем же отступом, что у полосы выбора
+     в редакторе, — две панели не должны стоять на разной высоте. */
+  .bulk-bar, .app-shell--sidebar-collapsed .bulk-bar { left: 15px; right: 15px; bottom: calc(76px + env(safe-area-inset-bottom)); width: auto; max-width: none; margin: 0; flex-wrap: wrap; }
+  .bulk-bar .button { flex: 1 1 40%; }
+  .app-content:has(.bulk-bar) { padding-bottom: calc(170px + env(safe-area-inset-bottom)); }
+}

@@ -8,6 +8,7 @@ import { ErrorState, RetryButton } from '../../components/ErrorState'
 import { PhotoThumb } from '../../components/PhotoThumb'
 import { fetchVehiclePhotoPaths, fetchVehicles, getSignedUrls, readCachedVehicles, readCachedVehiclesMeta } from './api'
 import { downloadVehicleEventXlsx } from './eventExport'
+import { Plate } from './Plate'
 import { VehicleDrawer } from './VehicleDrawer'
 import { VehicleEventExportDrawer } from './VehicleEventExportDrawer'
 import { plateForSearch, vehicleTitle, type VehicleWithDrivers } from './types'
@@ -318,7 +319,7 @@ export function VehiclesPage() {
                               </span>
                             </div>
                           </td>
-                          <td data-label={tr('Госномер', 'Davlat raqami')}><span className="plate-badge">{vehicle.plate_number}</span></td>
+                          <td data-label={tr('Госномер', 'Davlat raqami')}><Plate value={vehicle.plate_number} /></td>
                           <td data-label={tr('Водители', 'Haydovchilar')}>
                             {vehicle.drivers.length > 0 ? vehicle.drivers.map(employeeShortName).join(', ') : '—'}
                           </td>

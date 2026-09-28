@@ -26,7 +26,7 @@
  *
  * .mono несёт font-size: 13px !important — переопределить размер можно только
  * ещё одним !important. Поэтому на ПОЛЯХ ВВОДА он запрещён: там .input-mono,
- * без размера (см. рядом с .plate-badge). .mono остаётся для нередактируемого
+ * без размера (см. 05-features). .mono остаётся для нередактируемого
  * текста — ячеек таблиц, dd в дроверах, строк списка.
  *
  * БРЕЙКПОЙНТЫ. Мобильных три, и это разные вещи:
@@ -59,10 +59,13 @@
  *   03-controls    кнопки, тулбар, поиск, AppSelect, ActionMenu, датапикер
  *   04-data        .data-panel, таблица, миниатюры, дровер, .detail-list
  *   05-features    карточки списков, главная, формы, люди, машины
- *   05-editor      редактор списка (с35, ListEditor*.tsx) — сразу после 05-features
+ *   05-profile     профили сотрудника и машины (с37, ProfileCard, *Drawer, *FilesList)
+ *   05-registry    реестры сотрудников и машин (с37): аватар, галки, bulk-bar
+ *   05-editor      редактор списка (с35, ListEditor*.tsx) — после 05-registry
  *   05-delay       калькулятор задержки излучателей ITC (с30, селекторы delay-*)
  *   06-responsive-shell  медиазапросы оболочки (сайдбар, нижняя панель; с35)
  *   06-responsive  остальные медиазапросы и prefers-reduced-motion
+ *   06-responsive-registry  медиазапросы реестров (с37) — сразу после 06-responsive
  *   06-responsive-editor  медиазапросы редактора списка (с35) — последним
  *
  * Внутри кусков остались локальные @media (520, hover, reduced-motion внутри
@@ -80,8 +83,11 @@
 @import './styles/03-controls.css';
 @import './styles/04-data.css';
 @import './styles/05-features.css';
+@import './styles/05-profile.css';
+@import './styles/05-registry.css';
 @import './styles/05-editor.css';
 @import './styles/05-delay.css';
 @import './styles/06-responsive-shell.css';
 @import './styles/06-responsive.css';
+@import './styles/06-responsive-registry.css';
 @import './styles/06-responsive-editor.css';

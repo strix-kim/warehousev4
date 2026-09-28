@@ -1,7 +1,7 @@
 import type { ReactNode, Ref } from 'react'
 import { useSyncExternalStore } from 'react'
-import { BottomSheet } from '../../components/BottomSheet'
-import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
+import { BottomSheet } from './BottomSheet'
+import { MOBILE_MEDIA_QUERY } from '../lib/breakpoints'
 
 function subscribeMobile(onChange: () => void) {
   const media = window.matchMedia(MOBILE_MEDIA_QUERY)
@@ -14,7 +14,7 @@ function isMobileNow() {
 }
 
 /**
- * Рама дроверов оборудования (макет с31, «Каталог и дровер модели»): шапка —
+ * Рама дроверов-карточек (макет с31; с35 — оборудование, с37 — общая): шапка —
  * фото, название, крестик; тело прокручивается само; подвал с действиями
  * прибит к низу. На десктопе рама — боковой дровер, на телефоне (≤820, та же
  * граница, что у карточек каталога) — нижний лист с хватом.
@@ -25,7 +25,7 @@ function isMobileNow() {
  * держит вызывающий (useModalLayer + useGuardedClose) — в обоих вариантах
  * закрытие идёт через один и тот же onRequestClose.
  */
-export function EquipmentDrawerFrame({ ariaLabel, instant, onRequestClose, head, foot, bodyRef, children }: {
+export function DrawerFrame({ ariaLabel, instant, onRequestClose, head, foot, bodyRef, children }: {
   ariaLabel: string
   // true — слой уже был открыт (модель ↔ карточка): появление не анимируем.
   instant: boolean

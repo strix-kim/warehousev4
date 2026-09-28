@@ -3,9 +3,9 @@
    в её чанк. Токены — из 01-tokens; литералы остались там же, где их держит
    вся система: белый текст на тёмном, дымки rgba и цвета флага на госномере.
 
-   .plate — элемент дизайн-системы макета, но пока его берёт только главная, он
-   живёт здесь. Возьмёт второй экран — переезжает в общий слой тем же шагом,
-   копий не заводим. .pill и .count так и уехали в 03-controls (с35, редактор).
+   .plate, .pill и .count — элементы дизайн-системы макета: жили здесь, пока их
+   брала только главная, и уехали в 03-controls, когда их взял второй экран
+   (.pill и .count — с35, редактор; .plate — с37, профиль машины).
 
    Главная обязана помещаться в экран без прокрутки на 1440×900 и 1920×1080:
    это витрина выбора, а не текст. Отсюда плотные отступы макета, а не
@@ -92,15 +92,6 @@
 .hallsdots { display: flex; flex-wrap: wrap; gap: 5px; }
 .hallsdots i { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 7px; color: #fff; background: var(--hall-color, var(--faint)); font-size: 11px; font-style: normal; font-weight: 700; line-height: 1; }
 .hallsdots .hallsdots__rest { color: var(--ink); background: var(--line); }
-
-
-/* Госномер — узнаваемый объект Узбекистана, а не серая плашка: регион, номер,
-   флаг. Цвета флага — литералы, как печатная шкала залов: это не тема. */
-.plate { width: max-content; height: 30px; display: inline-flex; align-items: stretch; overflow: hidden; border: 2px solid var(--ink); border-radius: 6px; color: var(--ink); background: #fff; font-family: var(--f-mono); font-size: 16px; font-weight: 600; line-height: 1; letter-spacing: .02em; white-space: nowrap; }
-.plate b { display: grid; place-items: center; padding: 0 7px; border-right: 2px solid var(--ink); font-weight: 600; }
-.plate span { display: grid; place-items: center; padding: 0 9px; }
-.plate i { display: grid; grid-template-rows: 1fr auto; align-items: center; justify-items: center; padding: 3px 5px 2px; font-family: var(--f-text); font-size: 7px; font-style: normal; font-weight: 700; }
-.plate i::before { content: ''; width: 14px; height: 9px; display: block; border: .5px solid var(--line); background: linear-gradient(#1EB5E6 0 33%, #fff 33% 38%, var(--red) 38% 42%, #fff 42% 58%, var(--red) 58% 62%, #fff 62% 67%, #1EB53A 67%); }
 
 /* Телефонное дерево на десктопе не рисуется вовсе. */
 .home-phone { display: none; }

@@ -23,7 +23,7 @@ import { useLanguage } from '../../lib/i18n'
 import { useArmedAction } from '../../lib/useArmedAction'
 import { useGuardedClose } from '../../lib/useGuardedClose'
 import { useModalLayer } from '../../lib/useModalLayer'
-import { EquipmentDrawerFrame } from './EquipmentDrawerFrame'
+import { DrawerFrame } from '../../components/DrawerFrame'
 
 // parseDateValue отдаёт null на мусоре в колонке: дата мероприятия nullable и
 // приходит строкой из базы, а не из нашего пикера.
@@ -356,7 +356,7 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
   }
 
   return (
-    <EquipmentDrawerFrame
+    <DrawerFrame
       ariaLabel={tr('Карточка оборудования', 'Uskuna kartasi')}
       instant={skipEnterAnimation}
       onRequestClose={requestClose}
@@ -557,7 +557,7 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
           {hasHistoryError && <p className="form-error">{tr('История временно недоступна.', 'Tarix vaqtincha mavjud emas.')}</p>}
         </div>
       </section></>}
-    </EquipmentDrawerFrame>
+    </DrawerFrame>
   )
 }
 

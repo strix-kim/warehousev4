@@ -5,7 +5,7 @@ import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import { addEquipmentUnit, fetchEquipmentUnitsByModel, type EquipmentModelSummary } from './api'
 import { countUnitsByAvailability, equipmentAvailabilityView, toEquipmentAvailability } from './availability'
 import { AvailabilityTicks } from './AvailabilityTicks'
-import { EquipmentDrawerFrame } from './EquipmentDrawerFrame'
+import { DrawerFrame } from '../../components/DrawerFrame'
 import type { Equipment } from './types'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
@@ -134,7 +134,7 @@ export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, 
   const location = sample?.location
 
   return (
-    <EquipmentDrawerFrame
+    <DrawerFrame
       ariaLabel={tr('Модель оборудования', 'Uskuna modeli')}
       instant={skipEnterAnimation}
       onRequestClose={requestClose}
@@ -250,6 +250,6 @@ export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, 
           </section>
         </>
       )}
-    </EquipmentDrawerFrame>
+    </DrawerFrame>
   )
 }

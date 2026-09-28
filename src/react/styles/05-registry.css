@@ -1,0 +1,32 @@
+/* Реестры сотрудников и машин (с37): аватар строки, колонка галок, панель выбора.
+   Вынесено из 05-features ЧИСТЫМ ПЕРЕНОСОМ; импортируется после 05-profile. */
+
+.employee-avatar { width: 36px; height: 36px; display: grid; flex: 0 0 auto; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 50%; color: var(--faint); background: var(--sunk); }
+.employee-avatar img { width: 100%; height: 100%; display: block; object-fit: cover; }
+
+/* Выбор состава на мероприятие (с19). Колонка галок добавляет таблице первый
+   столбец, поэтому проценты остальных сдвинуты своим набором: общие правила
+   .data-table th:nth-child раздали бы 34% под галку. */
+.data-table--selectable th:nth-child(1) { width: 52px; }
+.data-table--selectable th:nth-child(2) { width: 34%; }
+.data-table--selectable th:nth-child(3) { width: 22%; }
+.data-table--selectable th:nth-child(4) { width: 18%; }
+.data-table th.select-cell, .data-table td.select-cell { padding-inline: 0; text-align: center; }
+.data-table td.select-cell input, .select-all input { width: 17px; height: 17px; accent-color: var(--red-act); cursor: pointer; }
+.data-table tbody tr.is-selected { background: color-mix(in srgb, var(--red) 5%, transparent); }
+.data-table tbody tr.is-selected:hover { background: color-mix(in srgb, var(--red) 8%, transparent); }
+.select-all { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; }
+.select-all input:disabled { cursor: default; }
+
+/* Панель действий над выбранным составом. Левый край считаем от сайдбара, а не
+   от окна: fixed не знает про сетку оболочки, и по центру ЭКРАНА панель заезжала
+   бы под меню. transition повторяет анимацию сворачивания сайдбара. */
+.bulk-bar { position: fixed; z-index: 14; left: 256px; right: 0; bottom: 22px; width: max-content; max-width: calc(100vw / var(--app-zoom) - 300px); margin-inline: auto; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid rgba(255,255,255,.16); border-radius: var(--r-lg); color: #fff; background: rgba(15,17,21,.96); box-shadow: 0 14px 36px rgba(15,17,21,.28); backdrop-filter: blur(14px); transition: left .22s ease; animation: slide-soft .2s ease both; }
+.app-shell--sidebar-collapsed .bulk-bar { left: 76px; max-width: calc(100vw / var(--app-zoom) - 120px); }
+.bulk-bar > span { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; }
+.bulk-bar strong { min-width: 26px; height: 26px; display: inline-grid; place-items: center; border-radius: var(--r-sm); background: var(--red-act); font-family: inherit; font-size: 13px; }
+.bulk-bar .button { min-height: 38px; }
+.bulk-bar .button--secondary { color: #fff; background: transparent; border-color: rgba(255,255,255,.24); }
+.bulk-bar .button--secondary:not(:disabled):hover { color: #fff; background: rgba(255,255,255,.08); }
+/* Под панелью не должна прятаться последняя строка таблицы. */
+.app-content:has(.bulk-bar) { padding-bottom: 110px; }

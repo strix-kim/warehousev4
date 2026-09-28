@@ -2,6 +2,7 @@ import { CarFront, CircleAlert, Palette, Pencil, UserRound, X } from 'lucide-rea
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { fetchVehicleFiles, getSignedUrls } from './api'
+import { Plate } from './Plate'
 import { VehicleFilesList, VehicleFilesSkeleton } from './VehicleFilesList'
 import { driverFullName, vehicleTitle, type Tr, type VehicleFile, type VehicleWithDrivers } from './types'
 import { ProfileHead, ProfileSections, type ProfileSection } from '../../components/ProfileCard'
@@ -81,7 +82,7 @@ export function VehicleDrawer({ vehicle, photoUrl, onClose }: {
               моделью идут главным фактом под ним. */}
           <ProfileHead
             eyebrow={tr('Автомобиль', 'Avtomobil')}
-            title={<span className="plate-badge plate-badge--lg">{vehicle.plate_number}</span>}
+            title={<Plate value={vehicle.plate_number} size="lg" />}
             copyValue={vehicle.plate_number}
             fact={title}
             photoUrl={photoUrl}
