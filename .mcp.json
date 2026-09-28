@@ -5,10 +5,17 @@
       "args": [
         "-y",
         "@playwright/mcp@0.0.79",
-        "--caps", "pdf",
-        "--user-data-dir", ".playwright-profile",
-        "--output-dir", ".playwright-out"
+        "--caps",
+        "pdf",
+        "--user-data-dir",
+        ".playwright-profile",
+        "--output-dir",
+        ".playwright-out"
       ]
+    },
+    "motion": {
+      "type": "http",
+      "url": "https://mcp.motion.dev"
     }
   }
 }
