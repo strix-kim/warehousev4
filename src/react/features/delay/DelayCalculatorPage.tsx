@@ -1,62 +1,33 @@
-import { Check, Copy, Minus, Play, Plus, RotateCcw } from 'lucide-react'
+import { Check, Copy, GitFork, Minus, Play, Plus, RotateCcw, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { copyText } from '../../lib/clipboard'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { useChainLayout } from './chainLayout'
-import { CABLE_NS_PER_METER, computeDelays, DELAY_STEP_NS, MAX_EMITTERS, parseLength } from './delay'
-import { CountUp, DelayChain, type Row } from './DelayChain'
+import { computeDelays, MAX_LINES, MAX_PER_LINE } from './delay'
+import { CountUp, DelayChain } from './DelayChain'
+import { DelayGuide } from './DelayGuide'
+import { LINE_PARAMS, lineLengths, linesFromSearch, makeLine, makeRow, searchFromLines, searchKey } from './lengthsParam'
 import { useSignalAnimation } from './useSignalAnimation'
 
 // Калькулятор задержки излучателей ITC. Базы здесь нет вовсе: всё состояние —
-// длины кабелей, и живут они в адресе (?l=15,50,15,70,15). Так расчёт переживает
-// F5, а ссылку можно скинуть в чат — у получателя откроется та же цепочка.
-
-const LENGTHS_PARAM = 'l'
-// Число с единицей не рвём по строкам: «5,6 нс/» на одной и «м» на другой (замечено на 1440).
-const NBSP = '\u00a0'
-const WJ = '\u2060'
-// Нетронутый экран — один излучатель: в одной цепочке их обычно до шести, лишние
-// пустые ряды только мешали бы; остальные добавляют кнопкой.
-const DEFAULT_ROWS = 1
-
-// Ключ строки — не индекс: удаление из середины сдвинуло бы индексы, и React
-// переиспользовал бы чужие поля ввода вместе с их фокусом.
-let rowSeq = 0
-function makeRow(draft: string): Row {
-  rowSeq += 1
-  return { id: rowSeq, draft }
-}
-
-function rowsFromParam(value: string | null): Row[] {
-  if (value === null) return Array.from({ length: DEFAULT_ROWS }, () => makeRow(''))
-  return value.split(',').slice(0, MAX_EMITTERS).map((token) => makeRow(parseLength(token) === null ? '' : token.trim()))
-}
-
-// В адрес уходит число с точкой, а не то, что набрано: запятая в адресе —
-// разделитель строк, и «12,5» превратилось бы в два излучателя. Нетронутый
-// экран (одна пустая строка) адрес не пачкает.
-function paramFromRows(rows: Row[]): string | null {
-  if (rows.length === DEFAULT_ROWS && rows.every((row) => !row.draft.trim())) return null
-  return rows.map((row) => {
-    const value = parseLength(row.draft)
-    return value === null ? '' : String(value)
-  }).join(',')
-}
-
+// длины кабелей, и живут они в адресе (?l=15,50,15,70,15 и, если линий две,
+// &l2=…). Так расчёт переживает F5, а ссылку можно скинуть в чат — у получателя
+// откроется та же схема. Разбор и сборка адреса — lengthsParam.ts.
 
 export function DelayCalculatorPage() {
   const { tr, locale } = useLanguage()
   useDocumentTitle(tr('Задержка излучателей', 'Nurlatgichlar kechikishi'))
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const urlValue = params.get(LENGTHS_PARAM)
-  const [rows, setRows] = useState<Row[]>(() => rowsFromParam(urlValue))
-  // Что МЫ последним записали в адрес. Без этой отметки своя запись, вернувшись
-  // из роутера, перетёрла бы поле: «12,» превратилось бы в «12» посреди набора
-  // (gotchas §7). Догоняем адрес только при расхождении — это чужая запись:
-  // «назад», ссылка, открытая поверх страницы.
-  const writtenRef = useRef<string | null>(urlValue)
+  const urlFirst = params.get(LINE_PARAMS[0])
+  const urlSecond = params.get(LINE_PARAMS[1])
+  const [lines, setLines] = useState(() => linesFromSearch(urlFirst, urlSecond))
+  // Что МЫ последним записали в адрес (обе линии одной строкой). Без этой отметки
+  // своя запись, вернувшись из роутера, перетёрла бы поле: «12,» превратилось бы в
+  // «12» посреди набора (gotchas §7). Догоняем адрес только при расхождении — это
+  // чужая запись: «назад», ссылка, открытая поверх страницы.
+  const writtenRef = useRef<string | null>(searchKey(urlFirst, urlSecond))
   // Только что добавленный излучатель получает фокус: следующее действие
   // человека — вписать длину его кабеля.
   const [focusId, setFocusId] = useState<number | null>(null)
@@ -65,65 +36,86 @@ export function DelayCalculatorPage() {
   const chainRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
-    if (urlValue === writtenRef.current) return
-    writtenRef.current = urlValue
-    setRows(rowsFromParam(urlValue))
-  }, [urlValue])
+    const key = searchKey(urlFirst, urlSecond)
+    if (key === writtenRef.current) return
+    writtenRef.current = key
+    setLines(linesFromSearch(urlFirst, urlSecond))
+  }, [urlFirst, urlSecond])
 
   useEffect(() => {
-    const next = paramFromRows(rows)
+    const next = searchFromLines(lines)
     if (next === writtenRef.current) return
     writtenRef.current = next
     // Строку поиска собираем сами, а не через setSearchParams: тот кодирует
     // запятые в %2C, и ссылка для чата читалась бы как l=15%2C50%2C15. В нашем
-    // значении только цифры, точки и запятые — кодировать там нечего.
+    // значении только цифры, точки, запятые и «&» между линиями — кодировать нечего.
     // replace: каждое нажатие клавиши не должно становиться шагом «назад».
     const rest = new URLSearchParams(params)
-    rest.delete(LENGTHS_PARAM)
-    const search = [rest.toString(), next === null ? '' : `${LENGTHS_PARAM}=${next}`].filter(Boolean).join('&')
+    LINE_PARAMS.forEach((key) => rest.delete(key))
+    const search = [rest.toString(), next ?? ''].filter(Boolean).join('&')
     navigate({ search: search ? `?${search}` : '' }, { replace: true })
-  }, [rows, params, navigate])
+  }, [lines, params, navigate])
 
   // Таймер подтверждения живёт дольше страницы — снимаем при уходе.
   useEffect(() => () => window.clearTimeout(copyTimer.current), [])
 
-  const lengths = rows.map((row) => parseLength(row.draft) ?? 0)
+  const lengths = lines.map(lineLengths)
   const delays = computeDelays(lengths)
   const { orientation, widths } = useChainLayout(chainRef, lengths)
+  const two = lines.length > 1
   const { play } = useSignalAnimation(chainRef, lengths, orientation)
 
-  const totalMeters = lengths.reduce((sum, meters) => sum + meters, 0)
-  const maxSteps = delays.reduce((max, delay) => Math.max(max, delay.steps), 0)
-  const isPristine = paramFromRows(rows) === null
-  const canAdd = rows.length < MAX_EMITTERS
+  const totalMeters = lengths.flat().reduce((sum, meters) => sum + meters, 0)
+  const allDelays = delays.flat()
+  const maxSteps = allDelays.reduce((max, delay) => Math.max(max, delay.steps), 0)
+  const isPristine = searchFromLines(lines) === null
   // Кабеля нет — задержки нулевые, объяснять движением нечего.
   const canPlay = totalMeters > 0
   const meters = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
+  const atLimit = lines.some((line) => line.rows.length >= MAX_PER_LINE)
 
   function updateRow(id: number, draft: string) {
-    setRows((current) => current.map((row) => (row.id === id ? { ...row, draft } : row)))
+    setLines((current) => current.map((line) => ({ ...line, rows: line.rows.map((row) => (row.id === id ? { ...row, draft } : row)) })))
   }
 
-  function addRow() {
-    if (!canAdd) return
+  function addRow(lineIndex: number) {
+    if ((lines[lineIndex]?.rows.length ?? MAX_PER_LINE) >= MAX_PER_LINE) return
     const row = makeRow('')
     setFocusId(row.id)
-    setRows((current) => [...current, row])
+    setLines((current) => current.map((line, index) => (index === lineIndex ? { ...line, rows: [...line.rows, row] } : line)))
   }
 
-  function removeLast() {
-    setRows((current) => (current.length > 1 ? current.slice(0, -1) : current))
+  function removeLast(lineIndex: number) {
+    setLines((current) => current.map((line, index) => (index === lineIndex && line.rows.length > 1 ? { ...line, rows: line.rows.slice(0, -1) } : line)))
+  }
+
+  // Новая линия приходит с одним пустым излучателем, фокус — в его поле.
+  function addLine() {
+    if (lines.length >= MAX_LINES) return
+    const row = makeRow('')
+    setFocusId(row.id)
+    setLines((current) => [...current, makeLine([row])])
+  }
+
+  // Убрать можно только вторую: первая — та, что живёт в ?l=.
+  function removeLine() {
+    setLines((current) => (current.length > 1 ? current.slice(0, 1) : current))
   }
 
   function reset() {
     setFocusId(null)
-    setRows(rowsFromParam(null))
+    setLines(linesFromSearch(null, null))
   }
 
   async function copyForChat() {
     const plain = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2, useGrouping: false })
-    const list = delays.map((delay, index) => `${tr('И', 'N')}${index + 1} — ${delay.steps}`).join(', ')
-    const text = `${tr('Задержки ITC', 'ITC kechikishlari')}: ${list} (${tr('кабели', 'kabellar')} ${lengths.map(plain).join('/')} ${tr('м', 'm')})`
+    const emitter = tr('И', 'N')
+    const cables = (line: number[]) => `${tr('кабели', 'kabellar')} ${line.map(plain).join('/')} ${tr('м', 'm')}`
+    const list = (index: number) => (delays[index] ?? []).map((delay, at) => `${emitter}${at + 1} — ${delay.steps}`).join(', ')
+    const title = tr('Задержки ITC', 'ITC kechikishlari')
+    const text = two
+      ? `${title}. ${lengths.map((line, index) => `${tr(`Линия ${index + 1}`, `${index + 1}-liniya`)}: ${list(index)} (${cables(line)})`).join('. ')}`
+      : `${title}: ${list(0)} (${cables(lengths[0] ?? [])})`
     const ok = await copyText(text)
     window.clearTimeout(copyTimer.current)
     setCopyState(ok ? 'copied' : 'failed')
@@ -137,8 +129,8 @@ export function DelayCalculatorPage() {
   const copyLabel = (idle: string) => (copyState === 'copied' ? tr('Скопировано', 'Nusxalandi') : copyState === 'failed' ? tr('Не скопировалось', 'Nusxalanmadi') : idle)
   const copyClass = copyState === 'idle' ? '' : ` delay-copy--${copyState}`
 
-  const formulaNumbers = { perMeter: CABLE_NS_PER_METER.toLocaleString(locale), step: DELAY_STEP_NS.toLocaleString(locale) }
-  const lastNs = Math.round(delays[0]?.ns ?? 0)
+  // Самый долгий ожидатель: в одной линии — первый, при двух — по обеим.
+  const farthestNs = Math.round(allDelays.reduce((max, delay) => Math.max(max, delay.ns), 0))
 
   return (
     <>
@@ -164,7 +156,7 @@ export function DelayCalculatorPage() {
         <div className="delay-stage">
           <section className="delay-summary" aria-label={tr('Сводка', 'Xulosa')}>
             <div>
-              <strong><CountUp value={rows.length} /></strong>
+              <strong><CountUp value={lines.reduce((sum, line) => sum + line.rows.length, 0)} /></strong>
               <span>{tr('Излучателей', 'Nurlatgichlar')}</span>
             </div>
             <div>
@@ -176,14 +168,14 @@ export function DelayCalculatorPage() {
               <span>{tr('Макс. шаг задержки', 'Eng katta kechikish qadami')}</span>
             </div>
             <div className="delay-summary__ns">
-              <strong><CountUp value={lastNs} /><small>{tr('нс', 'ns')}</small></strong>
-              <span>{tr('Сигнал до последнего', 'Oxirgisigacha signal')}</span>
+              <strong><CountUp value={farthestNs} /><small>{tr('нс', 'ns')}</small></strong>
+              <span>{two ? tr('Сигнал до дальнего', 'Eng uzoqqacha signal') : tr('Сигнал до последнего', 'Oxirgisigacha signal')}</span>
             </div>
           </section>
 
           <DelayChain
             chainRef={chainRef}
-            rows={rows}
+            lines={lines}
             delays={delays}
             maxSteps={maxSteps}
             orientation={orientation}
@@ -193,37 +185,51 @@ export function DelayCalculatorPage() {
           />
 
           <div className="delay-tools">
-            <button type="button" className="delay-quiet" onClick={addRow} disabled={!canAdd}>
-              <Plus size={16} /> {tr('Добавить излучатель', 'Nurlatgich qo‘shish')}
-            </button>
-            <button type="button" className="delay-quiet" onClick={removeLast} disabled={rows.length <= 1}>
-              <Minus size={16} /> {tr('Убрать последний', 'Oxirgisini olib tashlash')}
-            </button>
+            {two ? lines.map((line, index) => {
+              const number = index + 1
+              return (
+                <div key={line.id} className="delay-tools__line">
+                  <span className="delay-tools__tag">{tr(`Линия ${number}`, `${number}-liniya`)}</span>
+                  <button type="button" className="delay-quiet" onClick={() => addRow(index)} disabled={line.rows.length >= MAX_PER_LINE}
+                    aria-label={tr(`Добавить излучатель в линию ${number}`, `${number}-liniyaga nurlatgich qo‘shish`)}>
+                    <Plus size={16} /> {tr('Излучатель', 'Nurlatgich')}
+                  </button>
+                  <button type="button" className="delay-quiet" onClick={() => removeLast(index)} disabled={line.rows.length <= 1}
+                    aria-label={tr(`Убрать последний излучатель линии ${number}`, `${number}-liniya: oxirgisini olib tashlash`)}>
+                    <Minus size={16} /> {tr('Последний', 'Oxirgisi')}
+                  </button>
+                  {index === 1 && (
+                    <button type="button" className="delay-quiet" onClick={removeLine}
+                      aria-label={tr('Убрать линию 2', '2-liniyani olib tashlash')}>
+                      <X size={16} /> {tr('Убрать линию', 'Liniyani olib tashlash')}
+                    </button>
+                  )}
+                </div>
+              )
+            }) : (
+              <>
+                <button type="button" className="delay-quiet" onClick={() => addRow(0)} disabled={atLimit}>
+                  <Plus size={16} /> {tr('Добавить излучатель', 'Nurlatgich qo‘shish')}
+                </button>
+                <button type="button" className="delay-quiet" onClick={() => removeLast(0)} disabled={(lines[0]?.rows.length ?? 1) <= 1}>
+                  <Minus size={16} /> {tr('Убрать последний', 'Oxirgisini olib tashlash')}
+                </button>
+                <button type="button" className="delay-quiet" onClick={addLine}>
+                  <GitFork size={16} /> {tr('Добавить линию', 'Liniya qo‘shish')}
+                </button>
+              </>
+            )}
             <button type="button" className="delay-quiet" onClick={reset} disabled={isPristine}>
               <RotateCcw size={16} /> {tr('Сбросить', 'Tozalash')}
             </button>
-            {!canAdd && <span className="delay-tools__limit">{tr(`Максимум ${MAX_EMITTERS} излучателей`, `Ko‘pi bilan ${MAX_EMITTERS} ta nurlatgich`)}</span>}
+            {atLimit && <span className="delay-tools__limit">{tr(`В линии не больше ${MAX_PER_LINE} излучателей`, `Liniyada ko‘pi bilan ${MAX_PER_LINE} ta nurlatgich`)}</span>}
             {!isPristine && (
-              <span className="delay-url">{tr('Длины живут в адресе', 'Uzunliklar manzilda saqlanadi')}: <span className="delay-url__value">?{LENGTHS_PARAM}={paramFromRows(rows)}</span></span>
+              <span className="delay-url">{tr('Длины живут в адресе', 'Uzunliklar manzilda saqlanadi')}: <span className="delay-url__value">?{searchFromLines(lines)}</span></span>
             )}
           </div>
         </div>
 
-        <div className="delay-side">
-          <aside className="delay-guide" aria-label={tr('Как читать', 'Qanday o‘qish kerak')}>
-            <p className="delay-guide__title">{tr('Как читать', 'Qanday o‘qish kerak')}</p>
-            <ol>
-              <li>{tr('Сигнал идёт от мозгов по цепочке и до ближних излучателей доходит раньше.', 'Signal protsessordan zanjir bo‘ylab boradi va yaqin nurlatgichlarga oldinroq yetadi.')}</li>
-              <li>{tr('Каждому ставим задержку — сколько сигнал ещё идёт от него до последнего.', 'Har biriga kechikish qo‘yamiz — signal undan oxirgisigacha qancha yursa, shuncha.')}</li>
-              <li>{tr('Первый ждёт дольше всех, последний не ждёт — все излучают одновременно.', 'Birinchisi hammadan uzoq kutadi, oxirgisi kutmaydi — hammasi bir vaqtda nurlatadi.')}</li>
-              <li>{tr('Кабель от мозгов до первого на задержки не влияет.', 'Protsessordan birinchisigacha bo‘lgan kabel kechikishlarga ta’sir qilmaydi.')}</li>
-            </ol>
-          </aside>
-          <p className="delay-formula">{tr(
-            `шаг = ⌈${NBSP}кабель после излучателя × ${formulaNumbers.perMeter}${NBSP}нс/${WJ}м ÷ ${formulaNumbers.step}${NBSP}нс${NBSP}⌉`,
-            `qadam = ⌈${NBSP}nurlatgichdan keyingi kabel × ${formulaNumbers.perMeter}${NBSP}ns/${WJ}m ÷ ${formulaNumbers.step}${NBSP}ns${NBSP}⌉`,
-          )}</p>
-        </div>
+        <DelayGuide twoLines={two} />
       </div>
 
       {/* Отдельным элементом в конце страницы, а не в шапке: у шапки анимация

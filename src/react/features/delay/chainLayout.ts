@@ -16,6 +16,13 @@ export const CHAIN_PAD_X = 34
 // в кабеле 76 остаётся по 5,9 px линии с каждой стороны; на 1280 при 6 излучателях
 // меньшего минимума не нужно, а больший ряд не вместил бы.
 export const MIN_CABLE_PX = 76
+// Отвод от мозгов к двум линиям (колонка между мозгами и линиями), px. Пара в
+// 05-delay.css: .delay-chain--two.delay-chain--row. Инвариант:
+// NODE_PX + FORK_PX ≥ NODE_PX / 2 + 62 + 4 — расстояние от центра мозгов до центра
+// первого излучателя не меньше половины коробки, половины подписи (62) и зазора 4,
+// то есть FORK_PX ≥ 38; подпись мозгов над коробкой и подпись первого излучателя
+// не сталкиваются с шиной. Берём 40.
+export const FORK_PX = 40
 // Запас на округление, чтобы ряд не упирался в край ровно в пиксель.
 const CHAIN_SLACK_PX = 2
 // Гистерезис: из столбца обратно в ряд — только когда ряд влезает с запасом,
@@ -24,19 +31,22 @@ const HYSTERESIS_PX = 16
 
 export type ChainOrientation = 'row' | 'column'
 
-// Ширины кабелей, px: пропорциональны метрам, но не меньше minPx. Кабель, для
-// которого пропорция дала бы меньше минимума, фиксируется на минимуме, а остаток
-// делится между остальными — пока набор «закреплённых» не перестанет расти.
-export function cableWidths(available: number, lengths: number[], minPx: number): number[] {
+// Масштаб «px на метр» для кабелей одной линии: ширины пропорциональны метрам, но
+// не меньше minPx. Кабель, для которого пропорция дала бы меньше минимума,
+// фиксируется на минимуме, а остаток делится между остальными — пока набор
+// «закреплённых» не перестанет расти. null — незакреплённых положительных кабелей
+// не осталось: масштаб линии ничего не диктует.
+export function cableScale(available: number, lengths: number[], minPx: number): number | null {
   const values = lengths.map((length) => Math.max(0, length || 0))
   const fixed = new Set<number>()
   let scale = 0
+  let sum = 0
   // Не больше одного прохода на кабель: каждый проход либо закрепляет ещё один,
   // либо ничего не меняет. Три прохода (как в макете) оставляли бы хвост с
   // устаревшим масштабом и лишними пикселями за краем.
   for (let pass = 0; pass <= values.length; pass += 1) {
     let free = available
-    let sum = 0
+    sum = 0
     values.forEach((value, index) => {
       if (fixed.has(index)) free -= minPx
       else sum += value
@@ -51,12 +61,24 @@ export function cableWidths(available: number, lengths: number[], minPx: number)
     })
     if (!grew) break
   }
-  return values.map((value, index) => (fixed.has(index) ? minPx : Math.max(minPx, value * scale)))
+  return sum > 0 ? scale : null
 }
 
-// Ширина цепочки, при которой ряд из count излучателей ещё влезает с минимальными кабелями.
-function rowWidthNeeded(count: number) {
-  return NODE_PX * (count + 1) + MIN_CABLE_PX * count + CHAIN_PAD_X * 2 + CHAIN_SLACK_PX
+// Ширины кабелей системы, px. Обе линии рисуются в ОДНОМ масштабе метров, иначе
+// 70 м в одной линии и 40 м в другой выглядели бы одинаково: берём самый тесный
+// масштаб из линий (у каждой свой запас — свои узлы и свободная ширина), и никто
+// не вылезает за край. Кабель не уже minPx. Нет ни одного масштаба (все длины
+// нули) — все кабели на минимуме. На одной линии это её собственный масштаб.
+export function systemCableWidths(availablePerLine: number[], lines: number[][], minPx: number): number[][] {
+  const scales = lines.map((line, index) => cableScale(availablePerLine[index] ?? 0, line, minPx)).filter((scale): scale is number => scale !== null)
+  const scale = scales.length ? Math.min(...scales) : 0
+  return lines.map((line) => line.map((length) => Math.max(minPx, Math.max(0, length || 0) * scale)))
+}
+
+// Ширина цепочки, при которой ряд из count излучателей (в самой длинной линии)
+// ещё влезает с минимальными кабелями; при двух линиях — плюс отвод.
+function rowWidthNeeded(count: number, twoLines: boolean) {
+  return NODE_PX * (count + 1) + MIN_CABLE_PX * count + CHAIN_PAD_X * 2 + CHAIN_SLACK_PX + (twoLines ? FORK_PX : 0)
 }
 
 // Ориентация и ширины кабелей. Меряем родителя цепочки (карточку), а не саму
@@ -65,8 +87,11 @@ function rowWidthNeeded(count: number) {
 // отрицательным margin в 05-delay.css — без этих 44 px 6 излучателей не влезали
 // в ряд на 1280), поэтому его ширина — clientWidth карточки. clientWidth, а не getBoundingClientRect: под zoom 2560
 // прямоугольник отдаёт экранные px (gotchas §16).
-export function useChainLayout(chainRef: RefObject<HTMLElement | null>, lengths: number[]) {
-  const count = lengths.length
+// lines — длины кабелей по линиям (одна или две).
+export function useChainLayout(chainRef: RefObject<HTMLElement | null>, lines: number[][]) {
+  const counts = lines.map((line) => line.length)
+  // Строка, а не массив, в зависимостях: массив новый на каждый рендер.
+  const countsKey = counts.join(',')
   const [state, setState] = useState<{ orientation: ChainOrientation; width: number }>(() => ({
     orientation: window.matchMedia(MOBILE_MEDIA_QUERY).matches ? 'column' : 'row',
     width: 0,
@@ -77,7 +102,8 @@ export function useChainLayout(chainRef: RefObject<HTMLElement | null>, lengths:
     const stage = chainRef.current?.parentElement
     if (!stage) return
     const mobile = window.matchMedia(MOBILE_MEDIA_QUERY)
-    const needed = rowWidthNeeded(count)
+    const perLine = countsKey.split(',').map(Number)
+    const needed = rowWidthNeeded(Math.max(...perLine), perLine.length > 1)
 
     function measure() {
       if (!stage) return
@@ -99,8 +125,9 @@ export function useChainLayout(chainRef: RefObject<HTMLElement | null>, lengths:
       observer.disconnect()
       mobile.removeEventListener('change', measure)
     }
-  }, [chainRef, count])
+  }, [chainRef, countsKey])
 
-  const available = state.width - CHAIN_PAD_X * 2 - NODE_PX * (count + 1) - CHAIN_SLACK_PX
-  return { orientation: state.orientation, widths: cableWidths(available, lengths, MIN_CABLE_PX) }
+  const fork = lines.length > 1 ? FORK_PX : 0
+  const available = lines.map((line) => state.width - CHAIN_PAD_X * 2 - NODE_PX * (line.length + 1) - CHAIN_SLACK_PX - fork)
+  return { orientation: state.orientation, widths: systemCableWidths(available, lines, MIN_CABLE_PX) }
 }

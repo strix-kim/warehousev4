@@ -34,6 +34,28 @@
 .delay-chain--row { align-items: flex-start; margin-inline: -22px; padding: 46px 34px 0; min-height: 220px; }
 .delay-chain--column { flex-direction: column; max-width: 560px; }
 
+/* Линии от мозгов: обёртка прозрачна для раскладки — узлы и кабели остаются
+   прямыми детьми цепочки, как при одной линии. Отвод и начало второй линии
+   рисуются только там, где нужны (ряд из двух линий, столбец). */
+.delay-line { display: contents; }
+.delay-fork, .delay-line__start { display: none; }
+
+/* Две линии в ряд: мозги слева посередине, короткий отвод и вертикальная шина,
+   от неё вправо две дорожки одной высоты (--delay-track-h; линия 1 сверху,
+   2 снизу) в одном масштабе метров. Размеры 56 / 40 / 34 продублированы в
+   chainLayout.ts (NODE_PX, FORK_PX, CHAIN_PAD_X). 224 — подписи верхней дорожки
+   кончаются на 208, подпись над первым кабелем нижней начинается с H − 7. */
+.delay-chain--two.delay-chain--row { --delay-track-h: 224px; display: grid; grid-template-columns: 56px 40px minmax(0, 1fr); padding: 0 34px; min-height: 0; }
+.delay-chain--two.delay-chain--row .delay-line { grid-column: 3; display: flex; align-items: flex-start; box-sizing: border-box; min-width: 0; height: var(--delay-track-h); padding-top: 46px; }
+.delay-chain--two.delay-chain--row .delay-node--brain { grid-column: 1; grid-row: 1 / 3; align-self: start; margin-top: calc(46px + var(--delay-track-h) / 2); }
+/* Подпись мозгов — над коробкой: справа от неё шина, снизу пусто. */
+.delay-chain--two.delay-chain--row .delay-node--brain .delay-node__lab { top: auto; bottom: 70px; }
+.delay-chain--two.delay-chain--row .delay-fork { display: block; position: relative; grid-column: 2; grid-row: 1 / 3; }
+.delay-chain--two.delay-chain--row .delay-fork::before { content: ''; position: absolute; left: 0; right: 0; top: calc(74px + var(--delay-track-h) / 2 - 1.5px); height: 3px; background: var(--ink-2); }
+.delay-chain--two.delay-chain--row .delay-fork::after { content: ''; position: absolute; right: 0; top: 72.5px; width: 3px; height: calc(var(--delay-track-h) + 3px); border-radius: 2px; background: var(--ink-2); }
+/* Подпись первого кабеля сдвинута вправо от шины: по центру она бы легла на неё. */
+.delay-chain--two.delay-chain--row .delay-cable--first .delay-cable__note { left: 8px; margin-left: 0; text-align: left; }
+
 /* Узел: коробка 56 × 56 (слои — значок, подсветка, кольцо, волны) и подпись.
    Центр коробки и есть точка, куда бежит сигнал. */
 .delay-node { position: relative; z-index: 1; flex: none; width: 56px; }
@@ -118,11 +140,21 @@
 .delay-chain--column .delay-cable__body { display: block; padding: 7px 0; }
 .delay-chain--column .delay-cable__line { position: static; align-self: stretch; justify-self: center; width: 3px; height: auto; min-height: 58px; margin: 0; }
 .delay-chain--column .delay-cable--first .delay-cable__line { background: repeating-linear-gradient(180deg, var(--ctl) 0 6px, transparent 6px 11px); }
+/* Две линии: кабель от мозгов входит в расчёт — рисуется сплошным, как остальные.
+   Второе правило перебивает столбцовое пунктирное выше (специфичность). */
+.delay-chain--two .delay-cable--first .delay-cable__line { background: var(--ink-2); }
+.delay-chain--two.delay-chain--column .delay-cable--first .delay-cable__line { background: var(--ink-2); }
 .delay-chain--column .delay-cable__note { position: static; display: block; width: auto; margin: 4px 0 0; color: var(--faint); font-size: 12px; text-align: left; }
 .delay-chain--column .delay-cable__note--bad { color: var(--bad); }
 .delay-chain--column .delay-len { width: max-content; height: 44px; padding: 0 12px 0 6px; border-radius: 12px; }
 .delay-chain--column .delay-len input { width: 52px; font-size: 16px; }
 .delay-chain--column .delay-len > span { font-size: 14px; }
+
+/* Начало второй линии в столбце: маленькие мозги, откуда бежит её сигнал. */
+.delay-chain--column .delay-line__start { display: grid; grid-template-columns: 56px minmax(0, 1fr); column-gap: 14px; align-items: center; min-height: 52px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-2); }
+.delay-line__box { position: relative; justify-self: center; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; color: #fff; background: var(--ink); }
+.delay-line__box .delay-node__glow { border-radius: 14px; }
+.delay-line__name { color: var(--muted); font: 600 13px/1.2 var(--f-text); }
 
 /* Новый излучатель: короткое «всплытие». На заходе на страницу — ничего. */
 .delay-node--new, .delay-cable--new { animation: delay-pop .2s var(--ease-out) both; }
@@ -132,6 +164,8 @@
 .delay-tools { margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .delay-quiet { min-height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 9px; color: var(--ink-2); background: transparent; font: 600 13px/1 var(--f-text); }
 .delay-quiet:hover:not(:disabled) { background: var(--sunk); }
+.delay-tools__line { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.delay-tools__tag { color: var(--muted); font: 600 11px/1 var(--f-text); letter-spacing: .1em; text-transform: uppercase; }
 .delay-tools__limit { color: var(--faint); font-size: 12.5px; }
 .delay-url { min-width: 0; margin-left: auto; color: var(--faint); font-size: 12.5px; overflow-wrap: anywhere; }
 .delay-url__value { font-family: var(--f-mono); }
