@@ -2,45 +2,102 @@
    стоит на нём. Карта слоёв и правила распила — в шапке styles.css. */
 
 :root {
+  color-scheme: light;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-  color: #171c20;
-  background: #f3f4f2;
+  color: var(--ink);
+  background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --ink: #171c20;
-  --ink-soft: #5e686f;
-  --ink-faint: #8b949a;
-  --surface: #ffffff;
-  --surface-soft: #f7f8f6;
-  --line: #e2e5e1;
-  --line-strong: #ccd1cc;
-  --sidebar: #0c1116;
-  --accent: #ef1236;
-  --accent-strong: #cf0d2d;
-  --success: #2d7d54;
-  --success-bg: #e9f6ee;
-  --warning: #9a6114;
-  --warning-bg: #fff3d6;
-  --danger: #b64242;
-  --danger-bg: #fcebea;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
-  --shadow: 0 12px 32px rgba(15, 22, 28, 0.07);
+  /* Палитра редизайна с31 — имена и значения дословно из :root макета
+     docs/project/design/redesign-s31.html; контрасты — в его разделе «Решения». */
+  --bg: #EEF0F3;
+  --grid: rgba(22,24,29,.055);
+  --card: #FFFFFF;
+  --sunk: #F5F6F8;
+  --hover: #F0F2F5;
+  --select: #E9ECF1;
+  --ink: #16181D;
+  --ink-2: #2A2E36;
+  --muted: #5F6470;
+  --faint: #676C77;
+  /* Только декор, не текст: на белом ниже 4,5:1. */
+  --soft: #8A8F9A;
+  --line: #DDE0E5;
+  --line-2: #E8EAEE;
+  --ctl: #858A95;
+  --red: #E52D27;
+  --red-act: #C8201B;
+  --red-press: #AE1B16;
+  --red-tint: #FCEAE9;
+  --night: #0F1115;
+  --night-2: #1A1D23;
+  --night-3: #262A31;
+  --night-line: #2C3038;
+  --on-night: #E8EAEE;
+  --on-night-2: #9CA1AC;
+  --red-night: #FF5A52;
+  --bad-night: #FF8095;
+  --ok: #1B7A45;
+  --ok-bg: #E3F3EA;
+  --ok-dot: #2A9D5C;
+  --warn: #8A5A00;
+  --warn-bg: #FBF0D5;
+  --warn-dot: #B7800A;
+  --bad: #B0203F;
+  --bad-bg: #FBE6EA;
+  --bad-dot: #B0203F;
+  --focus: #16181D;
+  --r-xl: 22px;
+  --r-lg: 18px;
+  --r-md: 12px;
+  --r-sm: 8px;
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+  --shadow-pop: 0 18px 48px rgba(15,17,21,.16), 0 2px 6px rgba(15,17,21,.06);
+
+  /* МОСТ СТАРЫХ ИМЁН — временный, на время CP2: компоненты ещё читают прежние
+     токены, здесь они только ссылаются на новые, своих значений не держат.
+     CP2 переводит обращения на новые имена и удаляет этот блок целиком.
+     Алиас вычисляется на :root: переопределение НОВОГО токена ниже по дереву
+     до старого имени не дойдёт — переопределять пока надо старое имя. */
+  --ink-soft: var(--muted);
+  --ink-faint: var(--faint);
+  --surface: var(--card);
+  --surface-soft: var(--sunk);
+  --line-strong: var(--ctl);
+  --sidebar: var(--night);
+  /* Не --red: белый на #E52D27 даёт 4,4:1, на --red-act — 5,7:1. */
+  --accent: var(--red-act);
+  --accent-strong: var(--red-press);
+  --success: var(--ok);
+  --success-bg: var(--ok-bg);
+  --warning: var(--warn);
+  --warning-bg: var(--warn-bg);
+  --danger: var(--bad);
+  --danger-bg: var(--bad-bg);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  /* Геометрия прежняя, цвет — RGB --night. */
+  --shadow: 0 12px 32px rgba(15, 17, 21, 0.07);
 }
 
 * { box-sizing: border-box; }
-html { min-width: 320px; background: #f3f4f2; }
+html { min-width: 320px; background: var(--bg); }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
-* { scrollbar-width: thin; scrollbar-color: #aeb6b1 transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--soft) transparent; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 999px; background: #aeb6b1; background-clip: padding-box; }
-*::-webkit-scrollbar-thumb:hover { background: #7d8882; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 999px; background: var(--soft); background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--ctl); background-clip: padding-box; }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.48; }
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible { outline: 3px solid rgba(239,18,54,.22); outline-offset: 2px; }
+/* A-02: одна обводка фокуса на всё, 15,6:1 к фону. Специфичность у :focus-visible
+   ниже, чем у прежнего списка button/input/…:focus-visible, — компонентные правила
+   с классом и outline в том же слое каскада теперь перебивают его. На тёмных
+   поверхностях тёмная обводка не видна — там белая. */
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sidebar :focus-visible, .login-brand-panel :focus-visible, .hall-tv :focus-visible { outline-color: #fff; }
 h1, h2, h3, p { margin-top: 0; }
 h1, h2, h3, .brand-name { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-weight: 750; }
 h1 { margin-bottom: 8px; font-size: clamp(28px, 3vw, 40px); line-height: 1.08; letter-spacing: -0.035em; }
