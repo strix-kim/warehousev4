@@ -1,85 +1,38 @@
-import {
-  ArrowDown,
-  ArrowLeft,
-  Check,
-  CircleAlert,
-  FileCheck2,
-  FileSpreadsheet,
-  Info,
-  ListChecks,
-  Minus,
-  Plus,
-  Save,
-  ScanBarcode,
-  Trash2,
-} from 'lucide-react'
+import { ArrowDown, FileCheck2, FileSpreadsheet, ListChecks, Save } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
-import { preloadEquipmentImages } from '../../components/EquipmentVisual'
-import { formatDateTime, formatTime, parseDateValue, todayDateValue } from '../../lib/date'
-import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
+import { formatDateTime, todayDateValue } from '../../lib/date'
 import { useLanguage } from '../../lib/i18n'
-import { useArmedAction } from '../../lib/useArmedAction'
-import { fetchAllEquipment, readCachedAllEquipment } from '../equipment/api'
-import type { Equipment } from '../equipment/types'
 import {
   clearListDraft,
   createEquipmentList,
-  fetchEquipmentList,
-  readCachedEquipmentList,
   readListDraft,
   updateEquipmentList,
-  type EquipmentList,
-  type EquipmentListItem,
 } from './api'
-import { buildCatalogGroups, groupKey, type CatalogGroup } from './catalogGroups'
+import { buildCatalogGroups, type CatalogGroup } from './catalogGroups'
 import { CatalogPanel, CatalogPreviewDrawer } from './ListEditorCatalog'
+import { ListEditorDraftNotice } from './ListEditorDraftNotice'
+import { ListEditorHeader } from './ListEditorHeader'
+import { KitPanel } from './ListEditorKit'
 import { ListEditorMeta, type ListMetaField, type RequisiteField } from './ListEditorMeta'
 import { useEditorChrome } from './useEditorChrome'
-import { selectionLabel, type SelectedGroup } from './listSelection'
+import { useEditorCatalog } from './useEditorCatalog'
+import { useMobilePanels } from './useMobilePanels'
+import { useOpenedList } from './useOpenedList'
+import {
+  addGroupTo,
+  changeCountIn,
+  setCountIn,
+  toggleSerialIn,
+  toggleSerialPickerIn,
+  type SelectedGroup,
+} from './listSelection'
+import { buildExportRows, buildListItems, resolveListName, resolveSelection, selectionFromList, serializeDocument } from './listDocument'
 import { useListDraftAutosave } from './useListDraftAutosave'
 import { useListDraftRestore } from './useListDraftRestore'
 import type { ListDraft } from './api'
 import { downloadEquipmentListXlsx } from './xlsxExport'
-
-// Подпись позиции — минимальный снимок группы. Нужен ровно в одном случае:
-// группы больше нет в свежем каталоге, и строку нечем было бы нарисовать.
-// Причина отказа при открытии сохранённого списка. Держим кодом, а не готовой
-// строкой: строка потянула бы tr в зависимости эффекта, и смена языка
-// перезапрашивала бы список из базы.
-type OpenErrorCode = '' | 'failed'
-
-// Высота липкой полосы табов на телефоне (8 сверху + кнопка 44 + 4 снизу + рамка 1).
-// Держится в паре с .mobile-editor-tabs и .quick-catalog-toolbar в styles.css:
-// разъедется — таб «В списке» снова приземлится под срезанным заголовком.
-const MOBILE_TABS_HEIGHT = 57
-
-// Потолок количества в позиции. Ограничение чисто интерфейсное — база принимает
-// любое число, но в рабочем списке четырёхзначное количество означает опечатку.
-const MAX_ITEM_COUNT = 999
-
-// Снимок документа одной строкой — по нему считается «есть несохранённые
-// правки». Серийники сортируются, порядок ключей фиксирован: иначе одна и та же
-// правка давала бы разные строки, и предупреждение загоралось бы на ровном месте.
-function serializeDocument(input: {
-  name: string
-  clientName: string
-  venue: string
-  description: string
-  eventDate: string
-  items: { key: string; count: number; serialIds: string[] }[]
-}) {
-  return JSON.stringify({
-    name: input.name.trim(),
-    clientName: input.clientName.trim(),
-    venue: input.venue.trim(),
-    description: input.description.trim(),
-    eventDate: input.eventDate,
-    items: input.items.map(({ key, count, serialIds }) => ({ key, count, serialIds: [...serialIds].sort() })),
-  })
-}
 
 export function ListEditorPage() {
   const navigate = useNavigate()
@@ -99,19 +52,10 @@ export function ListEditorPage() {
   const [venue, setVenue] = useState<string>(() => restoredDraft?.venue ?? '')
   const [description, setDescription] = useState(() => restoredDraft?.description ?? '')
   const [eventDate, setEventDate] = useState(() => restoredDraft?.eventDate ?? todayDateValue())
-  const [cachedEquipment] = useState(readCachedAllEquipment)
-  const [cachedList] = useState(() => listId ? readCachedEquipmentList(listId) : null)
-  const [equipment, setEquipment] = useState<Equipment[]>(() => cachedEquipment ?? [])
   const [selected, setSelected] = useState<SelectedGroup[]>([])
-  const [isLoading, setIsLoading] = useState(() => !cachedEquipment)
   const [isSaving, setIsSaving] = useState(false)
   // Режим экспорта, а не флаг: «Готовим…» должна гореть на нажатой кнопке, а не на обеих.
   const [isExporting, setIsExporting] = useState<'' | 'working' | 'approval'>('')
-  // Каталог: тоже только флаг — текст ошибки собирается на рендере.
-  const [hasLoadError, setHasLoadError] = useState(false)
-  const [openError, setOpenError] = useState<OpenErrorCode>('')
-  const [isOpening, setIsOpening] = useState(Boolean(listId && !cachedList))
-  const [listToEdit, setListToEdit] = useState<EquipmentList | null>(() => cachedList ?? null)
   const [saveError, setSaveError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   // Незаполненные реквизиты, на которые указала попытка собрать документ на
@@ -119,21 +63,13 @@ export function ListEditorPage() {
   const [requisiteErrors, setRequisiteErrors] = useState<Set<RequisiteField>>(() => new Set())
   // Момент последней записи в базу. Нужен только строке состояния в шапке.
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
-  // Количество, которое пользователь СЕЙЧАС набирает. Держим отдельно от выборки:
-  // пустое поле — законное промежуточное состояние, а count = 0 выбросил бы позицию.
-  const [countDraft, setCountDraft] = useState<{ key: string; text: string } | null>(null)
   const [previewGroup, setPreviewGroup] = useState<CatalogGroup | null>(null)
-  const [mobilePanel, setMobilePanel] = useState<'catalog' | 'selection'>('catalog')
+  const { mobilePanel, moveToMobilePanel, catalogRef, selectionRef } = useMobilePanels()
   // Панель реквизитов свёрнута по умолчанию: список собирают без неё, а документу
   // на согласование страница раскроет её сама (см. exportList).
   const [metaOpen, setMetaOpen] = useState(false)
-  const catalogRef = useRef<HTMLElement>(null)
-  const selectionRef = useRef<HTMLElement>(null)
   const metaRef = useRef<HTMLElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
-  // Прокрутка каждой вкладки телефона на момент ухода с неё: возврат в каталог
-  // приводит к той же модели, а не к первой.
-  const panelScrollRef = useRef<Partial<Record<'catalog' | 'selection', number>>>({})
   useEditorChrome(gridRef)
   // Снимок документа на момент последней записи в базу. Пустая строка — снимка
   // ещё нет (список не открыт или не догрузился), и предупреждать не о чем.
@@ -151,53 +87,11 @@ export function ListEditorPage() {
   // Автосейв заблокирован, пока восстановление не закончилось: стартовый пустой
   // стейт затёр бы сохранённый черновик раньше, чем тот успеет подняться.
   // Восстанавливать нечего — снят сразу.
-  // Оба действия необратимы и стоят рядом с обычными кнопками, поэтому спрашивают
-  // подтверждение вторым нажатием. Экземпляры независимые: взведённая «Очистить»
-  // не должна взводить «Начать заново».
-  const clearArmed = useArmedAction()
-  const restartArmed = useArmedAction()
 
-  useEffect(() => {
-    let current = true
-    setIsLoading(!cachedEquipment)
-    setHasLoadError(false)
-    fetchAllEquipment({ bypassCache: Boolean(cachedEquipment) })
-      .then((result) => {
-        if (!current) return
-        setEquipment(result)
-        preloadEquipmentImages(result, 32)
-      })
-      .catch(() => { if (current && !cachedEquipment) setHasLoadError(true) })
-      .finally(() => { if (current) setIsLoading(false) })
-    return () => { current = false }
-  }, [])
-
-  useEffect(() => {
-    if (!listId) {
-      setIsOpening(false)
-      setListToEdit(null)
-      setOpenError('')
-      return
-    }
-    let current = true
-    const cached = readCachedEquipmentList(listId)
-    if (cached) setListToEdit(cached)
-    setIsOpening(!cached)
-    setOpenError('')
-    fetchEquipmentList(listId, { bypassCache: Boolean(cached) })
-      .then((list) => {
-        if (!current) return
-        setListToEdit(list)
-      })
-      .catch(() => {
-        if (!current) return
-        // Живой кэш уже показан — сбой обновления не повод рушить открытый редактор.
-        if (cached) return
-        setOpenError('failed')
-      })
-      .finally(() => { if (current) setIsOpening(false) })
-    return () => { current = false }
-  }, [listId])
+  // Порядок важен: эффекты исполняются в порядке объявления — каталог, строка
+  // списка, затем гидратация шапки ниже.
+  const { equipment, isLoading, hasLoadError } = useEditorCatalog()
+  const { listToEdit, isOpening, openError } = useOpenedList(listId)
 
   // Шапка документа заполняется, как только приехала САМА строка списка, и не
   // ждёт каталог. Раньше и шапка, и состав гидратировались одним эффектом по
@@ -223,26 +117,7 @@ export function ListEditorPage() {
 
   useEffect(() => {
     if (!listToEdit || groups.length === 0 || hydratedSelectionRef.current === listToEdit.id) return
-    const equipmentById = new Map(equipment.map((item) => [item.id, item]))
-    const restored = new Map<string, SelectedGroup>()
-    const addRestored = (group: CatalogGroup, count: number, serialId?: string) => {
-      const current = restored.get(group.key) ?? { key: group.key, label: selectionLabel(group), count: 0, serialIds: [], serialPickerOpen: false }
-      current.count += count
-      if (serialId && group.serializedItems.some((item) => item.id === serialId)) current.serialIds.push(serialId)
-      restored.set(group.key, current)
-    }
-
-    for (const equipmentId of listToEdit.equipment_ids ?? []) {
-      const item = equipmentById.get(equipmentId)
-      const group = item ? groupsByKey.get(groupKey(item)) : undefined
-      if (group) addRestored(group, 1, equipmentId)
-    }
-    for (const item of listToEdit.equipment_items ?? []) {
-      const group = groupsByKey.get(groupKey(item))
-      if (group) addRestored(group, Math.max(1, Number(item.count) || 1), item.tracking_mode === 'serialized' ? item.equipment_id : undefined)
-    }
-
-    const restoredItems = [...restored.values()]
+    const restoredItems = selectionFromList(listToEdit, equipment, groupsByKey)
     setSelected(restoredItems)
     // Точка отсчёта для «есть несохранённые правки»: считаем её по строке из
     // базы, а не по стейту — стейт шапки мог уже разъехаться с ней, если
@@ -355,83 +230,28 @@ export function ListEditorPage() {
   const selectedCount = selected.reduce((sum, item) => sum + item.count, 0)
   const selectedKeys = useMemo(() => new Set(selected.map((item) => item.key)), [selected])
   const selectedByKey = useMemo(() => new Map(selected.map((item) => [item.key, item])), [selected])
-  // Выборка, склеенная со свежим каталогом. group === null означает, что модели
-  // в каталоге больше нет: позицию не выбрасываем, рисуем по снимку подписи.
-  const resolvedSelection = useMemo(() => selected.map((item) => ({
-    item,
-    group: groupsByKey.get(item.key) ?? null,
-    label: groupsByKey.get(item.key) ?? item.label,
-  })), [groupsByKey, selected])
+  const resolvedSelection = useMemo(() => resolveSelection(selected, groupsByKey), [groupsByKey, selected])
   const canSubmit = selectedCount > 0 && !isOpening && !openError
-
-  function moveToMobilePanel(panel: 'catalog' | 'selection') {
-    const switching = panel !== mobilePanel
-    if (switching) panelScrollRef.current[mobilePanel] = window.scrollY
-    setMobilePanel(panel)
-    window.requestAnimationFrame(() => {
-      // Вкладка уже открывалась — возвращаемся туда, где с неё ушли. Повторное
-      // нажатие на активную вкладку — к её заголовку, как и первое открытие.
-      const remembered = switching ? panelScrollRef.current[panel] : undefined
-      if (remembered !== undefined) {
-        window.scrollTo({ top: remembered })
-        return
-      }
-      const target = panel === 'catalog' ? catalogRef.current : selectionRef.current
-      if (!target) return
-      // scrollIntoView прижимал панель к самому верху окна — липкие табы накрывали
-      // её заголовок. Скроллим руками, оставляя ровно высоту полосы табов.
-      window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - MOBILE_TABS_HEIGHT, behavior: 'smooth' })
-    })
-  }
 
   function addGroup(group: CatalogGroup) {
     setSuccessMessage('')
-    setSelected((current) => {
-      const existing = current.find((item) => item.key === group.key)
-      if (existing) return current.map((item) => item.key === group.key ? { ...item, count: item.count + 1 } : item)
-      return [...current, { key: group.key, label: selectionLabel(group), count: 1, serialIds: [], serialPickerOpen: false }]
-    })
+    setSelected((current) => addGroupTo(current, group))
   }
 
   function changeCount(key: string, delta: number) {
-    setSelected((current) => current
-      .map((item) => {
-        if (item.key !== key) return item
-        const count = Math.max(0, item.count + delta)
-        return { ...item, count, serialIds: item.serialIds.slice(0, count) }
-      })
-      .filter((item) => item.count > 0))
+    setSelected((current) => changeCountIn(current, key, delta))
   }
 
-  // Количество, набранное с клавиатуры. Ноль сюда не доходит: удаление позиции —
-  // это корзина и «−» с единицы, а не пустое поле.
   function setCount(key: string, count: number) {
-    const next = Math.min(MAX_ITEM_COUNT, Math.max(1, count))
-    setSelected((current) => current.map((item) => item.key === key
-      ? { ...item, count: next, serialIds: item.serialIds.slice(0, next) }
-      : item))
-  }
-
-  // Набранное число применяется ОДИН раз — на blur или Enter, а не на каждый символ:
-  // иначе «12» поверх «5» проходило бы через count = 1 и резало бы выбранные S/N до
-  // одного, восстановить которые нечем. Клик по любой кнопке сначала снимает фокус,
-  // так что «Сохранить»/«Excel» всегда видят уже зафиксированное количество.
-  function commitCountDraft(key: string) {
-    if (countDraft?.key === key && Number(countDraft.text) >= 1) setCount(key, Number(countDraft.text))
-    setCountDraft(null)
+    setSelected((current) => setCountIn(current, key, count))
   }
 
   function toggleSerialPicker(key: string) {
-    setSelected((current) => current.map((item) => item.key === key ? { ...item, serialPickerOpen: !item.serialPickerOpen } : item))
+    setSelected((current) => toggleSerialPickerIn(current, key))
   }
 
   function toggleSerial(key: string, equipmentId: string) {
-    setSelected((current) => current.map((item) => {
-      if (item.key !== key) return item
-      const exists = item.serialIds.includes(equipmentId)
-      const serialIds = exists ? item.serialIds.filter((id) => id !== equipmentId) : [...item.serialIds, equipmentId]
-      return { ...item, serialIds, count: Math.max(item.count, serialIds.length) }
-    }))
+    setSelected((current) => toggleSerialIn(current, key, equipmentId))
   }
 
   function clearSelection() {
@@ -439,68 +259,11 @@ export function ListEditorPage() {
     setSelected([])
   }
 
-  // Состав документа собирается по АКТУАЛЬНОМУ каталогу: конкретные единицы
-  // берутся только из живой группы. Группы уже нет — вся позиция уходит
-  // планируемой строкой по снимку подписи, как и раньше.
-  function buildItems(): EquipmentListItem[] {
-    return resolvedSelection.flatMap(({ item: selectedItem, group, label }) => {
-      const concrete = selectedItem.serialIds.flatMap((id) => {
-        const item = group?.serializedItems.find((candidate) => candidate.id === id)
-        return item ? [{
-          equipment_id: item.id,
-          brand: item.brand,
-          model: item.model,
-          type: item.type,
-          subtype: item.subtype,
-          count: 1,
-          tracking_mode: 'serialized' as const,
-        }] : []
-      })
-      let remaining = selectedItem.count - concrete.length
-      const quantityItems: EquipmentListItem[] = []
-      for (const item of group?.quantityItems ?? []) {
-        if (remaining <= 0) break
-        const allocated = Math.min(remaining, Math.max(0, item.count))
-        if (allocated <= 0) continue
-        quantityItems.push({
-          equipment_id: item.id,
-          brand: item.brand,
-          model: item.model,
-          type: item.type,
-          subtype: item.subtype,
-          count: allocated,
-          tracking_mode: 'quantity',
-        })
-        remaining -= allocated
-      }
-      const planned: EquipmentListItem[] = remaining > 0 ? [{
-        brand: label.brand,
-        model: label.model,
-        type: label.type,
-        subtype: label.subtype,
-        count: remaining,
-        tracking_mode: 'planned',
-      }] : []
-      return [...concrete, ...quantityItems, ...planned]
-    })
-  }
-
-  // Имя собирается в момент действия и только если поле пустое: дата мероприятия
-  // отвечает на «что искать в реестре», время — на «который из сегодняшних».
-  // Само поле не трогаем — пустое поле законно, и подставлять в него нечего.
-  function resolveListName() {
-    const trimmed = name.trim()
-    if (trimmed) return trimmed
-    const date = new Intl.DateTimeFormat(locale).format(parseDateValue(eventDate) ?? new Date())
-    const time = formatTime(Date.now(), locale)
-    return tr(`Список ${date} · ${time}`, `Ro‘yxat ${date} · ${time}`)
-  }
-
   async function persistList() {
-    const items = buildItems()
+    const items = buildListItems(resolvedSelection)
     const listMode: 'specific' | 'abstract' = items.every((item) => item.tracking_mode !== 'planned') ? 'specific' : 'abstract'
     const input = {
-      name: resolveListName(),
+      name: resolveListName({ name, eventDate, locale, tr }),
       description,
       clientName: clientName.trim(),
       venue: venue.trim(),
@@ -578,7 +341,7 @@ export function ListEditorPage() {
     setSuccessMessage('')
     try {
       downloadEquipmentListXlsx({
-        name: resolveListName(),
+        name: resolveListName({ name, eventDate, locale, tr }),
         clientName: clientName.trim(),
         venue: venue.trim(),
         description: description.trim(),
@@ -586,16 +349,7 @@ export function ListEditorPage() {
         locale,
         language,
         documentMode,
-        rows: resolvedSelection.map(({ item, group, label }) => ({
-          category: label.type,
-          equipment: `${label.brand} ${label.model}`.trim(),
-          subtype: label.subtype,
-          count: item.count,
-          serialNumbers: item.serialIds.flatMap((id) => {
-            const equipmentItem = group?.serializedItems.find((candidate) => candidate.id === id)
-            return equipmentItem?.serialnumber ? [equipmentItem.serialnumber] : []
-          }),
-        })),
+        rows: buildExportRows(resolvedSelection),
       })
       setSuccessMessage(tr('Excel скачан. Сохранять список в системе необязательно.', 'Excel yuklandi. Ro‘yxatni tizimda saqlash shart emas.'))
     } catch {
@@ -639,49 +393,17 @@ export function ListEditorPage() {
 
   return (
     <>
-      <header className="editor-header editor-header--quick">
-        <button className="icon-button icon-button--bordered" onClick={() => navigate('/lists')} aria-label={tr('Назад к спискам', 'Ro‘yxatlarga qaytish')}>
-          <ArrowLeft size={18} />
-        </button>
-        <div>
-          <p className={`editor-status ${statusTone ? `editor-status--${statusTone}` : ''}`} role="status">{statusBody}</p>
-          <h1>{name.trim() || tr('Новый список', 'Yangi ro‘yxat')}</h1>
-        </div>
-        <div className="editor-header__actions">{actionButtons}</div>
-      </header>
+      <ListEditorHeader
+        title={name.trim() || tr('Новый список', 'Yangi ro‘yxat')}
+        statusTone={statusTone}
+        statusBody={statusBody}
+        actions={actionButtons}
+        onBack={() => navigate('/lists')}
+      />
 
       {openError && <ErrorState inline className="editor-open-error" title={tr('Список не открыт', 'Ro‘yxat ochilmadi')} text={tr('Не удалось открыть сохранённый список. Проверьте интернет и откройте его из реестра ещё раз — сам список не изменился.', 'Saqlangan ro‘yxatni ochib bo‘lmadi. Internetni tekshiring va uni reestrdan qayta oching — ro‘yxatning o‘zi o‘zgarmadi.')} action={<button className="button button--secondary" onClick={() => navigate('/lists')}>{tr('Вернуться к спискам', 'Ro‘yxatlarga qaytish')}</button>} />}
 
-      {draftNotice && (
-        <div className="editor-draft-notice">
-          <Info size={18} />
-          <span>
-            {/* У открытого списка формулировка другая: «Черновик восстановлен»
-                читалось бы как «список не сохранён», а он в базе есть. */}
-            <strong>{draftNotice.kind === 'edits'
-              ? tr('Восстановлены несохранённые правки', 'Saqlanmagan o‘zgarishlar tiklandi')
-              : tr('Черновик восстановлен', 'Qoralama tiklandi')}</strong>
-            {/* Что именно вернулось и когда: состав лежит на другой вкладке, и без
-                этих двух чисел «восстановлен» относится непонятно к чему, а решение
-                нажать «Начать заново» принимается вслепую. */}
-            <small>{draftNotice.touchedAt === null
-              ? tr(`единиц: ${draftNotice.units}`, `birliklar: ${draftNotice.units}`)
-              : tr(
-                `единиц: ${draftNotice.units} · изменён ${formatDateTime(draftNotice.touchedAt, locale)}`,
-                `birliklar: ${draftNotice.units} · ${formatDateTime(draftNotice.touchedAt, locale)} da o‘zgartirilgan`,
-              )}</small>
-            {draftNotice.missingGroups > 0 && <small>{tr(
-              `позиций больше нет в каталоге: ${draftNotice.missingGroups}`,
-              `katalogda qolmagan pozitsiyalar: ${draftNotice.missingGroups}`,
-            )}</small>}
-          </span>
-          <button className="button button--secondary" type="button" onClick={() => restartArmed.fire(discardDraft)} onBlur={restartArmed.disarm}>
-            {draftNotice.kind === 'edits'
-              ? (restartArmed.armed ? tr('Да, отбросить правки', 'Ha, o‘zgarishlar tashlansin') : tr('Отбросить правки', 'O‘zgarishlarni tashlash'))
-              : (restartArmed.armed ? tr('Да, начать заново', 'Ha, yangidan boshlansin') : tr('Начать заново', 'Yangidan boshlash'))}
-          </button>
-        </div>
-      )}
+      {draftNotice && <ListEditorDraftNotice notice={draftNotice} onDiscard={discardDraft} />}
 
       <ListEditorMeta
         panelRef={metaRef}
@@ -711,91 +433,19 @@ export function ListEditorPage() {
           onAdd={addGroup}
         />
 
-        <section ref={selectionRef} className={`data-panel selection-panel ${mobilePanel === 'selection' ? 'mobile-active' : ''}`}>
-          <div className="panel-heading">
-            <div><h2>{tr('Рабочий список', 'Ish ro‘yxati')}</h2><p>{tr('Количество сейчас, серийные номера — при необходимости.', 'Hozir miqdor, zarur bo‘lsa seriya raqamlari.')}</p></div>
-            <strong className="selection-count">{selectedCount}</strong>
-          </div>
-
-          <div className="selection-list quick-selection-list">
-            {selected.length === 0 && (
-              <EmptyState art title={tr('Список пока пуст', 'Ro‘yxat hozircha bo‘sh')} text={tr('Нажмите на нужную модель в каталоге.', 'Katalogdagi kerakli modelni bosing.')} />
-            )}
-            {resolvedSelection.map(({ item, group, label }, index) => (
-              <article className="quick-selection-item" key={item.key}>
-                <div className="quick-selection-item__main">
-                  <span className="equipment-row-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
-                  <div className="quick-selection-item__copy">
-                    <strong>{label.brand} {label.model}</strong>
-                    <small>{translateEquipmentTaxonomy(label.subtype, language)} · {group
-                      ? `${tr('на складе', 'omborda')} ${group.availableCount}`
-                      : tr('нет в каталоге', 'katalogda yo‘q')}{item.serialIds.length > 0
-                        ? tr(` · S/N ${item.serialIds.length} из ${item.count}`, ` · S/N ${item.serialIds.length} / ${item.count}`)
-                        : ''}</small>
-                  </div>
-                  <div className="quantity-stepper">
-                    <button onClick={() => changeCount(item.key, -1)} aria-label={tr('Уменьшить', 'Kamaytirish')}><Minus size={14} /></button>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      aria-label={tr('Количество', 'Miqdor')}
-                      value={countDraft?.key === item.key ? countDraft.text : String(item.count)}
-                      onFocus={(event) => event.currentTarget.select()}
-                      onChange={(event) => setCountDraft({ key: item.key, text: event.target.value.replace(/\D+/g, '').slice(0, 3) })}
-                      onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }}
-                      onBlur={() => commitCountDraft(item.key)}
-                    />
-                    <button onClick={() => changeCount(item.key, 1)} aria-label={tr('Увеличить', 'Ko‘paytirish')}><Plus size={14} /></button>
-                  </div>
-                  {group && group.serializedItems.length > 0 && (
-                    <button
-                      className={`icon-button serial-button ${item.serialPickerOpen ? 'is-open' : ''}`}
-                      type="button"
-                      onClick={() => toggleSerialPicker(item.key)}
-                      aria-label={tr('Уточнить серийные номера', 'Seriya raqamlarini aniqlash')}
-                      aria-expanded={item.serialPickerOpen}
-                    ><ScanBarcode size={16} /></button>
-                  )}
-                  <button className="icon-button" onClick={() => changeCount(item.key, -item.count)} aria-label={tr('Удалить модель', 'Modelni o‘chirish')}><Trash2 size={16} /></button>
-                </div>
-                {group && item.count > group.availableCount && <p className="quick-inline-warning"><CircleAlert size={13} /> {tr('Больше текущего остатка — в Excel попадёт указанное количество.', 'Joriy qoldiqdan ko‘p — Excelga ko‘rsatilgan miqdor tushadi.')}</p>}
-                {!group && <p className="quick-inline-warning"><CircleAlert size={13} /> {tr('Модели больше нет в каталоге — позиция уйдёт в документ как планируемая.', 'Model katalogda yo‘q — pozitsiya hujjatga rejalashtirilgan sifatida tushadi.')}</p>}
-                {group && group.serializedItems.length > 0 && item.serialPickerOpen && (
-                  <div className="serial-picker">
-                    <p>{tr('Отметьте только те номера, которые точно поедут на мероприятие.', 'Tadbirga aniq olib boriladigan raqamlarni belgilang.')}</p>
-                    <div>{group.serializedItems.map((equipmentItem) => {
-                      const active = item.serialIds.includes(equipmentItem.id)
-                      return <button className={active ? 'active' : ''} onClick={() => toggleSerial(item.key, equipmentItem.id)} key={equipmentItem.id} type="button"><span>{active && <Check size={13} />}</span>{equipmentItem.serialnumber || tr('Без номера', 'Raqamsiz')}</button>
-                    })}</div>
-                  </div>
-                )}
-              </article>
-            ))}
-          </div>
-
-          <footer className="selection-footer">
-            <div>
-              <span className="selection-footer__total">{tr('Всего единиц', 'Jami birliklar')} <strong>{selectedCount}</strong></span>
-              {selected.length > 0 && (
-                <button
-                  className={`clear-selection ${clearArmed.armed ? 'clear-selection--armed' : ''}`}
-                  onClick={() => clearArmed.fire(clearSelection)}
-                  onBlur={clearArmed.disarm}
-                  type="button"
-                ><Trash2 size={14} /> {clearArmed.armed
-                  ? tr(`Да, очистить ${selectedCount}`, `Ha, ${selectedCount} ta tozalansin`)
-                  : tr('Очистить список', 'Ro‘yxatni tozalash')}</button>
-              )}
-            </div>
-            {/* Дубль действий для телефона: на десктопе он скрыт CSS, там кнопки живут в
-                липкой шапке. Сообщение о результате держим рядом с нажатой кнопкой. */}
-            <div className="selection-footer__mobile">
-              {actionButtons}
-              {statusTone !== '' && <p className={`editor-status editor-status--${statusTone} editor-status--inline`}>{statusBody}</p>}
-            </div>
-          </footer>
-        </section>
+        <KitPanel
+          panelRef={selectionRef}
+          isMobileActive={mobilePanel === 'selection'}
+          resolvedSelection={resolvedSelection}
+          selectedCount={selectedCount}
+          onChangeCount={changeCount}
+          onSetCount={setCount}
+          onToggleSerialPicker={toggleSerialPicker}
+          onToggleSerial={toggleSerial}
+          onClear={clearSelection}
+          actions={actionButtons}
+          status={statusTone !== '' ? <p className={`editor-status editor-status--${statusTone} editor-status--inline`}>{statusBody}</p> : null}
+        />
       </div>
 
       {selectedCount > 0 && mobilePanel === 'catalog' && (
