@@ -71,3 +71,14 @@
   .language-switch--compact button { min-width: 0; height: 44px; padding: 0; width: 100%; font-size: 11px; }
   .app-content { padding: 25px 15px calc(90px + env(safe-area-inset-bottom)); }
 }
+
+/* Режим «задача» (класс ставит App.tsx на маршрутах редактора списка): на
+   телефоне нижней панели нет — экран работает как «Новое письмо», выход
+   стрелкой «←». Граница 700, а не 820: это телефонная раскладка редактора, на
+   701–820 он ещё двухколоночный, и навигация там остаётся. Нижний отступ —
+   зеркало верхних 25px плюс safe-area: места под панель больше не держим, а
+   место под липкую плашку редактора добавляет 06-responsive-editor. */
+@media (max-width: 700px) {
+  .app-shell--task .sidebar { display: none; }
+  .app-shell--task .app-content { padding-bottom: calc(25px + env(safe-area-inset-bottom)); }
+}

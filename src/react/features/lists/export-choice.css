@@ -1,0 +1,39 @@
+/* Выбор формата Excel, его лист и липкая плашка телефона (ExportChoice,
+   ListExportSheet, ListStickyBar; макет с31 — .xl, .p-sheet, .p-dock).
+   Файл импортируется компонентами и едет ленивым чанком — ПОСЛЕ всех 06-*.css.
+   Поэтому здесь только собственные селекторы .export-choice*, .export-sheet*,
+   .list-sticky-bar*: чужое правило, переопределённое отсюда, перебило бы
+   медиазапросы глобальных файлов. */
+
+.export-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.export-choice__card { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 12px; padding: 12px 14px; border: 1px solid var(--ctl); border-radius: var(--r-md); color: var(--ink); background: var(--card); font-family: var(--f-text); text-align: left; transition: background .15s ease, border-color .15s ease; }
+.export-choice__card svg { grid-row: span 2; width: 22px; height: 22px; }
+.export-choice__card b { font: 700 14.5px/1.15 var(--f-text); }
+.export-choice__card small { color: var(--muted); font-size: 12px; line-height: 1.3; }
+.export-choice__card:not(:disabled):hover { background: var(--hover); }
+.export-choice__card--main { border-color: var(--red-act); color: #fff; background: var(--red-act); }
+.export-choice__card--main small { color: rgba(255,255,255,.92); }
+.export-choice__card--main:not(:disabled):hover { border-color: var(--red-press); background: var(--red-press); }
+.export-choice__card:disabled { cursor: not-allowed; opacity: .55; }
+/* «Готовим…» — на нажатой карточке она не гаснет: видно, что именно готовится. */
+.export-choice__card[aria-busy='true']:disabled { cursor: progress; opacity: 1; }
+
+/* Лист формата: карточки стопкой и крупнее — палец, а не мышь. */
+.export-sheet__title { margin: 0; font: 800 24px/1.1 var(--f-display); letter-spacing: -.03em; }
+.export-sheet .export-choice { grid-template-columns: 1fr; gap: 10px; }
+.export-sheet .export-choice__card { padding: 16px; }
+.export-sheet__foot { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line-2); }
+.export-sheet__foot .button { width: 100%; min-height: 52px; font-size: 16px; }
+.export-sheet__save small { color: var(--faint); font-size: 12.5px; font-weight: 600; }
+
+/* Липкая плашка — только в телефонной раскладке редактора (≤700, та же граница,
+   что в 06-responsive-editor). Режим «задача» прячет там нижнюю панель
+   (06-responsive-shell), поэтому плашка стоит у самой кромки окна. */
+.list-sticky-bar { display: none; }
+
+@media (max-width: 700px) {
+  .list-sticky-bar { position: fixed; z-index: 14; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent); background: color-mix(in srgb, var(--card) 92%, transparent); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+  .list-sticky-bar__sum b { display: block; font: 800 22px/1 var(--f-display); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .list-sticky-bar__sum span { color: var(--muted); font-size: 12px; }
+  .list-sticky-bar__action { width: 100%; min-height: 52px; font-size: 16px; }
+}

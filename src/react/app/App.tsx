@@ -1,7 +1,7 @@
 import { ArrowUpRight, Boxes, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Presentation, RadioTower, Users, Warehouse, X } from 'lucide-react'
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, m, type Transition } from 'motion/react'
-import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
+import { Link, matchPath, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AppErrorBoundary } from '../components/AppErrorBoundary'
 import { ArgoDots } from '../components/ArgoDots'
 import { BottomSheet } from '../components/BottomSheet'
@@ -65,6 +65,16 @@ function phoneTabOf(pathname: string): PhoneTab {
   if (isUnder(pathname, '/lists')) return 'lists'
   if (isUnder(pathname, '/halls')) return 'halls'
   return 'more'
+}
+
+// Режим «задача» (макет с31, решение прораба с35): редактор списка — как экран
+// «Новое письмо», на телефоне (≤700) нижней панели нет, выход — стрелкой «←»
+// в шапке. Шаблоны — те же, что у маршрутов редактора в App: правишь маршрут —
+// правишь и здесь. Сама панель прячется в 06-responsive-shell.
+const TASK_ROUTE_PATTERNS = ['/lists/new', '/lists/:listId/edit']
+
+function isTaskRoute(pathname: string) {
+  return TASK_ROUTE_PATTERNS.some((pattern) => matchPath(pattern, pathname) !== null)
 }
 
 // Числа — из раздела «Решения» макета с31: индикатор вкладки переезжает за 200 мс,
@@ -318,7 +328,7 @@ function AppShell() {
     : <em className="sidebar__count">{value.toLocaleString(locale)}</em>)
 
   return (
-    <div className={`app-shell ${sidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`}>
+    <div className={`app-shell ${sidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}${isTaskRoute(pathname) ? ' app-shell--task' : ''}`}>
       <aside className="sidebar">
         <div className="sidebar__brand">
           {/* Знак — SVG из точек (ArgoDots), а не картинка: растровых ассетов в
