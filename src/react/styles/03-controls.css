@@ -1,7 +1,7 @@
 
 .button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 0 16px; border: 1px solid transparent; border-radius: var(--r-md); font-size: 14px; font-weight: 700; transition: transform .15s ease, background .15s ease, border .15s ease; }
 .button:not(:disabled):hover { transform: translateY(-1px); }
-.button:not(:disabled):active { transform: translateY(1px) scale(.99); }
+.button:not(:disabled):active { transform: scale(.97); }
 .button--primary { color: #fff; background: var(--red-act); border-color: var(--red-act); }
 .button--primary:not(:disabled):hover { background: var(--red-press); border-color: var(--red-press); }
 .button--secondary { color: var(--ink); background: var(--card); border-color: var(--ctl); }
@@ -40,9 +40,11 @@
    Радиус кнопки вложенный — внешний минус паддинг. */
 .segmented { max-width: 100%; display: inline-flex; gap: 2px; padding: 3px; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card); scrollbar-width: none; }
 .segmented::-webkit-scrollbar { display: none; }
-.segmented button { flex: none; min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.segmented button { flex: none; min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 500; white-space: nowrap; position: relative; isolation: isolate; }
 .segmented button:hover { color: var(--ink); }
-.segmented button[aria-pressed='true'] { color: var(--ink); background: var(--select); font-weight: 600; }
+.segmented button[aria-pressed='true'] { color: var(--ink); font-weight: 600; }
+/* Бегунок под текстом кнопки: фон нажатой даёт он, а не сама кнопка. */
+.segmented__thumb { position: absolute; inset: 0; z-index: -1; border-radius: 9px; background: var(--select); }
 /* Точка статуса — тон словаря статусов; нейтральная серая — декор, не текст. */
 .status-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--soft); }
 .status-dot--success { background: var(--ok-dot); }

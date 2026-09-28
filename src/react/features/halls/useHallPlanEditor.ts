@@ -63,6 +63,10 @@ export function hallPersonKeyOf(hallId: string, employeeId: string): string {
   return `${hallId}:${employeeId}`
 }
 
+// Сколько живёт отметка freshAssign: дольше самой длинной анимации (подсветка
+// клетки 900 мс) и докрутки счётчиков, короче любого тика поллинга.
+const FRESH_ASSIGN_MS = 1200
+
 // Всё состояние редактора в одном хуке: страница и ячейки остаются разметкой.
 // Иначе три компонента правили бы одну и ту же матрицу каждый по-своему,
 // а «Сохраняем…» считалось бы в четвёртом месте.
@@ -109,6 +113,19 @@ export function useHallPlanEditor(planId: string | undefined) {
   const [addingHall, setAddingHall] = useState(false)
   const [addingPosition, setAddingPosition] = useState(false)
   const [addingCell, setAddingCell] = useState('')
+  // Презентационная отметка «пользователь только что назначил в эту клетку»
+  // (ключ клетки + время). Читают только клетки, счётчики и чипы свободных —
+  // чтобы движение играло от действия в ЭТОЙ вкладке и не играло от поллинга
+  // и первой загрузки: те кладут строки через setAssignments напрямую, минуя
+  // assign(). Гаснет сама через FRESH_ASSIGN_MS. В запись в базу не входит.
+  const [freshAssign, setFreshAssign] = useState<{ cell: string; at: number } | null>(null)
+  const freshTimer = useRef(0)
+  useEffect(() => () => window.clearTimeout(freshTimer.current), [])
+  function markFresh(key: CellKey) {
+    window.clearTimeout(freshTimer.current)
+    setFreshAssign({ cell: cellKeyOf(key), at: Date.now() })
+    freshTimer.current = window.setTimeout(() => setFreshAssign(null), FRESH_ASSIGN_MS)
+  }
 
   useEffect(() => {
     if (!planId) return
@@ -427,12 +444,16 @@ export function useHallPlanEditor(planId: string | undefined) {
       const patch = { employee_id: employee?.id ?? null, is_external: !employee }
       await run('replace-assignment', () => updateHallAssignment(current.id, patch), (row) => {
         setAssignments((rows) => rows.map((cell) => cell.id === row.id ? { ...row, employees: employee } : cell))
+        markFresh(key)
       })
     } else {
       await runInsert(
         'create-assignment',
         () => createHallAssignment({ planId, hallId: key.hallId, positionId: key.positionId, employeeId: employee?.id ?? null }),
-        (row) => { setAssignments((rows) => [...rows, { ...row, employees: employee }]) },
+        (row) => {
+          setAssignments((rows) => [...rows, { ...row, employees: employee }])
+          markFresh(key)
+        },
       )
     }
     setAddingCell('')
@@ -563,6 +584,7 @@ export function useHallPlanEditor(planId: string | undefined) {
     addingHall,
     addingPosition,
     addingCell,
+    freshAssign,
     reload,
     silentRefresh,
     renameHall,

@@ -1,4 +1,4 @@
-import { m } from 'motion/react'
+import { m, useIsPresent } from 'motion/react'
 import { useEffect, useId, useRef, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { PHONE_MEDIA_QUERY } from '../lib/breakpoints'
@@ -57,6 +57,9 @@ export function UnsavedPrompt(props: UnsavedPromptProps) {
 function UnsavedBar({ message, stayLabel, leaveLabel, onStay, onLeave }: UnsavedPromptProps) {
   const promptRef = useRef<HTMLDivElement>(null)
   const messageId = useId()
+  // Уходящая плашка ещё в DOM: второе нажатие «Уйти» за эти 140 мс повторило бы
+  // переход.
+  const isPresent = useIsPresent()
 
   // Переход могли начать из низа длинной формы или с таб-бара — плашка вверху
   // экрана была бы за кадром, и клик выглядел бы как «ничего не произошло».
@@ -71,11 +74,12 @@ function UnsavedBar({ message, stayLabel, leaveLabel, onStay, onLeave }: Unsaved
       role="alertdialog"
       aria-live="assertive"
       aria-labelledby={messageId}
-      // Макет: 180 мс сверху вниз. Ухода нет — плашку снимает вызывающий
-      // условным рендером, без AnimatePresence.
+      // Макет: 180 мс сверху вниз. Уход играет, когда вызывающий держит
+      // плашку в AnimatePresence (у ребёнка — key); без неё просто исчезает.
+      style={isPresent ? undefined : { pointerEvents: 'none' }}
       initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18, ease: 'easeOut' }}
+      animate={{ opacity: 1, y: 0, transition: { duration: 0.18, ease: 'easeOut' } }}
+      exit={{ opacity: 0, y: -8, transition: { duration: 0.14, ease: 'easeIn' } }}
     >
       <p className="unsaved-prompt__text"><strong id={messageId}>{message}</strong></p>
       <div className="unsaved-prompt__actions">

@@ -1,6 +1,7 @@
 import { CircleAlert, PackagePlus, Save, X } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
+import { AnimatePresence } from 'motion/react'
 import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import { addEquipmentUnit, fetchEquipmentUnitsByModel, type EquipmentModelSummary } from './api'
 import { countUnitsByAvailability, equipmentAvailabilityView, toEquipmentAvailability } from './availability'
@@ -155,15 +156,18 @@ export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, 
         </button>
       )}
     >
-      {isPrompting && (
-        <UnsavedPrompt
-          message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
-          stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
-          leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
-          onStay={keepEditing}
-          onLeave={confirmClose}
-        />
-      )}
+      <AnimatePresence>
+        {isPrompting && (
+          <UnsavedPrompt
+            key="unsaved"
+            message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+            stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
+            leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
+            onStay={keepEditing}
+            onLeave={confirmClose}
+          />
+        )}
+      </AnimatePresence>
       {/* Главный факт модели — сколько свободно. Отклонения — строками под
           числом, каждая со словом: цвет шкалы без слова не читается. */}
       <div className="bigfact">

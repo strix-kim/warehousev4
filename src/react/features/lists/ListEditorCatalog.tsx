@@ -1,6 +1,7 @@
 import { Info, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type RefObject } from 'react'
 import { AppSelect } from '../../components/AppSelect'
+import { DrawerLayer } from '../../components/DrawerLayer'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
@@ -177,8 +178,7 @@ export function CatalogPreviewDrawer({ group, onClose, onAdd }: { group: Catalog
     : hasSerialized ? tr('По серийным номерам', 'Seriya raqamlari bo‘yicha') : tr('По количеству', 'Miqdor bo‘yicha')
 
   return (
-    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Описание модели', 'Model tavsifi')} onMouseDown={onClose}>
-      <aside className="drawer catalog-preview-drawer" onMouseDown={(event) => event.stopPropagation()}>
+    <DrawerLayer ariaLabel={tr('Описание модели', 'Model tavsifi')} onRequestClose={onClose} className="drawer catalog-preview-drawer">
         <div className="drawer__header">
           <div><p className="eyebrow">{translateEquipmentTaxonomy(group.type, language)}</p><h2>{group.brand} {group.model}</h2></div>
           <div className="drawer__header-actions">
@@ -199,7 +199,6 @@ export function CatalogPreviewDrawer({ group, onClose, onAdd }: { group: Catalog
         <div className="catalog-preview-drawer__footer">
           <button className="button button--primary catalog-preview-drawer__add" onClick={onAdd}><Plus size={17} /> {tr('Добавить в список', 'Ro‘yxatga qo‘shish')}</button>
         </div>
-      </aside>
-    </div>
+    </DrawerLayer>
   )
 }

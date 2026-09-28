@@ -1,4 +1,5 @@
 import { ArrowLeft, CarFront, CheckCircle2, CircleAlert, Save, X } from 'lucide-react'
+import { AnimatePresence } from 'motion/react'
 import { FormEvent, useMemo, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createVehicle, fetchVehicleById, fetchVehicleFiles, getSignedUrls, saveVehicleDrivers, updateVehicle, uploadVehiclePhoto, vehicleSaveErrorText, type VehicleInput } from './api'
@@ -396,15 +397,18 @@ export function VehicleFormPage() {
         </button>
       </header>
 
-      {guard.isBlocked && (
-        <UnsavedPrompt
-          message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
-          stayLabel={tr('Остаться', 'Qolish')}
-          leaveLabel={tr('Уйти без сохранения', 'Saqlamasdan chiqish')}
-          onStay={guard.stay}
-          onLeave={guard.leave}
-        />
-      )}
+      <AnimatePresence>
+        {guard.isBlocked && (
+          <UnsavedPrompt
+            key="unsaved"
+            message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+            stayLabel={tr('Остаться', 'Qolish')}
+            leaveLabel={tr('Уйти без сохранения', 'Saqlamasdan chiqish')}
+            onStay={guard.stay}
+            onLeave={guard.leave}
+          />
+        )}
+      </AnimatePresence>
 
       <section className="data-panel vehicle-form">
         <div className="form-section">

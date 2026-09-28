@@ -1,4 +1,5 @@
-import { m, useDragControls, useIsPresent, type Transition } from 'motion/react'
+import { m, useDragControls, useIsPresent, usePresenceData, type Transition, type Variants } from 'motion/react'
+import type { DrawerExitCustom } from './DrawerLayer'
 import { useRef, type ReactNode } from 'react'
 
 // Числа — из раздела «Решения» макета с31: лист выезжает пружиной bounce .18 / .4 с,
@@ -6,7 +7,13 @@ import { useRef, type ReactNode } from 'react'
 // рывок (0,6 px/мс).
 const SHEET_ENTER: Transition = { type: 'spring', bounce: 0.18, duration: 0.4 }
 const SHEET_EXIT: Transition = { duration: 0.2, ease: [0.4, 0, 1, 1] }
+const INSTANT: Transition = { duration: 0 }
 const SHEET_CLOSE_OFFSET = 90
+
+// Уход — функцией от custom AnimatePresence вызывающего: смена дровера другим
+// (модель ↔ карточка) уводит старый лист мгновенно, как и боковой слой.
+const scrimExit: Variants = { exit: (instantExit: DrawerExitCustom) => ({ opacity: 0, transition: instantExit ? INSTANT : { duration: 0.16 } }) }
+const sheetExit: Variants = { exit: (instantExit: DrawerExitCustom) => ({ y: '100%', transition: instantExit ? INSTANT : SHEET_EXIT }) }
 const SHEET_CLOSE_VELOCITY = 600
 
 type BottomSheetProps = {
@@ -38,16 +45,20 @@ export function BottomSheet({ onClose, role = 'dialog', ariaLabel, ariaLabelledB
   // Пока лист уезжает, слой ещё в DOM и накрывает экран: без этого первое
   // нажатие после закрытия тонуло бы в уходящей подложке.
   const isPresent = useIsPresent()
+  // Мгновенный уход — прячем в рендере снятия, как DrawerLayer.
+  const presenceData = usePresenceData() as DrawerExitCustom
+  const instantExit = !isPresent && presenceData === true
 
   return (
-    <div className="sheet-layer" role={role} aria-modal="true" aria-label={ariaLabel} aria-labelledby={ariaLabelledBy} onMouseDown={onClose} style={isPresent ? undefined : { pointerEvents: 'none' }}>
-      <m.div className="sheet-layer__scrim" initial={instant ? false : { opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.18 } }} exit={{ opacity: 0, transition: { duration: 0.16 } }} />
+    <div className="sheet-layer" role={role} aria-modal="true" aria-label={ariaLabel} aria-labelledby={ariaLabelledBy} onMouseDown={onClose} style={isPresent ? undefined : { pointerEvents: 'none', visibility: instantExit ? 'hidden' : undefined }}>
+      <m.div className="sheet-layer__scrim" initial={instant ? false : { opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.18 } }} variants={scrimExit} exit="exit" />
       <m.div
         className={className ? `sheet ${className}` : 'sheet'}
         onMouseDown={(event) => event.stopPropagation()}
         initial={instant ? false : { y: '100%' }}
         animate={{ y: 0, transition: SHEET_ENTER }}
-        exit={{ y: '100%', transition: SHEET_EXIT }}
+        variants={sheetExit}
+        exit="exit"
         drag="y"
         dragControls={dragControls}
         dragListener={false}

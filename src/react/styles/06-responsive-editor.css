@@ -100,7 +100,8 @@
      Отсчёт — от паддинга полосы (15 px по бокам, 8 сверху), как у кнопок. */
   .mobile-editor-tabs__ind { position: absolute; top: 8px; left: 15px; width: calc((100% - 30px) / 2); height: 44px; border-radius: 10px; background: var(--card); box-shadow: 0 1px 3px rgba(15,17,21,.12); transition: transform .2s cubic-bezier(.2,.7,.2,1); }
   .mobile-editor-tabs__ind--end { transform: translateX(100%); }
-  .editor-grid .catalog-picker, .editor-grid .selection-panel { display: none; min-height: 0; height: auto; overflow: visible; }
+  /* animation: none — display: none → flex перезапускал бы rise-in .data-panel на каждом переключении вкладки; вход играет один раз, у самой сетки (макет: переходы без движения). */
+  .editor-grid .catalog-picker, .editor-grid .selection-panel { display: none; min-height: 0; height: auto; overflow: visible; animation: none; }
   .editor-grid .catalog-picker.mobile-active, .editor-grid .selection-panel.mobile-active { display: flex; }
   .quick-catalog-toolbar, .quick-catalog-toolbar:not(:has(.app-select + .app-select)) { position: sticky; z-index: 7; top: 57px; grid-template-columns: 1fr; background: rgba(255,255,255,.96); backdrop-filter: blur(12px); }
   .quick-catalog-toolbar .app-select { width: 100%; }

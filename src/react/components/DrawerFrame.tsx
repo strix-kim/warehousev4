@@ -1,5 +1,6 @@
 import { Children, useSyncExternalStore, type ReactNode, type Ref } from 'react'
 import { BottomSheet } from './BottomSheet'
+import { DrawerLayer } from './DrawerLayer'
 import { MOBILE_MEDIA_QUERY } from '../lib/breakpoints'
 
 function subscribeMobile(onChange: () => void) {
@@ -23,6 +24,10 @@ function isMobileNow() {
  * и открытые формы остаются. Esc, блокировку прокрутки и защиту несохранённого
  * держит вызывающий (useModalLayer + useGuardedClose) — в обоих вариантах
  * закрытие идёт через один и тот же onRequestClose.
+ *
+ * Уход (слой и лист) играет, когда вызывающий держит раму в AnimatePresence;
+ * смена одного дровера другим — AnimatePresence custom={true}, старый уходит
+ * мгновенно (DrawerExitCustom в DrawerLayer).
  *
  * Тело без содержимого не рисуется вовсе: пустой прокручиваемый блок держал бы
  * между шапкой и подвалом дыру (профиль машины без фото и файлов).
@@ -59,15 +64,8 @@ export function DrawerFrame({ ariaLabel, instant, onRequestClose, head, foot, bo
   }
 
   return (
-    <div className={`drawer-layer${instant ? ' drawer-layer--instant' : ''}`} role="dialog" aria-modal="true" aria-label={ariaLabel} onMouseDown={(event) => {
-      // Без preventDefault нажатие на подложку увело бы фокус в body уже ПОСЛЕ
-      // того, как плашка его забрала, — и Enter перестал бы значить «продолжить».
-      event.preventDefault()
-      onRequestClose()
-    }}>
-      <aside className={`drawer drawer--split${className ? ` drawer--${className}` : ''}`} onMouseDown={(event) => event.stopPropagation()}>
-        {content}
-      </aside>
-    </div>
+    <DrawerLayer ariaLabel={ariaLabel} instant={instant} onRequestClose={onRequestClose} className={`drawer drawer--split${className ? ` drawer--${className}` : ''}`}>
+      {content}
+    </DrawerLayer>
   )
 }

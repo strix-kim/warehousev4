@@ -52,7 +52,7 @@
 .form-success { display: flex; align-items: center; gap: 6px; margin: 0; padding: 9px 10px; border-radius: var(--r-sm); color: var(--ok); background: var(--ok-bg); font-size: 12px; line-height: 1.45; }
 .list-export-error { display: flex; align-items: center; gap: 7px; margin: 12px 14px 0; }
 
-.reservation-drawer { width: min(640px, 100%); height: calc(100dvh / var(--app-zoom)); display: flex; flex-direction: column; padding: 0; overflow: hidden; animation-duration: .18s; backface-visibility: hidden; }
+.reservation-drawer { width: min(640px, 100%); height: calc(100dvh / var(--app-zoom)); display: flex; flex-direction: column; padding: 0; overflow: hidden; backface-visibility: hidden; }
 .reservation-drawer__top { flex: 0 0 auto; padding: 28px 30px 0; }
 .reservation-drawer__body { min-height: 0; flex: 1 1 auto; padding: 0 30px 18px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .reservation-drawer__footer { position: relative; z-index: 1; flex: 0 0 auto; padding: 15px 30px max(18px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(255,255,255,.98); box-shadow: 0 -10px 28px rgba(15,17,21,.07); }

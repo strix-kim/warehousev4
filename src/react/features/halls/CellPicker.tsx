@@ -1,5 +1,6 @@
 import { UserPlus } from 'lucide-react'
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { m } from 'motion/react'
 import { createPortal } from 'react-dom'
 import type { HallPlanEditor } from './useHallPlanEditor'
 import { EmployeePicker } from '../../components/EmployeePicker'
@@ -53,10 +54,13 @@ export function CellPicker({ anchor, exclude, editor, onPick, onHire, onClose }:
   usePopoverLayer(true, onClose, [popoverRef, anchorRef])
 
   return createPortal(
-    <div
+    <m.div
       ref={popoverRef}
       className="hall-cell-picker"
       style={{ top: position.top, left: position.left, width: position.width }}
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.14, ease: 'easeOut' }}
     >
       {/* «Наём» стоит НАД поиском, а не строкой в выдаче: выдача — это список
           людей, и внешний оператор, притворяющийся сотрудником, читался бы как
@@ -100,7 +104,7 @@ export function CellPicker({ anchor, exclude, editor, onPick, onHire, onClose }:
           )
         }}
       />
-    </div>,
+    </m.div>,
     // Целью портала body быть перестал (с21, Ш3): ТВ-витрину открывают во весь
     // экран, а в полноэкранном режиме браузер рисует ТОЛЬКО поддерево
     // fullscreenElement — панель, оставшаяся в body, там просто не появилась бы.

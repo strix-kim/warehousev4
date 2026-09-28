@@ -12,6 +12,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
+import { AnimatePresence } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ActionMenu } from '../../components/ActionMenu'
@@ -23,6 +24,7 @@ import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { formatDateTime, formatEventDate, monthRange, parseDateValue } from '../../lib/date'
 import { useArmedAction } from '../../lib/useArmedAction'
+import { DrawerLayer } from '../../components/DrawerLayer'
 import { useModalLayer } from '../../lib/useModalLayer'
 import {
   buildSavedListComposition,
@@ -450,7 +452,9 @@ export function ListsPage() {
         )}
       </section>
 
-      {selected && <ReservationDrawer list={selected} onClose={() => setSelected(null)} onChanged={() => setReloadKey((current) => current + 1)} />}
+      <AnimatePresence initial={false}>
+        {selected && <ReservationDrawer key={selected.id} list={selected} onClose={() => setSelected(null)} onChanged={() => setReloadKey((current) => current + 1)} />}
+      </AnimatePresence>
     </>
   )
 }
@@ -498,8 +502,7 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   }
 
   return (
-    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Детали списка', 'Ro‘yxat tafsilotlari')} onMouseDown={onClose}>
-      <aside className="drawer reservation-drawer" onMouseDown={(event) => event.stopPropagation()}>
+    <DrawerLayer ariaLabel={tr('Детали списка', 'Ro‘yxat tafsilotlari')} onRequestClose={onClose} className="drawer reservation-drawer">
         <div className="reservation-drawer__top">
           <div className="drawer__header">
             <div><p className="eyebrow">{tr('Детали списка', 'Ro‘yxat tafsilotlari')}</p><h2>{list.name}</h2><p className="drawer__lead">{tr('Состав списка и реквизиты документа', 'Ro‘yxat tarkibi va hujjat rekvizitlari')}</p></div>
@@ -570,7 +573,6 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
           )}
           </section>
         </div>
-      </aside>
-    </div>
+    </DrawerLayer>
   )
 }

@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
+import { AnimatePresence } from 'motion/react'
 import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import {
   createEquipment,
@@ -370,15 +371,18 @@ export function EquipmentCreatePage() {
         </button>
       </header>
 
-      {guard.isBlocked && (
-        <UnsavedPrompt
-          message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
-          stayLabel={tr('Остаться', 'Qolish')}
-          leaveLabel={tr('Уйти без сохранения', 'Saqlamasdan chiqish')}
-          onStay={guard.stay}
-          onLeave={guard.leave}
-        />
-      )}
+      <AnimatePresence>
+        {guard.isBlocked && (
+          <UnsavedPrompt
+            key="unsaved"
+            message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+            stayLabel={tr('Остаться', 'Qolish')}
+            leaveLabel={tr('Уйти без сохранения', 'Saqlamasdan chiqish')}
+            onStay={guard.stay}
+            onLeave={guard.leave}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="equipment-form-layout">
         <section className="data-panel equipment-form">

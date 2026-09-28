@@ -1,4 +1,5 @@
 import { ArrowLeft, Check, Copy, LayoutGrid, MonitorPlay, Pencil, Plus, Presentation } from 'lucide-react'
+import { AnimatePresence, m } from 'motion/react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { HallMatrix } from './HallMatrix'
@@ -6,6 +7,7 @@ import { HallPlanMetaDrawer } from './HallPlanMetaDrawer'
 import { buildPlanText } from './planText'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState, RetryButton } from '../../components/ErrorState'
+import { useCountUp } from '../../lib/useCountUp'
 import { copyText } from '../../lib/clipboard'
 import { useHallPlanEditor, type HallPlanEditor } from './useHallPlanEditor'
 import { formatPlanPeriod } from './types'
@@ -123,8 +125,8 @@ export function HallPlanPage() {
           места нет. На печати полоса снимается display: contents — правила
           листа адресованы .hall-counts и .hall-free, и они остаются на месте. */}
       <div className="hall-summary">
-        <PlanCounts counts={editor.counts} />
-        <FreeEmployees editor={editor} />
+        <PlanCounts counts={editor.counts} live={editor.freshAssign !== null} />
+        <FreeEmployees editor={editor} live={editor.freshAssign !== null} />
       </div>
 
       <section className="data-panel data-panel--halls">
@@ -151,18 +153,21 @@ export function HallPlanPage() {
         <HallMatrix editor={editor} />
       </section>
 
-      {isMetaOpen && (
-        <HallPlanMetaDrawer
-          plan={plan}
-          onClose={() => setMetaOpen(false)}
-          onSubmit={async (input) => {
-            // Отказ наверх не глотаем: его показывает сам дровер и оставляет
-            // форму открытой с набранными полями.
-            await editor.updateMeta(input)
-            setMetaOpen(false)
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {isMetaOpen && (
+          <HallPlanMetaDrawer
+            key="meta"
+            plan={plan}
+            onClose={() => setMetaOpen(false)}
+            onSubmit={async (input) => {
+              // Отказ наверх не глотаем: его показывает сам дровер и оставляет
+              // форму открытой с набранными полями.
+              await editor.updateMeta(input)
+              setMetaOpen(false)
+            }}
+          />
+        )}
+      </AnimatePresence>
     </>
   )
 }
@@ -301,8 +306,15 @@ function SaveState({ state, savedAt, errorText, onRetry }: {
 // «Наём» стоит отдельным пунктом и только при N > 0: это не люди бригады, а
 // сколько внешних операторов ещё предстоит взять. Пока слотов нет, лишнего
 // нуля в строке быть не должно.
-function PlanCounts({ counts }: { counts: { technicians: number; operators: number; others: number; totalPeople: number; hired: number } }) {
+function PlanCounts({ counts, live }: { counts: { technicians: number; operators: number; others: number; totalPeople: number; hired: number }; live: boolean }) {
   const { tr, locale } = useLanguage()
+  // Докрутка (180 мс, lib/useCountUp) — только пока висит отметка свежего
+  // назначения; поллинг и первая загрузка меняют числа сразу.
+  const totalPeople = useCountUp(counts.totalPeople, live)
+  const technicians = useCountUp(counts.technicians, live)
+  const operators = useCountUp(counts.operators, live)
+  const others = useCountUp(counts.others, live)
+  const hired = useCountUp(counts.hired, live)
 
   return (
     // Число над подписью, а не «7 видеоинженеров»: на единице выходило
@@ -311,16 +323,16 @@ function PlanCounts({ counts }: { counts: { technicians: number; operators: numb
     // сводку формой, которая не склоняется вовсе: подпись капсом — это имя
     // столбца, а не часть фразы. Так же подписаны счётчики ТВ.
     <div className="hall-counts">
-      <div className="hall-count"><strong>{counts.totalPeople.toLocaleString(locale)}</strong><span>{tr('Людей', 'Odamlar')}</span></div>
-      <div className="hall-count"><strong>{counts.technicians.toLocaleString(locale)}</strong><span>{tr('Видеоинженеры', 'Videoinjenerlar')}</span></div>
-      <div className="hall-count"><strong>{counts.operators.toLocaleString(locale)}</strong><span>{tr('Операторы', 'Operatorlar')}</span></div>
-      {counts.others > 0 && <div className="hall-count"><strong>{counts.others.toLocaleString(locale)}</strong><span>{tr('Прочие', 'Boshqalar')}</span></div>}
+      <div className="hall-count"><strong>{totalPeople.toLocaleString(locale)}</strong><span>{tr('Людей', 'Odamlar')}</span></div>
+      <div className="hall-count"><strong>{technicians.toLocaleString(locale)}</strong><span>{tr('Видеоинженеры', 'Videoinjenerlar')}</span></div>
+      <div className="hall-count"><strong>{operators.toLocaleString(locale)}</strong><span>{tr('Операторы', 'Operatorlar')}</span></div>
+      {counts.others > 0 && <div className="hall-count"><strong>{others.toLocaleString(locale)}</strong><span>{tr('Прочие', 'Boshqalar')}</span></div>}
       {/* «Наём» отделён чертой: это не люди бригады, а сколько ещё брать со
           стороны, и число у него цвета предупреждения. */}
       {counts.hired > 0 && (
         <>
           <span className="hall-counts__sep" aria-hidden="true" />
-          <div className="hall-count hall-count--hire"><strong>{counts.hired.toLocaleString(locale)}</strong><span>{tr('Наём', 'Yollash')}</span></div>
+          <div className="hall-count hall-count--hire"><strong>{hired.toLocaleString(locale)}</strong><span>{tr('Наём', 'Yollash')}</span></div>
         </>
       )}
     </div>
@@ -337,7 +349,7 @@ const VISIBLE_FREE = 6
 //
 // Свободные считаются от ВСЕХ сотрудников, а не от тех, кого видно в матрице:
 // список кандидатов ровно тот же, что отдаёт пикер, и разойтись они не могут.
-function FreeEmployees({ editor }: { editor: HallPlanEditor }) {
+function FreeEmployees({ editor, live }: { editor: HallPlanEditor; live: boolean }) {
   const { tr, locale } = useLanguage()
   const [isExpanded, setExpanded] = useState(false)
 
@@ -346,6 +358,9 @@ function FreeEmployees({ editor }: { editor: HallPlanEditor }) {
     [editor.candidates, editor.planCountByEmployee],
   )
 
+  // Число докручивается, как счётчики шапки; хук стоит ДО ранних return.
+  const shownFree = useCountUp(free.length, live)
+
   // Кандидаты ещё в пути — строки нет вовсе: «Свободных нет» на недогруженном
   // списке было бы враньём, а скелет ради одной серой строки избыточен.
   if (editor.candidatesState !== 'ready') return null
@@ -353,6 +368,7 @@ function FreeEmployees({ editor }: { editor: HallPlanEditor }) {
   const all = free.map(employeeDisplayName)
   const names = all.join(', ')
   const count = free.length.toLocaleString(locale)
+  const shownCount = shownFree.toLocaleString(locale)
 
   if (free.length === 0) return <p className="hall-free">{tr('Свободных нет', 'Bo‘sh xodim yo‘q')}</p>
 
@@ -368,8 +384,27 @@ function FreeEmployees({ editor }: { editor: HallPlanEditor }) {
   return (
     <p className="hall-free" title={names}>
       <span className="hall-free__screen">
-        <span>{tr('Свободны', 'Bo‘sh')}: <strong>{count}</strong></span>
-        {shown.map((employee) => <span className="chip" key={employee.id}>{employeeDisplayName(employee)}</span>)}
+        <span>{tr('Свободны', 'Bo‘sh')}: <strong>{shownCount}</strong></span>
+        {/* Уход назначенного чипа — только от действия пользователя: live едет в
+            exit-вариант через custom (уходящий элемент своих новых пропсов не
+            получает). Вход новых чипов не анимируется. */}
+        <AnimatePresence initial={false} custom={live}>
+          {shown.map((employee) => (
+            <m.span
+              className="chip"
+              key={employee.id}
+              custom={live}
+              variants={{
+                exit: (isLive: boolean) => isLive
+                  ? { opacity: 0, scale: 0.92, transition: { duration: 0.16, ease: 'easeOut' } }
+                  : { opacity: 0, transition: { duration: 0 } },
+              }}
+              exit="exit"
+            >
+              {employeeDisplayName(employee)}
+            </m.span>
+          ))}
+        </AnimatePresence>
         {rest > 0 && (
           <button type="button" className="hall-free__more" onClick={() => setExpanded(true)}>
             {tr(`и ещё ${rest}`, `va yana ${rest}`)}

@@ -1,4 +1,5 @@
 import { Save } from 'lucide-react'
+import { AnimatePresence } from 'motion/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ErrorState } from '../../components/ErrorState'
@@ -500,7 +501,10 @@ export function ListEditorPage() {
         />
       </div>
 
-      {previewGroup && <CatalogPreviewDrawer group={previewGroup} onClose={() => setPreviewGroup(null)} onAdd={() => { addGroup(previewGroup); setPreviewGroup(null) }} />}
+      {/* AnimatePresence держит превью в DOM, пока оно уезжает (DrawerLayer). */}
+      <AnimatePresence>
+        {previewGroup && <CatalogPreviewDrawer key="preview" group={previewGroup} onClose={() => setPreviewGroup(null)} onAdd={() => { addGroup(previewGroup); setPreviewGroup(null) }} />}
+      </AnimatePresence>
 
       {/* Плашка и лист — последними и вне .editor-grid/.data-panel: у тех анимация
           с transform, и position: fixed уехал бы вместе с панелью. Счётчик единиц

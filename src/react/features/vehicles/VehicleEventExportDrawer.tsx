@@ -1,6 +1,8 @@
 import { FileSpreadsheet, X } from 'lucide-react'
+import { AnimatePresence } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { type VehicleWithDrivers } from './types'
+import { DrawerLayer } from '../../components/DrawerLayer'
 import { EventDocumentFields } from '../../components/EventDocumentFields'
 import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import { todayDateValue } from '../../lib/date'
@@ -76,26 +78,22 @@ export function VehicleEventExportDrawer({ vehicles, onClose, onExport }: {
   }
 
   return (
-    <div className="drawer-layer" role="dialog" aria-modal="true" aria-label={tr('Список на мероприятие', 'Tadbir uchun ro‘yxat')} onMouseDown={(event) => {
-      // Без preventDefault нажатие на подложку увело бы фокус в body уже ПОСЛЕ
-      // того, как плашка его забрала, — и Enter перестал бы значить «продолжить».
-      event.preventDefault()
-      requestClose()
-    }}>
-      <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="drawer__header">
-          <div>
-            <p className="eyebrow">{tr('Документ', 'Hujjat')}</p>
-            <h2>{tr('Список на мероприятие', 'Tadbir uchun ro‘yxat')}</h2>
-            <p className="drawer__lead">{tr('Машин', 'Mashinalar')}: {vehicles.length.toLocaleString(locale)}</p>
-          </div>
-          <div className="drawer__header-actions">
-            <button autoFocus className="icon-button icon-button--bordered" onClick={requestClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
-          </div>
+    <DrawerLayer ariaLabel={tr('Список на мероприятие', 'Tadbir uchun ro‘yxat')} onRequestClose={requestClose} className="drawer">
+      <div className="drawer__header">
+        <div>
+          <p className="eyebrow">{tr('Документ', 'Hujjat')}</p>
+          <h2>{tr('Список на мероприятие', 'Tadbir uchun ro‘yxat')}</h2>
+          <p className="drawer__lead">{tr('Машин', 'Mashinalar')}: {vehicles.length.toLocaleString(locale)}</p>
         </div>
+        <div className="drawer__header-actions">
+          <button autoFocus className="icon-button icon-button--bordered" onClick={requestClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+        </div>
+      </div>
 
+      <AnimatePresence>
         {isPrompting && (
           <UnsavedPrompt
+            key="unsaved"
             message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
             stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
             leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
@@ -103,39 +101,39 @@ export function VehicleEventExportDrawer({ vehicles, onClose, onExport }: {
             onLeave={confirmClose}
           />
         )}
+      </AnimatePresence>
 
-        {/* onBlur ловим на обёртке: React пускает его вверх по дереву, и одного
-            обработчика хватает на все поля блока — «человек уже потрогал форму». */}
-        <div onBlur={() => setNameTouched(true)}>
-          <EventDocumentFields value={meta} onChange={setMeta} nameError={nameTouched && nameEmpty} rangeError={rangeError} />
-        </div>
+      {/* onBlur ловим на обёртке: React пускает его вверх по дереву, и одного
+          обработчика хватает на все поля блока — «человек уже потрогал форму». */}
+      <div onBlur={() => setNameTouched(true)}>
+        <EventDocumentFields value={meta} onChange={setMeta} nameError={nameTouched && nameEmpty} rangeError={rangeError} />
+      </div>
 
-        <div className="event-export-summary">
-          {withoutDriver.length === 0
-            ? <strong>{tr('Водители есть у всех машин', 'Hamma mashinada haydovchi bor')}</strong>
-            : <>
-              <strong>{tr('Без водителя', 'Haydovchisiz')}: {withoutDriver.length.toLocaleString(locale)}</strong>
-              <small>{withoutDriver.map((vehicle) => vehicle.plate_number).join(', ')}</small>
-            </>}
-        </div>
+      <div className="event-export-summary">
+        {withoutDriver.length === 0
+          ? <strong>{tr('Водители есть у всех машин', 'Hamma mashinada haydovchi bor')}</strong>
+          : <>
+            <strong>{tr('Без водителя', 'Haydovchisiz')}: {withoutDriver.length.toLocaleString(locale)}</strong>
+            <small>{withoutDriver.map((vehicle) => vehicle.plate_number).join(', ')}</small>
+          </>}
+      </div>
 
-        <div className="event-export-actions">
-          <button className="button button--primary button--wide" disabled={!onExport || !canExport || phase.kind === 'preparing'} onClick={() => void runExport()}>
-            <FileSpreadsheet size={17} /> {tr('Скачать Excel', 'Excel yuklab olish')}
-          </button>
-          {phase.kind === 'preparing' && (
-            <small className="field-hint">{tr('Готовим карточки водителей…', 'Haydovchilar kartalari tayyorlanmoqda…')}</small>
-          )}
-          {phase.kind === 'done' && (
-            <small className="field-hint">{tr('Файл скачан', 'Fayl yuklab olindi')}</small>
-          )}
-          {phase.kind === 'error' && (
-            <small className="field-hint field-hint--error">
-              {tr('Не удалось собрать файл. Повторите попытку.', 'Faylni yig‘ib bo‘lmadi. Qayta urinib ko‘ring.')}
-            </small>
-          )}
-        </div>
-      </aside>
-    </div>
+      <div className="event-export-actions">
+        <button className="button button--primary button--wide" disabled={!onExport || !canExport || phase.kind === 'preparing'} onClick={() => void runExport()}>
+          <FileSpreadsheet size={17} /> {tr('Скачать Excel', 'Excel yuklab olish')}
+        </button>
+        {phase.kind === 'preparing' && (
+          <small className="field-hint">{tr('Готовим карточки водителей…', 'Haydovchilar kartalari tayyorlanmoqda…')}</small>
+        )}
+        {phase.kind === 'done' && (
+          <small className="field-hint">{tr('Файл скачан', 'Fayl yuklab olindi')}</small>
+        )}
+        {phase.kind === 'error' && (
+          <small className="field-hint field-hint--error">
+            {tr('Не удалось собрать файл. Повторите попытку.', 'Faylni yig‘ib bo‘lmadi. Qayta urinib ko‘ring.')}
+          </small>
+        )}
+      </div>
+    </DrawerLayer>
   )
 }

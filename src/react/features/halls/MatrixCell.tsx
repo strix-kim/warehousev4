@@ -1,4 +1,5 @@
 import { Link2, Plus, X } from 'lucide-react'
+import { m } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { CellPicker } from './CellPicker'
 import { cellKeyOf, hallPersonKeyOf, type HallPlanEditor } from './useHallPlanEditor'
@@ -31,6 +32,9 @@ export function MatrixCell({ hallId, positionId, positionName, positionRole, hal
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const armed = useArmedAction()
   const isBusy = editor.addingCell === cellKeyOf({ hallId, positionId })
+  // Пользователь только что назначил сюда (см. freshAssign в редакторе): имя
+  // выезжает и клетка подсвечивается. Поллинг и первая загрузка отметки не ставят.
+  const isFresh = editor.freshAssign?.cell === cellKeyOf({ hallId, positionId })
 
   // Слот узнаём по отсутствию человека, а не по is_external: равенство держит
   // CHECK базы, а TS сужает тип именно по null — в ветке человека ниже
@@ -96,7 +100,7 @@ export function MatrixCell({ hallId, positionId, positionName, positionRole, hal
 
   if (cell.employee_id === null) {
     return (
-      <div className={`hall-matrix__cell ${armed.armed ? 'is-armed' : ''}`}>
+      <div className={`hall-matrix__cell ${armed.armed ? 'is-armed' : ''} ${isFresh ? 'is-fresh' : ''}`}>
         {/* Чип с пунктиром, а не имя: слот обязан читаться иначе, чем человек, —
             иначе «Наём» в клетке принимают за фамилию. Клик открывает тот же
             пикер: поставить человека вместо слота — обычный ход планирования.
@@ -145,7 +149,7 @@ export function MatrixCell({ hallId, positionId, positionName, positionRole, hal
   const linkHint = tr(`В этом зале также: ${linkedTo.join(', ')}`, `Bu zalda yana: ${linkedTo.join(', ')}`)
 
   return (
-    <div className={`hall-matrix__cell ${linkedTo.length > 0 ? 'is-linked' : ''} ${armed.armed ? 'is-armed' : ''}`}>
+    <div className={`hall-matrix__cell ${linkedTo.length > 0 ? 'is-linked' : ''} ${armed.armed ? 'is-armed' : ''} ${isFresh ? 'is-fresh' : ''}`}>
       {/* Имя занимает всю клетку и само же открывает замену: отдельной кнопки
           «заменить» нет — клик по человеку в расстановке всегда означает
           «поставить сюда другого». */}
@@ -164,10 +168,19 @@ export function MatrixCell({ hallId, positionId, positionName, positionRole, hal
             <Link2 size={12} aria-hidden="true" />
           </span>
         )}
-        <span className="hall-matrix__person-name">
+        {/* key по человеку: при замене имя монтируется заново и играет вход.
+            initial только у свежей клетки — иначе переразметка от поллинга
+            тоже «выезжала» бы. */}
+        <m.span
+          key={cell.employee_id}
+          className="hall-matrix__person-name"
+          initial={isFresh ? { opacity: 0, scale: 0.92 } : false}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.16, ease: 'easeOut' }}
+        >
           <span className="hall-matrix__first">{isBusy ? tr('Меняем…', 'O‘zgartirilmoqda…') : first}</span>
           {!isBusy && last && <span className="hall-matrix__last">{last}</span>}
-        </span>
+        </m.span>
         {planCount > 1 && (
           // ×N — по ВСЕМУ плану, в отличие от скрепки: страховка на четыре зала
           // это одна фамилия в четырёх клетках разных залов.

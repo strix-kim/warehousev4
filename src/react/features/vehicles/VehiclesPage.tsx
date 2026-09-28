@@ -1,4 +1,5 @@
 import { CarFront, FileSpreadsheet, Plus, Search, X } from 'lucide-react'
+import { AnimatePresence } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
@@ -378,8 +379,12 @@ export function VehiclesPage() {
         </div>
       )}
 
-      {openCard && <VehicleDrawer vehicle={openCard} photoUrl={photoUrls.get(openCard.id)} onClose={closeVehicle} />}
-      {isExportOpen && <VehicleEventExportDrawer vehicles={chosen} onClose={() => setIsExportOpen(false)} onExport={exportEventList} />}
+      <AnimatePresence>
+        {openCard && <VehicleDrawer key="profile" vehicle={openCard} photoUrl={photoUrls.get(openCard.id)} onClose={closeVehicle} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isExportOpen && <VehicleEventExportDrawer key="export" vehicles={chosen} onClose={() => setIsExportOpen(false)} onExport={exportEventList} />}
+      </AnimatePresence>
     </>
   )
 }

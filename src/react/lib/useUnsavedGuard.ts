@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { useIsPresent } from 'motion/react'
 import { useBlocker, type BlockerFunction } from 'react-router-dom'
 import { registerUnsavedWork } from './unsavedRegistry'
 
@@ -14,6 +15,11 @@ import { registerUnsavedWork } from './unsavedRegistry'
 // active, и при двух смонтированных роутер спрашивает только последний, а
 // первый молча не работает (в разработке — предупреждение в консоль). Поэтому
 // страница-хозяин дровера защиту не ставит — её ставит сам дровер.
+// Исключение — уход (с39): уезжающий в AnimatePresence дровер ещё смонтирован
+// 160 мс, и на смене модель ↔ карточка блокеров на миг два (то самое
+// предупреждение в разработке). Спрашивается последний — новый, а уходящий
+// гасится ниже: закрытый «без сохранения» дровер ещё держит грязную форму и
+// иначе перехватил бы первый переход после закрытия.
 
 // Закрытие и перезагрузка вкладки. Текст диалога свой у каждого браузера,
 // задать его нельзя.
@@ -88,6 +94,8 @@ export function useNavigationGuard(active: boolean) {
 }
 
 export function useUnsavedGuard(active: boolean) {
-  useUnloadWarning(active)
-  return useNavigationGuard(active)
+  // Вне AnimatePresence useIsPresent всегда true.
+  const isPresent = useIsPresent()
+  useUnloadWarning(active && isPresent)
+  return useNavigationGuard(active && isPresent)
 }

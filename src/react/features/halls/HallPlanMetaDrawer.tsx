@@ -1,8 +1,10 @@
 import { CalendarDays, CircleAlert, Minus, Plus, Save, X } from 'lucide-react'
+import { AnimatePresence } from 'motion/react'
 import { useState } from 'react'
 import { hallPlanErrorText, type HallPlanInput } from './api'
 import type { HallPlan } from './types'
 import { AppDatePicker } from '../../components/AppDatePicker'
+import { DrawerLayer } from '../../components/DrawerLayer'
 import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import { useLanguage } from '../../lib/i18n'
 import { useGuardedClose } from '../../lib/useGuardedClose'
@@ -76,31 +78,25 @@ export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
   }
 
   return (
-    <div
-      className="drawer-layer"
-      role="dialog"
-      aria-modal="true"
-      aria-label={isEditing ? tr('Изменить план', 'Rejani o‘zgartirish') : tr('Новый план залов', 'Yangi zallar rejasi')}
-      onMouseDown={(event) => {
-        // Без preventDefault нажатие на подложку увело бы фокус в body уже ПОСЛЕ
-        // того, как плашка его забрала, — и Enter перестал бы значить «продолжить».
-        event.preventDefault()
-        requestClose()
-      }}
+    <DrawerLayer
+      ariaLabel={isEditing ? tr('Изменить план', 'Rejani o‘zgartirish') : tr('Новый план залов', 'Yangi zallar rejasi')}
+      onRequestClose={requestClose}
+      className="drawer"
     >
-      <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="drawer__header">
-          <div>
-            <p className="eyebrow">{tr('Распределение по залам', 'Zallar bo‘yicha taqsimlash')}</p>
-            <h2>{isEditing ? tr('Изменить план', 'Rejani o‘zgartirish') : tr('Новый план', 'Yangi reja')}</h2>
-          </div>
-          <div className="drawer__header-actions">
-            <button className="icon-button icon-button--bordered" onClick={requestClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
-          </div>
+      <div className="drawer__header">
+        <div>
+          <p className="eyebrow">{tr('Распределение по залам', 'Zallar bo‘yicha taqsimlash')}</p>
+          <h2>{isEditing ? tr('Изменить план', 'Rejani o‘zgartirish') : tr('Новый план', 'Yangi reja')}</h2>
         </div>
+        <div className="drawer__header-actions">
+          <button className="icon-button icon-button--bordered" onClick={requestClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+        </div>
+      </div>
 
+      <AnimatePresence>
         {isPrompting && (
           <UnsavedPrompt
+            key="unsaved"
             message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
             stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
             leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
@@ -108,83 +104,83 @@ export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
             onLeave={confirmClose}
           />
         )}
+      </AnimatePresence>
 
-        <label className="field">
-          <span>{tr('Название', 'Nomi')} *</span>
-          <input
-            autoFocus
-            value={draft.name}
-            onChange={(event) => patch({ name: event.target.value })}
-            placeholder={tr('Например, Форум в Hyatt', 'Masalan, Hyatt forumi')}
-          />
-        </label>
+      <label className="field">
+        <span>{tr('Название', 'Nomi')} *</span>
+        <input
+          autoFocus
+          value={draft.name}
+          onChange={(event) => patch({ name: event.target.value })}
+          placeholder={tr('Например, Форум в Hyatt', 'Masalan, Hyatt forumi')}
+        />
+      </label>
 
+      <div className="field">
+        <span><CalendarDays size={13} /> {tr('Дата начала', 'Boshlanish sanasi')}</span>
+        <AppDatePicker
+          value={draft.eventFrom}
+          onChange={(next) => patch({ eventFrom: next })}
+          locale={locale}
+          placeholder={tr('Не указана', 'Ko‘rsatilmagan')}
+          ariaLabel={tr('Дата начала', 'Boshlanish sanasi')}
+          todayLabel={tr('Сегодня', 'Bugun')}
+          clearLabel={tr('Очистить', 'Tozalash')}
+          previousMonthLabel={tr('Предыдущий месяц', 'Oldingi oy')}
+          nextMonthLabel={tr('Следующий месяц', 'Keyingi oy')}
+        />
+      </div>
+
+      <div className="field">
+        <span>{tr('Дата окончания', 'Tugash sanasi')} <small>{tr('Один день — оставьте пустым', 'Bir kun bo‘lsa — bo‘sh qoldiring')}</small></span>
+        <AppDatePicker
+          value={draft.eventTo}
+          onChange={(next) => patch({ eventTo: next })}
+          locale={locale}
+          placeholder={tr('Не указана', 'Ko‘rsatilmagan')}
+          ariaLabel={tr('Дата окончания', 'Tugash sanasi')}
+          todayLabel={tr('Сегодня', 'Bugun')}
+          clearLabel={tr('Очистить', 'Tozalash')}
+          previousMonthLabel={tr('Предыдущий месяц', 'Oldingi oy')}
+          nextMonthLabel={tr('Следующий месяц', 'Keyingi oy')}
+        />
+        {rangeError && <small className="field-hint field-hint--error">{tr('Окончание раньше начала', 'Tugash sanasi boshlanishdan oldin')}</small>}
+        {endWithoutStart && <small className="field-hint field-hint--error">{tr('Сначала укажите дату начала', 'Avval boshlanish sanasini ko‘rsating')}</small>}
+      </div>
+
+      {!isEditing && (
         <div className="field">
-          <span><CalendarDays size={13} /> {tr('Дата начала', 'Boshlanish sanasi')}</span>
-          <AppDatePicker
-            value={draft.eventFrom}
-            onChange={(next) => patch({ eventFrom: next })}
-            locale={locale}
-            placeholder={tr('Не указана', 'Ko‘rsatilmagan')}
-            ariaLabel={tr('Дата начала', 'Boshlanish sanasi')}
-            todayLabel={tr('Сегодня', 'Bugun')}
-            clearLabel={tr('Очистить', 'Tozalash')}
-            previousMonthLabel={tr('Предыдущий месяц', 'Oldingi oy')}
-            nextMonthLabel={tr('Следующий месяц', 'Keyingi oy')}
-          />
-        </div>
-
-        <div className="field">
-          <span>{tr('Дата окончания', 'Tugash sanasi')} <small>{tr('Один день — оставьте пустым', 'Bir kun bo‘lsa — bo‘sh qoldiring')}</small></span>
-          <AppDatePicker
-            value={draft.eventTo}
-            onChange={(next) => patch({ eventTo: next })}
-            locale={locale}
-            placeholder={tr('Не указана', 'Ko‘rsatilmagan')}
-            ariaLabel={tr('Дата окончания', 'Tugash sanasi')}
-            todayLabel={tr('Сегодня', 'Bugun')}
-            clearLabel={tr('Очистить', 'Tozalash')}
-            previousMonthLabel={tr('Предыдущий месяц', 'Oldingi oy')}
-            nextMonthLabel={tr('Следующий месяц', 'Keyingi oy')}
-          />
-          {rangeError && <small className="field-hint field-hint--error">{tr('Окончание раньше начала', 'Tugash sanasi boshlanishdan oldin')}</small>}
-          {endWithoutStart && <small className="field-hint field-hint--error">{tr('Сначала укажите дату начала', 'Avval boshlanish sanasini ko‘rsating')}</small>}
-        </div>
-
-        {!isEditing && (
-          <div className="field">
-            <span>{tr('Сколько залов', 'Nechta zal')} <small>{tr('Потом можно добавить ещё', 'Keyin yana qo‘shish mumkin')}</small></span>
-            <div className="hall-count-stepper">
-              <button
-                type="button"
-                onClick={() => setHallCount((current) => Math.max(MIN_HALL_COUNT, current - 1))}
-                disabled={hallCount <= MIN_HALL_COUNT}
-                aria-label={tr('Меньше залов', 'Kamroq zal')}
-              >
-                <Minus size={16} />
-              </button>
-              {/* Число только показывается: ввод с клавиатуры пустил бы в поле
-                  «0» и «100», а границы у количества залов жёсткие. */}
-              <output aria-live="polite">{hallCount}</output>
-              <button
-                type="button"
-                onClick={() => setHallCount((current) => Math.min(MAX_HALL_COUNT, current + 1))}
-                disabled={hallCount >= MAX_HALL_COUNT}
-                aria-label={tr('Больше залов', 'Ko‘proq zal')}
-              >
-                <Plus size={16} />
-              </button>
-            </div>
+          <span>{tr('Сколько залов', 'Nechta zal')} <small>{tr('Потом можно добавить ещё', 'Keyin yana qo‘shish mumkin')}</small></span>
+          <div className="hall-count-stepper">
+            <button
+              type="button"
+              onClick={() => setHallCount((current) => Math.max(MIN_HALL_COUNT, current - 1))}
+              disabled={hallCount <= MIN_HALL_COUNT}
+              aria-label={tr('Меньше залов', 'Kamroq zal')}
+            >
+              <Minus size={16} />
+            </button>
+            {/* Число только показывается: ввод с клавиатуры пустил бы в поле
+                «0» и «100», а границы у количества залов жёсткие. */}
+            <output aria-live="polite">{hallCount}</output>
+            <button
+              type="button"
+              onClick={() => setHallCount((current) => Math.min(MAX_HALL_COUNT, current + 1))}
+              disabled={hallCount >= MAX_HALL_COUNT}
+              aria-label={tr('Больше залов', 'Ko‘proq zal')}
+            >
+              <Plus size={16} />
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
 
-        {errorText && <p className="form-error"><CircleAlert size={15} /> {errorText}</p>}
+      {errorText && <p className="form-error"><CircleAlert size={15} /> {errorText}</p>}
 
-        <button className="button button--primary button--wide" disabled={nameEmpty || isSaving} onClick={() => void save()}>
-          {isEditing ? <><Save size={17} /> {tr('Сохранить', 'Saqlash')}</> : <><Plus size={17} /> {tr('Создать план', 'Reja yaratish')}</>}
-        </button>
-      </aside>
-    </div>
+      <button className="button button--primary button--wide" disabled={nameEmpty || isSaving} onClick={() => void save()}>
+        {isEditing ? <><Save size={17} /> {tr('Сохранить', 'Saqlash')}</> : <><Plus size={17} /> {tr('Создать план', 'Reja yaratish')}</>}
+      </button>
+    </DrawerLayer>
   )
 }

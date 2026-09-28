@@ -163,7 +163,14 @@
 /* Клетка — один человек или пустота. Белая во всех колонках (макет с31):
    принадлежность залу держит шапка с номером, а не тонировка — на восьми
    залах тонированные колонки читались витражом. */
-.hall-matrix__cell { position: relative; display: flex; align-items: stretch; min-width: 0; min-height: 54px; border-top: 1px solid var(--line-2); border-left: 1px solid var(--line-2); background: var(--card); }
+.hall-matrix__cell { position: relative; isolation: isolate; display: flex; align-items: stretch; min-width: 0; min-height: 54px; border-top: 1px solid var(--line-2); border-left: 1px solid var(--line-2); background: var(--card); }
+
+/* Подсветка клетки после назначения (макет с31): красный тинт гаснет за 900 мс.
+   Псевдоэлемент под содержимым (z-index -1, isolation на клетке), а не фон
+   самой клетки: имя ведёт motion, и CSS-анимация на нём перебила бы transform.
+   Глобальный prefers-reduced-motion (06-responsive.css) сжимает её до нуля. */
+.hall-matrix__cell.is-fresh::after { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--red-tint); pointer-events: none; animation: hall-cell-flash .9s ease-out both; }
+@keyframes hall-cell-flash { from { opacity: 1; } to { opacity: 0; } }
 
 /* Пустая клетка целиком кликабельна: она же и вакансия. На экране в ней «+»
    цвета --soft, видимый всегда (решение прораба с36): пустое место — это
@@ -247,7 +254,7 @@
 /* z-index 70 — тот же слой, что у остальных порталов проекта (.app-select__popover,
    .app-date-picker__popover): поповеры не должны перекрывать друг друга через раз.
    Своя подложка нужна инпуту: он висит над матрицей, а не в форме. */
-.hall-cell-picker { position: fixed; z-index: 70; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: var(--shadow-pop); animation: popover-in .16s ease-out; }
+.hall-cell-picker { position: fixed; z-index: 70; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: var(--shadow-pop); }
 .hall-cell-picker .field { margin: 0; }
 /* «Наём» — отдельная строка над поиском, вторичной кнопкой: это альтернатива
    всему списку, а не одна из его строк. Отступ снизу свой — .field в поповере

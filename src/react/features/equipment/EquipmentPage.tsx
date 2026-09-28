@@ -6,7 +6,8 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, m } from 'motion/react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
 import { DataAge } from '../../components/DataAge'
@@ -38,6 +39,8 @@ import { reportAppError } from '../../lib/reportAppError'
 export function EquipmentPage() {
   const navigate = useNavigate()
   const { tr, locale, language } = useLanguage()
+  // layoutId бегунка сегмента уникален на экземпляр страницы.
+  const segmentedThumbId = useId()
   useDocumentTitle(tr('Оборудование', 'Uskunalar'))
   // Статусы — сегментом (макет с31): все варианты видны разом, без попапа.
   // Точка — тон того же словаря, что у бейджа единицы.
@@ -483,14 +486,18 @@ export function EquipmentPage() {
                 )
                 : <kbd className="search-field__key" aria-hidden="true">/</kbd>}
             </label>
-            <div className="segmented" role="group" aria-label={tr('Фильтр по статусу', 'Holat bo‘yicha filtr')}>
+            <m.div className="segmented" layoutScroll role="group" aria-label={tr('Фильтр по статусу', 'Holat bo‘yicha filtr')}>
               {statusSegments.map((segment) => (
                 <button key={segment.value || 'all'} type="button" aria-pressed={availability === segment.value} onClick={() => updateParams({ status: segment.value })}>
+                  {availability === segment.value && (
+                    // Один бегунок на весь сегмент: переезжает в нажатую кнопку (макет: 200 мс).
+                    <m.span className="segmented__thumb" layoutId={segmentedThumbId} transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }} />
+                  )}
                   {segment.tone && <i className={`status-dot status-dot--${segment.tone}`} />}
                   {segment.label}
                 </button>
               ))}
-            </div>
+            </m.div>
           </div>
           <div className="catalog-filters">
             {!isWide && (
@@ -624,8 +631,15 @@ export function EquipmentPage() {
       {/* В каждый момент рисуется ОДИН дровер: карточка единицы поверх модели
           дала бы два модальных слоя с двумя обработчиками Esc. Возврат из
           карточки в модель делает адрес: закрытие item оставляет mbrand/mmodel. */}
+      {/* custom = «какой-то дровер остаётся открытым»: тогда уходящий — часть смены
+          модель ↔ карточка и исчезает мгновенно (DrawerExitCustom), иначе два
+          затемнения наложились бы на 160 мс. Обычное закрытие — custom false,
+          уход играет полностью. Ключ карточки — по id: правка той же записи
+          не перемонтирует слой, другая запись — новый слой. */}
+      <AnimatePresence initial={false} custom={isDrawerOpen}>
       {selected ? (
         <EquipmentDrawer
+          key={`unit-${selected.id}`}
           item={selected}
           onClose={closeItem}
           // Карточка поверх открытой модели — смена содержимого слоя, а не
@@ -642,6 +656,7 @@ export function EquipmentPage() {
         />
       ) : selectedModel ? (
         <EquipmentModelDrawer
+          key={`model-${selectedModel.brand}|${selectedModel.model}`}
           summary={selectedModel}
           reloadKey={reloadKey}
           onClose={closeModel}
@@ -655,6 +670,7 @@ export function EquipmentPage() {
           onUnitsChanged={() => setReloadKey((value) => value + 1)}
         />
       ) : null}
+      </AnimatePresence>
     </>
   )
 }

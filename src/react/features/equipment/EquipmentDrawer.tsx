@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
+import { AnimatePresence } from 'motion/react'
 import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import {
   countEquipmentModelUnits,
@@ -395,15 +396,18 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
         <button className="button button--secondary" onClick={() => { setIsEditing(true); setEditSuccess('') }}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>
       )}
     >
-      {isPrompting && (
-        <UnsavedPrompt
-          message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
-          stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
-          leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
-          onStay={keepEditing}
-          onLeave={confirmClose}
-        />
-      )}
+      <AnimatePresence>
+        {isPrompting && (
+          <UnsavedPrompt
+            key="unsaved"
+            message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+            stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
+            leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
+            onStay={keepEditing}
+            onLeave={confirmClose}
+          />
+        )}
+      </AnimatePresence>
       <span className={`badge badge--${status.tone}`}><i />{status.label}</span>
       {refreshState !== 'fresh' && (
         <p className="form-error"><CircleAlert size={15} /> {refreshState === 'missing'

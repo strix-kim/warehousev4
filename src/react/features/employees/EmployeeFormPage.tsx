@@ -1,4 +1,5 @@
 import { ArrowLeft, CheckCircle2, CircleAlert, Save, TriangleAlert, UserRound } from 'lucide-react'
+import { AnimatePresence } from 'motion/react'
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createEmployee, employeeSaveErrorText, fetchEmployeeById, fetchEmployeeFiles, findNamesakes, getSignedUrls, setEmployeeDocumentPhoto, updateEmployee, uploadEmployeeFile, type EmployeeInput, type EmployeeNamesake } from './api'
@@ -397,15 +398,18 @@ export function EmployeeFormPage() {
         </button>
       </header>
 
-      {guard.isBlocked && (
-        <UnsavedPrompt
-          message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
-          stayLabel={tr('Остаться', 'Qolish')}
-          leaveLabel={tr('Уйти без сохранения', 'Saqlamasdan chiqish')}
-          onStay={guard.stay}
-          onLeave={guard.leave}
-        />
-      )}
+      <AnimatePresence>
+        {guard.isBlocked && (
+          <UnsavedPrompt
+            key="unsaved"
+            message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+            stayLabel={tr('Остаться', 'Qolish')}
+            leaveLabel={tr('Уйти без сохранения', 'Saqlamasdan chiqish')}
+            onStay={guard.stay}
+            onLeave={guard.leave}
+          />
+        )}
+      </AnimatePresence>
 
       <section className="data-panel employee-form">
         <div className="form-section">

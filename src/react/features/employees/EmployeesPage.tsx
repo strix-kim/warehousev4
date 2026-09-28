@@ -1,4 +1,5 @@
 import { BriefcaseBusiness, FileSpreadsheet, Plus, Search, X } from 'lucide-react'
+import { AnimatePresence } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchEmployeeList, fetchEmployeePhotos, fetchEmployeesByIds, getSignedUrls, pickDocumentPhoto, readCachedEmployeeList, readCachedEmployeeListMeta, readCachedEmployeePhotos, type EmployeePhotoRef } from './api'
@@ -435,8 +436,12 @@ export function EmployeesPage() {
         </div>
       )}
 
-      {openCard && <EmployeeDrawer employee={openCard} photoUrl={openCardPhotoUrl} onClose={closeEmployee} onDocumentPhotoChange={(fileId) => applyDocumentPhoto(openCard.id, fileId)} />}
-      {isExportOpen && <EmployeeEventExportDrawer employees={chosen} photos={photos} photosKnown={photosKnown} onClose={() => setIsExportOpen(false)} onExport={exportEventList} />}
+      <AnimatePresence>
+        {openCard && <EmployeeDrawer key="profile" employee={openCard} photoUrl={openCardPhotoUrl} onClose={closeEmployee} onDocumentPhotoChange={(fileId) => applyDocumentPhoto(openCard.id, fileId)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isExportOpen && <EmployeeEventExportDrawer key="export" employees={chosen} photos={photos} photosKnown={photosKnown} onClose={() => setIsExportOpen(false)} onExport={exportEventList} />}
+      </AnimatePresence>
     </>
   )
 }

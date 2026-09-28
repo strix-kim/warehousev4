@@ -1,5 +1,6 @@
 import { CircleAlert, Copy, Ellipsis, PanelsTopLeft, Plus, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { AnimatePresence } from 'motion/react'
 import { useNavigate } from 'react-router-dom'
 import { createHallPlan, deleteHallPlan, duplicateHallPlan, fetchHallPlans, readCachedHallPlans, readCachedHallPlansMeta, type HallPlanInput, type HallPlanWithHalls } from './api'
 import { HallPlanMetaDrawer } from './HallPlanMetaDrawer'
@@ -235,7 +236,9 @@ export function HallPlansPage() {
         )}
       </section>
 
-      {isCreateOpen && <HallPlanMetaDrawer onClose={() => setCreateOpen(false)} onSubmit={createPlan} />}
+      <AnimatePresence>
+        {isCreateOpen && <HallPlanMetaDrawer key="create" onClose={() => setCreateOpen(false)} onSubmit={createPlan} />}
+      </AnimatePresence>
     </>
   )
 }
