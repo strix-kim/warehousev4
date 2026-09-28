@@ -1,20 +1,42 @@
-/* Вопрос «уйти без сохранения?» (UnsavedPrompt) — родня плашки черновика, но
-   красная: это не сведение, а остановленный переход. */
-.unsaved-prompt { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding: 12px 14px; border: 1px solid var(--bad); border-radius: var(--r-md); background: var(--bad-bg); }
-.unsaved-prompt > svg { flex: 0 0 auto; color: var(--bad); }
-.unsaved-prompt > strong { flex: 1 1 auto; min-width: 0; font-size: 13px; }
+/* Вопрос «уйти без сохранения?» (UnsavedPrompt) — макет с31, .guard: тёмная
+   плашка, а не красная — это вопрос, а не ошибка. Жёлтая точка слева заменяет
+   значок. Движение (180 мс сверху вниз) ведёт motion — CSS-анимаций здесь нет. */
+.unsaved-prompt { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 18px; padding: 12px 12px 12px 16px; border-radius: 14px; color: var(--on-night); background: var(--ink); }
+.unsaved-prompt :focus-visible { outline-color: #fff; }
+.unsaved-prompt__text { flex: 1 1 160px; min-width: 160px; display: flex; align-items: center; gap: 10px; margin: 0; font: 600 14px/1.3 var(--f-text); }
+.unsaved-prompt__text::before { content: ''; flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--warn-night); }
+.unsaved-prompt__text strong { min-width: 0; font-weight: 600; }
 .unsaved-prompt__actions { display: flex; flex: 0 0 auto; gap: 8px; }
+/* Размер — .btn--sm макета: плашка — строка поверх формы, а не панель действий. */
+.unsaved-prompt__actions .button { min-height: 32px; padding: 0 11px; border-radius: 9px; font-size: 13px; font-weight: 600; }
+.unsaved-prompt__stay { color: var(--ink); background: #fff; }
+.unsaved-prompt__stay:not(:disabled):hover { background: var(--line-2); }
+/* Рамка #4A2A33 — дословно из макета: тёмно-малиновая, в палитре токена нет. */
+.unsaved-prompt__leave { color: var(--bad-night); background: transparent; border-color: #4A2A33; }
+.unsaved-prompt__leave:not(:disabled):hover { background: rgba(255,128,149,.1); }
 /* В дровере полезной ширины ~420px: вопрос и две длинные кнопки в строку не
    влезают — текст сжимался бы в столбик по слову. Кнопки уходят второй строкой
    и сами переносятся друг под друга, если не помещаются рядом. */
-.drawer .unsaved-prompt { flex-wrap: wrap; }
 .drawer .unsaved-prompt__actions { flex: 1 1 100%; flex-wrap: wrap; }
 .drawer .unsaved-prompt__actions .button { flex: 1 1 auto; }
+
+@media (max-width: 820px) {
+  /* Тач-цель от 44 px (A-11 макета): мелкая кнопка .btn--sm — только под мышь. */
+  .unsaved-prompt__actions .button { min-height: 44px; font-size: 14px; }
+}
 
 @media (max-width: 700px) {
   /* Две длинные подписи рядом с текстом на телефон не помещаются — кнопки
      уходят под вопрос столбиком, во всю ширину. */
-  .unsaved-prompt { flex-wrap: wrap; }
   .unsaved-prompt__actions { flex: 1 1 100%; flex-direction: column; }
   .unsaved-prompt__actions .button { width: 100%; }
 }
+
+/* Телефон (< 600 px, выбор — в JS): тот же вопрос нижним листом, макет с31
+   «Есть несохранённые изменения · телефон». Лист и скрим — BottomSheet. */
+.unsaved-sheet { display: grid; gap: 10px; padding-bottom: 4px; }
+.unsaved-sheet__title { margin-bottom: 4px; font: 800 20px/1.15 var(--f-display); letter-spacing: -.02em; color: var(--ink); }
+.unsaved-sheet .button { width: 100%; min-height: 52px; border-radius: 15px; font-size: 16px; }
+.unsaved-sheet__stay { color: #fff; background: var(--ink); }
+.unsaved-sheet__stay:not(:disabled):hover { background: #000; }
+.unsaved-sheet__leave { color: var(--bad); background: var(--bad-bg); }

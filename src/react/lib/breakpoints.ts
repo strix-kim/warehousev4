@@ -24,3 +24,8 @@ export const MOBILE_MEDIA_QUERY = `(max-width: ${MOBILE_BREAKPOINT}px)`
 export const WIDE_EDITOR_BREAKPOINT = 1800
 
 export const WIDE_EDITOR_MEDIA_QUERY = `(min-width: ${WIDE_EDITOR_BREAKPOINT}px)`
+
+// Телефон в узком смысле (макет с31: «до 599 · телефон»): здесь вопрос о
+// несохранённом становится нижним листом, а не плашкой в форме (UnsavedPrompt).
+// Та же граница в CSS — медиазапрос `599px` в `features/home/home.css`.
+export const PHONE_MEDIA_QUERY = '(max-width: 599px)'

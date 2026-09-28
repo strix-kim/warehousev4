@@ -64,7 +64,7 @@ import { LazyMotion, domAnimation, MotionConfig, AnimatePresence, m } from "moti
 - `useTransform(value, inputRange, outputRange)`; форма `useTransform(value, fn)` —
   устарела, не использовать.
 
-## Приёмы, которые уже живут в коде (с33, `app/App.tsx`)
+## Приёмы, которые уже живут в коде (с33 `app/App.tsx`; лист — `components/BottomSheet.tsx` с с34)
 
 - **Чужой компонент с жестами** — `m.create(NavLink)` на уровне модуля (не в рендере).
   `className`-функция NavLink проходит насквозь; `children`-функцию NavLink motion

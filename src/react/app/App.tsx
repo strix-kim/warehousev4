@@ -1,8 +1,9 @@
 import { ArrowUpRight, Boxes, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Presentation, RadioTower, Users, Warehouse, X } from 'lucide-react'
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
-import { AnimatePresence, m, useDragControls, useIsPresent, type Transition } from 'motion/react'
+import { AnimatePresence, m, type Transition } from 'motion/react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AppErrorBoundary } from '../components/AppErrorBoundary'
+import { BottomSheet } from '../components/BottomSheet'
 import { useAuth } from '../features/auth/AuthProvider'
 import { hasUnsavedListDraft } from '../features/lists/cacheKeys'
 import { MOBILE_MEDIA_QUERY } from '../lib/breakpoints'
@@ -65,14 +66,9 @@ function phoneTabOf(pathname: string): PhoneTab {
 }
 
 // Числа — из раздела «Решения» макета с31: индикатор вкладки переезжает за 200 мс,
-// нажатие — 0,97; лист выезжает пружиной bounce .18 / .4 с, уходит за 200 мс
-// ускорением. Порог свайпа — тоже макетный: 90 px или быстрый рывок (0,6 px/мс).
+// нажатие — 0,97. Числа листа «Ещё» — в components/BottomSheet.tsx.
 const TAB_INDICATOR_TRANSITION: Transition = { duration: 0.2, ease: 'easeOut' }
 const TAB_PRESS = { scale: 0.97 }
-const SHEET_ENTER: Transition = { type: 'spring', bounce: 0.18, duration: 0.4 }
-const SHEET_EXIT: Transition = { duration: 0.2, ease: [0.4, 0, 1, 1] }
-const SHEET_CLOSE_OFFSET = 90
-const SHEET_CLOSE_VELOCITY = 600
 
 export function App() {
   const { isLoading, session } = useAuth()
@@ -393,83 +389,44 @@ function MobileMoreSheet({ email, onSignOut, onClose }: { email: string; onSignO
   useModalLayer(onClose)
   // Свой взвод, а не сайдбара: лист закрылся — взвод ушёл вместе с ним.
   const signOutConfirm = useSignOutConfirm(onSignOut)
-  // Тянуть лист можно только за хват: вся площадь листа — это ссылки и кнопки,
-  // и перетаскивание с любой точки съедало бы их нажатия.
-  const dragControls = useDragControls()
-  // Отпущенный после протяжки хват всё равно получает click (палец поднят над
-  // ним же — лист ехал вместе с пальцем). Без отметки протяжка вниз на 30 px с
-  // возвратом закрывала бы лист «кликом».
-  const draggedRef = useRef(false)
-  // Пока лист уезжает, слой ещё в DOM и накрывает экран: без этого первое
-  // нажатие после закрытия тонуло бы в уходящей подложке.
-  const isPresent = useIsPresent()
 
   return (
-    <div className="sheet-layer" role="dialog" aria-modal="true" aria-label={tr('Ещё', 'Yana')} onMouseDown={onClose} style={isPresent ? undefined : { pointerEvents: 'none' }}>
-      <m.div className="sheet-layer__scrim" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.18 } }} exit={{ opacity: 0, transition: { duration: 0.16 } }} />
-      <m.div
-        className="sheet"
-        onMouseDown={(event) => event.stopPropagation()}
-        initial={{ y: '100%' }}
-        animate={{ y: 0, transition: SHEET_ENTER }}
-        exit={{ y: '100%', transition: SHEET_EXIT }}
-        drag="y"
-        dragControls={dragControls}
-        dragListener={false}
-        // Вниз лист идёт за пальцем один в один, вверх — упирается (четверть хода).
-        dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={{ top: 0.25, bottom: 1 }}
-        onDragStart={() => { draggedRef.current = true }}
-        onDragEnd={(_event, info) => {
-          if (info.offset.y > SHEET_CLOSE_OFFSET || info.velocity.y > SHEET_CLOSE_VELOCITY) onClose()
-        }}
-      >
-        {/* Хват — только для пальца и мыши: с клавиатуры лист закрывают «Закрыть»
-            и Esc, второй такой же кнопке в порядке фокуса делать нечего. */}
+    <BottomSheet ariaLabel={tr('Ещё', 'Yana')} onClose={onClose}>
+      <div className="sheet__header">
+        <strong>{tr('Ещё', 'Yana')}</strong>
+        <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+      </div>
+      {/* Тот же путь, что у быстрого действия сайдбара: на телефоне сайдбар
+          скрыт, и одношаговый вход в сборку комплекта пропадал. Единственный
+          красный значок листа — главное действие (V-17 макета). */}
+      <Link className="sheet__action" to="/lists/new" onClick={onClose}>
+        <span><ListPlus size={19} /></span>
+        <div><strong>{tr('Новый список', 'Yangi ro‘yxat')}</strong><small>{tr('Собрать комплект', 'Jamlanma tuzish')}</small></div>
+        <ArrowUpRight size={16} />
+      </Link>
+      {/* Разделы, которым нет слота в нижней панели (см. sidebar__nav-extra).
+          Значки серые: красный остаётся за «Новым списком». */}
+      <nav className="sheet__nav" aria-label={tr('Другие разделы', 'Boshqa bo‘limlar')}>
+        <NavLink to="/employees" onClick={onClose}><span><Users size={19} /></span>{tr('Сотрудники', 'Xodimlar')}</NavLink>
+        <NavLink to="/vehicles" onClick={onClose}><span><CarFront size={19} /></span>{tr('Автомобили', 'Avtomobillar')}</NavLink>
+        <NavLink to="/delay" onClick={onClose}><span><RadioTower size={19} /></span>{tr('Задержка излучателей', 'Nurlatgichlar kechikishi')}</NavLink>
+      </nav>
+      <div className="sheet__row">
+        <span>{tr('Язык интерфейса', 'Interfeys tili')}</span>
+        <LanguageSwitcher />
+      </div>
+      <div className="sheet__account">
+        <span>{email}</span>
         <button
-          type="button"
-          className="sheet__grab"
-          tabIndex={-1}
-          aria-hidden="true"
-          onPointerDown={(event) => { draggedRef.current = false; dragControls.start(event) }}
-          onClick={() => { if (!draggedRef.current) onClose() }}
-        />
-        <div className="sheet__header">
-          <strong>{tr('Ещё', 'Yana')}</strong>
-          <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
-        </div>
-        {/* Тот же путь, что у быстрого действия сайдбара: на телефоне сайдбар
-            скрыт, и одношаговый вход в сборку комплекта пропадал. Единственный
-            красный значок листа — главное действие (V-17 макета). */}
-        <Link className="sheet__action" to="/lists/new" onClick={onClose}>
-          <span><ListPlus size={19} /></span>
-          <div><strong>{tr('Новый список', 'Yangi ro‘yxat')}</strong><small>{tr('Собрать комплект', 'Jamlanma tuzish')}</small></div>
-          <ArrowUpRight size={16} />
-        </Link>
-        {/* Разделы, которым нет слота в нижней панели (см. sidebar__nav-extra).
-            Значки серые: красный остаётся за «Новым списком». */}
-        <nav className="sheet__nav" aria-label={tr('Другие разделы', 'Boshqa bo‘limlar')}>
-          <NavLink to="/employees" onClick={onClose}><span><Users size={19} /></span>{tr('Сотрудники', 'Xodimlar')}</NavLink>
-          <NavLink to="/vehicles" onClick={onClose}><span><CarFront size={19} /></span>{tr('Автомобили', 'Avtomobillar')}</NavLink>
-          <NavLink to="/delay" onClick={onClose}><span><RadioTower size={19} /></span>{tr('Задержка излучателей', 'Nurlatgichlar kechikishi')}</NavLink>
-        </nav>
-        <div className="sheet__row">
-          <span>{tr('Язык интерфейса', 'Interfeys tili')}</span>
-          <LanguageSwitcher />
-        </div>
-        <div className="sheet__account">
-          <span>{email}</span>
-          <button
-            className="button button--secondary"
-            onClick={signOutConfirm.requestSignOut}
-            onBlur={signOutConfirm.disarm}
-            onMouseDown={(event) => { if (signOutConfirm.armed) event.preventDefault() }}
-          ><LogOut size={16} />{signOutConfirm.armed
-            ? tr('Да, выйти — несохранённое пропадёт', 'Ha, chiqish — saqlanmagan ish yo‘qoladi')
-            : tr('Выйти', 'Chiqish')}</button>
-        </div>
-      </m.div>
-    </div>
+          className="button button--secondary"
+          onClick={signOutConfirm.requestSignOut}
+          onBlur={signOutConfirm.disarm}
+          onMouseDown={(event) => { if (signOutConfirm.armed) event.preventDefault() }}
+        ><LogOut size={16} />{signOutConfirm.armed
+          ? tr('Да, выйти — несохранённое пропадёт', 'Ha, chiqish — saqlanmagan ish yo‘qoladi')
+          : tr('Выйти', 'Chiqish')}</button>
+      </div>
+    </BottomSheet>
   )
 }
 

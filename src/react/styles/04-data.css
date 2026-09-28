@@ -170,7 +170,7 @@
 .drawer-layer--instant, .drawer-layer--instant .drawer { animation: none; }
 /* Нижний лист телефона. z-index выше панели навигации (15), иначе фиксированная
    панель проступала бы сквозь затемнение и оставалась кликабельной.
-   Движение листа — motion (MobileMoreSheet в App.tsx): подложка и лист — два
+   Движение листа — motion (components/BottomSheet.tsx): подложка и лист — два
    слоя, чтобы прозрачность подложки не гасила сам лист. CSS-анимаций здесь нет
    намеренно: keyframes перебили бы inline-transform, которым motion ведёт лист. */
 .sheet-layer { position: fixed; z-index: 25; inset: 0; display: flex; align-items: flex-end; }
