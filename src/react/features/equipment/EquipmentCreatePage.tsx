@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AppSelect } from '../../components/AppSelect'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
+import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import {
   createEquipment,
   createEquipmentBatch,
@@ -18,6 +19,7 @@ import {
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import { useUnsavedGuard } from '../../lib/useUnsavedGuard'
 
 // 'batch' — та же серийная запись, но много сразу: U34-L. Отдельный режим, а не
 // флажок при 'serialized', потому что выбор «как заводим» уже живёт карточками
@@ -46,6 +48,51 @@ const BATCH_LIMIT = 200
 function parseSerialLines(value: string) {
   return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
 }
+
+type FormFields = {
+  brand: string
+  model: string
+  serialNumber: string
+  inventoryCode: string
+  serialBatch: string
+  type: string
+  subtype: string
+  count: number
+  availability: EquipmentAvailability
+  location: string
+  length: string
+  specification: string
+  description: string
+}
+
+// Снимок полей для сравнения «есть ли что терять при уходе». Массив в
+// фиксированном порядке, а не JSON объекта: порядок ключей у литерала в месте
+// вызова не должен решать, равны ли снимки. Способ учёта (kind) сюда не входит
+// намеренно: выбор карточки — не набранная работа.
+function serializeForm(form: FormFields) {
+  return JSON.stringify([
+    form.brand, form.model, form.serialNumber, form.inventoryCode, form.serialBatch,
+    form.type, form.subtype, form.count, form.availability, form.location,
+    form.length, form.specification, form.description,
+  ])
+}
+
+// Нетронутый бланк — те же значения, с которыми стартуют useState формы.
+const PRISTINE = serializeForm({
+  brand: '',
+  model: '',
+  serialNumber: '',
+  inventoryCode: '',
+  serialBatch: '',
+  type: '',
+  subtype: '',
+  count: 1,
+  availability: 'available',
+  location: DEFAULT_LOCATION,
+  length: '',
+  specification: '',
+  description: '',
+})
 
 export function EquipmentCreatePage() {
   const navigate = useNavigate()
@@ -80,6 +127,9 @@ export function EquipmentCreatePage() {
   // createdId решает, какой экран успеха показывать.
   const [createdCount, setCreatedCount] = useState<number | null>(null)
   const [serialBatch, setSerialBatch] = useState('')
+  // Снимок бланка, с которым сравнивается форма: пустой, а после «Добавить ещё
+  // такую же» — с сохранёнными общими полями модели.
+  const [baseline, setBaseline] = useState(PRISTINE)
   const brandInputRef = useRef<HTMLInputElement>(null)
   // Первое уникальное поле единицы: серийный номер, а у количественного учёта —
   // внутренний код. Обе ветки отдают ссылку сюда, потому что рендерится всегда
@@ -113,6 +163,14 @@ export function EquipmentCreatePage() {
     && serialCheck !== 'duplicate',
   )
 
+  // На экране успеха (createdId или createdCount) запись уже в базе — терять нечего.
+  const isDirty = !createdId && createdCount === null && serializeForm({
+    brand, model, serialNumber, inventoryCode, serialBatch, type, subtype,
+    count, availability, location, length, specification, description,
+  }) !== baseline
+  // Пока идёт сохранение, защита снята: переход после успеха — это сама форма.
+  const guard = useUnsavedGuard(isDirty && !isSaving)
+
   useEffect(() => {
     fetchEquipmentTaxonomy().then(setTaxonomy).catch((error: unknown) => reportAppError(error, { scope: 'prefetch', route: '/equipment/new', detail: { source: 'taxonomy' } }))
   }, [])
@@ -141,6 +199,7 @@ export function EquipmentCreatePage() {
     setLength('')
     setSpecification('')
     setDescription('')
+    setBaseline(PRISTINE)
     setSerialCheck('idle')
     setError('')
     setCreatedId('')
@@ -153,10 +212,18 @@ export function EquipmentCreatePage() {
   // характеристики у них общие: чистится только то, что принадлежит конкретной
   // единице. Полный resetForm на этом сценарии заставлял вводить модель заново.
   function resetForSameModel() {
+    const nextCount = kind !== 'quantity' ? 1 : count
     setSerialNumber('')
     setInventoryCode('')
     setSerialBatch('')
-    if (kind !== 'quantity') setCount(1)
+    setCount(nextCount)
+    // Оставленные общие поля уже сохранены с прошлой записью — это не набранная
+    // работа. С пустым бланком в сравнении уход без единой правки спросил бы
+    // «уйти без сохранения?».
+    setBaseline(serializeForm({
+      brand, model, serialNumber: '', inventoryCode: '', serialBatch: '', type, subtype,
+      count: nextCount, availability, location, length, specification, description,
+    }))
     setSerialCheck('idle')
     setError('')
     setCreatedId('')
@@ -302,6 +369,16 @@ export function EquipmentCreatePage() {
           <Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Добавить в каталог', 'Katalogga qo‘shish')}
         </button>
       </header>
+
+      {guard.isBlocked && (
+        <UnsavedPrompt
+          message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+          stayLabel={tr('Остаться', 'Qolish')}
+          leaveLabel={tr('Уйти без сохранения', 'Saqlamasdan chiqish')}
+          onStay={guard.stay}
+          onLeave={guard.leave}
+        />
+      )}
 
       <div className="equipment-form-layout">
         <section className="data-panel equipment-form">
