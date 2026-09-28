@@ -18,10 +18,6 @@
    тулбар, не поместившийся в строку, терял бы правый край вместе с бейджем
    возраста. У реестра с одним селектом перенос не наступает никогда. */
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
-/* В каталоге фильтров три: при 260 px на селект строка не помещается в панель на
-   1440 (сайдбар 256 + поля страницы оставляют ~1037 px). Поиск остаётся растяжимым. */
-.toolbar--catalog .search-field { min-width: 200px; }
-.toolbar--catalog .app-select { width: min(200px, 100%); }
 .data-age { flex: 0 0 auto; margin-left: auto; display: inline-flex; align-items: center; gap: 10px; color: var(--faint); font-size: 13px; }
 .data-age button { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: var(--muted); background: transparent; font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .data-age button:disabled { color: var(--faint); text-decoration: none; }
@@ -31,6 +27,31 @@
 .search-field:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 .search-field input { min-width: 0; flex: 1; height: 100%; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 14px; }
 .search-field input::placeholder { color: var(--faint); }
+/* Поиск каталога (макет с31, .field--xl): самое крупное поле экрана, вход —
+   клавишей «/», подсказка клавиши стоит там, где у набранного запроса крестик. */
+.search-field--xl { max-width: none; height: 52px; border-radius: var(--r-lg); }
+.search-field--xl input { font-size: 15px; }
+.search-field__key { flex: none; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: var(--sunk); font: 600 11px/1 var(--f-mono); }
+/* Сегмент (макет с31, .seg): выбор одного из немногих вариантов, все видны разом.
+   Радиус кнопки вложенный — внешний минус паддинг. */
+.segmented { max-width: 100%; display: inline-flex; gap: 2px; padding: 3px; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card); scrollbar-width: none; }
+.segmented::-webkit-scrollbar { display: none; }
+.segmented button { flex: none; min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.segmented button:hover { color: var(--ink); }
+.segmented button[aria-pressed='true'] { color: var(--ink); background: var(--select); font-weight: 600; }
+/* Точка статуса — тон словаря статусов; нейтральная серая — декор, не текст. */
+.status-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--soft); }
+.status-dot--success { background: var(--ok-dot); }
+.status-dot--warning { background: var(--warn-dot); }
+.status-dot--danger { background: var(--bad-dot); }
+/* Чипы (макет с31, .chip): фильтр с несколькими значениями в одну строку.
+   Строка прокручивается вбок, а не режется: категорий больше, чем влезает.
+   Паддинг 2 px — место под обводку фокуса внутри прокручиваемой полосы. */
+.chips { min-width: 0; flex: 1 1 auto; display: flex; gap: 6px; margin: -2px; padding: 2px; overflow-x: auto; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; min-height: 34px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: var(--card); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.chip:hover { border-color: var(--ctl); }
+.chip[aria-pressed='true'] { border-color: var(--ink); color: #fff; background: var(--ink); }
 .app-select { position: relative; width: min(260px, 100%); height: 42px; flex: 0 0 auto; }
 .app-select__trigger { width: 100%; height: 100%; display: flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid var(--ctl); border-radius: var(--r-md); color: var(--ink); background: var(--card); font-size: 14px; font-weight: 600; text-align: left; transition: border-color .16s ease, box-shadow .16s ease, background .16s ease; }
 /* Наведение на контролы (с32): рамка в покое — уже --ctl, поэтому отклик — темнее

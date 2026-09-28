@@ -4,7 +4,6 @@ import {
   PackageOpen,
   Plus,
   Search,
-  SlidersHorizontal,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -26,11 +25,12 @@ import {
   readCachedEquipmentModelsMeta,
   type EquipmentModelSummary,
 } from './api'
-import { equipmentAvailabilityOptions, toEquipmentAvailability } from './availability'
+import { equipmentAvailabilityCodes, equipmentAvailabilityView, toEquipmentAvailability } from './availability'
+import { AvailabilityTicks, FreeCount } from './AvailabilityTicks'
 import { EquipmentDrawer } from './EquipmentDrawer'
 import { EquipmentModelDrawer } from './EquipmentModelDrawer'
 import type { Equipment } from './types'
-import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
+import { MOBILE_MEDIA_QUERY, WIDE_EDITOR_MEDIA_QUERY } from '../../lib/breakpoints'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
@@ -39,9 +39,11 @@ export function EquipmentPage() {
   const navigate = useNavigate()
   const { tr, locale, language } = useLanguage()
   useDocumentTitle(tr('Оборудование', 'Uskunalar'))
-  const availabilityOptions = [
-    { value: '', label: tr('Все статусы', 'Barcha holatlar') },
-    ...equipmentAvailabilityOptions(tr),
+  // Статусы — сегментом (макет с31): все варианты видны разом, без попапа.
+  // Точка — тон того же словаря, что у бейджа единицы.
+  const statusSegments = [
+    { value: '', label: tr('Все', 'Barchasi'), tone: '' },
+    ...equipmentAvailabilityCodes.map((code) => ({ value: code, ...equipmentAvailabilityView(code, tr) })),
   ]
   // Состояние каталога живёт в АДРЕСЕ, а не в компоненте: заход в «Добавить
   // оборудование» и обратно размонтирует страницу, F5 обнуляет её же, а на телефоне
@@ -64,6 +66,11 @@ export function EquipmentPage() {
   // — спрятанный элемент остаётся в :last-child и nth-child и ломает чётность
   // грида. Граница та же, что у CSS-карточек (820, lib/breakpoints).
   const [isMobile, setIsMobile] = useState(() => window.matchMedia(MOBILE_MEDIA_QUERY).matches)
+  // Широкий экран (≥1800): категории — колонкой слева вместо чипов над таблицей,
+  // и в таблице появляется колонка «Категория». Выбор — в разметке, как и у
+  // мобильной раскладки: колонка таблицы, спрятанная стилями, ломала бы colSpan.
+  const [isWide, setIsWide] = useState(() => window.matchMedia(WIDE_EDITOR_MEDIA_QUERY).matches)
+  const searchRef = useRef<HTMLInputElement>(null)
   // Прогретый первый кадр берём только для НЕТРОНУТОГО каталога. Раньше фильтров в
   // адресе не было и брать было нечего иное; теперь ссылка `?q=…` рисовала бы кадр
   // из кэша БЕЗ фильтра — первый экран отвечал бы не на тот вопрос, который задан
@@ -216,6 +223,29 @@ export function EquipmentPage() {
     media.addEventListener('change', handleChange)
     return () => media.removeEventListener('change', handleChange)
   }, [setParams])
+
+  useEffect(() => {
+    const media = window.matchMedia(WIDE_EDITOR_MEDIA_QUERY)
+    const handleChange = () => setIsWide(media.matches)
+    media.addEventListener('change', handleChange)
+    return () => media.removeEventListener('change', handleChange)
+  }, [])
+
+  // «/» — к поиску (макет с31): поиск — главный вход каталога. Не перехватываем
+  // набор в полях и нажатие при открытом дровере — там «/» значит сам символ.
+  const isDrawerOpen = Boolean(selected || selectedModel)
+  useEffect(() => {
+    if (isDrawerOpen) return
+    const focusSearch = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
+      event.preventDefault()
+      searchRef.current?.focus()
+    }
+    window.addEventListener('keydown', focusSearch)
+    return () => window.removeEventListener('keydown', focusSearch)
+  }, [isDrawerOpen])
 
   useEffect(() => {
     if (searchInput === search) return
@@ -396,13 +426,18 @@ export function EquipmentPage() {
     return `${from}–${to}`
   }, [currentPage, isMobile, pageSize, rows.length, total])
 
+  // Колонок три или четыре: «Категория» есть только на широком экране.
+  const columnCount = isWide ? 4 : 3
+
   return (
     <>
       <header className="page-header">
         <div>
           <p className="eyebrow">{tr('Складской учёт', 'Ombor hisobi')}</p>
           <h1>{tr('Оборудование', 'Uskunalar')}</h1>
-          <p className="page-description">{tr('Единый каталог техники, комплектующих и расходных материалов.', 'Texnika, butlovchi qismlar va sarf materiallarining yagona katalogi.')}</p>
+          {/* Счётчик — модели И штуки разом: «218 моделей» без «1 877 штук»
+              снова спрятал бы физический объём склада за строками выдачи. */}
+          <p className="catalog-summary">{isFiltered ? tr('Найдено моделей', 'Topilgan modellar') : tr('Моделей', 'Modellar')}: {total.toLocaleString(locale)} · {tr('штук', 'dona')}: {totalUnits.toLocaleString(locale)}</p>
         </div>
         {/* Адрес каталога уезжает в state перехода: экран заведения возвращает
             человека ровно в ту выборку, из которой он ушёл. Через state, а не
@@ -413,159 +448,178 @@ export function EquipmentPage() {
         </button>
       </header>
 
-      <section className="data-panel">
-        <div className="toolbar toolbar--catalog">
-          <label className="search-field">
-            <Search size={18} />
-            <input
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder={tr('Модель, бренд, серийный номер…', 'Model, brend, seriya raqami…')}
-              aria-label={tr('Поиск оборудования', 'Uskunalarni qidirish')}
-            />
-            {searchInput && (
-              <button className="icon-button" onClick={() => setSearchInput('')} aria-label={tr('Очистить поиск', 'Qidiruvni tozalash')}>
-                <X size={16} />
+      <div className={`catalog-layout${isWide ? ' catalog-layout--rail' : ''}`}>
+        {/* Значения категорий — ДАННЫЕ из базы: в фильтр они уезжают как есть,
+            а на узбекском их переводит словарь таксономии. Подкатегория
+            принадлежит категории: оставленная от прошлой, она дала бы заведомо
+            пустую выборку. */}
+        {isWide && (
+          <nav className="catalog-rail-card" aria-label={tr('Фильтр по категории', 'Toifa bo‘yicha filtr')}>
+            <p className="drawer-caps">{tr('Категории', 'Toifalar')}</p>
+            {typeOptions.map((option) => (
+              <button key={option.value || 'all'} type="button" aria-pressed={type === option.value} onClick={() => updateParams({ type: option.value, subtype: '' })}>
+                {option.label}
               </button>
-            )}
-          </label>
-          <AppSelect
-            value={type}
-            options={typeOptions}
-            onChange={(value) => {
-              // Подкатегория принадлежит категории: оставленная от прошлой
-              // категории, она дала бы заведомо пустую выборку.
-              updateParams({ type: value, subtype: '' })
-            }}
-            ariaLabel={tr('Фильтр по категории', 'Toifa bo‘yicha filtr')}
-          />
-          <AppSelect
-            value={subtype}
-            options={subtypeOptions}
-            onChange={(value) => updateParams({ subtype: value })}
-            ariaLabel={tr('Фильтр по подкатегории', 'Quyi toifa bo‘yicha filtr')}
-          />
-          <AppSelect
-            value={availability}
-            options={availabilityOptions}
-            icon={<SlidersHorizontal size={17} />}
-            onChange={(value) => updateParams({ status: value })}
-            ariaLabel={tr('Фильтр по статусу', 'Holat bo‘yicha filtr')}
-          />
-          {/* Счётчик — модели И штуки разом: «218 моделей» без «1 877 штук»
-              снова спрятал бы физический объём склада за строками выдачи. */}
-          <span className="toolbar__count">{isFiltered ? tr('Найдено моделей', 'Topilgan modellar') : tr('Моделей', 'Modellar')}: {total.toLocaleString(locale)} · {tr('штук', 'dona')}: {totalUnits.toLocaleString(locale)}</span>
-          {/* Рядом с блоком «Ошибка загрузки» бейдж не рисуем: на экране оказались бы
-              два разных предложения обновиться и «Обновлено 25 минут назад» под
-              заголовком о том, что данных нет. */}
-          {!hasLoadError && <DataAge touchedAt={dataAt} isRefreshing={isFetching} failed={lastFetchFailed} onRefresh={() => setReloadKey((value) => value + 1)} />}
-        </div>
-
-        {hasLoadError ? (
-          <ErrorState
-            title={tr('Не удалось загрузить оборудование', 'Uskunalarni yuklab bo‘lmadi')}
-            text={tr('Проверьте интернет и повторите. Каталог на месте — его просто не удалось показать.', 'Internetni tekshiring va qayta urinib ko‘ring. Katalog joyida — uni shunchaki ko‘rsatib bo‘lmadi.')}
-            action={<RetryButton onClick={() => setReloadKey((value) => value + 1)} />}
-          />
-        ) : (
-          <div className={`table-scroll ${isLoading && rows.length ? 'table-scroll--refreshing' : ''}`} aria-busy={isLoading}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>{tr('Оборудование', 'Uskuna')}</th>
-                  <th>{tr('Категория', 'Toifa')}</th>
-                  <th>{tr('Штук', 'Dona')}</th>
-                  <th>{tr('Доступно', 'Mavjud')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading && rows.length === 0
-                  ? Array.from({ length: 8 }, (_, index) => (
-                      <tr key={index} className="skeleton-row">
-                        <td colSpan={4}><span /></td>
-                      </tr>
-                    ))
-                  : rows.map((item) => {
-                      // Ячейка-константа на телефоне съедает экран (правило U33):
-                      // «1 шт.» у модели-одиночки и «доступно = всего» не различают
-                      // карточки — из DOM их убираем, а не прячем стилями.
-                      const showCount = !isMobile || item.unitsTotal !== 1
-                      const showAvailable = !isMobile || item.unitsAvailable !== item.unitsTotal
-                      return (
-                        <tr
-                          key={`${item.brand}::${item.model}`}
-                          onClick={() => openModel(item)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault()
-                              openModel(item)
-                            }
-                          }}
-                          tabIndex={0}
-                        >
-                          <td>
-                            <div className="equipment-cell">
-                              <EquipmentVisual item={item} />
-                              <span>
-                                <strong>{item.brand} {item.model}</strong>
-                                <small>{translateEquipmentTaxonomy(item.subtype, language)}</small>
-                              </span>
-                            </div>
-                          </td>
-                          <td data-label={tr('Категория', 'Toifa')}>{translateEquipmentTaxonomy(item.type, language)}</td>
-                          {showCount && <td data-label={tr('Штук', 'Dona')}><strong>{item.unitsTotal}</strong> {tr('шт.', 'dona')}</td>}
-                          {showAvailable && (
-                            <td data-label={tr('Доступно', 'Mavjud')}>
-                              <span className={`badge badge--${item.unitsAvailable > 0 ? 'success' : 'danger'}`}><i />{item.unitsAvailable} {tr('шт.', 'dona')}</span>
-                            </td>
-                          )}
-                        </tr>
-                      )
-                    })}
-              </tbody>
-            </table>
-
-            {!isLoading && !rows.length && (
-              <EmptyState
-                icon={<PackageOpen size={27} />}
-                // Пустой ответ БЕЗ запроса и фильтров — это не «ничего не найдено»:
-                // у сотрудника без строки в public.users каталог закрыт политикой
-                // и приходит пустым. Почту администратора в бандл не кладём.
-                title={isFiltered ? tr('Ничего не найдено', 'Hech narsa topilmadi') : tr('Каталог пуст или недоступен', 'Katalog bo‘sh yoki mavjud emas')}
-                text={isFiltered
-                  ? tr('Измените запрос или сбросьте фильтры.', 'So‘rovni o‘zgartiring yoki filtrlarni tozalang.')
-                  : tr('Если вы только что получили доступ, обратитесь к администратору склада.', 'Agar siz endigina ruxsat olgan bo‘lsangiz, ombor administratoriga murojaat qiling.')}
-              />
-            )}
-          </div>
+            ))}
+          </nav>
         )}
-
-        <footer className="pagination">
-          <span>{tr('Показано', 'Ko‘rsatildi')} {range} {tr('из', 'dan')} {total.toLocaleString(locale)}</span>
-          {isMobile ? (
-            // Кнопка вместо двух стрелок: 186 страниц пролистать нельзя, а «ещё 8»
-            // — можно. Следующая страница уже прогрета префетчем ниже по эффекту,
-            // поэтому нажатие отрабатывает без ожидания сети.
-            currentPage < pageCount && (
-              <button className="button button--secondary catalog-more" disabled={isFetching} onClick={() => goToPage(currentPage + 1)}>
-                {isFetching
-                  ? tr('Загружаем…', 'Yuklanmoqda…')
-                  : tr(`Показать ещё ${Math.min(pageSize, total - rows.length)}`, `Yana ${Math.min(pageSize, total - rows.length)} ta ko‘rsatish`)}
-              </button>
-            )
-          ) : (
-            <div className="pagination__controls">
-              <button className="icon-button icon-button--bordered" disabled={currentPage <= 1 || isLoading} onClick={() => goToPage(currentPage - 1)} aria-label={tr('Предыдущая страница', 'Oldingi sahifa')}>
-                <ChevronLeft size={18} />
-              </button>
-              <span>{tr('Страница', 'Sahifa')} <strong>{currentPage}</strong> {tr('из', 'dan')} {pageCount}</span>
-              <button className="icon-button icon-button--bordered" disabled={currentPage >= pageCount || isLoading} onClick={() => goToPage(currentPage + 1)} aria-label={tr('Следующая страница', 'Keyingi sahifa')}>
-                <ChevronRight size={18} />
-              </button>
+        <div className="catalog-main">
+          <div className="catalog-tools">
+            <label className="search-field search-field--xl">
+              <Search size={18} />
+              <input
+                ref={searchRef}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder={tr('Модель, бренд, серийный номер…', 'Model, brend, seriya raqami…')}
+                aria-label={tr('Поиск оборудования', 'Uskunalarni qidirish')}
+                aria-keyshortcuts="/"
+              />
+              {searchInput
+                ? (
+                  <button className="icon-button" onClick={() => setSearchInput('')} aria-label={tr('Очистить поиск', 'Qidiruvni tozalash')}>
+                    <X size={16} />
+                  </button>
+                )
+                : <kbd className="search-field__key" aria-hidden="true">/</kbd>}
+            </label>
+            <div className="segmented" role="group" aria-label={tr('Фильтр по статусу', 'Holat bo‘yicha filtr')}>
+              {statusSegments.map((segment) => (
+                <button key={segment.value || 'all'} type="button" aria-pressed={availability === segment.value} onClick={() => updateParams({ status: segment.value })}>
+                  {segment.tone && <i className={`status-dot status-dot--${segment.tone}`} />}
+                  {segment.label}
+                </button>
+              ))}
             </div>
-          )}
-        </footer>
-      </section>
+          </div>
+          <div className="catalog-filters">
+            {!isWide && (
+              <div className="chips" role="group" aria-label={tr('Фильтр по категории', 'Toifa bo‘yicha filtr')}>
+                {typeOptions.map((option) => (
+                  <button key={option.value || 'all'} type="button" className="chip" aria-pressed={type === option.value} onClick={() => updateParams({ type: option.value, subtype: '' })}>
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <AppSelect
+              value={subtype}
+              options={subtypeOptions}
+              onChange={(value) => updateParams({ subtype: value })}
+              ariaLabel={tr('Фильтр по подкатегории', 'Quyi toifa bo‘yicha filtr')}
+            />
+            {/* Рядом с блоком «Ошибка загрузки» бейдж не рисуем: на экране оказались бы
+                два разных предложения обновиться и «Обновлено 25 минут назад» под
+                заголовком о том, что данных нет. */}
+            {!hasLoadError && <DataAge touchedAt={dataAt} isRefreshing={isFetching} failed={lastFetchFailed} onRefresh={() => setReloadKey((value) => value + 1)} />}
+          </div>
+
+          <section className="data-panel">
+            {hasLoadError ? (
+              <ErrorState
+                title={tr('Не удалось загрузить оборудование', 'Uskunalarni yuklab bo‘lmadi')}
+                text={tr('Проверьте интернет и повторите. Каталог на месте — его просто не удалось показать.', 'Internetni tekshiring va qayta urinib ko‘ring. Katalog joyida — uni shunchaki ko‘rsatib bo‘lmadi.')}
+                action={<RetryButton onClick={() => setReloadKey((value) => value + 1)} />}
+              />
+            ) : (
+              <div className={`table-scroll ${isLoading && rows.length ? 'table-scroll--refreshing' : ''}`} aria-busy={isLoading}>
+                <table className="data-table catalog-table">
+                  <thead>
+                    <tr>
+                      <th>{tr('Модель', 'Model')}</th>
+                      {isWide && <th className="catalog-table__category">{tr('Категория', 'Toifa')}</th>}
+                      <th className="catalog-table__units">{tr('Единицы', 'Birliklar')}</th>
+                      <th className="catalog-table__free">{tr('Свободно', 'Bo‘sh')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoading && rows.length === 0
+                      ? Array.from({ length: 8 }, (_, index) => (
+                          <tr key={index} className="skeleton-row">
+                            <td colSpan={columnCount}><span /></td>
+                          </tr>
+                        ))
+                      : rows.map((item) => {
+                          const isCurrent = selectedModel?.brand === item.brand && selectedModel.model === item.model
+                          return (
+                            <tr
+                              key={`${item.brand}::${item.model}`}
+                              className={isCurrent ? 'is-selected' : undefined}
+                              onClick={() => openModel(item)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault()
+                                  openModel(item)
+                                }
+                              }}
+                              tabIndex={0}
+                            >
+                              <td className="catalog-table__model">
+                                <div className="equipment-cell">
+                                  <EquipmentVisual item={item} />
+                                  <span>
+                                    <strong>{item.brand} {item.model}</strong>
+                                    <small>{translateEquipmentTaxonomy(item.subtype, language)}</small>
+                                  </span>
+                                </div>
+                              </td>
+                              {isWide && <td className="catalog-table__category">{translateEquipmentTaxonomy(item.type, language)}</td>}
+                              <td className="catalog-table__units">
+                                <AvailabilityTicks free={item.unitsAvailable} rest={Math.max(0, item.unitsTotal - item.unitsAvailable)} />
+                              </td>
+                              <td className="catalog-table__free">
+                                {/* На телефоне «3/4»: карточке не хватает ширины на «из». */}
+                                <FreeCount free={item.unitsAvailable} totalLabel={isMobile ? `/${item.unitsTotal}` : tr(`из ${item.unitsTotal}`, `/ ${item.unitsTotal}`)} />
+                              </td>
+                            </tr>
+                          )
+                        })}
+                  </tbody>
+                </table>
+
+                {!isLoading && !rows.length && (
+                  <EmptyState
+                    icon={<PackageOpen size={27} />}
+                    // Пустой ответ БЕЗ запроса и фильтров — это не «ничего не найдено»:
+                    // у сотрудника без строки в public.users каталог закрыт политикой
+                    // и приходит пустым. Почту администратора в бандл не кладём.
+                    title={isFiltered ? tr('Ничего не найдено', 'Hech narsa topilmadi') : tr('Каталог пуст или недоступен', 'Katalog bo‘sh yoki mavjud emas')}
+                    text={isFiltered
+                      ? tr('Измените запрос или сбросьте фильтры.', 'So‘rovni o‘zgartiring yoki filtrlarni tozalang.')
+                      : tr('Если вы только что получили доступ, обратитесь к администратору склада.', 'Agar siz endigina ruxsat olgan bo‘lsangiz, ombor administratoriga murojaat qiling.')}
+                  />
+                )}
+              </div>
+            )}
+
+            <footer className="pagination">
+              <span>{tr('Показано', 'Ko‘rsatildi')} {range} {tr('из', 'dan')} {total.toLocaleString(locale)}</span>
+              {isMobile ? (
+                // Кнопка вместо двух стрелок: 186 страниц пролистать нельзя, а «ещё 8»
+                // — можно. Следующая страница уже прогрета префетчем ниже по эффекту,
+                // поэтому нажатие отрабатывает без ожидания сети.
+                currentPage < pageCount && (
+                  <button className="button button--secondary catalog-more" disabled={isFetching} onClick={() => goToPage(currentPage + 1)}>
+                    {isFetching
+                      ? tr('Загружаем…', 'Yuklanmoqda…')
+                      : tr(`Показать ещё ${Math.min(pageSize, total - rows.length)}`, `Yana ${Math.min(pageSize, total - rows.length)} ta ko‘rsatish`)}
+                  </button>
+                )
+              ) : (
+                <div className="pagination__controls">
+                  <button className="icon-button icon-button--bordered" disabled={currentPage <= 1 || isLoading} onClick={() => goToPage(currentPage - 1)} aria-label={tr('Предыдущая страница', 'Oldingi sahifa')}>
+                    <ChevronLeft size={18} />
+                  </button>
+                  <span>{tr('Страница', 'Sahifa')} <strong>{currentPage}</strong> {tr('из', 'dan')} {pageCount}</span>
+                  <button className="icon-button icon-button--bordered" disabled={currentPage >= pageCount || isLoading} onClick={() => goToPage(currentPage + 1)} aria-label={tr('Следующая страница', 'Keyingi sahifa')}>
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              )}
+            </footer>
+          </section>
+        </div>
+      </div>
 
       {/* В каждый момент рисуется ОДИН дровер: карточка единицы поверх модели
           дала бы два модальных слоя с двумя обработчиками Esc. Возврат из

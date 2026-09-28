@@ -56,25 +56,50 @@
   .page-header .button { width: 100%; }
   .button { min-height: 44px; }
   .icon-button { width: 44px; height: 44px; }
-  .toolbar { align-items: stretch; flex-direction: column; }
   /* Реестр: два фильтра делят одну строку. В столбик они стоили бы лишние 44 px
      первого экрана — ровно то, что волна 2 отвоёвывает под первую карточку.
-     Каталог не трогаем: там селектов три, и половинная ширина разложит их 2 + 1. */
-  .toolbar:not(.toolbar--catalog) { flex-direction: row; flex-wrap: wrap; }
-  .toolbar:not(.toolbar--catalog) > *:not(.app-select) { flex: 1 0 100%; }
-  .toolbar:not(.toolbar--catalog) .app-select { flex: 1 1 calc(50% - 5px); min-width: 0; }
+     У каталога оборудования тулбара нет с с35 — свои .catalog-tools ниже. */
+  .toolbar { align-items: stretch; flex-direction: row; flex-wrap: wrap; }
+  .toolbar > *:not(.app-select) { flex: 1 0 100%; }
+  .toolbar .app-select { flex: 1 1 calc(50% - 5px); min-width: 0; }
   .data-age { margin-left: 0; justify-content: space-between; }
   .data-age button { min-height: 44px; }
   .search-field { max-width: none; min-width: 0; height: 44px; }
   .search-field input { align-self: stretch; height: auto; }
-  /* Тулбар в столбик — селекты на всю ширину, а не 200/260 px посреди экрана */
-  .toolbar .app-select { width: 100%; }
-  .toolbar:not(.toolbar--catalog) .app-select { width: auto; }
+  .toolbar .app-select { width: auto; }
   .pagination { align-items: flex-start; flex-direction: column; }
   .pagination__controls { width: 100%; justify-content: space-between; }
   /* «Показать ещё» — основное действие подвала на телефоне, поэтому во всю ширину
      и с тач-высотой: две круглые стрелки по 186 страницам здесь бесполезны. */
   .catalog-more { width: 100%; min-height: 46px; }
+  /* Каталог на телефоне (макет с31, .p-row): инструменты в столбик, сегмент и
+     чипы прокручиваются вбок, строки — одна карточка-список: фото и название
+     слева, «3/4» и шкала справа. Ячейки-подписи (data-label) здесь не нужны. */
+  .catalog-tools { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .search-field--xl { height: 48px; }
+  .segmented { width: 100%; }
+  .segmented button { min-height: 40px; }
+  .catalog-filters { flex-wrap: wrap; }
+  .catalog-filters .chips { flex: 1 0 100%; }
+  .chip { min-height: 38px; font-size: 14px; }
+  .catalog-filters .app-select { width: auto; flex: 1 1 auto; min-width: 0; }
+  .search-field__key { display: none; }
+  .data-table.catalog-table { min-width: 0; }
+  .data-table.catalog-table tbody { gap: 0; padding: 0; background: var(--card); }
+  .data-table.catalog-table tbody tr { grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; padding: 10px 14px; border: 0; border-bottom: 1px solid var(--line-2); border-radius: 0; box-shadow: none; }
+  .data-table.catalog-table tbody tr:last-child { border-bottom: 0; }
+  .data-table.catalog-table tbody tr td { height: auto; min-height: 0; padding: 0; border: 0; }
+  .data-table.catalog-table tbody tr td::before { display: none; }
+  .data-table.catalog-table tbody tr td.catalog-table__model { grid-column: 1; grid-row: 1 / span 2; min-height: 48px; }
+  .data-table.catalog-table tbody tr td.catalog-table__free { grid-column: 2; grid-row: 1; align-items: flex-end; }
+  .data-table.catalog-table tbody tr td.catalog-table__units { grid-column: 2; grid-row: 2; align-items: flex-end; }
+  .catalog-table .free-count { font-size: 17px; }
+  .catalog-table .ticks { justify-content: flex-end; }
+  .catalog-table .ticks i { width: 5px; height: 12px; }
+  .catalog-table .ticks--bar { width: 64px; height: 8px; }
+  .catalog-table .ticks--bar i { width: auto; height: 100%; }
+  .catalog-table .equipment-cell strong { font-size: 15px; }
+  .catalog-table .equipment-cell small { font-size: 13px; }
   .table-scroll { overflow: visible; }
   .data-table { min-width: 0; display: block; table-layout: auto; }
   .data-table thead { display: none; }
@@ -101,9 +126,6 @@
      150 px высоты карточки, как столбик до волны 2 */
   .list-card__date { font-size: 16px; }
   .drawer { padding: 22px 18px calc(30px + env(safe-area-inset-bottom)); }
-  /* Поля дровера на телефоне другие — липкий футер повторяет их, иначе подложка
-     не дотягивается до краёв и обрезает тень. */
-  .equipment-edit-footer { bottom: calc(-30px - env(safe-area-inset-bottom)); margin: 0 -18px calc(-30px - env(safe-area-inset-bottom)); padding: 12px 18px calc(30px + env(safe-area-inset-bottom)); }
   .reservation-drawer { height: 100dvh; padding: 0; }
   .reservation-drawer__top { padding: 20px 18px 0; }
   .reservation-drawer__body { padding: 0 18px 14px; }

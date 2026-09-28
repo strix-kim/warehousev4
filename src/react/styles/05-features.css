@@ -562,3 +562,19 @@
   .profile-head__copy { transition: none; }
   .profile-head__copy-note { animation: none; }
 }
+
+/* Каталог оборудования (с35, макет с31 «Каталог»): инструменты над таблицей, а не
+   в её панели — поиск, сегмент статусов, строка чипов категорий. На ≥1800
+   категории уходят в колонку слева (решение в разметке, см. isWide). */
+.catalog-summary { margin: 0; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.catalog-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.catalog-layout--rail { grid-template-columns: 240px minmax(0, 1fr); align-items: start; }
+.catalog-main { min-width: 0; display: grid; gap: 12px; }
+.catalog-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.catalog-filters { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.catalog-filters .app-select { width: 220px; }
+.catalog-rail-card { position: sticky; top: 24px; max-height: calc(100vh / var(--app-zoom) - 48px); display: flex; flex-direction: column; gap: 2px; padding: 14px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card); }
+.catalog-rail-card .drawer-caps { margin: 0; padding: 4px 10px 10px; }
+.catalog-rail-card button { min-height: 38px; display: flex; align-items: center; padding: 6px 10px; border: 0; border-radius: var(--r-md); color: var(--ink); background: transparent; font-size: 13.5px; line-height: 1.3; text-align: left; }
+.catalog-rail-card button:hover { background: var(--hover); }
+.catalog-rail-card button[aria-pressed='true'] { background: var(--select); font-weight: 600; }

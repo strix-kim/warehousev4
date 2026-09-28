@@ -3,7 +3,9 @@ import { FormEvent, useEffect, useState } from 'react'
 import { EquipmentVisual } from '../../components/EquipmentVisual'
 import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import { addEquipmentUnit, fetchEquipmentUnitsByModel, type EquipmentModelSummary } from './api'
-import { equipmentAvailabilityView, toEquipmentAvailability } from './availability'
+import { countUnitsByAvailability, equipmentAvailabilityView, toEquipmentAvailability } from './availability'
+import { AvailabilityTicks } from './AvailabilityTicks'
+import { EquipmentDrawerFrame } from './EquipmentDrawerFrame'
 import type { Equipment } from './types'
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
@@ -123,115 +125,131 @@ export function EquipmentModelDrawer({ summary, reloadKey, onClose, onOpenUnit, 
     }
   }
 
+  // Шкала и «большой факт» — из единиц, как только они пришли: у них настоящие
+  // статусы. До загрузки — из снапшота строки каталога, где известно только
+  // «свободно из всего».
+  const breakdown = hasFreshUnits
+    ? countUnitsByAvailability(units)
+    : { free: unitsAvailable, warn: 0, bad: 0, rest: Math.max(0, unitsTotal - unitsAvailable) }
+  const location = sample?.location
+
   return (
-    <div className={`drawer-layer${skipEnterAnimation ? ' drawer-layer--instant' : ''}`} role="dialog" aria-modal="true" aria-label={tr('Модель оборудования', 'Uskuna modeli')} onMouseDown={(event) => {
-      // Без preventDefault нажатие на подложку увело бы фокус в body уже ПОСЛЕ
-      // того, как плашка его забрала, — и Enter перестал бы значить «продолжить».
-      event.preventDefault()
-      requestClose()
-    }}>
-      <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="drawer__header">
-          <div>
-            <p className="eyebrow">{translateEquipmentTaxonomy(summary.subtype, language)}</p>
-            <h2>{summary.brand} {summary.model}</h2>
-          </div>
-          <div className="drawer__header-actions">
-            <button autoFocus className="icon-button icon-button--bordered" onClick={requestClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
-          </div>
+    <EquipmentDrawerFrame
+      ariaLabel={tr('Модель оборудования', 'Uskuna modeli')}
+      instant={skipEnterAnimation}
+      onRequestClose={requestClose}
+      head={<>
+        <div className="drawer__photo"><EquipmentVisual item={summary} alt={`${summary.brand} ${summary.model}`} /></div>
+        <div className="drawer__titles">
+          <p className="eyebrow">{translateEquipmentTaxonomy(summary.subtype, language)}</p>
+          <h2>{summary.brand} {summary.model}</h2>
+          <p className="drawer__meta">{translateEquipmentTaxonomy(summary.type, language)}{location ? ` · ${location}` : ''}</p>
         </div>
-        {isPrompting && (
-          <UnsavedPrompt
-            message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
-            stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
-            leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
-            onStay={keepEditing}
-            onLeave={confirmClose}
-          />
-        )}
-        <EquipmentVisual item={summary} size="large" alt={`${summary.brand} ${summary.model}`} />
-        <div className="model-drawer-stats">
-          <span className="badge badge--neutral"><i />{tr(`Всего: ${unitsTotal} шт.`, `Jami: ${unitsTotal} dona`)}</span>
-          <span className={`badge ${unitsAvailable > 0 ? 'badge--success' : 'badge--danger'}`}><i />{tr(`Доступно: ${unitsAvailable}`, `Mavjud: ${unitsAvailable}`)}</span>
+        <button autoFocus className="icon-button" onClick={requestClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+      </>}
+      // Добавление доступно, когда есть образец: сервер копирует из него общие
+      // поля модели. Пустая модель — заведение через форму каталога.
+      foot={sample && !isAddOpen && (
+        <button type="button" className="button button--secondary" onClick={() => { setIsAddOpen(true); setAddError(''); setAddSuccess('') }}>
+          <PackagePlus size={16} /> {tr('Добавить единицу', 'Birlik qo‘shish')}
+        </button>
+      )}
+    >
+      {isPrompting && (
+        <UnsavedPrompt
+          message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+          stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
+          leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
+          onStay={keepEditing}
+          onLeave={confirmClose}
+        />
+      )}
+      {/* Главный факт модели — сколько свободно. Отклонения — строками под
+          числом, каждая со словом: цвет шкалы без слова не читается. */}
+      <div className="bigfact">
+        <b>{unitsAvailable}</b>
+        <span>
+          {tr('из', '')} <strong>{unitsTotal}</strong> {tr('на складе', 'tadan omborda')}
+          {breakdown.warn > 0 && <><br />{tr(`${breakdown.warn} на диагностике`, `${breakdown.warn} diagnostikada`)}</>}
+          {breakdown.bad > 0 && <><br />{tr(`${breakdown.bad} нет на складе`, `${breakdown.bad} omborda yo‘q`)}</>}
+          {breakdown.rest > 0 && hasFreshUnits && <><br />{tr(`${breakdown.rest} выдано или без статуса`, `${breakdown.rest} berilgan yoki holatsiz`)}</>}
           {/* «С серийником» — только когда номер есть не у всех штук: у полностью
-              серийной модели бейдж дублировал бы «Всего». До загрузки единиц
-              числа нет — бейдж появляется вместе со списком. */}
+              серийной модели строка дублировала бы «всего». */}
           {hasFreshUnits && serializedUnits.length < unitsTotal
-            && <span className="badge badge--neutral"><i />{tr(`С серийником: ${serializedUnits.length}`, `Seriya raqami bilan: ${serializedUnits.length}`)}</span>}
-        </div>
-        {sample && (
-          <dl className="detail-list">
-            <div><dt>{tr('Категория', 'Toifa')}</dt><dd>{translateEquipmentTaxonomy(sample.type, language)}</dd></div>
-            <div><dt>{tr('Подкатегория', 'Quyi toifa')}</dt><dd>{translateEquipmentTaxonomy(sample.subtype, language)}</dd></div>
-            <div><dt>{tr('Локация', 'Joylashuv')}</dt><dd>{sample.location || '—'}</dd></div>
-            {sample.lengthinmeters && sample.lengthinmeters !== 'N/A' && <div><dt>{tr('Длина', 'Uzunlik')}</dt><dd>{sample.lengthinmeters}</dd></div>}
-            <div className="detail-list__wide"><dt>{tr('Характеристики', 'Xususiyatlar')}</dt><dd>{sample.technicalspecification || tr('Не указаны', 'Ko‘rsatilmagan')}</dd></div>
-            <div className="detail-list__wide"><dt>{tr('Описание', 'Tavsif')}</dt><dd>{sample.description || tr('Нет описания', 'Tavsif yo‘q')}</dd></div>
-          </dl>
+            && <><br />{tr(`с серийным номером: ${serializedUnits.length}`, `seriya raqami bilan: ${serializedUnits.length}`)}</>}
+        </span>
+      </div>
+      <AvailabilityTicks {...breakdown} />
+      <section className="drawer-section">
+        <h3 className="drawer-caps">{tr('Единицы', 'Birliklar')}</h3>
+        {addSuccess && <p className="form-success"><Save size={15} /> {addSuccess}</p>}
+        {sample && isAddOpen && (
+          <form className="model-add-unit" onSubmit={handleAddUnit}>
+            <div className="model-add-unit__fields">
+              <label className="field">
+                <span>{tr('Серийный номер — если есть', 'Seriya raqami — bo‘lsa')}</span>
+                <input autoFocus className="input-mono" value={addSerial} onChange={(event) => setAddSerial(event.target.value)} placeholder={tr('Можно оставить пустым', 'Bo‘sh qoldirsa bo‘ladi')} />
+              </label>
+              <label className="field">
+                <span>{tr('Сколько', 'Nechta')}</span>
+                {/* С номером единица всегда одна: номер идентифицирует штуку. */}
+                <input type="number" min="1" max="9999" value={addSerial.trim() ? 1 : addCount} onChange={(event) => setAddCount(Math.max(1, Number(event.target.value) || 1))} disabled={Boolean(addSerial.trim())} />
+              </label>
+            </div>
+            {addError && <p className="form-error"><CircleAlert size={15} /> {addError}</p>}
+            <div className="model-add-unit__actions">
+              <button type="button" className="button button--secondary" onClick={() => { setIsAddOpen(false); setAddError('') }} disabled={isAddSaving}>{tr('Отмена', 'Bekor qilish')}</button>
+              <button type="submit" className="button button--primary" disabled={isAddSaving}>
+                {isAddSaving ? tr('Добавляем…', 'Qo‘shilmoqda…') : tr('Добавить', 'Qo‘shish')}
+              </button>
+            </div>
+          </form>
         )}
-        <section className="unit-lists">
-          <div className="panel-heading"><div><h3>{tr('Единицы', 'Birliklar')}</h3><p>{tr('Каждая строка — отдельная запись каталога. Откройте, чтобы посмотреть или изменить.', 'Har bir qator — katalogning alohida yozuvi. Ko‘rish yoki o‘zgartirish uchun oching.')}</p></div></div>
-          {addSuccess && <p className="form-success"><Save size={15} /> {addSuccess}</p>}
-          {/* Добавление доступно, когда есть образец: сервер копирует из него
-              общие поля модели. Пустая модель — заведение через форму каталога. */}
-          {sample && !isAddOpen && (
-            <button type="button" className="button button--secondary" onClick={() => { setIsAddOpen(true); setAddError(''); setAddSuccess('') }}>
-              <PackagePlus size={16} /> {tr('Добавить единицу', 'Birlik qo‘shish')}
-            </button>
+        {hasError
+          ? <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить единицы модели.', 'Model birliklarini yuklab bo‘lmadi.')}</p>
+          : isLoading
+            ? <p className="muted">{tr('Загружаем единицы…', 'Birliklar yuklanmoqda…')}</p>
+            : orderedUnits.length === 0
+              ? <p className="muted">{tr('Единиц не нашлось — возможно, записи только что удалили.', 'Birliklar topilmadi — ehtimol, yozuvlar hozirgina o‘chirilgan.')}</p>
+              // Каждая строка — отдельная запись каталога: нажатие открывает её карточку.
+              : <ul className="unit-rows">
+                {orderedUnits.map((unit) => {
+                  const status = equipmentAvailabilityView(unit.availability, tr)
+                  const isQuantity = unit.tracking_mode === 'quantity'
+                  return (
+                    <li key={unit.id}>
+                      <button type="button" onClick={() => requestLeave(() => onOpenUnit(unit))}>
+                        {isQuantity
+                          ? <strong>{unit.inventory_code
+                            ? tr(`${unit.count} шт. · ${unit.inventory_code}`, `${unit.count} dona · ${unit.inventory_code}`)
+                            : tr(`${unit.count} шт. без серийного номера`, `${unit.count} dona seriya raqamisiz`)}</strong>
+                          : <strong className="mono">{unit.serialnumber || tr('Без серийного номера', 'Seriya raqamisiz')}</strong>}
+                        <small>{unit.location}</small>
+                        <span className={`badge badge--${status.tone}`}><i />{status.label}</span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>}
+      </section>
+      {sample && (
+        <>
+          {sample.lengthinmeters && sample.lengthinmeters !== 'N/A' && (
+            <section className="drawer-section">
+              <h3 className="drawer-caps">{tr('Длина', 'Uzunlik')}</h3>
+              <p className="drawer-text">{sample.lengthinmeters}</p>
+            </section>
           )}
-          {sample && isAddOpen && (
-            <form className="model-add-unit" onSubmit={handleAddUnit}>
-              <div className="model-add-unit__fields">
-                <label className="field">
-                  <span>{tr('Серийный номер — если есть', 'Seriya raqami — bo‘lsa')}</span>
-                  <input autoFocus className="input-mono" value={addSerial} onChange={(event) => setAddSerial(event.target.value)} placeholder={tr('Можно оставить пустым', 'Bo‘sh qoldirsa bo‘ladi')} />
-                </label>
-                <label className="field">
-                  <span>{tr('Сколько', 'Nechta')}</span>
-                  {/* С номером единица всегда одна: номер идентифицирует штуку. */}
-                  <input type="number" min="1" max="9999" value={addSerial.trim() ? 1 : addCount} onChange={(event) => setAddCount(Math.max(1, Number(event.target.value) || 1))} disabled={Boolean(addSerial.trim())} />
-                </label>
-              </div>
-              {addError && <p className="form-error"><CircleAlert size={15} /> {addError}</p>}
-              <div className="model-add-unit__actions">
-                <button type="button" className="button button--secondary" onClick={() => { setIsAddOpen(false); setAddError('') }} disabled={isAddSaving}>{tr('Отмена', 'Bekor qilish')}</button>
-                <button type="submit" className="button button--primary" disabled={isAddSaving}>
-                  {isAddSaving ? tr('Добавляем…', 'Qo‘shilmoqda…') : tr('Добавить', 'Qo‘shish')}
-                </button>
-              </div>
-            </form>
-          )}
-          {hasError
-            ? <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить единицы модели.', 'Model birliklarini yuklab bo‘lmadi.')}</p>
-            : isLoading
-              ? <p className="muted">{tr('Загружаем единицы…', 'Birliklar yuklanmoqda…')}</p>
-              : orderedUnits.length === 0
-                ? <p className="muted">{tr('Единиц не нашлось — возможно, записи только что удалили.', 'Birliklar topilmadi — ehtimol, yozuvlar hozirgina o‘chirilgan.')}</p>
-                : <ul className="unit-lists__items">
-                  {orderedUnits.map((unit) => {
-                    const status = equipmentAvailabilityView(unit.availability, tr)
-                    const isQuantity = unit.tracking_mode === 'quantity'
-                    return (
-                      <li key={unit.id}>
-                        <button type="button" onClick={() => requestLeave(() => onOpenUnit(unit))}>
-                          <span>
-                            {isQuantity
-                              ? <strong>{unit.inventory_code
-                                ? tr(`${unit.count} шт. · ${unit.inventory_code}`, `${unit.count} dona · ${unit.inventory_code}`)
-                                : tr(`${unit.count} шт. без серийного номера`, `${unit.count} dona seriya raqamisiz`)}</strong>
-                              : <strong className="mono">{unit.serialnumber || tr('Без серийного номера', 'Seriya raqamisiz')}</strong>}
-                            <small>
-                              {status.label}
-                              {unit.location ? ` · ${unit.location}` : ''}
-                            </small>
-                          </span>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>}
-        </section>
-      </aside>
-    </div>
+          <section className="drawer-section">
+            <h3 className="drawer-caps">{tr('Характеристики', 'Xususiyatlar')}</h3>
+            <p className="drawer-text">{sample.technicalspecification || tr('Не указаны', 'Ko‘rsatilmagan')}</p>
+          </section>
+          <section className="drawer-section">
+            <h3 className="drawer-caps">{tr('Описание', 'Tavsif')}</h3>
+            <p className="drawer-text">{sample.description || tr('Нет описания', 'Tavsif yo‘q')}</p>
+          </section>
+        </>
+      )}
+    </EquipmentDrawerFrame>
   )
 }

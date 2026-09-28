@@ -17,6 +17,38 @@
 .equipment-cell > span:last-child { min-width: 0; display: flex; flex-direction: column; }
 .equipment-cell strong { overflow: hidden; color: var(--ink); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .equipment-cell small { overflow: hidden; margin-top: 3px; color: var(--faint); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+/* Каталог оборудования (макет с31, «Каталог»). Модификатор общей таблицы: колонки
+   свои (модель · категория на ≥1800 · шкала единиц · свободно), проценты общих
+   nth-child для сотрудников и машин не трогаем — перебиваем специфичностью. */
+.data-table.catalog-table { min-width: 620px; }
+.data-table.catalog-table th:first-child { width: auto; }
+.data-table.catalog-table th.catalog-table__category { width: 240px; }
+.data-table.catalog-table th.catalog-table__units { width: 180px; }
+.data-table.catalog-table th.catalog-table__free { width: 128px; }
+.data-table.catalog-table td { height: 62px; padding-block: 8px; }
+.catalog-table .catalog-table__free { text-align: right; }
+.catalog-table td.catalog-table__category { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.catalog-table .equipment-cell strong { font-weight: 600; }
+.catalog-table .equipment-thumb--compact { width: 44px; height: 44px; }
+/* Открытая в дровере модель подсвечена в выдаче — видно, откуда пришёл. */
+.catalog-table tbody tr.is-selected td { background: var(--select); }
+.catalog-table tbody tr.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--ink); }
+/* Шкала единиц (AvailabilityTicks): штрих на штуку, больше 14 — полоса долей.
+   Норма — тёмная заливка, диагностика — янтарь, «нет на складе» — малиновый
+   контур, несвободное без известной причины — серый контур. */
+.ticks { display: flex; align-items: center; gap: 3px; }
+.ticks i { width: 7px; height: 16px; display: block; flex: none; border-radius: 2.5px; background: var(--ink-2); }
+.ticks i.w { background: var(--warn-dot); }
+.ticks i.b { background: transparent; box-shadow: inset 0 0 0 1.5px var(--bad-dot); }
+.ticks i.r { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ctl); }
+.ticks--bar { width: 120px; height: 10px; gap: 0; overflow: hidden; border-radius: 5px; background: var(--line); }
+.ticks--bar i { width: auto; height: 100%; flex-shrink: 1; border-radius: 0; }
+.ticks--bar i.b { background: var(--bad-bg); box-shadow: none; }
+.ticks--bar i.r { background: transparent; box-shadow: none; }
+/* «3 из 4» — главное число строки. Ноль свободных — отклонение, малиновый. */
+.free-count { color: var(--ink); font: 700 15px/1 var(--f-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.free-count small { color: var(--faint); font-size: 12.5px; font-weight: 500; }
+.free-count--none b { color: var(--bad); }
 .equipment-thumb { position: relative; width: 36px; height: 36px; display: grid; flex: 0 0 auto; place-items: center; overflow: hidden; border: 1px solid var(--line-2); border-radius: var(--r-sm); color: var(--faint); background: var(--sunk); }
 .equipment-thumb--photo { background: var(--card); }
 .equipment-thumb__placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: var(--faint); opacity: 1; transition: opacity .16s ease; }
@@ -62,17 +94,9 @@
 .equipment-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .equipment-edit-grid .field { margin: 0; }
 .equipment-edit-grid .field--wide { grid-column: 1 / -1; }
-/* Липкий низ панели правки: .drawer сам прокручивается, поэтому sticky держит
-   кнопки и сообщение о конфликте в поле зрения на любой длине формы. Отрицательные
-   поля растягивают подложку на всю ширину дровера поверх его padding — иначе из-под
-   блока видно прокручивающийся текст. */
-.equipment-edit-footer { position: sticky; bottom: -30px; z-index: 1; display: flex; flex-direction: column; gap: 10px; margin: 0 -30px -30px; padding: 14px 30px 30px; border-top: 1px solid var(--line); background: rgba(255,255,255,.98); box-shadow: 0 -10px 28px rgba(15,17,21,.07); }
-.equipment-edit-footer .form-error { margin: 0; }
 /* «Сейчас в списках» в карточке оборудования. Раздел появляется только когда
    единица где-то стоит, поэтому пустого состояния у него нет. */
 .unit-lists { margin: 26px 0 0; }
-/* Сводка дровера модели: два бейджа под заголовком. */
-.model-drawer-stats { display: flex; flex-wrap: wrap; gap: 8px; }
 /* Форма «+1 единица» в дровере модели: серийник широкий, количество узкое. */
 .model-add-unit { display: grid; gap: 10px; margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--sunk); }
 .model-add-unit__fields { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 8px; }
@@ -199,9 +223,60 @@
 .sheet__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 14px; }
 .sheet__account { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--faint); font-size: 13px; }
 .sheet__account > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Лист-дровер оборудования (телефон): рама та же, что у бокового дровера —
+   шапка, прокручиваемое тело, подвал. Паддинги и gap листа меню здесь не нужны:
+   их несут части рамы. Хват стоит в потоке, над шапкой. */
+.sheet--drawer { max-height: calc(100dvh - 48px); gap: 0; padding: 0; }
+.sheet--drawer .sheet__grab { flex: none; height: 22px; margin: 0; }
+.sheet--drawer .drawer__head { padding: 4px 18px 14px; }
+.sheet--drawer .drawer__photo .equipment-thumb { width: 56px; height: 56px; }
+.sheet--drawer .drawer__body { padding: 16px 18px 20px; }
+.sheet--drawer .drawer__foot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+.sheet--drawer .drawer__foot > .button, .sheet--drawer .equipment-edit-foot { flex: 1 1 auto; }
 .drawer { width: min(480px, 100%); height: 100%; padding: 30px; background: var(--card); box-shadow: var(--shadow-drawer); overflow-y: auto; animation: slide-in .22s ease-out; }
 .drawer__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 14px; }
 .drawer__header h2 { margin-bottom: 0; font-size: 25px; }
+/* Рама дроверов оборудования (EquipmentDrawerFrame, макет с31): шапка, тело со
+   своим скроллом, подвал с действиями. На десктопе — модификатор бокового
+   дровера, на телефоне — тот же набор классов внутри .sheet--drawer. */
+.drawer--split { width: min(460px, 100%); display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.drawer__head { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 14px; padding: 22px 22px 16px; border-bottom: 1px solid var(--line-2); }
+.drawer__photo .equipment-thumb { width: 64px; height: 64px; border-radius: var(--r-lg); }
+.drawer__titles .eyebrow { margin-bottom: 6px; }
+.drawer__titles h2 { margin: 0; font: 800 22px/1.12 var(--f-display); letter-spacing: -.025em; overflow-wrap: anywhere; }
+.drawer__meta { margin: 5px 0 0; color: var(--faint); font-size: 13px; }
+.drawer__head > .icon-button { margin: -6px -8px 0 0; }
+/* Тело — flex-колонка, а не grid: в сетке с ограниченной высотой блок с
+   overflow: hidden (.detail-list) сжимался до обрезки — его минимальный размер 0. */
+.drawer__body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 18px; padding: 18px 22px 24px; overflow-y: auto; overscroll-behavior: contain; }
+.drawer__body > * { flex-shrink: 0; }
+.drawer__body .panel-heading { padding-inline: 0; }
+/* Детям тела поля даёт gap сетки — собственные внешние отступы общих блоков
+   (.detail-list, .unit-lists, фото правки, сообщения) здесь лишние. */
+.drawer__body > :is(.detail-list, .unit-lists, .history-section, .equipment-edit-panel, .equipment-thumb--large, .form-error, .form-success, .unsaved-prompt) { margin-block: 0; }
+.drawer__body > .badge { align-self: flex-start; }
+.drawer__body > .history-section { padding-top: 4px; }
+.drawer__foot { flex: none; display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--line-2); background: var(--card); }
+.drawer__foot .form-error { margin: 0; }
+.equipment-edit-foot { width: 100%; display: grid; gap: 10px; }
+.drawer__body > .equipment-thumb--large.equipment-thumb--photo { align-self: center; }
+/* Главный факт дровера модели: сколько свободно, отклонения — строками рядом. */
+.bigfact { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; }
+.bigfact b { font: 800 52px/.9 var(--f-display); letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.bigfact span { padding-bottom: 4px; color: var(--muted); font-size: 15px; line-height: 1.4; }
+.bigfact strong { color: var(--ink); font-weight: 600; }
+.drawer-section > .form-success { margin-bottom: 10px; }
+/* Подпись раздела капсом (макет с31, .caps) — у дровера и рельса категорий. */
+.drawer-caps { margin: 0 0 8px; color: var(--muted); font: 600 11px/1.2 var(--f-text); letter-spacing: .12em; text-transform: uppercase; }
+.drawer-text { margin: 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.55; }
+/* Единицы модели: серийник моноширинным, локация, статус. Строка — кнопка в
+   карточку единицы. */
+.unit-rows { margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-lg); list-style: none; }
+.unit-rows li + li { border-top: 1px solid var(--line-2); }
+.unit-rows button { width: 100%; min-height: 48px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 8px 14px; border: 0; color: var(--ink); background: transparent; font: inherit; text-align: left; }
+.unit-rows button:hover { background: var(--sunk); }
+.unit-rows strong { overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.unit-rows small { color: var(--faint); font-size: 12.5px; }
 .detail-list { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 26px 0; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--line); overflow: hidden; }
 .detail-list > div { min-height: 78px; display: flex; flex-direction: column; gap: 7px; padding: 14px; background: var(--card); }
 .detail-list dt { color: var(--faint); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }

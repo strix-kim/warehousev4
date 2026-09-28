@@ -14,6 +14,12 @@ type BottomSheetProps = {
   role?: 'dialog' | 'alertdialog'
   ariaLabel?: string
   ariaLabelledBy?: string
+  // Модификатор листа: дроверы оборудования (с35) — лист с шапкой, прокручиваемым
+  // телом и подвалом, а не короткое меню. Без него лист «Ещё» остаётся как был.
+  className?: string
+  // true — слой уже был открыт (модель ↔ карточка): въезд не играем, это смена
+  // содержимого, а не появление листа. Тот же смысл, что у drawer-layer--instant.
+  instant?: boolean
   children: ReactNode
 }
 
@@ -21,7 +27,7 @@ type BottomSheetProps = {
 // Уход анимируется, только если вызывающий держит лист в AnimatePresence
 // (лист «Ещё» в App.tsx); без неё лист просто исчезает. Esc и блокировку
 // прокрутки лист не берёт на себя — это useModalLayer вызывающего.
-export function BottomSheet({ onClose, role = 'dialog', ariaLabel, ariaLabelledBy, children }: BottomSheetProps) {
+export function BottomSheet({ onClose, role = 'dialog', ariaLabel, ariaLabelledBy, className, instant = false, children }: BottomSheetProps) {
   // Тянуть лист можно только за хват: вся площадь листа — это ссылки и кнопки,
   // и перетаскивание с любой точки съедало бы их нажатия.
   const dragControls = useDragControls()
@@ -35,11 +41,11 @@ export function BottomSheet({ onClose, role = 'dialog', ariaLabel, ariaLabelledB
 
   return (
     <div className="sheet-layer" role={role} aria-modal="true" aria-label={ariaLabel} aria-labelledby={ariaLabelledBy} onMouseDown={onClose} style={isPresent ? undefined : { pointerEvents: 'none' }}>
-      <m.div className="sheet-layer__scrim" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.18 } }} exit={{ opacity: 0, transition: { duration: 0.16 } }} />
+      <m.div className="sheet-layer__scrim" initial={instant ? false : { opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.18 } }} exit={{ opacity: 0, transition: { duration: 0.16 } }} />
       <m.div
-        className="sheet"
+        className={className ? `sheet ${className}` : 'sheet'}
         onMouseDown={(event) => event.stopPropagation()}
-        initial={{ y: '100%' }}
+        initial={instant ? false : { y: '100%' }}
         animate={{ y: 0, transition: SHEET_ENTER }}
         exit={{ y: '100%', transition: SHEET_EXIT }}
         drag="y"

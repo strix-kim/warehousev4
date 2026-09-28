@@ -23,6 +23,7 @@ import { useLanguage } from '../../lib/i18n'
 import { useArmedAction } from '../../lib/useArmedAction'
 import { useGuardedClose } from '../../lib/useGuardedClose'
 import { useModalLayer } from '../../lib/useModalLayer'
+import { EquipmentDrawerFrame } from './EquipmentDrawerFrame'
 
 // parseDateValue отдаёт null на мусоре в колонке: дата мероприятия nullable и
 // приходит строкой из базы, а не из нашего пикера.
@@ -114,9 +115,9 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
   // Ответ, пришедший после закрытия, игнорируем: onRefreshed поднимает запись
   // наверх и заново открыл бы уже закрытый drawer.
   const isOpenRef = useRef(true)
-  // Дровер — сам себе скролл-контейнер (.drawer overflow-y: auto), поэтому
-  // прокрутка к подтверждению идёт по нему, а не по window.
-  const drawerRef = useRef<HTMLElement>(null)
+  // Тело рамы — сам себе скролл-контейнер (.drawer__body overflow-y: auto),
+  // поэтому прокрутка к подтверждению идёт по нему, а не по window.
+  const drawerRef = useRef<HTMLDivElement>(null)
   const { brand, model, type, subtype, specification, length, description, availability, location, count } = draft
   const canSave = Boolean(brand.trim() && model.trim() && type.trim() && subtype.trim() && count >= 0)
   // Серийная единица в этих списках уже стоит — пикер блокирует их строки.
@@ -355,203 +356,208 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
   }
 
   return (
-    <div className={`drawer-layer${skipEnterAnimation ? ' drawer-layer--instant' : ''}`} role="dialog" aria-modal="true" aria-label={tr('Карточка оборудования', 'Uskuna kartasi')} onMouseDown={(event) => {
-      // Без preventDefault нажатие на подложку увело бы фокус в body уже ПОСЛЕ
-      // того, как плашка его забрала, — и Enter перестал бы значить «продолжить».
-      event.preventDefault()
-      requestClose()
-    }}>
-      <aside className="drawer" ref={drawerRef} onMouseDown={(event) => event.stopPropagation()}>
-        <div className="drawer__header">
-          <div>
-            <p className="eyebrow">{equipmentCode(item.id)}</p>
-            <h2>{item.brand} {item.model}</h2>
-          </div>
-          <div className="drawer__header-actions">
-            {!isEditing && <button className="button button--secondary" onClick={() => { setIsEditing(true); setEditSuccess('') }}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>}
-            <button autoFocus className="icon-button icon-button--bordered" onClick={requestClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+    <EquipmentDrawerFrame
+      ariaLabel={tr('Карточка оборудования', 'Uskuna kartasi')}
+      instant={skipEnterAnimation}
+      onRequestClose={requestClose}
+      bodyRef={drawerRef}
+      head={<>
+        {/* Фото в шапке — в режиме чтения; в правке оно же полосой в теле:
+            там видно, во что превратится единица при смене категории. */}
+        <div className="drawer__photo"><EquipmentVisual item={item} alt={`${item.brand} ${item.model}`} /></div>
+        <div className="drawer__titles">
+          <p className="eyebrow">{translateEquipmentTaxonomy(item.subtype, language)}</p>
+          <h2>{item.brand} {item.model}</h2>
+          <p className="drawer__meta">
+            <span className="mono">{equipmentIdentifier(item, tr)}</span>
+            {item.location ? ` · ${item.location}` : ''} · {equipmentCode(item.id)}
+          </p>
+        </div>
+        <button autoFocus className="icon-button" onClick={requestClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
+      </>}
+      // Действия — в подвале рамы: он прибит к низу, и ошибка конфликта версий
+      // стоит прямо над «Сохранить», где по ней и принимают решение.
+      foot={isEditing ? (
+        <div className="equipment-edit-foot">
+          {editError && <p className="form-error"><CircleAlert size={15} /> {editError}</p>}
+          <div className="equipment-edit-actions">
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => (isDirty ? cancelArmed.fire(cancelEditing) : cancelEditing())}
+              onBlur={cancelArmed.disarm}
+              disabled={isSaving}
+            >{cancelArmed.armed ? tr('Отменить правки?', 'O‘zgarishlar bekor qilinsinmi?') : tr('Отмена', 'Bekor qilish')}</button>
+            <button className="button button--primary" type="button" onClick={() => void saveChanges()} disabled={!canSave || isSaving}><Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить изменения', 'O‘zgarishlarni saqlash')}</button>
           </div>
         </div>
-        {isPrompting && (
-          <UnsavedPrompt
-            message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
-            stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
-            leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
-            onStay={keepEditing}
-            onLeave={confirmClose}
-          />
-        )}
-        <span className={`badge badge--${status.tone}`}><i />{status.label}</span>
-        {refreshState !== 'fresh' && (
-          <p className="form-error"><CircleAlert size={15} /> {refreshState === 'missing'
-            ? tr('Записи больше нет в базе — возможно, её удалили.', 'Yozuv bazada yo‘q — ehtimol, u o‘chirilgan.')
-            : tr('Не удалось обновить карточку с сервера — показаны данные из каталога.', 'Kartani serverdan yangilab bo‘lmadi — katalogdagi ma’lumotlar ko‘rsatilmoqda.')}</p>
-        )}
-        <EquipmentVisual item={isEditing ? { brand, model, type, subtype } : item} size="large" alt={`${brand} ${model}`} />
-        {editSuccess && <p className="form-success"><Save size={15} /> {editSuccess}</p>}
-        {isEditing ? (
-          <div className="equipment-edit-panel">
-            <section className="equipment-edit-section">
-              <div className="equipment-edit-section__heading">
-                <div><h3>{tr('Данные модели', 'Model ma’lumotlari')}</h3><p>{tr('Изменятся у всех экземпляров с тем же брендом и моделью.', 'Xuddi shu brend va modeldagi barcha nusxalarda o‘zgaradi.')}</p></div>
-                {/* Без числа бейдж честно говорит «у всех», а не выдаёт неизвестное
-                    за единицу: цена ошибки — правка описания у 596 единиц под видом одной. */}
-                <span className="read-only-label">{modelUnitCount === null
-                  ? tr('у всех единиц этой модели', 'bu modelning barcha birliklarida')
-                  : formatUnitCount(modelUnitCount, tr)}</span>
-              </div>
-              <div className="equipment-edit-grid">
-                <label className="field"><span>{tr('Бренд', 'Brend')} *</span><input value={brand} onChange={(event) => changeDraft('brand', event.target.value)} /></label>
-                <label className="field"><span>{tr('Модель', 'Model')} *</span><input value={model} onChange={(event) => changeDraft('model', event.target.value)} /></label>
-                <label className="field"><span>{tr('Категория', 'Toifa')} *</span><input value={type} onChange={(event) => changeDraft('type', event.target.value)} /></label>
-                <label className="field"><span>{tr('Подкатегория', 'Quyi toifa')} *</span><input value={subtype} onChange={(event) => changeDraft('subtype', event.target.value)} /></label>
-                <label className="field"><span>{tr('Длина, м', 'Uzunlik, m')}</span><input value={length} onChange={(event) => changeDraft('length', event.target.value)} placeholder={tr('Только если применимо', 'Faqat tegishli bo‘lsa')} /></label>
-                <label className="field field--wide"><span>{tr('Технические характеристики', 'Texnik xususiyatlar')}</span><textarea value={specification} onChange={(event) => changeDraft('specification', event.target.value)} rows={3} /></label>
-                <label className="field field--wide"><span>{tr('Описание', 'Tavsif')}</span><textarea value={description} onChange={(event) => changeDraft('description', event.target.value)} rows={3} /></label>
-              </div>
-            </section>
-            <section className="equipment-edit-section">
-              <div className="equipment-edit-section__heading">
-                <div><h3>{tr('Конкретная единица', 'Muayyan birlik')}</h3><p>{tr('Статус и локация изменятся только у этой записи. Серийный номер останется прежним.', 'Holat va joylashuv faqat shu yozuvda o‘zgaradi. Seriya raqami o‘zgarmaydi.')}</p></div>
-              </div>
-              <div className="equipment-edit-grid">
-                <div className="field"><span>{tr('Статус', 'Holat')}</span><AppSelect value={availability} onChange={(value) => changeDraft('availability', value)} ariaLabel={tr('Статус оборудования', 'Uskuna holati')} options={equipmentAvailabilityOptions(tr)} /></div>
-                <label className="field"><span>{tr('Локация', 'Joylashuv')} *</span><input value={location} onChange={(event) => changeDraft('location', event.target.value)} required /></label>
-                <label className="field"><span>{item.tracking_mode === 'quantity' ? tr('Внутренний код', 'Ichki kod') : tr('Серийный номер', 'Seriya raqami')}</span><input value={equipmentIdentifier(item, tr)} readOnly /></label>
-                {/* У серийной единицы количество всегда 1 и в базу не уезжает —
-                    показывать заблокированное поле незачем. */}
-                {item.tracking_mode === 'quantity' && (
-                  <label className="field"><span>{tr('Количество', 'Miqdor')}</span><input type="number" min="0" max="9999" value={count} onChange={(event) => changeDraft('count', Number(event.target.value))} /></label>
-                )}
-              </div>
-            </section>
-            {/* Ошибка и кнопки — один липкий блок: порознь сообщение о конфликте
-                версий уезжало вверх за экран, а решение по нему принимают прямо
-                у кнопки «Сохранить». */}
-            <div className="equipment-edit-footer">
-            {editError && <p className="form-error"><CircleAlert size={15} /> {editError}</p>}
-            <div className="equipment-edit-actions">
-              <button
-                className="button button--secondary"
-                type="button"
-                onClick={() => (isDirty ? cancelArmed.fire(cancelEditing) : cancelEditing())}
-                onBlur={cancelArmed.disarm}
-                disabled={isSaving}
-              >{cancelArmed.armed ? tr('Отменить правки?', 'O‘zgarishlar bekor qilinsinmi?') : tr('Отмена', 'Bekor qilish')}</button>
-              <button className="button button--primary" type="button" onClick={() => void saveChanges()} disabled={!canSave || isSaving}><Save size={17} /> {isSaving ? tr('Сохраняем…', 'Saqlanmoqda…') : tr('Сохранить изменения', 'O‘zgarishlarni saqlash')}</button>
+      ) : (
+        <button className="button button--secondary" onClick={() => { setIsEditing(true); setEditSuccess('') }}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>
+      )}
+    >
+      {isPrompting && (
+        <UnsavedPrompt
+          message={tr('Есть несохранённые изменения.', 'Saqlanmagan o‘zgarishlar bor.')}
+          stayLabel={tr('Продолжить правку', 'Tahrirni davom ettirish')}
+          leaveLabel={tr('Закрыть без сохранения', 'Saqlamasdan yopish')}
+          onStay={keepEditing}
+          onLeave={confirmClose}
+        />
+      )}
+      <span className={`badge badge--${status.tone}`}><i />{status.label}</span>
+      {refreshState !== 'fresh' && (
+        <p className="form-error"><CircleAlert size={15} /> {refreshState === 'missing'
+          ? tr('Записи больше нет в базе — возможно, её удалили.', 'Yozuv bazada yo‘q — ehtimol, u o‘chirilgan.')
+          : tr('Не удалось обновить карточку с сервера — показаны данные из каталога.', 'Kartani serverdan yangilab bo‘lmadi — katalogdagi ma’lumotlar ko‘rsatilmoqda.')}</p>
+      )}
+      {isEditing && <EquipmentVisual item={{ brand, model, type, subtype }} size="large" alt={`${brand} ${model}`} />}
+      {editSuccess && <p className="form-success"><Save size={15} /> {editSuccess}</p>}
+      {isEditing ? (
+        <div className="equipment-edit-panel">
+          <section className="equipment-edit-section">
+            <div className="equipment-edit-section__heading">
+              <div><h3>{tr('Данные модели', 'Model ma’lumotlari')}</h3><p>{tr('Изменятся у всех экземпляров с тем же брендом и моделью.', 'Xuddi shu brend va modeldagi barcha nusxalarda o‘zgaradi.')}</p></div>
+              {/* Без числа бейдж честно говорит «у всех», а не выдаёт неизвестное
+                  за единицу: цена ошибки — правка описания у 596 единиц под видом одной. */}
+              <span className="read-only-label">{modelUnitCount === null
+                ? tr('у всех единиц этой модели', 'bu modelning barcha birliklarida')
+                : formatUnitCount(modelUnitCount, tr)}</span>
             </div>
+            <div className="equipment-edit-grid">
+              <label className="field"><span>{tr('Бренд', 'Brend')} *</span><input value={brand} onChange={(event) => changeDraft('brand', event.target.value)} /></label>
+              <label className="field"><span>{tr('Модель', 'Model')} *</span><input value={model} onChange={(event) => changeDraft('model', event.target.value)} /></label>
+              <label className="field"><span>{tr('Категория', 'Toifa')} *</span><input value={type} onChange={(event) => changeDraft('type', event.target.value)} /></label>
+              <label className="field"><span>{tr('Подкатегория', 'Quyi toifa')} *</span><input value={subtype} onChange={(event) => changeDraft('subtype', event.target.value)} /></label>
+              <label className="field"><span>{tr('Длина, м', 'Uzunlik, m')}</span><input value={length} onChange={(event) => changeDraft('length', event.target.value)} placeholder={tr('Только если применимо', 'Faqat tegishli bo‘lsa')} /></label>
+              <label className="field field--wide"><span>{tr('Технические характеристики', 'Texnik xususiyatlar')}</span><textarea value={specification} onChange={(event) => changeDraft('specification', event.target.value)} rows={3} /></label>
+              <label className="field field--wide"><span>{tr('Описание', 'Tavsif')}</span><textarea value={description} onChange={(event) => changeDraft('description', event.target.value)} rows={3} /></label>
             </div>
-          </div>
-        ) : <><dl className="detail-list">
-          <div><dt>{tr('Категория', 'Toifa')}</dt><dd>{translateEquipmentTaxonomy(item.type, language)}</dd></div>
-          <div><dt>{tr('Подкатегория', 'Quyi toifa')}</dt><dd>{translateEquipmentTaxonomy(item.subtype, language)}</dd></div>
-          <div><dt>{tr('Способ учёта', 'Hisob turi')}</dt><dd>{item.tracking_mode === 'quantity' ? tr('По количеству', 'Miqdor bo‘yicha') : tr('По серийному номеру', 'Seriya raqami bo‘yicha')}</dd></div>
-          <div><dt>{item.tracking_mode === 'quantity' ? tr('Внутренний код', 'Ichki kod') : tr('Серийный номер', 'Seriya raqami')}</dt><dd className="mono">{equipmentIdentifier(item, tr)}</dd></div>
-          <div><dt>{tr('Количество', 'Miqdor')}</dt><dd>{item.count} {tr('шт.', 'dona')}</dd></div>
-          <div><dt>{tr('Локация', 'Joylashuv')}</dt><dd>{item.location || '—'}</dd></div>
-          {item.lengthinmeters && item.lengthinmeters !== 'N/A' && <div><dt>{tr('Длина', 'Uzunlik')}</dt><dd>{item.lengthinmeters}</dd></div>}
-          <div className="detail-list__wide"><dt>{tr('Характеристики', 'Xususiyatlar')}</dt><dd>{item.technicalspecification || tr('Не указаны', 'Ko‘rsatilmagan')}</dd></div>
-          <div className="detail-list__wide"><dt>{tr('Описание', 'Tavsif')}</dt><dd>{item.description || tr('Нет описания', 'Tavsif yo‘q')}</dd></div>
-        </dl>
-        {/* U35-б: путь «нашёл в каталоге → добавил в список». Секция стоит перед
-            «Сейчас в списках»: действие — над справкой о его результате. */}
-        <section className="unit-lists">
-          <div className="panel-heading"><div><h3>{tr('В список', 'Ro‘yxatga')}</h3><p>{tr('Добавить эту единицу в сохранённый список', 'Bu birlikni saqlangan ro‘yxatga qo‘shish')}</p></div></div>
-          {appendResult && (
-            <p className="form-success">
-              <ClipboardList size={15} />
-              <span>
-                {appendResult.status !== 'added'
-                  ? tr(`Эта единица уже в списке «${appendResult.name}».`, `Bu birlik «${appendResult.name}» ro‘yxatida allaqachon bor.`)
-                  // Число называем со второй штуки: «теперь 1 шт.» — шум,
-                  // а «теперь 3 шт.» — ответ на вопрос «сколько уже набрал».
-                  : appendResult.count !== null && appendResult.count > 1
-                    ? tr(`Добавлено в «${appendResult.name}» — теперь ${appendResult.count} шт.`, `«${appendResult.name}» ro‘yxatiga qo‘shildi — endi ${appendResult.count} dona.`)
-                    : tr(`Добавлено в «${appendResult.name}».`, `«${appendResult.name}» ro‘yxatiga qo‘shildi.`)}
-                {' '}<Link to={`/lists/${appendResult.listId}/edit`}>{tr('Открыть', 'Ochish')}</Link>
-              </span>
-            </p>
-          )}
-          {hasAppendError && <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось добавить в список. Список не изменён.', 'Ro‘yxatga qo‘shib bo‘lmadi. Ro‘yxat o‘zgarmadi.')}</p>}
-          <button className="button button--secondary" type="button" onClick={toggleAppendPicker}>
-            <Plus size={16} /> {tr('Добавить в список', 'Ro‘yxatga qo‘shish')}
-          </button>
-          {isAppendOpen && (
-            hasTargetsError
-              ? <p className="form-error">{tr('Не удалось загрузить списки.', 'Ro‘yxatlarni yuklab bo‘lmadi.')}</p>
-              : isLoadingTargets && appendTargets.length === 0
-                ? <p className="muted">{tr('Загружаем списки…', 'Ro‘yxatlar yuklanmoqda…')}</p>
-                : appendTargets.length === 0
-                  ? <p className="muted">{tr('Сохранённых списков пока нет.', 'Saqlangan ro‘yxatlar hali yo‘q.')} <Link to="/lists/new">{tr('Создать список', 'Ro‘yxat yaratish')}</Link></p>
-                  : <ul className="unit-lists__items">
-                    {appendTargets.map((target) => {
-                      // Дубль серийной единицы сервер отвергнет и сам ('already'),
-                      // но заблокированная строка честнее кнопки-обманки.
-                      const alreadyIn = item.tracking_mode === 'serialized' && unitListIds.has(target.id)
-                      return (
-                        <li key={target.id}>
-                          <button type="button" onClick={() => void appendToList(target)} disabled={alreadyIn || appendBusyId !== null}>
-                            <ClipboardList size={16} />
-                            <span>
-                              <strong>{target.name}</strong>
-                              <small>{alreadyIn
-                                ? tr('Уже в этом списке', 'Bu ro‘yxatda allaqachon bor')
-                                : appendBusyId === target.id
-                                  ? tr('Добавляем…', 'Qo‘shilmoqda…')
-                                  : eventDateLabel(target.reservation_start, locale) ?? tr('Дата не указана', 'Sana ko‘rsatilmagan')}</small>
-                            </span>
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-          )}
-        </section>
-        {/* «Где единица сейчас» — вопрос настоящего, поэтому стоит ПЕРЕД журналом:
-            тот отвечает про прошлое. Раздел скрыт целиком, когда единица ни в
-            одном списке и запрос при этом прошёл: пустой блок «ни в одном» —
-            шум на каждой из 1 481 карточки. */}
-        {(unitLists.length > 0 || hasUnitListsError) && (
-          <section className="unit-lists">
-            <div className="panel-heading"><div><h3>{tr('Сейчас в списках', 'Hozir ro‘yxatlarda')}</h3><p>{tr('Сохранённые документы, куда включена эта единица', 'Ushbu birlik kiritilgan saqlangan hujjatlar')}</p></div></div>
-            {hasUnitListsError
-              ? <p className="form-error">{tr('Не удалось проверить, в каких списках стоит единица.', 'Birlik qaysi ro‘yxatlarda turganini tekshirib bo‘lmadi.')}</p>
-              : <ul className="unit-lists__items">
-                {unitLists.map((list) => (
-                  <li key={list.id}>
-                    <Link to={`/lists/${list.id}/edit`}>
-                      <ClipboardList size={16} />
-                      <span>
-                        {/* «× 3» — со второй штуки: одна подразумевается самим фактом строки. */}
-                        <strong>{list.name}{list.count !== null && list.count > 1 ? ` × ${list.count}` : ''}</strong>
-                        <small>{eventDateLabel(list.reservation_start, locale) ?? tr('Дата не указана', 'Sana ko‘rsatilmagan')}</small>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>}
           </section>
+          <section className="equipment-edit-section">
+            <div className="equipment-edit-section__heading">
+              <div><h3>{tr('Конкретная единица', 'Muayyan birlik')}</h3><p>{tr('Статус и локация изменятся только у этой записи. Серийный номер останется прежним.', 'Holat va joylashuv faqat shu yozuvda o‘zgaradi. Seriya raqami o‘zgarmaydi.')}</p></div>
+            </div>
+            <div className="equipment-edit-grid">
+              <div className="field"><span>{tr('Статус', 'Holat')}</span><AppSelect value={availability} onChange={(value) => changeDraft('availability', value)} ariaLabel={tr('Статус оборудования', 'Uskuna holati')} options={equipmentAvailabilityOptions(tr)} /></div>
+              <label className="field"><span>{tr('Локация', 'Joylashuv')} *</span><input value={location} onChange={(event) => changeDraft('location', event.target.value)} required /></label>
+              <label className="field"><span>{item.tracking_mode === 'quantity' ? tr('Внутренний код', 'Ichki kod') : tr('Серийный номер', 'Seriya raqami')}</span><input value={equipmentIdentifier(item, tr)} readOnly /></label>
+              {/* У серийной единицы количество всегда 1 и в базу не уезжает —
+                  показывать заблокированное поле незачем. */}
+              {item.tracking_mode === 'quantity' && (
+                <label className="field"><span>{tr('Количество', 'Miqdor')}</span><input type="number" min="0" max="9999" value={count} onChange={(event) => changeDraft('count', Number(event.target.value))} /></label>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : <><dl className="detail-list">
+        <div><dt>{tr('Категория', 'Toifa')}</dt><dd>{translateEquipmentTaxonomy(item.type, language)}</dd></div>
+        <div><dt>{tr('Подкатегория', 'Quyi toifa')}</dt><dd>{translateEquipmentTaxonomy(item.subtype, language)}</dd></div>
+        <div><dt>{tr('Способ учёта', 'Hisob turi')}</dt><dd>{item.tracking_mode === 'quantity' ? tr('По количеству', 'Miqdor bo‘yicha') : tr('По серийному номеру', 'Seriya raqami bo‘yicha')}</dd></div>
+        <div><dt>{item.tracking_mode === 'quantity' ? tr('Внутренний код', 'Ichki kod') : tr('Серийный номер', 'Seriya raqami')}</dt><dd className="mono">{equipmentIdentifier(item, tr)}</dd></div>
+        <div><dt>{tr('Количество', 'Miqdor')}</dt><dd>{item.count} {tr('шт.', 'dona')}</dd></div>
+        <div><dt>{tr('Локация', 'Joylashuv')}</dt><dd>{item.location || '—'}</dd></div>
+        {item.lengthinmeters && item.lengthinmeters !== 'N/A' && <div><dt>{tr('Длина', 'Uzunlik')}</dt><dd>{item.lengthinmeters}</dd></div>}
+        <div className="detail-list__wide"><dt>{tr('Характеристики', 'Xususiyatlar')}</dt><dd>{item.technicalspecification || tr('Не указаны', 'Ko‘rsatilmagan')}</dd></div>
+        <div className="detail-list__wide"><dt>{tr('Описание', 'Tavsif')}</dt><dd>{item.description || tr('Нет описания', 'Tavsif yo‘q')}</dd></div>
+      </dl>
+      {/* U35-б: путь «нашёл в каталоге → добавил в список». Секция стоит перед
+          «Сейчас в списках»: действие — над справкой о его результате. */}
+      <section className="unit-lists">
+        <div className="panel-heading"><div><h3>{tr('В список', 'Ro‘yxatga')}</h3><p>{tr('Добавить эту единицу в сохранённый список', 'Bu birlikni saqlangan ro‘yxatga qo‘shish')}</p></div></div>
+        {appendResult && (
+          <p className="form-success">
+            <ClipboardList size={15} />
+            <span>
+              {appendResult.status !== 'added'
+                ? tr(`Эта единица уже в списке «${appendResult.name}».`, `Bu birlik «${appendResult.name}» ro‘yxatida allaqachon bor.`)
+                // Число называем со второй штуки: «теперь 1 шт.» — шум,
+                // а «теперь 3 шт.» — ответ на вопрос «сколько уже набрал».
+                : appendResult.count !== null && appendResult.count > 1
+                  ? tr(`Добавлено в «${appendResult.name}» — теперь ${appendResult.count} шт.`, `«${appendResult.name}» ro‘yxatiga qo‘shildi — endi ${appendResult.count} dona.`)
+                  : tr(`Добавлено в «${appendResult.name}».`, `«${appendResult.name}» ro‘yxatiga qo‘shildi.`)}
+              {' '}<Link to={`/lists/${appendResult.listId}/edit`}>{tr('Открыть', 'Ochish')}</Link>
+            </span>
+          </p>
         )}
-        <section className="history-section">
-          <div className="panel-heading"><div><h3>{tr('История движения', 'Harakat tarixi')}</h3><p>{tr('Количество, статус, выдачи и возвраты', 'Miqdor, holat, berish va qaytarish')}</p></div></div>
-          <div className="timeline">
-            {movements.map((movement) => (
-              <div className="timeline__item" key={movement.id}>
-                <i />
-                <div>
-                  <strong>{movementLabel(movement, tr)}</strong>
-                  <span>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(movement.changed_at))}</span>
-                  {(movement.quantity_before !== movement.quantity_after) && <p>{movement.quantity_before ?? '—'} → {movement.quantity_after ?? '—'} {tr('шт.', 'dona')} ({movement.quantity_delta > 0 ? '+' : ''}{movement.quantity_delta})</p>}
-                  {movement.note && <p>{movement.note}</p>}
-                </div>
+        {hasAppendError && <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось добавить в список. Список не изменён.', 'Ro‘yxatga qo‘shib bo‘lmadi. Ro‘yxat o‘zgarmadi.')}</p>}
+        <button className="button button--secondary" type="button" onClick={toggleAppendPicker}>
+          <Plus size={16} /> {tr('Добавить в список', 'Ro‘yxatga qo‘shish')}
+        </button>
+        {isAppendOpen && (
+          hasTargetsError
+            ? <p className="form-error">{tr('Не удалось загрузить списки.', 'Ro‘yxatlarni yuklab bo‘lmadi.')}</p>
+            : isLoadingTargets && appendTargets.length === 0
+              ? <p className="muted">{tr('Загружаем списки…', 'Ro‘yxatlar yuklanmoqda…')}</p>
+              : appendTargets.length === 0
+                ? <p className="muted">{tr('Сохранённых списков пока нет.', 'Saqlangan ro‘yxatlar hali yo‘q.')} <Link to="/lists/new">{tr('Создать список', 'Ro‘yxat yaratish')}</Link></p>
+                : <ul className="unit-lists__items">
+                  {appendTargets.map((target) => {
+                    // Дубль серийной единицы сервер отвергнет и сам ('already'),
+                    // но заблокированная строка честнее кнопки-обманки.
+                    const alreadyIn = item.tracking_mode === 'serialized' && unitListIds.has(target.id)
+                    return (
+                      <li key={target.id}>
+                        <button type="button" onClick={() => void appendToList(target)} disabled={alreadyIn || appendBusyId !== null}>
+                          <ClipboardList size={16} />
+                          <span>
+                            <strong>{target.name}</strong>
+                            <small>{alreadyIn
+                              ? tr('Уже в этом списке', 'Bu ro‘yxatda allaqachon bor')
+                              : appendBusyId === target.id
+                                ? tr('Добавляем…', 'Qo‘shilmoqda…')
+                                : eventDateLabel(target.reservation_start, locale) ?? tr('Дата не указана', 'Sana ko‘rsatilmagan')}</small>
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+        )}
+      </section>
+      {/* «Где единица сейчас» — вопрос настоящего, поэтому стоит ПЕРЕД журналом:
+          тот отвечает про прошлое. Раздел скрыт целиком, когда единица ни в
+          одном списке и запрос при этом прошёл: пустой блок «ни в одном» —
+          шум на каждой из 1 481 карточки. */}
+      {(unitLists.length > 0 || hasUnitListsError) && (
+        <section className="unit-lists">
+          <div className="panel-heading"><div><h3>{tr('Сейчас в списках', 'Hozir ro‘yxatlarda')}</h3><p>{tr('Сохранённые документы, куда включена эта единица', 'Ushbu birlik kiritilgan saqlangan hujjatlar')}</p></div></div>
+          {hasUnitListsError
+            ? <p className="form-error">{tr('Не удалось проверить, в каких списках стоит единица.', 'Birlik qaysi ro‘yxatlarda turganini tekshirib bo‘lmadi.')}</p>
+            : <ul className="unit-lists__items">
+              {unitLists.map((list) => (
+                <li key={list.id}>
+                  <Link to={`/lists/${list.id}/edit`}>
+                    <ClipboardList size={16} />
+                    <span>
+                      {/* «× 3» — со второй штуки: одна подразумевается самим фактом строки. */}
+                      <strong>{list.name}{list.count !== null && list.count > 1 ? ` × ${list.count}` : ''}</strong>
+                      <small>{eventDateLabel(list.reservation_start, locale) ?? tr('Дата не указана', 'Sana ko‘rsatilmagan')}</small>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>}
+        </section>
+      )}
+      <section className="history-section">
+        <div className="panel-heading"><div><h3>{tr('История движения', 'Harakat tarixi')}</h3><p>{tr('Количество, статус, выдачи и возвраты', 'Miqdor, holat, berish va qaytarish')}</p></div></div>
+        <div className="timeline">
+          {movements.map((movement) => (
+            <div className="timeline__item" key={movement.id}>
+              <i />
+              <div>
+                <strong>{movementLabel(movement, tr)}</strong>
+                <span>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(movement.changed_at))}</span>
+                {(movement.quantity_before !== movement.quantity_after) && <p>{movement.quantity_before ?? '—'} → {movement.quantity_after ?? '—'} {tr('шт.', 'dona')} ({movement.quantity_delta > 0 ? '+' : ''}{movement.quantity_delta})</p>}
+                {movement.note && <p>{movement.note}</p>}
               </div>
-            ))}
-            {!hasHistoryError && movements.length === 0 && <p className="muted">{tr('История пока пуста. После подключения журнала здесь появятся изменения количества, выдачи и возвраты.', 'Tarix hozircha bo‘sh. Jurnal ulangach, bu yerda miqdor o‘zgarishi, berish va qaytarishlar ko‘rinadi.')}</p>}
-            {hasHistoryError && <p className="form-error">{tr('История временно недоступна.', 'Tarix vaqtincha mavjud emas.')}</p>}
-          </div>
-        </section></>}
-      </aside>
-    </div>
+            </div>
+          ))}
+          {!hasHistoryError && movements.length === 0 && <p className="muted">{tr('История пока пуста. После подключения журнала здесь появятся изменения количества, выдачи и возвраты.', 'Tarix hozircha bo‘sh. Jurnal ulangach, bu yerda miqdor o‘zgarishi, berish va qaytarishlar ko‘rinadi.')}</p>}
+          {hasHistoryError && <p className="form-error">{tr('История временно недоступна.', 'Tarix vaqtincha mavjud emas.')}</p>}
+        </div>
+      </section></>}
+    </EquipmentDrawerFrame>
   )
 }
 
