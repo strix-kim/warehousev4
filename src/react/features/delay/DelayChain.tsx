@@ -152,7 +152,14 @@ export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, wid
                       <small className="delay-node__stepword">{tr('шаг', 'qadam')}</small>
                     </span>
                     <span className="delay-node__unit">
-                      {waitless ? (two ? tr('самый дальний — не ждёт', 'eng uzoqdagisi — kutmaydi') : tr('последний — не ждёт', 'oxirgisi — kutmaydi')) : (
+                      {/* Двумя блоками, как «нс / метры» у соседей: одной строкой с тире
+                          подпись крайнего узла доставала до рамки карточки (с41). */}
+                      {waitless ? (
+                        <>
+                          <span className="delay-node__ns">{two ? tr('самый дальний', 'eng uzoqdagisi') : tr('последний', 'oxirgisi')}</span>
+                          <span className="delay-node__down">{tr('не ждёт', 'kutmaydi')}</span>
+                        </>
+                      ) : (
                         <>
                           <span className="delay-node__ns">
                             <span className="delay-node__word">{tr('шаг', 'qadam')} · </span>

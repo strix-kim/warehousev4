@@ -54,7 +54,7 @@
 .delay-chain--two.delay-chain--row .delay-fork::before { content: ''; position: absolute; left: 0; right: 0; top: calc(74px + var(--delay-track-h) / 2 - 1.5px); height: 3px; background: var(--ink-2); }
 .delay-chain--two.delay-chain--row .delay-fork::after { content: ''; position: absolute; right: 0; top: 72.5px; width: 3px; height: calc(var(--delay-track-h) + 3px); border-radius: 2px; background: var(--ink-2); }
 /* Подпись первого кабеля сдвинута вправо от шины: по центру она бы легла на неё. */
-.delay-chain--two.delay-chain--row .delay-cable--first .delay-cable__note { left: 8px; margin-left: 0; text-align: left; }
+.delay-chain--two.delay-chain--row .delay-cable--first .delay-cable__note { left: 8px; width: auto; margin-left: 0; text-align: left; white-space: nowrap; }
 
 /* Узел: коробка 56 × 56 (слои — значок, подсветка, кольцо, волны) и подпись.
    Центр коробки и есть точка, куда бежит сигнал. */
@@ -70,6 +70,9 @@
 .delay-node__lab { position: absolute; top: 70px; left: 50%; width: 124px; margin-left: -62px; display: grid; gap: 5px; text-align: center; }
 .delay-node__name { color: var(--muted); font: 600 12px/1.2 var(--f-text); }
 .delay-node--brain .delay-node__name { color: var(--ink); font: 700 16px/1.2 var(--f-display); }
+/* Подпись мозгов уже общих 124: узел стоит в 34 px от рамки карточки, и блок
+   124 доставал до самой рамки слева и до подписи первого излучателя справа (с41). */
+.delay-node--brain .delay-node__lab { width: 104px; margin-left: -52px; }
 .delay-node__stepsbox { display: block; }
 .delay-node__steps { font: 800 36px/1 var(--f-display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 .delay-node__stepword { display: none; }
