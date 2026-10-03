@@ -199,6 +199,9 @@
 /* Связка — черта слева, фон остаётся белым: заливка спорила бы с ховером. */
 .hall-matrix__cell.is-linked { box-shadow: inset 2px 0 0 var(--ctl); }
 .hall-matrix__cell.is-linked .hall-matrix__link { color: var(--ink); }
+/* Легенда значков под матрицей: расшифровка ×N и скрепки словами. */
+.hall-legend { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 10px 2px 0; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.hall-legend span { display: inline-flex; align-items: center; gap: 7px; }
 
 /* Слот «Наём» (с21): место занято решением «берём внешнего», человека нет.
    Пунктирная пилюля цвета предупреждения, а не текст во всю ширину, как у
@@ -418,6 +421,7 @@
   .hall-print .hall-matrix__cell { background: none !important; }
   .hall-print .hall-matrix__cell.is-linked { box-shadow: none; }
   .hall-print .hall-matrix__badge { padding: 0 4px; border: 1px solid var(--ctl); background: none; font-size: 9px; }
+  .hall-print .hall-legend { margin-top: 6px; font-size: 9.5px; }
 
   /* На экране длинное имя обрезается многоточием — там его дочитывают
      подсказкой. На бумаге подсказки нет, поэтому имя переносится, а не

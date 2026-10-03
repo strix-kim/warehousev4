@@ -88,11 +88,11 @@ export async function loadEventPhotos(
   return { photos, failed }
 }
 
-// Колонки листа в «символах» Excel. Ширина G участвует в расчёте якоря картинки,
+// Колонки листа в «символах» Excel. Ширина H участвует в расчёте якоря картинки,
 // поэтому она здесь константой, а не числом в строке cols.
 const PHOTO_COLUMN_WIDTH = 20
-// Индекс колонки G в нумерации DrawingML (A = 0).
-const PHOTO_COLUMN_INDEX = 6
+// Индекс колонки H в нумерации DrawingML (A = 0).
+const PHOTO_COLUMN_INDEX = 7
 // Ширина и выравнивание одной парой на колонку: ФИО и должность текстом слева,
 // остальное по центру.
 const COLUMN_LAYOUT: Array<{ width: number; align: EventSheetColumn['align'] }> = [
@@ -100,10 +100,11 @@ const COLUMN_LAYOUT: Array<{ width: number; align: EventSheetColumn['align'] }> 
   { width: 30, align: 'left' },                     // B ФИО
   { width: 13, align: 'center' },                   // C дата рождения
   { width: 22, align: 'centerWrap' },               // D место рождения
-  { width: 16, align: 'centerWrap' },               // E паспорт
-  { width: 17, align: 'center' },                   // F ПИНФЛ
-  { width: PHOTO_COLUMN_WIDTH, align: 'center' },   // G фото
-  { width: 22, align: 'left' },                     // H должность
+  { width: 26, align: 'centerWrap' },               // E место жительства
+  { width: 16, align: 'centerWrap' },               // F паспорт
+  { width: 17, align: 'center' },                   // G ПИНФЛ
+  { width: PHOTO_COLUMN_WIDTH, align: 'center' },   // H фото
+  { width: 22, align: 'left' },                     // I должность
 ]
 
 // Ровная сетка под фото: высота одна на все строки данных, иначе якорь каждой
@@ -112,7 +113,7 @@ const DATA_ROW_HEIGHT_PT = 128
 // Рамка под портрет внутри ячейки — с полями до её границ.
 const PHOTO_BOX = { widthPx: 120, heightPx: 160 }
 
-// Шапка таблицы — 30 пунктов: восемь широких колонок, заголовки в две строки.
+// Шапка таблицы — 30 пунктов: девять широких колонок, заголовки в две строки.
 const HEADER_HEIGHT_PT = 30
 
 function sheetTexts(language: 'ru' | 'uz') {
@@ -122,6 +123,7 @@ function sheetTexts(language: 'ru' | 'uz') {
     fullName: docText(language, 'Ф.И.О.', 'Ф.И.Ш.'),
     birthDate: docText(language, 'Дата рождения', 'Туғилган сана'),
     birthPlace: docText(language, 'Место рождения', 'Туғилган жойи'),
+    residence: docText(language, 'Место жительства', 'Яшаш манзили'),
     passport: docText(language, 'Серия и номер паспорта', 'Паспорт серияси ва рақами'),
     pinfl: docText(language, 'ПИНФЛ', 'ЖШШИР рақами'),
     photo: docText(language, 'Фото', 'Фотосурати'),
@@ -147,16 +149,16 @@ export type EmployeeEventSheet = {
 
 export function buildEmployeeEventSheet(rows: Employee[], meta: EventDocumentMeta, photos: Map<string, EventPhoto>): EmployeeEventSheet {
   const t = sheetTexts(meta.language)
-  const headers = [t.number, t.fullName, t.birthDate, t.birthPlace, t.passport, t.pinfl, t.photo, t.position]
+  const headers = [t.number, t.fullName, t.birthDate, t.birthPlace, t.residence, t.passport, t.pinfl, t.photo, t.position]
   const columns: EventSheetColumn[] = COLUMN_LAYOUT.map((column, index) => ({ ...column, header: headers[index] ?? '' }))
   const anchors: string[] = []
   const images: Uint8Array[] = []
 
-  // Размеры ячейки G в EMU — по ним картинка центрируется офсетами якоря.
+  // Размеры ячейки H в EMU — по ним картинка центрируется офсетами якоря.
   const cellWidthEmu = columnWidthToPx(PHOTO_COLUMN_WIDTH) * EMU_PER_PX
   const cellHeightEmu = rowHeightToEmu(DATA_ROW_HEIGHT_PT)
-  // Абсолютные координаты угла ячейки G для a:xfrm: слева — сумма ширин колонок
-  // A–F, сверху — служебные строки 1–5 и шапка. Ширины и высоты фиксированы
+  // Абсолютные координаты угла ячейки H для a:xfrm: слева — сумма ширин колонок
+  // A–G, сверху — служебные строки 1–5 и шапка. Ширины и высоты фиксированы
   // константами, поэтому раскладка считается без обхода листа.
   const cellLeftEmu = COLUMN_LAYOUT.slice(0, PHOTO_COLUMN_INDEX)
     .reduce((sum, column) => sum + columnWidthToPx(column.width), 0) * EMU_PER_PX
@@ -169,6 +171,7 @@ export function buildEmployeeEventSheet(rows: Employee[], meta: EventDocumentMet
       employeeFullName(employee),
       employee.birth_date ? formatDocumentDate(employee.birth_date) : DASH,
       employee.birth_place || DASH,
+      employee.residence_address || DASH,
       passportText(employee),
       employee.pinfl || DASH,
       // Ячейка под фото остаётся текстовой и при наличии снимка: она даёт рамку и

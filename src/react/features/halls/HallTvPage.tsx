@@ -1,4 +1,4 @@
-import { CircleAlert, Maximize2, Presentation, WifiOff, X } from 'lucide-react'
+import { CircleAlert, Maximize2, Minimize2, Presentation, WifiOff, X } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { CellPicker } from './CellPicker'
@@ -97,12 +97,21 @@ export function HallTvPage() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [navigate, planId])
 
+  // Состояние читаем из события, а не ведём сами: из полноэкранного режима
+  // выходят и мимо кнопки — Esc, F11, жест системы. Без него кнопка в уже
+  // развёрнутом окне звала развернуть ещё раз и выглядела сломанной (с41).
+  const [isFullscreen, setFullscreen] = useState(() => Boolean(document.fullscreenElement))
+  useEffect(() => {
+    const sync = () => setFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', sync)
+    return () => document.removeEventListener('fullscreenchange', sync)
+  }, [])
+
   // Отказ браузера гасим молча: полноэкранный режим — удобство, а не условие
   // работы экрана, и модалка «не получилось» на витрине в зале лишняя.
-  // Оптический обрыв цепочки на `?.` уносит и .catch — старым движкам без
-  // requestFullscreen кнопка просто ничего не делает.
-  function goFullscreen() {
-    rootRef.current?.requestFullscreen?.().catch(() => {})
+  function toggleFullscreen() {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+    else void rootRef.current?.requestFullscreen().catch(() => {})
   }
 
   const time = refreshedAt ? formatTime(refreshedAt, locale) : ''
@@ -140,9 +149,15 @@ export function HallTvPage() {
                 : tr(`Обновлено ${time}`, `${time} da yangilandi`)}
             </p>
           )}
-          <button type="button" className="hall-tv__button" onClick={goFullscreen}>
-            <Maximize2 size={15} aria-hidden="true" /> {tr('Во весь экран', 'To‘liq ekran')}
-          </button>
+          {/* Движок без Fullscreen API (iPhone, встроенные браузеры мессенджеров)
+              кнопку не получает: мёртвая кнопка хуже отсутствующей. */}
+          {document.fullscreenEnabled && (
+            <button type="button" className="hall-tv__button" onClick={toggleFullscreen}>
+              {isFullscreen
+                ? <><Minimize2 size={15} aria-hidden="true" /> {tr('Свернуть', 'Kichraytirish')}</>
+                : <><Maximize2 size={15} aria-hidden="true" /> {tr('Во весь экран', 'To‘liq ekran')}</>}
+            </button>
+          )}
         </div>
       </header>
 

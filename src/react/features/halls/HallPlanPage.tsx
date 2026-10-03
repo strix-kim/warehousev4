@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Copy, LayoutGrid, MonitorPlay, Pencil, Plus, Presentation } from 'lucide-react'
+import { ArrowLeft, Check, Copy, LayoutGrid, Link2, MonitorPlay, Pencil, Plus, Presentation } from 'lucide-react'
 import { AnimatePresence, m } from 'motion/react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -85,6 +85,7 @@ export function HallPlanPage() {
   }
 
   const plan = editor.plan
+  const hasRepeats = [...editor.planCountByEmployee.values()].some((count) => count > 1)
 
   return (
     <>
@@ -152,6 +153,16 @@ export function HallPlanPage() {
           : null}
         <HallMatrix editor={editor} />
       </section>
+
+      {/* Легенда — только когда значки есть на экране: связка всегда даёт и ×N,
+          поэтому условие одно. Подсказка по ховеру на телефоне и на бумаге не
+          живёт, а «×2» без слов читают как «двое» (вопрос коллеги, с41). */}
+      {hasRepeats && (
+        <p className="hall-legend">
+          <span><b className="hall-matrix__badge">×2</b> {tr('столько раз человек стоит в плане', 'xodim rejada shuncha marta turadi')}</span>
+          <span><Link2 size={12} aria-hidden="true" /> {tr('несколько позиций в одном зале', 'bitta zalda bir nechta lavozim')}</span>
+        </p>
+      )}
 
       <AnimatePresence>
         {isMetaOpen && (
