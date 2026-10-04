@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { lineArrivals } from './delay'
 
 // Анимация сигнала по цепочке — объяснение формулы движением, а не текстом.
@@ -27,6 +27,11 @@ import { lineArrivals } from './delay'
 // prefers-reduced-motion в 06-responsive гасит CSS-анимации, но до WAAPI не
 // дотягивается — поэтому media query проверяется здесь: точки не бегут, кольца
 // не крутятся, вспышка — только opacity.
+//
+// Фоновая «живая» анимация цепочки (ореол мозгов, импульсы по кабелям, эхо у
+// излучателей) — чистый CSS в 05-delay.css, хук её не ведёт. Он только отдаёт
+// running: пока идёт проход, DelayChain гасит фон классом, чтобы два сигнала не
+// читались разом.
 //
 // Путь второй линии: в столбце она стартует из маленьких мозгов своего блока
 // (data-signal-start), в ряду обе линии идут от мозгов по отводу — два угла у
@@ -123,6 +128,7 @@ export function useSignalAnimation(chainRef: RefObject<HTMLElement | null>, line
   // проход обрывался бы от любого нажатия клавиши, не меняющего длины.
   const signature = lines.map((line) => line.join('|')).join('~')
   const playRef = useRef<(() => void) | null>(null)
+  const [running, setRunning] = useState(false)
 
   useEffect(() => {
     const chain = chainRef.current
@@ -141,6 +147,7 @@ export function useSignalAnimation(chainRef: RefObject<HTMLElement | null>, line
       running.forEach((animation) => animation.cancel())
       running = []
       busy = false
+      setRunning(false)
     }
 
     function animate(element: Element | null | undefined, keyframes: Keyframe[], options: KeyframeAnimationOptions) {
@@ -169,6 +176,7 @@ export function useSignalAnimation(chainRef: RefObject<HTMLElement | null>, line
       // Кабеля нет — задержки все нулевые, и объяснять движением нечего.
       if (!schedule) return
       busy = true
+      setRunning(true)
 
       // Без движения: вспышка одновременным fade подсветки всех видимых узлов
       // (скрытое начало второй линии в ряду не считается), кольца остаются в покое.
@@ -306,5 +314,5 @@ export function useSignalAnimation(chainRef: RefObject<HTMLElement | null>, line
   }, [chainRef, signature, orientation])
 
   const play = useCallback(() => playRef.current?.(), [])
-  return { play }
+  return { play, running }
 }

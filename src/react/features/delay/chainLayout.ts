@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useState, type RefObject } from 'react'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
 
 // Геометрия цепочки калькулятора ITC: ширины кабелей «в масштабе метров» и
@@ -12,10 +12,13 @@ export const CHAIN_PAD_X = 34
 // Меньше кабель не бывает: под поле длины и под подписи соседних узлов.
 // Инвариант: MIN_CABLE_PX + NODE_PX ≥ 124 + 8 — расстояние между центрами соседних
 // узлов не меньше ширины подписи (124) плюс зазор 8, подписи не наезжают друг на друга.
-// 76 — ровно по инварианту. Замер (с38): пилюля поля с «125,5» — 64,25 px, то есть
-// в кабеле 76 остаётся по 5,9 px линии с каждой стороны; на 1280 при 6 излучателях
-// меньшего минимума не нужно, а больший ряд не вместил бы.
-export const MIN_CABLE_PX = 76
+// Замер (с38): пилюля поля с «125,5» — 64,25 px. При минимуме 76 (ровно по
+// инварианту) линии оставалось по 5,9 px с каждой стороны, а кольцо ожидания
+// выступает за коробку узла на 7 px (.delay-ring) — серое кольцо излучателя
+// заходило на рамку поля, а обводка фокуса поля — на кольцо. 90 даёт по 12,9 px:
+// кольцо 7, обводка фокуса 4, остаток — воздух (с42). Цена: 6 излучателей в ряд
+// на 1280 больше не помещаются и уходят в столбец; 5 — помещаются.
+export const MIN_CABLE_PX = 90
 // Отвод от мозгов к двум линиям (колонка между мозгами и линиями), px. Пара в
 // 05-delay.css: .delay-chain--two.delay-chain--row. Инвариант:
 // NODE_PX + FORK_PX ≥ NODE_PX / 2 + 62 + 4 — расстояние от центра мозгов до центра
@@ -23,6 +26,8 @@ export const MIN_CABLE_PX = 76
 // то есть FORK_PX ≥ 38; подпись мозгов над коробкой и подпись первого излучателя
 // не сталкиваются с шиной. Берём 40.
 export const FORK_PX = 40
+// Пауза в наборе, после которой кабели перестраиваются под новые длины.
+const SETTLE_MS = 900
 // Запас на округление, чтобы ряд не упирался в край ровно в пиксель.
 const CHAIN_SLACK_PX = 2
 // Гистерезис: из столбца обратно в ряд — только когда ряд влезает с запасом,
@@ -127,7 +132,20 @@ export function useChainLayout(chainRef: RefObject<HTMLElement | null>, lines: n
     }
   }, [chainRef, countsKey])
 
+  // Масштаб пересчитывается не на каждый символ, а когда ввод затих (с42): пока
+  // человек набирает «150», длины «1», «15» и «150» трижды перекраивали бы ряд, и
+  // поле, в которое он печатает, уезжало из-под курсора. Число излучателей
+  // сменилось — старые длины не подходят по форме, берём свежие сразу.
+  const linesKey = JSON.stringify(lines)
+  const [settled, setSettled] = useState({ key: linesKey, lines })
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettled({ key: linesKey, lines: JSON.parse(linesKey) as number[][] }), SETTLE_MS)
+    return () => window.clearTimeout(timer)
+  }, [linesKey])
+  const sameShape = settled.lines.map((line) => line.length).join(',') === countsKey
+  const scaled = sameShape ? settled.lines : lines
+
   const fork = lines.length > 1 ? FORK_PX : 0
   const available = lines.map((line) => state.width - CHAIN_PAD_X * 2 - NODE_PX * (line.length + 1) - CHAIN_SLACK_PX - fork)
-  return { orientation: state.orientation, widths: systemCableWidths(available, lines, MIN_CABLE_PX) }
+  return { orientation: state.orientation, widths: systemCableWidths(available, scaled, MIN_CABLE_PX) }
 }

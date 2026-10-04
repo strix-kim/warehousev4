@@ -3,7 +3,7 @@
    превращался в серый прямоугольник до края панели (с25). Внешние тени срезает
    overflow: hidden у .data-panel. */
 .list-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.list-card { position: relative; min-height: 250px; display: flex; flex-direction: column; gap: 20px; padding: 20px; background: var(--card); box-shadow: 1px 0 0 var(--line), 0 1px 0 var(--line); transition: box-shadow .16s ease; }
+.list-card { position: relative; min-height: 250px; display: flex; flex-direction: column; gap: 20px; padding: 20px; background: var(--card); box-shadow: 1px 0 0 var(--line), 0 1px 0 var(--line); transition: background-color .16s ease; }
 .list-card__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 /* Дата мероприятия и заказчик — первичный идентификатор списка вместо названия:
    название у всех дефолтное, а «форум в Hyatt 25 августа» человек помнит. */
@@ -31,8 +31,12 @@
 .list-card__title { padding: 0; border: 0; color: inherit; background: none; font: inherit; text-align: left; }
 .list-card__title::after { content: ''; position: absolute; z-index: 0; inset: 0; }
 .list-card__open, .list-card__export { position: relative; z-index: 1; }
-.list-card:has(.list-card__title:hover) { z-index: 1; box-shadow: 0 0 0 1px var(--ctl); }
-.list-card:has(.list-card__title:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* Наведение — заливкой, а не кольцом (с42). Кольцо в 1 px рисовалось тенью
+   СНАРУЖИ карточки: у крайних колонок его срезал overflow панели, и рамка
+   выходила без левой или правой стороны, а переход шёл из тени-разделителя и
+   выглядел рывком. Заливке резаться не обо что. Фокус по той же причине — внутрь. */
+.list-card:has(.list-card__title:hover) { background: var(--hover); }
+.list-card:has(.list-card__title:focus-visible) { outline: 2px solid var(--ink); outline-offset: -2px; }
 
 .editor-header { display: grid; grid-template-columns: 42px 1fr auto; align-items: start; gap: 16px; margin-bottom: 22px; }
 /* Средняя колонка обязана уметь сжиматься (min-width: 0): иначе её min-content —

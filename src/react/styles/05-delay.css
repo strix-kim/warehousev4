@@ -5,7 +5,9 @@
    медиазапросы в 06»: у селекторов нет ни одного пересечения с чужими, и
    каскаду не с чем спорить. Граница 820 — та же, что у оболочки (пара в
    lib/breakpoints.ts). Глобальное prefers-reduced-motion из 06 CSS-анимации
-   здесь гасит само; WAAPI-анимацию сигнала гасит useSignalAnimation.ts.
+   здесь гасит само; WAAPI-анимацию сигнала гасит useSignalAnimation.ts. Фоновую
+   анимацию цепочки (блок «Фон» ниже) при reduce убираем целиком своим правилом:
+   глобальное оставило бы от бесконечного цикла один мгновенный кадр.
 
    Цепочка — одна разметка на две раскладки: .delay-chain--row (слева направо, в
    масштабе метров, ширины кабелей приходят инлайном из chainLayout.ts) и
@@ -107,6 +109,10 @@
 
 /* Кабель: линия 3 px и поле длины пилюлей на ней. Ширину в ряду задаёт инлайн. */
 .delay-cable { position: relative; flex: none; height: 56px; display: flex; align-items: center; justify-content: center; }
+/* Ширина кабеля меняется плавно: масштаб «px на метр» общий, и новая длина
+   двигает весь ряд — рывком это читалось как поломка (с42). 650 мс, с42: 280 мс
+   прораб назвал резким. */
+.delay-chain--row .delay-cable { transition: width .65s cubic-bezier(.3, .1, .2, 1); }
 .delay-cable__body { display: contents; }
 .delay-cable__line { position: absolute; left: -1px; right: -1px; top: 50%; height: 3px; margin-top: -1.5px; border-radius: 2px; background: var(--ink-2); }
 .delay-cable--first .delay-cable__line { background: repeating-linear-gradient(90deg, var(--ctl) 0 6px, transparent 6px 11px); }
@@ -158,6 +164,44 @@
 .delay-line__box { position: relative; justify-self: center; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; color: #fff; background: var(--ink); }
 .delay-line__box .delay-node__glow { border-radius: 14px; }
 .delay-line__name { color: var(--muted); font: 600 13px/1.2 var(--f-text); }
+
+/* Фон: цепочка живёт без нажатий (с42). Три слоя — ореол мозгов, импульс по
+   кабелю, эхо у излучателя; все приглушённые и только на transform / opacity.
+   Каждый слой — обёртка и движущаяся часть внутри: обёртку гасит прогон по
+   кнопке (transition opacity), keyframes её не трогают — иначе анимация и
+   гашение дрались бы за одно свойство. Цикл импульса 5,4 с = 6 шагов по 0,9 с:
+   кабель N стартует на шаг позже N−1 (--delay-i из DelayChain), и по длинной
+   линии идёт ровная череда импульсов с интервалом в шесть кабелей. */
+.delay-node__aura, .delay-node__echo, .delay-cable__flow { position: absolute; pointer-events: none; transition: opacity .2s linear; }
+.delay-chain--signal .delay-node__aura, .delay-chain--signal .delay-node__echo, .delay-chain--signal .delay-cable__flow { opacity: 0; }
+
+/* Ореол мозгов: мягкое красное пятно из-под коробки, «дышит» 3,2 с. Отдельно от
+   .delay-node__glow — тот ведёт прогон. */
+.delay-node__aura { z-index: 0; inset: -18px; }
+.delay-node__aura::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--red) 85%, transparent) 45%, transparent); opacity: 0; animation: delay-aura 3.2s ease-in-out infinite; }
+@keyframes delay-aura { 0%, 100% { opacity: .18; transform: scale(1); } 50% { opacity: .45; transform: scale(1.06); } }
+
+/* Импульс по кабелю: блик 24 px бежит от мозгов к концу. Дорожка — контейнер
+   (container-type: size), сдвиг на всю её длину — 100cqw / 100cqh: ширины
+   кабелей разные и меняются, а JS их для этого знать не должен. Вне прохода
+   блик стоит за краем дорожки, и overflow его прячет — opacity не нужна.
+   Дорожка идёт в разметке до поля длины: под пилюлей блик не виден. */
+.delay-cable__flow { left: -1px; right: -1px; top: 50%; height: 3px; margin-top: -1.5px; border-radius: 2px; overflow: hidden; container-type: size; }
+.delay-cable__flow i { position: absolute; top: 0; left: 0; width: 24px; height: 100%; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--red) 75%, transparent), transparent); animation: delay-flow-x 5.4s linear calc(var(--delay-i, 0) * .9s) infinite backwards; }
+.delay-chain--column .delay-cable__flow { left: 26.5px; right: auto; top: 0; bottom: 0; width: 3px; height: auto; margin-top: 0; }
+.delay-chain--column .delay-cable__flow i { width: 100%; height: 24px; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--red) 75%, transparent), transparent); animation-name: delay-flow-y; }
+@keyframes delay-flow-x { 0% { transform: translateX(-100%); } 18%, 100% { transform: translateX(100cqw); } }
+@keyframes delay-flow-y { 0% { transform: translateY(-100%); } 18%, 100% { transform: translateY(100cqh); } }
+
+/* Эхо излучателя: импульс дошёл — от узла расходится слабое кольцо. Отстаёт от
+   своего кабеля на время его прохода (0,85 с). */
+.delay-node__echo { z-index: 1; inset: 0; }
+.delay-node__echo::before { content: ''; position: absolute; inset: 0; border: 1.5px solid var(--red); border-radius: 50%; opacity: 0; animation: delay-echo 5.4s ease-out calc(var(--delay-i, 0) * .9s + .85s) infinite backwards; }
+@keyframes delay-echo { 0% { opacity: 0; transform: scale(1.14); } 2% { opacity: .25; transform: scale(1.18); } 15%, 100% { opacity: 0; transform: scale(1.6); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .delay-node__aura, .delay-node__echo, .delay-cable__flow { display: none; }
+}
 
 /* Новый излучатель: короткое «всплытие». На заходе на страницу — ничего. */
 .delay-node--new, .delay-cable--new { animation: delay-pop .2s var(--ease-out) both; }

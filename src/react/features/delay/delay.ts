@@ -81,6 +81,16 @@ export function computeDelays(lines: number[][]): EmitterDelay[][] {
 // Длина из поля ввода. Запятая — десятичный разделитель наравне с точкой
 // («12,5»): на телефоне в русской раскладке цифровая клавиатура даёт именно её.
 // Пустое и нераспознанное — null; решать, считать ли это нулём, вызывающему.
+// Что остаётся в поле после нажатия: цифры и ОДИН разделитель. Буквы, пробелы и
+// второй разделитель отбрасываются на входе (с42) — раньше поле их принимало,
+// краснело и писало «не число»; не дать ввести честнее, чем объяснять. Вставка
+// «12,5 м» из мессенджера превращается в «12,5».
+export function sanitizeLength(raw: string): string {
+  const kept = raw.replace(/[^\d.,]/g, '')
+  const first = kept.search(/[.,]/)
+  return first < 0 ? kept : kept.slice(0, first + 1) + kept.slice(first + 1).replace(/[.,]/g, '')
+}
+
 export function parseLength(raw: string): number | null {
   const normalized = raw.trim().replace(',', '.')
   if (!normalized || normalized === '.') return null

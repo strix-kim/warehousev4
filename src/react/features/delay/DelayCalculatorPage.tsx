@@ -63,7 +63,7 @@ export function DelayCalculatorPage() {
   const delays = computeDelays(lengths)
   const { orientation, widths } = useChainLayout(chainRef, lengths)
   const two = lines.length > 1
-  const { play } = useSignalAnimation(chainRef, lengths, orientation)
+  const { play, running } = useSignalAnimation(chainRef, lengths, orientation)
 
   const totalMeters = lengths.flat().reduce((sum, meters) => sum + meters, 0)
   const allDelays = delays.flat()
@@ -180,6 +180,7 @@ export function DelayCalculatorPage() {
             maxSteps={maxSteps}
             orientation={orientation}
             widths={widths}
+            signalRunning={running}
             focusId={focusId}
             onChange={updateRow}
           />

@@ -1,9 +1,9 @@
 import { Cpu, Speaker } from 'lucide-react'
-import { Fragment, type RefObject } from 'react'
+import { Fragment, type CSSProperties, type RefObject } from 'react'
 import { useCountUp } from '../../lib/useCountUp'
 import { useLanguage } from '../../lib/i18n'
 import type { ChainOrientation } from './chainLayout'
-import { parseLength, type EmitterDelay } from './delay'
+import { parseLength, sanitizeLength, type EmitterDelay } from './delay'
 import type { Line } from './lengthsParam'
 
 // Цепочка калькулятора ITC: мозги — кабель — излучатель — кабель — … Линий от
@@ -11,6 +11,11 @@ import type { Line } from './lengthsParam'
 // меняются только классы на секции (--row / --column / --two): иначе при смене
 // раскладки поле длины с фокусом размонтировалось бы. Первая линия при
 // добавлении и удалении второй сохраняет ключ и не перемонтируется.
+//
+// Фон: цепочка «живёт» без нажатий — ореол мозгов (delay-node__aura), импульс по
+// каждому кабелю (delay-cable__flow) и эхо у излучателя (delay-node__echo). Всё
+// на CSS-keyframes в 05-delay.css; отсюда приходит только порядковый номер в
+// линии (--delay-i) — от него считается отставание импульса от мозгов.
 
 // Число с единицей не рвём по строкам.
 const NBSP = '\u00a0'
@@ -33,13 +38,15 @@ function restRotation(steps: number, maxSteps: number) {
   }
 }
 
-export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, widths, focusId, onChange }: {
+export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, widths, signalRunning, focusId, onChange }: {
   chainRef: RefObject<HTMLElement | null>
   lines: Line[]
   delays: EmitterDelay[][]
   maxSteps: number
   orientation: ChainOrientation
   widths: number[][]
+  // Идёт прогон по кнопке — фон гаснет, пока он не кончится.
+  signalRunning: boolean
   focusId: number | null
   onChange: (id: number, draft: string) => void
 }) {
@@ -48,11 +55,12 @@ export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, wid
   const two = lines.length > 1
 
   return (
-    <section className={`delay-chain delay-chain--${orientation}${two ? ' delay-chain--two' : ''}`} ref={chainRef} aria-label={tr('Цепочка излучателей', 'Nurlatgichlar zanjiri')}>
+    <section className={`delay-chain delay-chain--${orientation}${two ? ' delay-chain--two' : ''}${signalRunning ? ' delay-chain--signal' : ''}`} ref={chainRef} aria-label={tr('Цепочка излучателей', 'Nurlatgichlar zanjiri')}>
       {lines.map((line) => <span key={line.id} className="delay-signal" data-signal-dot aria-hidden="true" />)}
 
       <div className="delay-node delay-node--brain">
         <span className="delay-node__box" data-signal-anchor data-signal-brain aria-hidden="true">
+          <span className="delay-node__aura" />
           <span className="delay-node__glow" data-signal-glow />
           <span className="delay-node__icon" data-signal-icon><Cpu size={24} /></span>
         </span>
@@ -100,19 +108,21 @@ export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, wid
               : tr(`Длина кабеля до излучателя ${number}, м`, `${number}-nurlatgichgacha kabel uzunligi, m`)
             // Одна линия — «последний» (D); две — «самый дальний»: он не обязан стоять последним.
             const waitless = two ? downstream === 0 : isLast
+            const order = { '--delay-i': index } as CSSProperties
 
             return (
               <Fragment key={row.id}>
                 <div
                   className={`delay-cable${index === 0 ? ' delay-cable--first' : ''}${isNew ? ' delay-cable--new' : ''}`}
-                  style={orientation === 'row' ? { width: widths[lineIndex]?.[index] } : undefined}
+                  style={orientation === 'row' ? { ...order, width: widths[lineIndex]?.[index] } : order}
                 >
                   <span className="delay-cable__line" aria-hidden="true" />
+                  <span className="delay-cable__flow" aria-hidden="true"><i /></span>
                   <div className="delay-cable__body">
                     <label className={`delay-len${isInvalid ? ' delay-len--invalid' : ''}`}>
                       <input
                         value={row.draft}
-                        onChange={(event) => onChange(row.id, event.target.value)}
+                        onChange={(event) => onChange(row.id, sanitizeLength(event.target.value))}
                         inputMode="decimal"
                         autoComplete="off"
                         autoFocus={isNew}
@@ -128,8 +138,9 @@ export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, wid
                   </div>
                 </div>
 
-                <div className={`delay-node${isNew ? ' delay-node--new' : ''}`}>
+                <div className={`delay-node${isNew ? ' delay-node--new' : ''}`} style={order}>
                   <span className="delay-node__box" data-signal-anchor aria-hidden="true">
+                    <span className="delay-node__echo" />
                     <span className="delay-node__glow" data-signal-glow />
                     <span className="delay-wave" data-signal-wave />
                     <span className="delay-wave" data-signal-wave />
