@@ -1,5 +1,5 @@
 import { Check, Copy, GitFork, Play, Plus, RotateCcw, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { copyText } from '../../lib/clipboard'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
@@ -7,6 +7,7 @@ import { useChainLayout } from './chainLayout'
 import { computeDelays, MAX_LINES, MAX_PER_LINE } from './delay'
 import { CountUp, DelayChain } from './DelayChain'
 import { DelayGuide } from './DelayGuide'
+import { forgetLastCalc, readLastCalc, rememberLastCalc, summarizeLastCalc } from './lastCalc'
 import { LINE_PARAMS, lineLengths, linesFromSearch, makeLine, makeRow, removeRow, searchFromLines, searchKey, type Line } from './lengthsParam'
 import { useSignalAnimation } from './useSignalAnimation'
 
@@ -105,11 +106,34 @@ export function DelayCalculatorPage() {
   const totalMeters = lengths.flat().reduce((sum, meters) => sum + meters, 0)
   const allDelays = delays.flat()
   const maxSteps = allDelays.reduce((max, delay) => Math.max(max, delay.steps), 0)
-  const isPristine = searchFromLines(lines) === null
+  const linesSearch = searchFromLines(lines)
+  const isPristine = linesSearch === null
   // Кабеля нет — задержки нулевые, объяснять движением нечего.
   const canPlay = totalMeters > 0
   const meters = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
   const atLimit = lines.some((line) => line.rows.length >= MAX_PER_LINE)
+
+  // Указатель на последний расчёт (lastCalc.ts): пишем, пока на экране есть кабель,
+  // — и свой расчёт, и открытый по ссылке. Нетронутый экран и расчёт из одних
+  // нулей ничего не пишут и ничего не стирают: клик по пункту меню ведёт на голый
+  // /delay, и указатель обязан его пережить.
+  useEffect(() => {
+    if (linesSearch !== null && canPlay) rememberLastCalc(linesSearch)
+  }, [linesSearch, canPlay])
+
+  // Плашка «Последний расчёт» — только на нетронутом экране. Сам расчёт из кэша
+  // не подставляем: владелец — адрес, сюда он попадёт по нажатию «Открыть».
+  const last = isPristine ? readLastCalc() : null
+  const lastSearch = last?.search
+  const lastSummary = useMemo(() => summarizeLastCalc(lastSearch), [lastSearch])
+
+  // Только адрес: первый эффект примет его как чужую запись и соберёт линии сам.
+  // Кнопка исчезает вместе с плашкой — фокус уходит на «Добавить излучатель».
+  function openLast() {
+    if (!lastSummary) return
+    focusAfter.current = { rowId: null, lineIndex: 0 }
+    navigate({ search: searchWithLines(params, lastSummary.search) }, { replace: true })
+  }
 
   function offerUndo(message: string, focusRowId: number | null) {
     window.clearTimeout(undoTimer.current)
@@ -180,6 +204,9 @@ export function DelayCalculatorPage() {
 
   function reset() {
     offerUndo(tr('Расчёт сброшен', 'Hisob tozalandi'), null)
+    // Сбросил сознательно — плашки «Последний расчёт» после сброса быть не должно.
+    // «Вернуть» кладёт линии обратно, и эффект записи запомнит расчёт заново.
+    forgetLastCalc()
     setFocusId(null)
     setLines(linesFromSearch(null, null))
   }
@@ -234,6 +261,19 @@ export function DelayCalculatorPage() {
 
       <div className="delay-layout">
         <div className="delay-stage" ref={stageRef}>
+          {last && lastSummary && (
+            <div className="delay-last">
+              <div className="delay-last__text">
+                <strong>{tr('Последний расчёт', 'Oxirgi hisob')}</strong>
+                <span>
+                  {new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(last.touchedAt)}
+                  {' · '}{tr('излучателей', 'nurlatgichlar')}: {lastSummary.emitters}
+                  {' · '}{tr('кабель', 'kabel')} {meters(lastSummary.totalMeters)} {tr('м', 'm')}
+                </span>
+              </div>
+              <button type="button" className="button button--secondary" onClick={openLast}>{tr('Открыть', 'Ochish')}</button>
+            </div>
+          )}
           <section className="delay-summary" aria-label={tr('Сводка', 'Xulosa')}>
             <div>
               <strong><CountUp value={lines.reduce((sum, line) => sum + line.rows.length, 0)} /></strong>
@@ -299,7 +339,7 @@ export function DelayCalculatorPage() {
             </button>
             {atLimit && <span className="delay-tools__limit">{tr(`В линии не больше ${MAX_PER_LINE} излучателей`, `Liniyada ko‘pi bilan ${MAX_PER_LINE} ta nurlatgich`)}</span>}
             {!isPristine && (
-              <span className="delay-url">{tr('Длины живут в адресе', 'Uzunliklar manzilda saqlanadi')}: <span className="delay-url__value">?{searchFromLines(lines)}</span></span>
+              <span className="delay-url">{tr('Длины живут в адресе', 'Uzunliklar manzilda saqlanadi')}: <span className="delay-url__value">?{linesSearch}</span></span>
             )}
           </div>
         </div>

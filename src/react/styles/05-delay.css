@@ -23,6 +23,16 @@
    говорят галочка и подпись; цветом отмечается только отказ. */
 .delay-copy--failed { color: var(--bad); border-color: var(--bad); background: var(--bad-bg); }
 
+/* Плашка «Последний расчёт» на нетронутом экране: строка над сводкой, текст
+   слева, «Открыть» справа. Тихая — это подсказка, а не событие. */
+.delay-last { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 8px 14px; border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--sunk); }
+.delay-last__text { min-width: 0; display: grid; gap: 3px; color: var(--muted); font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+.delay-last__text strong { color: var(--ink); font: 700 14px/1.2 var(--f-text); }
+.delay-last .button { flex: none; min-height: 36px; padding: 0 14px; }
+@media (pointer: coarse) {
+  .delay-last .button { min-height: 44px; }
+}
+
 /* Сводка: строка без рамки внутри карточки. */
 .delay-summary { display: flex; flex-wrap: wrap; gap: 30px; }
 .delay-summary strong { display: block; font: 800 30px/1 var(--f-display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
@@ -270,6 +280,9 @@
   .delay-head__actions, .delay-summary__ns, .delay-url { display: none; }
   /* Рамка карточки снимается: картой становится сама цепочка-столбец. */
   .delay-stage { padding: 0; border: 0; border-radius: 0; background: none; }
+  /* Карточки вокруг нет — плашка сама становится карточкой, как цепочка ниже. */
+  .delay-last { border-color: var(--line); background: var(--card); }
+  .delay-last .button { min-height: 44px; }
   .delay-summary { gap: 22px; }
   .delay-chain--column { max-width: none; padding: 10px 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--card); }
   .delay-quiet { min-height: 44px; }
