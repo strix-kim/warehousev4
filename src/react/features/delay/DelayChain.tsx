@@ -1,4 +1,4 @@
-import { Cpu, Speaker } from 'lucide-react'
+import { Cpu, Speaker, X } from 'lucide-react'
 import { Fragment, type CSSProperties, type RefObject } from 'react'
 import { useCountUp } from '../../lib/useCountUp'
 import { useLanguage } from '../../lib/i18n'
@@ -38,7 +38,7 @@ function restRotation(steps: number, maxSteps: number) {
   }
 }
 
-export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, widths, signalRunning, focusId, onChange }: {
+export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, widths, signalRunning, focusId, onChange, onRemove }: {
   chainRef: RefObject<HTMLElement | null>
   lines: Line[]
   delays: EmitterDelay[][]
@@ -49,6 +49,7 @@ export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, wid
   signalRunning: boolean
   focusId: number | null
   onChange: (id: number, draft: string) => void
+  onRemove: (lineIndex: number, rowIndex: number) => void
 }) {
   const { tr, locale } = useLanguage()
   const meters = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
@@ -91,7 +92,12 @@ export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, wid
             const lineNumber = lineIndex + 1
             const isLast = index === line.rows.length - 1
             const isNew = row.id === focusId
-            const isInvalid = row.draft.trim() !== '' && parseLength(row.draft) === null
+            const isEmpty = row.draft.trim() === ''
+            const isInvalid = !isEmpty && parseLength(row.draft) === null
+            // Пустое поле молча считается нулём — говорим об этом там, где ноль
+            // меняет результат: при одной линии кабель от мозгов на задержки не
+            // влияет, его пустота ничего не значит.
+            const isAssumedZero = isEmpty && (two || index !== 0)
             const delay = delays[lineIndex]?.[index]
             const steps = delay?.steps ?? 0
             const downstream = delay?.downstreamMeters ?? 0
@@ -100,15 +106,19 @@ export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, wid
             const lineTag = two && index === 0 ? tr(`линия ${lineNumber} · `, `${lineNumber}-liniya · `) : ''
             const note = isInvalid
               ? `${lineTag}${tr('не число — считаем как 0', 'son emas — 0 deb hisoblanadi')}`
-              : index !== 0 ? null
-                : two ? tr(`линия ${lineNumber} · от мозгов, в расчёте`, `${lineNumber}-liniya · protsessordan, hisobda`)
-                  : tr('от мозгов — на задержки не влияет', 'protsessordan — kechikishlarga ta’sir qilmaydi')
+              : isAssumedZero ? `${lineTag}${tr('длина не указана — считаем 0', 'uzunlik kiritilmagan — 0 deb hisoblanadi')}`
+                : index !== 0 ? null
+                  : two ? tr(`линия ${lineNumber} · от мозгов, в расчёте`, `${lineNumber}-liniya · protsessordan, hisobda`)
+                    : tr('от мозгов — на задержки не влияет', 'protsessordan — kechikishlarga ta’sir qilmaydi')
             const fieldLabel = two
               ? tr(`Линия ${lineNumber}: длина кабеля до излучателя ${number}, м`, `${lineNumber}-liniya: ${number}-nurlatgichgacha kabel uzunligi, m`)
               : tr(`Длина кабеля до излучателя ${number}, м`, `${number}-nurlatgichgacha kabel uzunligi, m`)
             // Одна линия — «последний» (D); две — «самый дальний»: он не обязан стоять последним.
             const waitless = two ? downstream === 0 : isLast
             const order = { '--delay-i': index } as CSSProperties
+            const removeLabel = two
+              ? tr(`Убрать излучатель ${number} линии ${lineNumber}`, `${lineNumber}-liniya: ${number}-nurlatgichni olib tashlash`)
+              : tr(`Убрать излучатель ${number}`, `${number}-nurlatgichni olib tashlash`)
 
             return (
               <Fragment key={row.id}>
@@ -134,7 +144,7 @@ export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, wid
                       />
                       <span aria-hidden="true">{tr('м', 'm')}</span>
                     </label>
-                    {note && <span id={noteId} className={`delay-cable__note${isInvalid ? ' delay-cable__note--bad' : ''}`}>{note}</span>}
+                    {note && <span id={noteId} className={`delay-cable__note${isInvalid ? ' delay-cable__note--bad' : ''}${isAssumedZero ? ' delay-cable__note--zero' : ''}`}>{note}</span>}
                   </div>
                 </div>
 
@@ -157,7 +167,17 @@ export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, wid
                     <span className="delay-node__icon" data-signal-icon><Speaker size={24} /></span>
                   </span>
                   <div className="delay-node__lab">
-                    <span className="delay-node__name">{tr(`Излучатель ${number}`, `Nurlatgich ${number}`)}</span>
+                    <span className="delay-node__name">
+                      {tr(`Излучатель ${number}`, `Nurlatgich ${number}`)}
+                      {/* Крестик — в подписи, а не в коробке узла: та aria-hidden.
+                          Единственный излучатель линии не убирается. data-remove-row —
+                          по нему страница возвращает фокус после удаления соседа. */}
+                      {line.rows.length > 1 && (
+                        <button type="button" className="delay-node__remove" data-remove-row={row.id} aria-label={removeLabel} onClick={() => onRemove(lineIndex, index)}>
+                          <X size={14} aria-hidden="true" />
+                        </button>
+                      )}
+                    </span>
                     <span className="delay-node__stepsbox">
                       <strong className="delay-node__steps"><CountUp value={steps} /></strong>
                       <small className="delay-node__stepword">{tr('шаг', 'qadam')}</small>

@@ -66,6 +66,15 @@ export function searchKey(l: string | null, l2: string | null): string | null {
   return `l=${l ?? ''}${l2 === null ? '' : `&l2=${l2}`}`
 }
 
+// Убрать излучатель из линии. Длины НЕ складываются (решение прораба с42): кабель
+// удалённого излучателя исчезает вместе с ним, у остальных строк черновики и id
+// те же. Последний излучатель линии не убирается — линии возвращаются как есть.
+export function removeRow(lines: Line[], lineIndex: number, rowIndex: number): Line[] {
+  const line = lines[lineIndex]
+  if (!line || line.rows.length < 2 || !line.rows[rowIndex]) return lines
+  return lines.map((item, index) => (index === lineIndex ? { ...item, rows: item.rows.filter((_, at) => at !== rowIndex) } : item))
+}
+
 // Длины линии, м; пустое и нераспознанное — нулём.
 export function lineLengths(line: Line): number[] {
   return line.rows.map((row) => parseLength(row.draft) ?? 0)

@@ -18,7 +18,9 @@
 .delay-stage { min-width: 0; display: flex; flex-direction: column; gap: 18px; padding: 22px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card); }
 
 .delay-head__actions { flex: none; display: flex; gap: 10px; }
-.delay-copy--copied { color: var(--ok); border-color: var(--ok); background: var(--ok-bg); }
+/* «Скопировано» цвет кнопки не меняет (с42): зелёная заливка на красной главной
+   кнопке читалась как сбой и мигала туда-обратно за полторы секунды. Об успехе
+   говорят галочка и подпись; цветом отмечается только отказ. */
 .delay-copy--failed { color: var(--bad); border-color: var(--bad); background: var(--bad-bg); }
 
 /* Сводка: строка без рамки внутри карточки. */
@@ -72,6 +74,19 @@
 .delay-node__lab { position: absolute; top: 70px; left: 50%; width: 124px; margin-left: -62px; display: grid; gap: 5px; text-align: center; }
 .delay-node__name { color: var(--muted); font: 600 12px/1.2 var(--f-text); }
 .delay-node--brain .delay-node__name { color: var(--ink); font: 700 16px/1.2 var(--f-display); }
+/* Крестик «убрать излучатель» — постоянный, в строке имени. Сам 16 px: «Излучатель 6»
+   с ним — около 95 px из 124 блока подписи, имя не переносится (nowrap) и до
+   соседней подписи не достаёт даже при кабеле 90 px. Зона нажатия — псевдоэлементом
+   поверх: 24 × 24 под мышь, 44 × 44 в столбце и под палец; раскладку она не двигает. */
+.delay-chain--row .delay-node__name { white-space: nowrap; }
+.delay-node__remove { position: relative; display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 4px; padding: 0; border: 0; border-radius: 5px; color: var(--muted); background: transparent; vertical-align: -3px; }
+.delay-node__remove::before { content: ''; position: absolute; inset: -4px; }
+.delay-node__remove:hover { color: var(--ink); background: var(--sunk); }
+.delay-chain--column .delay-node__remove { margin-left: 8px; }
+.delay-chain--column .delay-node__remove::before { inset: -14px; }
+@media (pointer: coarse) {
+  .delay-node__remove::before { inset: -14px; }
+}
 /* Подпись мозгов уже общих 124: узел стоит в 34 px от рамки карточки, и блок
    124 доставал до самой рамки слева и до подписи первого излучателя справа (с41). */
 .delay-node--brain .delay-node__lab { width: 104px; margin-left: -52px; }
@@ -118,6 +133,10 @@
 .delay-cable--first .delay-cable__line { background: repeating-linear-gradient(90deg, var(--ctl) 0 6px, transparent 6px 11px); }
 .delay-cable__note { position: absolute; bottom: calc(50% + 38px); left: 50%; width: 132px; margin-left: -66px; color: var(--faint); font-size: 11.5px; line-height: 1.25; text-align: center; }
 .delay-cable__note--bad { color: var(--bad); font-weight: 600; }
+/* «длина не указана» у первого кабеля двух линий длиннее обычной подписи: одной
+   строкой (nowrap выше) она легла бы на подпись следующего кабеля — переносим,
+   не шире кабеля плюс 16 px. */
+.delay-chain--two.delay-chain--row .delay-cable--first .delay-cable__note--zero { width: max-content; max-width: calc(100% + 16px); white-space: normal; }
 
 /* Поле длины. 14 px в ряду; на телефоне и в столбце 16 — iOS Safari зумит
    страницу на меньшем (A-11). */
@@ -227,6 +246,22 @@
 /* Нижняя панель телефона: только ≤820 (см. ниже). */
 .delay-dock { display: none; }
 
+/* Плашка «Вернуть» после удаления, снятия линии и сброса. Облик — как у вопроса
+   о несохранённом (unsaved-prompt.css): тёмная, это не ошибка. Фиксирована внизу
+   по центру рабочей области — отступ слева под сайдбар, как у .bulk-bar. Закрытая
+   остаётся в разметке: уход (180 мс) играет transition, visibility выключается
+   после него и убирает кнопку из обхода Tab. */
+.delay-undo { position: fixed; z-index: 14; left: 256px; right: 0; bottom: 22px; width: max-content; max-width: calc(100vw / var(--app-zoom) - 300px); margin-inline: auto; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: 14px; color: var(--on-night); background: var(--ink); box-shadow: 0 14px 36px rgba(15,17,21,.28); font: 600 14px/1.3 var(--f-text); opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity .18s ease, transform .18s ease, visibility 0s .18s, left .22s ease; }
+.app-shell--sidebar-collapsed .delay-undo { left: 76px; max-width: calc(100vw / var(--app-zoom) - 120px); }
+.delay-undo--open { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+.delay-undo__text { min-width: 0; }
+.delay-undo__back { flex: none; min-height: 32px; padding: 0 11px; border-radius: 9px; color: var(--ink); background: #fff; font-size: 13px; font-weight: 600; }
+.delay-undo__back:not(:disabled):hover { background: var(--line-2); }
+.delay-undo :focus-visible { outline-color: #fff; }
+@media (pointer: coarse) {
+  .delay-undo__back { min-height: 44px; font-size: 14px; }
+}
+
 @media (max-width: 1100px) {
   .delay-side { grid-template-columns: minmax(0, 1fr); }
 }
@@ -241,6 +276,10 @@
   /* Над нижней навигацией (64 px + safe-area, z-index 15 у неё). */
   .delay-dock { position: fixed; z-index: 14; left: 0; right: 0; bottom: calc(64px + env(safe-area-inset-bottom)); display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--line); background: rgba(250,251,252,.92); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
   .delay-dock .button { min-height: 52px; border-radius: 15px; font-size: 16px; }
+  /* Плашка «Вернуть» — над панелью (72 px) с зазором 10, во всю ширину экрана;
+     навигацию и панель не закрывает. */
+  .delay-undo, .app-shell--sidebar-collapsed .delay-undo { left: 16px; right: 16px; bottom: calc(64px + 82px + env(safe-area-inset-bottom)); width: auto; max-width: none; justify-content: space-between; }
+  .delay-undo__back { min-height: 44px; font-size: 14px; }
   /* Место под панель: обычные 90 px под навигацию плюс высота самой панели. */
   .app-content:has(.delay-dock) { padding-bottom: calc(90px + 72px + env(safe-area-inset-bottom)); }
 }
