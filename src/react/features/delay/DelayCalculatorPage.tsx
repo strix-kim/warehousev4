@@ -101,6 +101,8 @@ export function DelayCalculatorPage() {
   const delays = computeDelays(lengths)
   const { orientation, widths } = useChainLayout(chainRef, lengths)
   const two = lines.length > 1
+  // В столбце кнопки линий рисует сама цепочка (DelayChain) — здесь их нет.
+  const inRow = orientation === 'row'
   const { play, running } = useSignalAnimation(chainRef, lengths, orientation)
 
   const totalMeters = lengths.flat().reduce((sum, meters) => sum + meters, 0)
@@ -302,12 +304,15 @@ export function DelayCalculatorPage() {
             widths={widths}
             signalRunning={running}
             focusId={focusId}
+            maxPerLine={MAX_PER_LINE}
             onChange={updateRow}
             onRemove={removeEmitter}
+            onAddRow={addRow}
+            onRemoveLine={removeLine}
           />
 
           <div className="delay-tools">
-            {two ? lines.map((line, index) => {
+            {two ? inRow && lines.map((line, index) => {
               const number = index + 1
               return (
                 <div key={line.id} className="delay-tools__line">
@@ -326,9 +331,11 @@ export function DelayCalculatorPage() {
               )
             }) : (
               <>
-                <button type="button" className="delay-quiet" data-add-row={0} onClick={() => addRow(0)} disabled={atLimit}>
-                  <Plus size={16} /> {tr('Добавить излучатель', 'Nurlatgich qo‘shish')}
-                </button>
+                {inRow && (
+                  <button type="button" className="delay-quiet" data-add-row={0} onClick={() => addRow(0)} disabled={atLimit}>
+                    <Plus size={16} /> {tr('Добавить излучатель', 'Nurlatgich qo‘shish')}
+                  </button>
+                )}
                 <button type="button" className="delay-quiet" onClick={addLine}>
                   <GitFork size={16} /> {tr('Добавить линию', 'Liniya qo‘shish')}
                 </button>

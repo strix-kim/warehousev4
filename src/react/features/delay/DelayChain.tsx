@@ -1,4 +1,4 @@
-import { Cpu, Speaker, X } from 'lucide-react'
+import { Cpu, Plus, Speaker, X } from 'lucide-react'
 import { Fragment, type CSSProperties, type RefObject } from 'react'
 import { useCountUp } from '../../lib/useCountUp'
 import { useLanguage } from '../../lib/i18n'
@@ -11,6 +11,13 @@ import type { Line } from './lengthsParam'
 // меняются только классы на секции (--row / --column / --two): иначе при смене
 // раскладки поле длины с фокусом размонтировалось бы. Первая линия при
 // добавлении и удалении второй сохраняет ключ и не перемонтируется.
+//
+// Кнопки линий в столбце живут в самих линиях (с43): «+ Излучатель» — в конце
+// каждой, заголовок «Линия N» и «Убрать линию» — в её начале. Под цепочкой кнопка
+// первой линии оказывалась за второй, в сотнях px от своего конца. В ряду их в
+// разметке нет вовсе — там они в .delay-tools на странице: лишний потомок линии
+// сломал бы расчёт ширин (chainLayout.ts). Всё это — соседи строк, не обёртки:
+// смена раскладки поля длины не перемонтирует.
 //
 // Фон: цепочка «живёт» без нажатий — ореол мозгов (delay-node__aura), импульс по
 // каждому кабелю (delay-cable__flow) и эхо у излучателя (delay-node__echo). Всё
@@ -38,7 +45,7 @@ function restRotation(steps: number, maxSteps: number) {
   }
 }
 
-export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, widths, signalRunning, focusId, onChange, onRemove }: {
+export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, widths, signalRunning, focusId, maxPerLine, onChange, onRemove, onAddRow, onRemoveLine }: {
   chainRef: RefObject<HTMLElement | null>
   lines: Line[]
   delays: EmitterDelay[][]
@@ -48,12 +55,18 @@ export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, wid
   // Идёт прогон по кнопке — фон гаснет, пока он не кончится.
   signalRunning: boolean
   focusId: number | null
+  // Лимит излучателей в линии — на нём «+ Излучатель» гаснет.
+  maxPerLine: number
   onChange: (id: number, draft: string) => void
   onRemove: (lineIndex: number, rowIndex: number) => void
+  // Кнопки линий — только в столбце (в ряду они на странице, в .delay-tools).
+  onAddRow: (lineIndex: number) => void
+  onRemoveLine: () => void
 }) {
   const { tr, locale } = useLanguage()
   const meters = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
   const two = lines.length > 1
+  const column = orientation === 'column'
 
   return (
     <section className={`delay-chain delay-chain--${orientation}${two ? ' delay-chain--two' : ''}${signalRunning ? ' delay-chain--signal' : ''}`} ref={chainRef} aria-label={tr('Цепочка излучателей', 'Nurlatgichlar zanjiri')}>
@@ -76,14 +89,35 @@ export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, wid
 
       {lines.map((line, lineIndex) => (
         <div key={line.id} className="delay-line" data-signal-line>
-          {/* Начало второй линии в столбце: маленькие мозги, откуда бежит её сигнал. */}
+          {/* Заголовок первой линии в столбце — строкой между мозгами и её первым
+              кабелем. Слева отрезок рельса: без него кабель от мозгов рвался бы
+              на высоту строки. */}
+          {column && two && lineIndex === 0 && (
+            <div className="delay-line__head">
+              <span className="delay-line__rail" aria-hidden="true" />
+              <span className="delay-line__tag">{tr('Линия 1', '1-liniya')}</span>
+            </div>
+          )}
+
+          {/* Начало второй линии в столбце: маленькие мозги, откуда бежит её сигнал,
+              её заголовок и «Убрать линию». В ряду строка скрыта, но остаётся в
+              разметке — по data-signal-start её ищет анимация сигнала. */}
           {lineIndex === 1 && (
-            <div className="delay-line__start" aria-hidden="true">
-              <span className="delay-line__box" data-signal-start>
+            <div className="delay-line__start">
+              <span className="delay-line__box" data-signal-start aria-hidden="true">
                 <span className="delay-node__glow" data-signal-glow />
                 <Cpu size={16} />
               </span>
-              <span className="delay-line__name">{tr('Мозги', 'Protsessor')}</span>
+              <span className="delay-line__title">
+                {column && <span className="delay-line__tag">{tr('Линия 2', '2-liniya')}</span>}
+                <span className="delay-line__name">{tr('Мозги', 'Protsessor')}</span>
+              </span>
+              {column && (
+                <button type="button" className="delay-quiet" onClick={onRemoveLine}
+                  aria-label={tr('Убрать линию 2', '2-liniyani olib tashlash')}>
+                  <X size={16} /> {tr('Убрать линию', 'Liniyani olib tashlash')}
+                </button>
+              )}
             </div>
           )}
 
@@ -205,6 +239,17 @@ export function DelayChain({ chainRef, lines, delays, maxSteps, orientation, wid
               </Fragment>
             )
           })}
+
+          {/* data-add-row — по нему страница возвращает фокус, когда крестиков в
+              линии не осталось; в ряду тот же атрибут носит кнопка в .delay-tools. */}
+          {column && (
+            <button type="button" className="delay-quiet delay-line__add" data-add-row={lineIndex} onClick={() => onAddRow(lineIndex)} disabled={line.rows.length >= maxPerLine}
+              aria-label={two
+                ? tr(`Добавить излучатель в линию ${lineIndex + 1}`, `${lineIndex + 1}-liniyaga nurlatgich qo‘shish`)
+                : tr('Добавить излучатель', 'Nurlatgich qo‘shish')}>
+              <Plus size={16} /> {tr('Излучатель', 'Nurlatgich')}
+            </button>
+          )}
         </div>
       ))}
     </section>
