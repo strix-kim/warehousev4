@@ -2,7 +2,7 @@
 
 Что лежит в базе, кто имеет к этому доступ и как это менять.
 
-**Сверено с живой базой 2026-08-22 (сессия 12).** Всё ниже — выписка из прода через
+**Сверено с живой базой 2026-10-04 (сессия 42).** Всё ниже — выписка из прода через
 Supabase MCP, а не реконструкция по типам. Схема живёт вне git: источник правды — база,
 мост между ней и файлами — миграции в `supabase/migrations/`.
 
@@ -19,11 +19,17 @@ select table_name, grantee, privilege_type from information_schema.role_table_gr
 where table_schema = 'public' and grantee in ('anon','authenticated') order by 1,2;
 ```
 
-**Габариты схемы на 2026-08-23 (с19):** 12 таблиц, 42 политики `public` + 4 на
-`storage.objects`, 14 триггеров, 20 функций (`public` + `private`), 46 индексов,
+**Габариты схемы на 2026-10-04 (с42):** 17 таблиц, 62 политики `public` + 4 на
+`storage.objects`, 21 триггер, 23 функции (19 `public` + 4 `private`), 61 индекс,
 2 Storage-бакета. Baseline (`00000000000000_baseline_remote_schema.sql`) снят в с2
-и описывает **стартовую точку**, а не сегодняшнее состояние: поверх него легла
-21 миграция. Переснимать его нужно только после большой ручной правки в дашборде.
+и описывает **стартовую точку**, а не сегодняшнее состояние: поверх него легло
+29 миграций. Переснимать его нужно только после большой ручной правки в дашборде.
+
+**Журнал миграций базы с файлами не совпадает один в один — это норма:** в нём
+33 записи; четыре от 2026-08-19 старше первой миграции репо и покрыты baseline;
+файл `20260819142617_allow_app_members_to_delete_any_list.sql` в базе записан как
+`allow_default_account_to_delete_any_list`; версии в базе штампует `apply_migration`
+в момент применения, поэтому таймстемпы файлов и базы расходятся — сверять по имени.
 
 ## 1. Таблицы
 
@@ -33,8 +39,16 @@ where table_schema = 'public' and grantee in ('anon','authenticated') order by 1
 | `public.equipment_lists` | прямой `.from()`, полный CRUD | документы; состав хранится прямо в строке |
 | `public.equipment_movements` | прямой `.from()`, **только чтение** | журнал движений, пишется триггером |
 | `public.users` | **нет ни одного гранта** — читают только `security definer`-функции | членство и роли |
-| `public.employees` | `.from()`: select/insert/update, **DELETE не дан никому** | база сотрудников (с17): карточка с паспортными данными; `document_photo_id` (с19) — фото для документов |
-| `public.employee_files` | `.from()`: select/insert, **ни UPDATE, ни DELETE** | файлы сотрудника: пять видов, фото несколько; сам файл — в бакете `employee-files` |
+| `public.employees` | `.from()`: select/insert/update; **гранта DELETE нет** (политика admin есть, но недостижима — §12) | база сотрудников (с17): карточка с паспортными данными; `document_photo_id` (с19) — фото для документов |
+| `public.employee_files` | `.from()`: select/insert; **грантов UPDATE и DELETE нет** (политика DELETE для admin есть, но недостижима — §12) | файлы сотрудника: пять видов, фото несколько; сам файл — в бакете `employee-files` |
+| `public.vehicles` | `.from()`: select/insert/update; гранта DELETE нет | автомобили для пропусков, главный идентификатор — госномер (§13) |
+| `public.vehicle_files` | `.from()`: select/insert; грантов UPDATE и DELETE нет | файлы машины, вид один — `photo`; сам файл — в бакете `vehicle-files` (§13) |
+| `public.vehicle_drivers` | `.from()`: select/insert/delete; гранта UPDATE нет | связка M2M машина ↔ сотрудник-водитель (§13) |
+| `public.hall_plans` | прямой `.from()`, полный CRUD | залы: шапка плана мероприятия (§14) |
+| `public.halls` | прямой `.from()`, полный CRUD | залы: колонки матрицы (§14) |
+| `public.plan_positions` | прямой `.from()`, полный CRUD | залы: строки матрицы — позиции всего плана (§14) |
+| `public.hall_assignments` | прямой `.from()`, полный CRUD | залы: ячейка позиция × зал — человек или слот наёма (§14) |
+| `public.position_catalog` | прямой `.from()`, полный CRUD | общий справочник позиций для залов (§14) |
 | `public.events`, `public.mount_points`, `public.reports` | **нет ни одного гранта** | наследие Vue-версии, продукт их не трогает |
 
 У роли `anon` нет прав ни на одну таблицу `public`.
@@ -97,12 +111,13 @@ default `'N/A'` · `count` integer default 1 · `availability` text default `'av
 Журнал заявлен неизменяемым, но не переживает удаление предмета.
 
 Значения `issued`/`returned` в check остались от снесённого цикла — новых строк с ними
-больше не появляется. Все 1391 существующие строки — `status_normalized`, след импорта.
+больше не появляется. Из 1392 существующих строк 1391 — `status_normalized`, след импорта,
+и одна — `created`.
 
 ## 2. RLS и гранты
 
-RLS включён на всех девяти таблицах. Все политики адресованы роли `authenticated`.
-Сотрудники (`employees`, `employee_files`) и политики бакета — §12.
+RLS включён на всех 17 таблицах (`force row level security` — ни на одной). Все
+политики адресованы роли `authenticated`.
 
 | Таблица | select | insert | update | delete |
 |---|---|---|---|---|
@@ -112,10 +127,21 @@ RLS включён на всех девяти таблицах. Все поли�
 | `equipment_movements` | `is_app_member()` | — | — | — |
 | `events` | все 4: назначенный инженер **или** manager/admin | | | |
 | `mount_points`, `reports` | все 4: `exists (select 1 from events where id = event_id)` | | | |
+| сотрудники, машины, залы (10 таблиц) и оба бакета | политики — в §12–14, здесь не дублируются | | | |
 
-**Гранты (фактические):** `equipment` и `equipment_lists` — полный CRUD у
-`authenticated`; `equipment_movements` — **только select**; `users`, `events`,
+**Гранты (фактические):** `equipment`, `equipment_lists` и пять таблиц залов
+(`hall_plans`, `halls`, `plan_positions`, `hall_assignments`, `position_catalog`) —
+полный CRUD у `authenticated`; `employees` и `vehicles` — select/insert/update;
+`employee_files` и `vehicle_files` — select/insert; `vehicle_drivers` —
+select/insert/delete; `equipment_movements` — **только select**; `users`, `events`,
 `mount_points`, `reports` — **ни одного гранта**; `anon` — ничего нигде.
+
+**DELETE у `authenticated` — ровно на восьми таблицах:** `equipment`,
+`equipment_lists`, `vehicle_drivers`, `hall_plans`, `halls`, `plan_positions`,
+`hall_assignments`, `position_catalog`. DELETE-политики при этом есть на 16 таблицах
+из 17 (нет только у `equipment_movements`): там, где политика есть, а гранта нет
+(`employees`, `employee_files`, `vehicles`, `vehicle_files` и четыре таблицы без
+грантов вовсе), удаление держит **грант**, политика спит.
 
 Три замечания, каждое с последствием:
 
@@ -129,8 +155,8 @@ RLS включён на всех девяти таблицах. Все поли�
    оказывается владельцем таблицы, а владелец таблицы от RLS освобождён — пока не
    выставлено `force row level security`.
 
-   > **Проверено 2026-08-22: конструкция цела.** Все 7 таблиц и все 4 функции `private.*`
-   > принадлежат роли `postgres`, `relforcerowsecurity = false` у всех семи.
+   > **Проверено 2026-10-04 (с42): конструкция цела.** Все 17 таблиц и все 4 функции `private.*`
+   > принадлежат роли `postgres`, `relforcerowsecurity = false` у всех семнадцати.
    > **Что её ломает:** включить `force row level security` на `equipment_movements` —
    > и триггерная вставка начнёт падать на RLS, а журнал молча перестанет писаться. То же
    > произойдёт при смене владельца таблицы без смены владельца функции.
@@ -138,8 +164,11 @@ RLS включён на всех девяти таблицах. Все поли�
 3. **Политики `mount_points` и `reports` проверяют лишь существование события, а не право
    на него.** Само по себе это дыра, но нейтрализована отсутствием грантов.
 
-**EXECUTE на RPC** выдан `authenticated` для девяти публичных функций; у `anon` нет ни
-одной. Это состояние приходится **удерживать руками**: default privileges Supabase отдают
+**EXECUTE на RPC** выдан `authenticated` для всех десяти RPC из §5; у `anon` нет ни
+одной функции `public`. Тот же EXECUTE достался и пяти триггерным функциям
+(`normalize_employee_fields`, `normalize_vehicle_fields`, `normalize_hall_name`,
+`touch_hall_plan`, `check_employee_document_photo`) — миграции отзывают его только у
+`public` и `anon`; как RPC они не вызываются (`returns trigger`). Это состояние приходится **удерживать руками**: default privileges Supabase отдают
 `EXECUTE` каждой новой функции напрямую `anon`, и `revoke … from public` этого не снимает.
 Каждая миграция, заводящая функцию, содержит отдельный `revoke execute … from anon`.
 
@@ -192,6 +221,7 @@ RLS включён на всех девяти таблицах. Все поли�
 | `trigger_update_equipment_lists_updated_at` | `equipment_lists` | before update | `public.update_equipment_lists_updated_at()` |
 | `trg_mount_points_count` + `mount_point_insert` / `_update` / `_delete` | `mount_points` | — | `update_mount_points_count()` — **четыре триггера на одну функцию** |
 | `trg_validate_technical_duties_status` | `mount_points` | before insert or update | проверяет jsonb-колонку `technical_duties` |
+| триггеры сотрудников (3), машин (2) и залов (7) | — | — | в §12–14, здесь не дублируются |
 
 **`guard_equipment_list_update()` после с10 делает ровно одно:** запрещает менять
 `created_by`. Прежний страж жизненного цикла (заморозка состава у не-черновика, GUC
@@ -339,8 +369,8 @@ technicalspecification, lengthinmeters, description) обновляются **у
 
 ## 8. Статусы оборудования: нормализация прошла
 
-В проде на 1481 строку встречаются ровно три значения `availability`, все английские:
-`available` — 1475, `unavailable` — 5, `diagnostics` — 1, `issued` — 0.
+В проде на 1482 строки встречаются ровно три значения `availability`, все английские:
+`available` — 1476, `unavailable` — 5, `diagnostics` — 1, `issued` — 0.
 
 **Русских статусов не осталось ни одного.** Поэтому клиентская эвристика `isAvailable`
 (`catalogGroups.ts`), которая до сих пор понимает `«в н»`, `«не »`, `«диагност»`, —
@@ -349,19 +379,19 @@ technicalspecification, lengthinmeters, description) обновляются **у
 
 ## 9. Индексы
 
-На `equipment` — девять: `equipment_pkey`, по `availability`, `brand`, `location`,
+На `equipment` — десять. Девять рабочих: `equipment_pkey`, по `availability`, `brand`, `location`,
 `model`, `serialnumber` (**btree, НЕ unique**), `subtype`, `type`, плюс
 `equipment_model_normalized_idx` по `(lower(btrim(brand)), lower(btrim(model)))` —
 он покрывает предикат, по которому работают `count_equipment_model_units` и
 `update_equipment_model_and_unit`.
 
-Отдельно `idx_equipment_search` — **GIN** по
+Десятый, `idx_equipment_search`, — **GIN** по
 `to_tsvector('russian', model || brand || serialnumber || coalesce(description,''))`.
 **Продукт его не использует:** поиск идёт через `ilike`-фильтры, а не через `@@`. Индекс
 не работает ни на один запрос и только удорожает запись — либо переводить поиск на него,
 либо убирать. В backlog.
 
-На `equipment_lists` — семь (pk, `created_at`, `event_id`, `is_archived`, `list_mode`,
+На `equipment_lists` — восемь (pk, `created_at`, `event_id`, `is_archived`, `list_mode`,
 `type`, `mount_point_id where not null`, `created_by`). На `equipment_movements` — четыре
 (pk, `(equipment_id, changed_at desc)`, `list_id where not null`, `changed_by where not null`).
 
@@ -385,6 +415,11 @@ technicalspecification, lengthinmeters, description) обновляются **у
 5. **`security definer` — только в схеме `private`** и только для того, что клиент не
    должен уметь подделать. Публичные RPC — `invoker`. Не трогать `is_app_member()` /
    `has_any_role()` без прочтения §3.
+   **Единственное исключение в `public` — триггерная `check_employee_document_photo()`**
+   (`20260823170000_employee_document_photo.sql`). Причина записана в самой миграции:
+   у `authenticated` на `employee_files` только SELECT под RLS члена, а триггеру нужен
+   гарантированный доступ к строке файла. Почему функцию завели в `public`, а не в
+   `private`, из миграции не видно. Остальные 18 функций `public` — `invoker`.
 6. **После добавления или изменения RPC** — `notify pgrst, 'reload schema'` в конце
    миграции, иначе PostgREST вернёт `PGRST202`.
 7. **`CASCADE` на политике RLS — не выход.** Таблица без INSERT-политики под RLS запрещает
@@ -419,8 +454,15 @@ technicalspecification, lengthinmeters, description) обновляются **у
   рождения легальны осознанно** (однофамильцы существуют) — предупреждение о
   совпадении ФИО живёт только в форме и ничего не охраняет. Это НЕ дыра
   «клиенту не верим»: охраняемые инварианты в базе.
-- **DELETE не дан никому намеренно** — ни сотрудникам, ни их файлам, ни
-  объектам бакета (у `employee_files` и бакета нет даже политик UPDATE/DELETE).
+- **Удаление закрыто намеренно, но держит его грант, а не отсутствие политики.**
+  Политики `employees_delete_for_admin` и `employee_files_delete_for_admin`
+  (`has_any_role(['admin'])`) в базе ЕСТЬ; гранта DELETE у `authenticated` на обе
+  таблицы НЕТ — запрос падает на правах, до политики не доходит. **Достаточно
+  одного `grant delete … to authenticated` — и admin начнёт удалять сразу**, без
+  новой политики, и удаление сотрудника каскадом унесёт его строки
+  `employee_files` (объекты в бакете останутся сиротами), связки
+  `vehicle_drivers` и ячейки `hall_assignments`. У `employee_files` нет ни гранта, ни политики UPDATE; у бакета
+  (`storage.objects`) политик UPDATE/DELETE нет вовсе — только select и insert.
   Паспортные данные: удаление — отдельное будущее решение с ролями. Убрать
   объект из бакета мостом НЕЛЬЗЯ: `storage.protect_delete()` запрещает прямой
   SQL-delete — только Storage API (при нужде: временная DELETE-политика на
@@ -446,6 +488,10 @@ technicalspecification, lengthinmeters, description) обновляются **у
   последнее загруженное (`pickDocumentPhoto` в `features/employees/api.ts` —
   единственное место правила, им же живут миниатюры списка). Новых грантов нет:
   запись идёт существующей `employees_update_for_staff`.
+- **Триггеры `employees` — три:** `trg_normalize_employee_fields`,
+  `trg_check_employee_document_photo` (before insert or update of
+  `document_photo_id`) и `update_employees_updated_at` (before update, общая
+  `update_updated_at_column()`).
 - **Экспорт «на мероприятие» в базу не пишет** (с19): документ собирается в
   браузере из `employees`/`vehicles` и байтов бакета (`storage.download()` под
   той же SELECT-политикой, что signed URL). Новых таблиц, политик и RPC у
@@ -471,8 +517,9 @@ technicalspecification, lengthinmeters, description) обновляются **у
   и «01 439 SNA» — одна машина. Клиент шлёт номер как ввели, пре-чеков нет.
 - **Водители — M2M `vehicle_drivers`**, а не массив uuid в `vehicles`: FK на
   элементы массива Postgres не умеет, целостность жила бы только в клиенте.
-  **Staff имеет DELETE на связке** — единственный DELETE-грант рядовой роли во
-  всей схеме, осознанный отход от канона с17: это связка, не данные; без него
+  **Staff имеет DELETE на связке** — первый DELETE-грант рядовой роли в схеме
+  (с18; с с20 к нему добавились пять таблиц залов, §14), осознанный отход от
+  канона с17: это связка, не данные; без него
   водителя нельзя снять с машины. Сами `vehicles`/`vehicle_files` — удаление
   admin-only политикой БЕЗ гранта, как у сотрудников.
 - **Директор компании в машинах НЕ хранится**, а для экспортного списка
@@ -494,6 +541,8 @@ technicalspecification, lengthinmeters, description) обновляются **у
 - **Пачечный upsert связки — `defaultToNull: false`** (`saveVehicleDrivers` в
   `features/vehicles/api.ts`): postgrest-js по умолчанию шлёт NULL в
   непереданные колонки, `created_by = NULL` не проходит INSERT-политику.
+- **Триггеры `vehicles` — два:** `trg_normalize_vehicle_fields` и
+  `update_vehicles_updated_at` (before update, общая `update_updated_at_column()`).
 - **Импортные 6 машин (с18)** — из xlsx прораба; связки нашли сотрудников по
   нормализованной паре паспорта (6/6), тем же файлом шести водителям дописаны
   телефоны, которых не было в импорте с17.
@@ -529,6 +578,11 @@ technician/operator/other) → `hall_assignments` (ячейка: позиция 
 - **`touch_hall_plan` — security invoker** (after-триггеры детей двигают
   `updated_at` плана): пишущему в детей нужен UPDATE на `hall_plans` — появится
   роль без него, запись начнёт падать на триггере.
+- **Триггеры залов — семь:** `trg_touch_hall_plan` (after insert or update or
+  delete) на `halls`, `plan_positions`, `hall_assignments`;
+  `trg_normalize_hall_name` (before insert or update, `btrim` имени) на `halls`,
+  `plan_positions`, `position_catalog`; `update_hall_plans_updated_at` на
+  `hall_plans`.
 - **Один человек во многих ячейках — норма** (страховка на все залы). База не
   ограничивает; интерфейсные скрепка/×N — подсказки без пары в базе, и это
   легально: они ничего не запрещают.
