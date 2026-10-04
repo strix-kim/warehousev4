@@ -10,6 +10,7 @@ import {
   createEquipmentBatch,
   emptyEquipmentTaxonomy,
   fetchEquipmentTaxonomy,
+  isUniqueViolation,
   serialNumberExists,
 } from './api'
 import {
@@ -244,8 +245,8 @@ export function EquipmentCreatePage() {
       setSerialCheck(result)
       return result
     } catch {
-      // Отказ проверки НЕ означает «дубля нет»: разрешает только база, а
-      // уникального индекса на serialnumber в проде нет (gotchas §11).
+      // Отказ проверки НЕ означает «дубля нет»: разрешает только база
+      // (триггер trg_equipment_serial_unique), подсказка тут лишь бережёт попытку.
       setSerialCheck('failed')
       return 'failed'
     } finally {
@@ -325,7 +326,16 @@ export function EquipmentCreatePage() {
         description,
       })
       setCreatedId(id)
-    } catch {
+    } catch (cause) {
+      // 23505 бросает триггер trg_equipment_serial_unique: между checkSerial и
+      // вставкой номер успела занять другая вкладка. Решает база, не подсказка.
+      if (isUniqueViolation(cause)) {
+        if (kind === 'serialized') setSerialCheck('duplicate')
+        setError(kind === 'serialized'
+          ? tr('Такой серийный номер уже есть в каталоге.', 'Bu seriya raqami katalogda allaqachon mavjud.')
+          : tr('Такой инвентарный код уже есть в каталоге.', 'Bu inventar kodi katalogda allaqachon mavjud.'))
+        return
+      }
       setError(tr('Не удалось добавить оборудование. Проверьте поля и повторите попытку.', 'Uskunani qo‘shib bo‘lmadi. Maydonlarni tekshirib, qayta urinib ko‘ring.'))
     } finally {
       setIsSaving(false)

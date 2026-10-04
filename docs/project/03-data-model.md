@@ -73,8 +73,9 @@ default `'N/A'` · `count` integer default 1 · `availability` text default `'av
 `count >= 0`.
 
 **Внешних ключей у таблицы нет ни одного. `UNIQUE` на `serialnumber` НЕТ** — есть только
-обычный btree `idx_equipment_serialnumber`. Уникальность держится единственной клиентской
-проверкой: это не гонка, а отсутствие ограничения (`02-decisions` §5).
+обычный btree `idx_equipment_serialnumber` и `equipment_serial_normalized_idx` по
+`lower(btrim(serialnumber))`. Новые дубли отклоняет триггер `trg_equipment_serial_unique`
+(с44, код `23505`); 10 групп старых повторов остаются до сверки наклеек (`02-decisions` §5).
 
 `serialnumber` объявлен not null, но наружу отдаётся `string | null`: для количественного
 учёта в колонке лежит служебный идентификатор `QTY::…`, который нормализация прячет (§7).
@@ -260,9 +261,9 @@ select/insert/delete; `equipment_movements` — **только select**; `users`
 Три RPC с15 — три разных ответа на «клиенту не верим», их различие из кода не
 выводится. `append_equipment_to_list` — ЕДИНСТВЕННЫЙ путь записи состава, где
 brand/model берутся из `equipment`, а не из клиентского JSON (точечный append под
-`for update`; документ-RPC выше дыру §5.1-2 сохраняют). `create_equipment_batch` —
-ЕДИНСТВЕННЫЙ путь заведения, где дубль серийника проверяет база под
-`pg_advisory_xact_lock` (одиночный insert по-прежнему держит клиентский ilike).
+`for update`; документ-RPC выше дыру §5.1-2 сохраняют). `create_equipment_batch`
+проверяет дубль серийника под `pg_advisory_xact_lock`; одиночный insert и прямую
+правку номера с с44 страхует триггер `trg_equipment_serial_unique` на том же ключе лока.
 Дубль у неё — не исключение, а ответ `{status:'duplicates'}`: список занятых
 номеров переводит на язык клиент. `fetch_equipment_models` повторяет построчную
 семантику поиска старого каталога намеренно — чтобы серийник находил модель.
@@ -441,7 +442,7 @@ technicalspecification, lengthinmeters, description) обновляются **у
   поломка приложения.
 - **Дубль внешнего ключа на `mount_points`** и четыре триггера пересчёта — §4.
 - **Неиспользуемый GIN-индекс** — §9.
-- **Нет `UNIQUE` на `equipment.serialnumber`** — §1.1.
+- **Нет `UNIQUE` на `equipment.serialnumber`** — уникальность новых держит триггер, §1.1.
 
 ## 12. Сотрудники и первый Storage-бакет (с17)
 

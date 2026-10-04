@@ -332,8 +332,8 @@ export type CreateEquipmentBatchResult =
 /**
  * Партия серийных единиц одной транзакцией — RPC create_equipment_batch
  * (миграция 20260823100000). Дубли проверяет СЕРВЕР, под advisory-локом по
- * нормализованному номеру: это единственный путь заведения, где гонка двух
- * вкладок с одним серийником закрыта (UNIQUE-индекса в базе нет, бэклог).
+ * нормализованному номеру, и перечень занятых номеров приходит ответом. Прямую
+ * вставку (createEquipment) с с44 страхует тем же локом триггер базы.
  */
 export async function createEquipmentBatch(input: CreateEquipmentBatchInput): Promise<CreateEquipmentBatchResult> {
   if (!supabase) throw new Error('Supabase не настроен')
@@ -412,6 +412,13 @@ export async function addEquipmentUnit(input: AddEquipmentUnitInput): Promise<Ad
 // уже добавленные косые.
 function escapeLikePattern(value: string) {
   return value.replace(/[\\%_]/g, (char) => `\\${char}`)
+}
+
+// 23505 на вставке или правке единицы бросает триггер trg_equipment_serial_unique
+// (миграция 20261004120000): номер или инвентарный код уже занят другой строкой.
+export function isUniqueViolation(error: unknown) {
+  if (typeof error !== 'object' || error === null) return false
+  return (error as { code?: unknown }).code === '23505'
 }
 
 export async function serialNumberExists(serialNumber: string) {
