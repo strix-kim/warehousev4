@@ -61,6 +61,22 @@ function touched<T>(value: T): T {
   return value
 }
 
+// Отказ удаления, который база не называет ошибкой. RLS не бросает исключение,
+// а молча отсекает строку: `.delete()` без прав возвращает пустой ответ и
+// `error: null` — интерфейс считал бы запись удалённой. Поэтому просим
+// удалённые id назад и ноль строк считаем отказом (тот же приём —
+// `deleteEquipmentList`). Ноль бывает и честным: строку уже снёс каскад или
+// другая вкладка. Различить эти два случая клиент не может, поэтому и текст
+// один на оба — «обновите план».
+export const HALL_DELETE_NOT_APPLIED = 'hall-delete-not-applied'
+
+async function deleteRow(table: 'hall_plans' | 'halls' | 'plan_positions' | 'hall_assignments' | 'position_catalog', id: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase не настроен')
+  const { data, error } = await supabase.from(table).delete().eq('id', id).select('id')
+  if (error) throw error
+  if (!data?.length) throw new Error(HALL_DELETE_NOT_APPLIED)
+}
+
 export function fetchHallPlans({ bypassCache = false } = {}): Promise<HallPlanWithHalls[]> {
   return cachedQuery(HALL_PLANS_CACHE_KEY, HALL_PLANS_CACHE_TTL, () => loadHallPlans(), { bypass: bypassCache })
 }
@@ -165,9 +181,7 @@ export async function updateHallPlan(id: string, input: HallPlanInput): Promise<
 // удалений здесь нет и быть не должно: три запроса вместо одного дали бы план
 // без залов, если второй не прошёл.
 export async function deleteHallPlan(id: string): Promise<void> {
-  if (!supabase) throw new Error('Supabase не настроен')
-  const { error } = await supabase.from('hall_plans').delete().eq('id', id)
-  if (error) throw error
+  await deleteRow('hall_plans', id)
   touched(null)
 }
 
@@ -179,6 +193,9 @@ export function hallPlanErrorText(error: unknown, tr: Tr): string {
   const code = typeof candidate.code === 'string' ? candidate.code : ''
   const message = typeof candidate.message === 'string' ? candidate.message : ''
 
+  if (message === HALL_DELETE_NOT_APPLIED) {
+    return tr('Не удалено: нет прав или запись уже удалена. Обновите план.', 'O‘chirilmadi: huquq yo‘q yoki yozuv allaqachon o‘chirilgan. Rejani yangilang.')
+  }
   if (message.includes('hall_plans_dates_check')) {
     return tr('Дата окончания раньше даты начала.', 'Tugash sanasi boshlanish sanasidan oldin.')
   }
@@ -258,9 +275,7 @@ export async function updateHall(id: string, patch: { name?: string; color?: str
 // Позиции зала уходят каскадом составного внешнего ключа — удалять их отдельно
 // нельзя: два запроса вместо одного оставили бы зал без позиций, не удалив сам зал.
 export async function deleteHall(id: string): Promise<void> {
-  if (!supabase) throw new Error('Supabase не настроен')
-  const { error } = await supabase.from('halls').delete().eq('id', id)
-  if (error) throw error
+  await deleteRow('halls', id)
   touched(null)
 }
 
@@ -285,9 +300,7 @@ export async function updatePlanPosition(id: string, patch: { name?: string; rol
 // Ячейки строки уходят каскадом составного FK — удалять их отдельно нельзя:
 // два запроса вместо одного оставили бы строку без ячеек, не удалив саму строку.
 export async function deletePlanPosition(id: string): Promise<void> {
-  if (!supabase) throw new Error('Supabase не настроен')
-  const { error } = await supabase.from('plan_positions').delete().eq('id', id)
-  if (error) throw error
+  await deleteRow('plan_positions', id)
   touched(null)
 }
 
@@ -334,9 +347,7 @@ export async function updateHallAssignment(id: string, patch: { employee_id: str
 }
 
 export async function deleteHallAssignment(id: string): Promise<void> {
-  if (!supabase) throw new Error('Supabase не настроен')
-  const { error } = await supabase.from('hall_assignments').delete().eq('id', id)
-  if (error) throw error
+  await deleteRow('hall_assignments', id)
   touched(null)
 }
 
@@ -473,8 +484,7 @@ export async function createCatalogEntry(name: string, role: string): Promise<Po
 
 // Удаление из справочника планы не задевает: FK на него нет намеренно — строка
 // плана хранит свою копию имени (см. миграцию 20260824120000).
-export async function deleteCatalogEntry(id: string): Promise<void> {
-  if (!supabase) throw new Error('Supabase не настроен')
-  const { error } = await supabase.from('position_catalog').delete().eq('id', id)
-  if (error) throw error
+// Кэш планов не сбрасывается: справочник в выдачу планов не входит.
+export function deleteCatalogEntry(id: string): Promise<void> {
+  return deleteRow('position_catalog', id)
 }

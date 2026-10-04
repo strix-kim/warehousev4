@@ -82,6 +82,8 @@ export function HallTvPage() {
     return () => window.clearInterval(timer)
   }, [editor.loadState])
 
+  const exitPath = planId ? `/halls/${planId}` : '/halls'
+
   // Esc — выход в редактор плана. В полноэкранном режиме первый Esc забирает
   // себе браузер, поэтому сюда событие доходит уже из обычного состояния;
   // проверка fullscreenElement страхует движки, которые событие всё же отдают.
@@ -91,11 +93,11 @@ export function HallTvPage() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape' || document.fullscreenElement) return
-      navigate(planId ? `/halls/${planId}` : '/halls')
+      navigate(exitPath)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [navigate, planId])
+  }, [navigate, exitPath])
 
   // Состояние читаем из события, а не ведём сами: из полноэкранного режима
   // выходят и мимо кнопки — Esc, F11, жест системы. Без него кнопка в уже
@@ -112,6 +114,15 @@ export function HallTvPage() {
   function toggleFullscreen() {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
     else void rootRef.current?.requestFullscreen().catch(() => {})
+  }
+
+  // Выход кнопкой (с42): Esc — единственный прежний путь — не существует на
+  // телефоне и на ТВ с пультом, и витрина оказывалась тупиком. Из полноэкранного
+  // режима выходим тем же нажатием: навигация сняла бы его и сама (корень
+  // размонтируется), но не во всех движках и не сразу.
+  function leave() {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+    navigate(exitPath)
   }
 
   const time = refreshedAt ? formatTime(refreshedAt, locale) : ''
@@ -158,6 +169,18 @@ export function HallTvPage() {
                 : <><Maximize2 size={15} aria-hidden="true" /> {tr('Во весь экран', 'To‘liq ekran')}</>}
             </button>
           )}
+          {/* Крестик без подписи: шапка витрины делит ширину со счётчиками, а
+              «закрыть» в правом углу читается без слов. Стоит вне условия
+              loadState — уйти можно и с экрана ошибки, и с загрузки. */}
+          <button
+            type="button"
+            className="hall-tv__button hall-tv__button--icon"
+            onClick={leave}
+            aria-label={tr('Закрыть ТВ-режим', 'TV rejimini yopish')}
+            title={tr('Закрыть ТВ-режим (Esc)', 'TV rejimini yopish (Esc)')}
+          >
+            <X size={15} aria-hidden="true" />
+          </button>
         </div>
       </header>
 

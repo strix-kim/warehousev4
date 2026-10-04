@@ -90,6 +90,8 @@
 .hall-tv__button { display: inline-flex; align-items: center; gap: .5em; padding: .55em .9em; border: 1px solid var(--tv-line); border-radius: .6em; color: var(--tv-ink-soft); background: var(--tv-panel); font-size: clamp(13px, .95vw, 18px); font-weight: 700; white-space: nowrap; }
 .hall-tv__button svg { width: 1.1em; height: 1.1em; }
 .hall-tv__button:hover { border-color: var(--tv-ink-soft); color: var(--tv-ink); }
+/* Кнопка из одной иконки — квадрат: поля равные, иначе крестик стоит в овале. */
+.hall-tv__button--icon { padding: .55em; }
 
 /* Состояния — по центру пустого экрана: на ТВ их читают издалека, поэтому это
    не строка в панели, а весь остаток высоты.
