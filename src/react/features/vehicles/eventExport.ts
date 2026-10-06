@@ -8,7 +8,7 @@
 import { driverFullName, vehicleTitle, type VehicleDriver, type VehicleWithDrivers } from './types'
 import type { Employee } from '../employees/types'
 import { companyDirector, companyLegalName } from '../../lib/xlsx/documentDefaults'
-import { downloadBlob, safeFileName } from '../../lib/xlsx/download'
+import { downloadBlob, exportFileName } from '../../lib/xlsx/download'
 import { docText, eventDocumentTitle, formatDocumentDate, type EventDocumentMeta } from '../../lib/xlsx/eventDocument'
 import { buildEventSheet, type EventSheet, type EventSheetCell, type EventSheetColumn } from '../../lib/xlsx/eventSheet'
 import { buildWorkbookPackage } from '../../lib/xlsx/package'
@@ -166,6 +166,5 @@ export function downloadVehicleEventXlsx({ vehicles, employeesById, meta }: {
     printArea: sheet.printArea,
     printTitles: sheet.printTitles,
   })
-  const suffix = docText(meta.language, 'авто', 'автомобиллар')
-  downloadBlob(blob, `${meta.dateFrom}_${safeFileName(meta.name, 'event')}_${suffix}.xlsx`)
+  downloadBlob(blob, exportFileName({ kind: 'vehicles', name: meta.name, date: meta.dateFrom, language: meta.language }))
 }

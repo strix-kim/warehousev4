@@ -1,7 +1,6 @@
-import { toDateValue } from '../../lib/date'
 import { textCell, numberCell, formulaCell, headerFooterText } from '../../lib/xlsx/cells'
 import { companyDetails, companyLegalName } from '../../lib/xlsx/documentDefaults'
-import { downloadBlob, safeFileName } from '../../lib/xlsx/download'
+import { downloadBlob, exportFileName } from '../../lib/xlsx/download'
 import { buildWorkbookPackage } from '../../lib/xlsx/package'
 
 export type ExportListRow = {
@@ -137,16 +136,6 @@ function buildSheet(input: ExportListInput) {
 </worksheet>`
 }
 
-// Имя файла: дата мероприятия, название и режим документа. До этого оба режима
-// давали одно и то же имя — второй файл ложился в загрузки как «… (1)», и понять,
-// где рабочий список, а где документ с реквизитами, можно было только открыв оба.
-function exportFileName(input: ExportListInput) {
-  const suffix = input.documentMode === 'approval'
-    ? (input.language === 'uz' ? 'kelishuvga' : 'на-согласование')
-    : (input.language === 'uz' ? 'ishchi' : 'рабочий')
-  return `${input.eventDate ?? toDateValue(new Date())}_${safeFileName(input.name)}_${suffix}.xlsx`
-}
-
 function createEquipmentListXlsxBlob(input: ExportListInput) {
   const sheetName = input.language === 'uz' ? 'Uskunalar' : 'Оборудование'
   // Область печати и повтор шапки считаются по той же сетке, что и сам лист:
@@ -162,5 +151,12 @@ function createEquipmentListXlsxBlob(input: ExportListInput) {
 }
 
 export function downloadEquipmentListXlsx(input: ExportListInput) {
-  downloadBlob(createEquipmentListXlsxBlob(input), exportFileName(input))
+  // Режим документа — в типе имени: рабочий и «на согласование» не должны
+  // совпадать, иначе второй файл ложится в загрузки как «… (1)».
+  downloadBlob(createEquipmentListXlsxBlob(input), exportFileName({
+    kind: input.documentMode === 'approval' ? 'equipmentApproval' : 'equipment',
+    name: input.name,
+    date: input.eventDate,
+    language: input.language,
+  }))
 }

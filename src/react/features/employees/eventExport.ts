@@ -9,7 +9,7 @@
 import { compressPhoto } from '../../lib/compressPhoto'
 import { reportAppError } from '../../lib/reportAppError'
 import { supabase } from '../../lib/supabase'
-import { downloadBlob, safeFileName } from '../../lib/xlsx/download'
+import { downloadBlob, exportFileName } from '../../lib/xlsx/download'
 import { docText, eventDocumentTitle, formatDocumentDate, type EventDocumentMeta } from '../../lib/xlsx/eventDocument'
 import { buildEventSheet, DATA_START_ROW, TOP_ROW_HEIGHTS_PT, type EventSheetCell, type EventSheetColumn } from '../../lib/xlsx/eventSheet'
 import { columnWidthToPx, drawingXml, EMU_PER_PX, fitImage, oneCellAnchor, rowHeightToEmu } from '../../lib/xlsx/images'
@@ -253,6 +253,5 @@ export function downloadEmployeeEventXlsx({ employees, meta, photos }: {
     printTitles: sheet.printTitles,
     drawing: sheet.drawing,
   })
-  const suffix = docText(meta.language, 'сотрудники', 'ходимлар')
-  downloadBlob(blob, `${meta.dateFrom}_${safeFileName(meta.name, 'event')}_${suffix}.xlsx`)
+  downloadBlob(blob, exportFileName({ kind: 'staff', name: meta.name, date: meta.dateFrom, language: meta.language }))
 }
