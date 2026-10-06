@@ -79,6 +79,7 @@
 | Непонятно, применён ли `scripts/*.sql` | это исторические ручные скрипты, не механизм миграций | новые SQL кладём только в `supabase/migrations/`; `scripts/` — архив без гарантий |
 | `apply_migration`/`execute_sql` вернули `{"status":"declined"}` без окна подтверждения | MCP-коннектор отклоняет вызовы, где есть `delete` или `drop` по живой базе (с44, с45: `DELETE` в DO-блоке, `drop trigger if exists`); дробить и повторять бесполезно | удаление данных и `drop` объектов — прорабу вставкой в SQL Editor, скрипт целиком в сообщении; затем запись версии в `supabase_migrations.schema_migrations` руками. Миграции без `drop … if exists`, когда объекта заведомо нет |
 | Новая функция доступна `anon`, хотя миграция делала `revoke from public` | default privileges Supabase выдают EXECUTE на каждую новую/пересозданную функцию НАПРЯМУЮ `anon`/`authenticated` — revoke с `public` прямой грант не снимает | каждый `create [or replace] function` сопровождается явным `revoke ... from public, anon` + grant нужным ролям, а после применения — контрольная выборка `information_schema.routine_privileges` (с5, поймано дважды) |
+| advisors lint 0029: `security definer` функция вызывается `authenticated` через `/rpc` | тот же прямой грант default privileges выдаётся и `authenticated`; триггерной функции он не нужен — право проверяется у создателя триггера при `create trigger`, а не при срабатывании | у функции, возвращающей `trigger`, снимать `EXECUTE` с `public, anon, authenticated`; после DDL перегонять `get_advisors` (с46) |
 
 ## §4 Кэш
 
