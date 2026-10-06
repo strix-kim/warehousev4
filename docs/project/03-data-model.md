@@ -188,6 +188,7 @@ select/insert/delete; `equipment_movements` — **только select**; `users`
 | `private.has_any_role(text[])` → boolean | те же свойства; `u.role::text = any(allowed_roles)`. `role` — `varchar(32)` с check на `video_engineer`, `technician`, `manager`, `admin` |
 | `private.log_equipment_change()` | триггерная, `security definer` |
 | `private.guard_equipment_list_update()` | триггерная, `security definer` |
+| `private.guard_equipment_list_items()` | триггерная, `security definer` (с45): читает `public.equipment` правами владельца, чтобы текст позиции не зависел от SELECT-политики пишущего |
 
 **Факт А.** `revoke all on table public.users from authenticated`. Клиент физически не
 может прочитать свою роль — в `src/react` нет ни одного обращения к `users`.
@@ -221,6 +222,7 @@ select/insert/delete; `equipment_movements` — **только select**; `users`
 | `trg_equipment_movement_history` | `equipment` | after insert or update of `count`, `availability` | `private.log_equipment_change()` |
 | `update_equipment_updated_at` | `equipment` | before update | `public.update_updated_at_column()` |
 | `trg_guard_equipment_list_update` | `equipment_lists` | before update | `private.guard_equipment_list_update()` |
+| `trg_guard_equipment_list_items` | `equipment_lists` | before insert or update of `equipment_items` | `private.guard_equipment_list_items()` — текст позиции из `equipment`, `count` 1..999, ссылка в никуда — `23503` (§5.1, §6) |
 | `trigger_update_equipment_lists_updated_at` | `equipment_lists` | before update | `public.update_equipment_lists_updated_at()` |
 | `trg_mount_points_count` + `mount_point_insert` / `_update` / `_delete` | `mount_points` | — | `update_mount_points_count()` — **четыре триггера на одну функцию** |
 | `trg_validate_technical_duties_status` | `mount_points` | before insert or update | проверяет jsonb-колонку `technical_duties` |
@@ -261,9 +263,9 @@ select/insert/delete; `equipment_movements` — **только select**; `users`
 | `home_summary()` → jsonb | да |
 
 Три RPC с15 — три разных ответа на «клиенту не верим», их различие из кода не
-выводится. `append_equipment_to_list` — ЕДИНСТВЕННЫЙ путь записи состава, где
-brand/model берутся из `equipment`, а не из клиентского JSON (точечный append под
-`for update`; документ-RPC выше дыру §5.1-2 сохраняют). `create_equipment_batch`
+выводится. `append_equipment_to_list` берёт brand/model из `equipment` сам (точечный
+append под `for update`); документ-RPC копируют текст клиента, но с с45 его на любом
+пути записи перезаписывает триггер `trg_guard_equipment_list_items` (§6). `create_equipment_batch`
 проверяет дубль серийника под `pg_advisory_xact_lock`; одиночный insert и прямую
 правку номера с с45 закрывает `UNIQUE`-индекс `equipment_serialnumber_unique`.
 Дубль у неё — не исключение, а ответ `{status:'duplicates'}`: список занятых
@@ -293,20 +295,21 @@ brand/model берутся из `equipment`, а не из клиентского
 **Проверяется:** членство; непустое имя после `btrim`; `list_mode` из двух значений; даты
 либо обе NULL, либо `start <= end`; `p_items` — непустой массив; у каждой
 `serialized`/`quantity`-позиции `equipment_id` валиден **и такая строка есть** в
-`equipment`.
+`equipment`. **С с45 те же два правила плюс `count` (целое 1..999) держит триггер
+`trg_guard_equipment_list_items` на самой таблице** — прямой `update` у `authenticated`
+есть, и RPC обходится одним запросом из консоли.
 
 **НЕ проверяется:**
 
-1. **`requested_count` против фактического наличия.** Ни при создании, ни при правке.
-   В базе может лежать список на 9999 единиц оборудования, которого на складе три.
-   После с10 физического гейта не осталось вообще — выдачи в продукте нет.
-2. **Соответствие `brand/model/type/subtype` реальной строке `equipment`.** Текст берётся
-   из клиентского JSON дословно, даже когда `equipment_id` присутствует и проверен (§6).
+1. **`count` против фактического наличия.** Намеренно (с45, `02-decisions` §5 (в)):
+   список — план на дату мероприятия, остаток на сегодня к нему не относится, нехватку
+   продукт выражает `planned`-позицией. Потолок 999 — только защита от опечатки.
+2. ~~Соответствие `brand/model/type/subtype`~~ — закрыто триггером (§6).
 3. **Пустые `brand/model` проходят.** Различать надо два случая: ключа в JSON нет →
    `btrim(NULL)` = NULL → нарушение not null, сырой текст ошибки; **ключ есть, но значение
    пустое** → `btrim('')` = `''`, not null удовлетворён, и в таблицу ложится пустая строка.
    Ни CHECK, ни `nullif` этот случай нигде не ловят.
-4. Даты в прошлом, длина имени, разумность `count` — не ограничены ничем.
+4. Даты в прошлом, длина имени — не ограничены ничем.
 
 **Правка (`update_equipment_list_document`)** повторяет тот же набор проверок, добавляет
 блокировку строки `for update` и переписывает её целиком — это replace, а не merge.
@@ -339,18 +342,23 @@ technicalspecification, lengthinmeters, description) обновляются **у
 
 ## 6. Денормализация состава — остаточный риск
 
-`equipment_items` (jsonb) хранит `brand`, `model`, `type`, `subtype` **снимком на момент
-сохранения**, рядом с `equipment_id`. Совпадение текста с реальной строкой `equipment`
-не проверяется нигде.
+`equipment_items` (jsonb) хранит `brand`, `model`, `type`, `subtype` рядом с
+`equipment_id`. **С с45 это не клиентский снимок, а последняя известная подпись склада:**
+триггер `trg_guard_equipment_list_items` при каждой записи массива перезаписывает текст
+позиции с живым `equipment_id` из `equipment`, что бы ни прислал клиент. Серийные позиции
+в массиве не лежат (они в `equipment_ids`), так что правило о тексте касается
+`quantity`-позиций.
 
-После с10 острота упала: расчёт дефицита, который джойнил склад по этому тексту, снесён
-вместе с подсистемой. Осталось одно последствие, и оно видимое: **сборщик состава
-сохранённого списка** склеивает jsonb-снимок с живыми строками склада. Подпись берётся по
-`equipment_id` как более авторитетному, снимок — фолбэк для позиций без id; иначе после
-переименования модели одна позиция показывалась бы двумя строками (`02-decisions` §5).
+Три края, записанные в шапке миграции `20261006130000`: (1) позиция, чьё оборудование
+удалили после сохранения («сирота»), на `UPDATE` берёт текст из элемента OLD с тем же id —
+живёт со своим последним снимком, подделать его нельзя; новая ссылка в никуда — `23503`;
+(2) `planned` без id — свободная строка, остаётся как прислали; (3) `UPDATE OF
+equipment_items` срабатывает и без изменения массива, поэтому первая проверка —
+«массив не изменился → выход», иначе старая сирота блокировала бы правку имени.
 
-**Чем закрывать по-настоящему:** ссылаться на `equipment_id`, а текст держать только как
-снимок для печати. Не сделано.
+Читатели держатся того же правила «id авторитетнее текста»: `loadSavedListComposition`
+(карточка, Excel) и с с45 `selectionFromList` в редакторе; снимок — фолбэк для
+`planned` и сирот.
 
 ## 7. `tracking_mode` и `inventory_code` — это НЕ колонки
 
