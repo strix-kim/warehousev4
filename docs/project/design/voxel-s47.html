@@ -153,6 +153,14 @@ body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
 .cap b{font:800 18px/1.15 var(--f-display);letter-spacing:-.02em}
 .cap span{font:500 12.5px/1.3 var(--f-text);color:var(--muted)}
 .stage-btn{position:absolute;right:12px;top:12px;background:rgba(255,255,255,.92)}
+/* Полёт в гараж и обратно: таблички, подпись и нижний ряд гаснут, в конце — шторка цвета фона поверх canvas.
+   Шторку ведёт JS покадрово, остальное — CSS-переходы по классам. */
+.curtain{position:absolute;inset:0;z-index:5;background:var(--bg);opacity:0;pointer-events:none}
+.labels,.cap,.dock,.stage-btn{transition:opacity .3s var(--ease-out)}
+.stage.is-flying .labels,.stage.is-flying .cap,.stage.is-flying .dock,.stage.is-flying .stage-btn{opacity:0;pointer-events:none}
+.page .u-head,.panel,.g-list{transition:opacity .35s var(--ease-out),transform .35s var(--ease-out)}
+.page.is-in .u-head,.page.is-out .u-head{opacity:0}
+.page.is-in .panel,.page.is-in .g-list,.page.is-out .panel,.page.is-out .g-list{opacity:0;transform:translateX(24px)}
 
 /* Нижний ряд сцены — клавиатурный и текстовый путь к каждому объекту */
 .dock{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:center;padding:12px 16px;overflow-x:auto;scrollbar-width:none}
@@ -339,6 +347,7 @@ body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
           <div class="cap" id="cap"></div>
           <button type="button" class="btn btn--secondary btn--sm stage-btn" id="toList">Показать списком</button>
           <nav class="dock" id="dock" aria-label="Объекты сцены"></nav>
+          <div class="curtain" id="curtain" aria-hidden="true"></div>
         </section>
       </div>
       <!-- Откат без WebGL / reduced-motion: плитки главной s31 -->
@@ -359,6 +368,7 @@ body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
       <div class="u-head">
         <div><div class="u-eyebrow">Люди и площадка</div><h1 class="u-h1" id="h-veh">Автомобили <span class="count">6</span></h1></div>
         <div class="u-actions">
+          <button type="button" class="btn btn--secondary" id="backBtn">← Кампус</button>
           <label class="field"><svg class="i"><use href="#i-search"/></svg><input id="carSearch" type="search" placeholder="Госномер, бренд, модель" aria-label="Поиск машины"></label>
           <button type="button" class="btn btn--secondary" id="flatBtn" aria-pressed="false">Свернуть 3D</button>
           <button type="button" class="btn btn--primary" data-stub="Добавить машину"><svg class="i"><use href="#i-plus"/></svg>Добавить</button>
@@ -441,7 +451,7 @@ const T = {
   ok: tok('--ok-dot'), warnBg: tok('--warn-bg'),
 };
 
-const state = { view: 'campus', event: false, hover: null, sel: null, userMoved: false };
+const state = { view: 'campus', event: false, hover: null, sel: null, userMoved: false, flying: false };
 const roots = {};             // id → корневая группа объекта (для подсветки)
 const pickables = { campus: [], garage: [] };
 const labels = {};            // id → CSS2DObject
@@ -508,8 +518,10 @@ function label(parent, html, cls, x, y, z) {
   return o;
 }
 
-// Миниатюра, а не макет района: здание — 8–20 объёмов, окна — 1–3 широкие ленты --select,
-// детали крупнее «реальных», рёбра — только у основных объёмов.
+// Диорама, а не макет района: ОФИС — эталон габаритов (≈12×10, высота 7,6, дверь 2,9),
+// остальные здания — игрушки того же калибра: склад ≤ 1,5 офиса, гараж шириной с офис,
+// отель ≤ 2 высот офиса. Фигурка (2,0) ≈ 2/3 двери — нарочито крупная, машины ей под стать.
+// Здание — 8–20 объёмов, окна — 1–3 широкие ленты --select, рёбра — только у основных объёмов.
 const BAND = mat(T.select);
 // Дерево-игрушка: куб-ствол + одна-две крупные кроны
 function tree(k, x, z, s = 1) {
@@ -520,20 +532,21 @@ function tree(k, x, z, s = 1) {
 // Кейс — один графитовый куб
 const crate = (k, x, y0, z, s = 0.7) => k(DARK, s, s, s, x, y0, z);
 
-// Здание: группа с собственным материалом корпуса и рёбер — их подсвечивает наведение
+// Здание: группа с собственным материалом корпуса (его чуть подсвечивает полёт в гараж).
+// ring — кольцо на земле вокруг основания: центр (cx, cz) в мире, радиус = половина диагонали + запас.
 function building(id, x, z) {
   const g = new THREE.Group();
   g.position.set(x, 0, z);
-  const body = own(T.card), edge = new THREE.LineBasicMaterial({ color: T.line });
-  g.userData = { id, mats: [body], edge };
+  const body = own(T.card);
+  g.userData = { id, mats: [body] };
   roots[id] = g;
-  return { g, body, edge, k: kit() };
+  return { g, body, edge: EDGE, k: kit() };
 }
 
 /* ============== Здания: у каждого свой силуэт и свой «жест» ============== */
 // Офис: Г-образный план, второй этаж консолью над входом, угол — стеклянный атриум
 function buildOffice() {
-  const { g, body, edge, k } = building('office', -18, 8);
+  const { g, body, edge, k } = building('office', -11, 5.5);
   k(body, 4.5, 7, 6, -3.75, 0, -1.5, edge);                 // западное крыло, 2 этажа
   k(body, 7.5, 3.5, 5, 2.25, 0, 1.5, edge);                 // южное крыло, первый этаж
   k(body, 7.5, 3.5, 6.5, 2.25, 3.5, 2.25, edge);            // второй этаж — консоль наружу
@@ -551,89 +564,97 @@ function buildOffice() {
   tree(k, -7.8, 5.6, 1.1);
   k.into(g);
   g.userData.top = 7.6;
+  g.userData.ring = [-11, 6, Math.hypot(12, 10) / 2 + 1.2];
   return g;
 }
 
-// Склад: ангар с пилообразной крышей (4 зуба), башня-офис с торца, рампа с навесом
+// Склад: ангар с пилой из 3 зубьев, башня-офис с торца чуть выше офиса, рампа с навесом.
+// Длина 17 = 1,4 офиса.
 function buildWarehouse() {
-  const { g, body, edge, k } = building('warehouse', 7, -12);
-  k(body, 26, 5, 12, 0, 0, 0, edge);
-  for (let t = 0; t < 4; t++) {
-    const a = -13 + t * 6.5;
-    k(body, 4.4, 1.1, 12, a + 4.3, 5, 0, edge);             // зуб: две ступени
-    k(body, 2.2, 1.1, 12, a + 5.4, 6.1, 0, edge);
+  const { g, body, edge, k } = building('warehouse', 10.5, -11);
+  k(body, 13, 4.5, 9, -2, 0, 0, edge);                       // ангар: x −8,5…4,5
+  for (let t = 0; t < 3; t++) {
+    const a = -8.5 + t * (13 / 3);
+    k(body, 2.9, 1, 9, a + 2.85, 4.5, 0, edge);              // зуб: две ступени
+    k(body, 1.45, 1, 9, a + 3.6, 5.5, 0, edge);
   }
-  k(body, 4.5, 11, 7, 15.25, 0, -2.5, edge);                 // башня
-  k(DARK, 4.7, 0.4, 7.2, 15.25, 11, -2.5);
-  k(BAND, 0.1, 1.4, 5.6, 17.52, 7.6, -2.5);                  // лента окон башни
-  k(DARK, 5, 3.6, 0.14, 8.75, 1.1, 6.02);                    // ворота у рампы
-  k(WHITE, 7.5, 1.1, 2.8, 8.75, 0, 7.4, EDGE);               // рампа
-  k(WHITE, 8.8, 0.35, 3.6, 8.75, 4.3, 7.8, EDGE);            // навес
-  for (const x of [4.9, 12.6]) k(DARK, 0.4, 4.3, 0.4, x, 0, 9.3);
-  crate(k, 6, 1.1, 6.7); crate(k, 6.9, 1.1, 7.4);
+  k(body, 4, 8.6, 5.5, 6.5, 0, -1.75, edge);                 // башня: 8,6 против 7,6 у офиса
+  k(DARK, 4.2, 0.4, 5.7, 6.5, 8.6, -1.75);
+  k(BAND, 0.1, 1.2, 4.4, 8.52, 6, -1.75);                    // лента окон башни
+  k(BAND, 4.6, 0.9, 0.1, 1.6, 2.6, 4.52);                    // лента окон ангара
+  k(DARK, 3.6, 3.2, 0.14, -4, 0.9, 4.52);                    // ворота у рампы
+  k(WHITE, 5, 0.9, 2, -4, 0, 5.5, EDGE);                     // рампа
+  k(WHITE, 6, 0.3, 2.6, -4, 4.2, 5.8, EDGE);                 // навес
+  for (const x of [-6.6, -1.4]) k(DARK, 0.35, 4.2, 0.35, x, 0, 6.9);
+  crate(k, -5, 0.9, 5.3); crate(k, -4.2, 0.9, 5.9);
   k.into(g);
-  g.userData.top = 11.5;
+  g.userData.top = 9.4;
+  g.userData.ring = [10.5, -10.5, Math.hypot(17, 11) / 2 + 1];
   return g;
 }
 
-// Гараж: 6 открытых проёмов, односкатная крыша ступенями, мезонин сверху
-const bayX = (i) => -7.5 + i * 3;     // локальный x проёма; мир: +12
+// Гараж: коробка шириной с офис, 3 проёма, односкатная крыша ступенями, мезонин.
+// В проёмах три машины кубами, остальные три — на площадке перед ним (Bongo — целой моделью).
+const GX = 10, GZ = 4;                // позиция гаража в мире
+const bayX = (b) => -3.8 + b * 3.8;   // локальный x проёма
 function buildGarage() {
-  const { g, body, edge, k } = building('garage', 12, 8);
-  k(body, 18, 4.5, 9, 0, 0, 0, edge);
-  k(DARK, 17, 3, 0.1, 0, 0, 4.52);                           // проёмы — одна тёмная лента
-  for (let i = 1; i < 6; i++) k(body, 0.5, 3, 0.3, bayX(i) - 1.5, 0, 4.6);   // простенки между проёмами
-  k(body, 18.2, 0.6, 6, 0, 4.5, -1.5, edge);                 // односкат: две ступени к задней стене
-  k(body, 18.2, 0.6, 3, 0, 5.1, -3, edge);
-  k(body, 7, 2.6, 4, 4.5, 5.7, -2.5, edge);                  // мезонин
-  k(BAND, 5.6, 1.1, 0.1, 4.5, 6.5, -0.48);
-  k(DARK, 5, 1.3, 0.2, -3, 5.1, -0.4);                       // вывеска
-  for (const dx of [0.6, 1.5]) k(RED, 0.6, 0.6, 0.2, -3 + dx, 5.45, -0.25);
-  // Машины в проёмах — по одному кубу цвета кузова (Bongo — целой моделью, он уезжает на мероприятие)
-  CARS.forEach((c, i) => { if (i !== VAN) k(mat(c.hex), 1.9, 1.2, 1.6, bayX(i), 0.3, 4.9, EDGE); });
-  k(mat(T.sunk), 18, 0.03, 4, 0, 0, 6.5);                    // площадка перед гаражом
+  const { g, body, edge, k } = building('garage', GX, GZ);
+  k(body, 12, 4, 7, 0, 0, 0, edge);
+  k(DARK, 11.4, 3, 0.1, 0, 0, 3.52);                         // проёмы — одна тёмная лента
+  for (const x of [-1.9, 1.9]) k(body, 0.5, 3, 0.3, x, 0, 3.6);   // простенки
+  k(body, 12.2, 0.5, 4.5, 0, 4, -1.25, edge);                // односкат: две ступени к задней стене
+  k(body, 12.2, 0.5, 2, 0, 4.5, -2.5, edge);
+  k(body, 4.5, 2, 3, 3, 5, -1.9, edge);                      // мезонин
+  k(BAND, 3.6, 0.9, 0.1, 3, 5.6, -0.38);
+  k(DARK, 3.6, 1.1, 0.2, -2.5, 4.5, 0.6);                    // вывеска
+  for (const dx of [-0.6, 0.4]) k(RED, 0.55, 0.55, 0.2, -2.5 + dx, 4.8, 0.75);
+  [0, 2, 3].forEach((ci, b) => k(mat(CARS[ci].hex), 1.9, 1.2, 1.6, bayX(b), 0.3, 3.9, EDGE));
+  [4, 5].forEach((ci, b) => k(mat(CARS[ci].hex), 1.7, 1.4, 2.2, bayX(b), 0, 6.6, EDGE));
+  k(mat(T.sunk), 12, 0.03, 5, 0, 0, 6);                      // площадка перед гаражом
   k.into(g);
-  g.userData.top = 8.3;
+  g.userData.top = 7;
+  g.userData.ring = [GX, GZ + 1, Math.hypot(12, 9) / 2 + 1];
   return g;
 }
 
-// Отель: широкий подиум + коренастая башня у края, пилон-знак, портик. Окна — ленты по этажам на двух фасадах.
+// Отель: подиум + коренастая башня у края, пилон-знак, портик. Верх 11,4 (+знак) — меньше 2 высот офиса.
 function buildHotel() {
-  const { g, body, edge, k } = building('hotel', -20, -15);
-  k(body, 14, 5, 10, 0, 0, 0, edge);                         // подиум, 2 этажа
-  k(body, 7.5, 7.5, 6.5, -3.25, 5, -1.25, edge);             // башня, 3 этажа
-  k(DARK, 7.7, 0.4, 6.7, -3.25, 12.5, -1.25);
-  for (const y of [1.3, 3.5]) k(BAND, 12.4, 1.1, 0.1, 0.4, y, 5.02);                 // подиум: фасад
-  for (const y of [5.8, 8]) k(BAND, 6.2, 1.1, 0.1, -3.25, y, 2.02);                   // башня: фасад
-  for (const y of [5.8, 8, 10.3]) k(BAND, 0.1, 1.1, 5.2, 0.52, y, -1.25);             // башня: бок
-  k(DARK, 4.4, 1.4, 0.2, -3.25, 10.1, 2.1);                  // плашка HOTEL
-  k(DARK, 0.8, 4, 1.6, -5, 12.9, -2.5);                       // пилон
-  k(RED, 1, 1, 1.8, -5, 16.9, -2.5);
-  k(WHITE, 6, 0.6, 3, 3.5, 3.4, 6.3, EDGE);                   // портик на двух колоннах
-  for (const x of [1, 6]) k(WHITE, 0.6, 3.4, 0.6, x, 0, 7.4);
+  const { g, body, edge, k } = building('hotel', -12, -14);
+  k(body, 12, 4, 9, 0, 0, 0, edge);                          // подиум, 2 этажа
+  k(body, 6.5, 7, 5.5, -2.5, 4, -1, edge);                   // башня, 3 этажа
+  k(DARK, 6.7, 0.4, 5.7, -2.5, 11, -1);
+  for (const y of [1.1, 2.9]) k(BAND, 10.4, 0.9, 0.1, 0.3, y, 4.52);                  // подиум: фасад
+  for (const y of [5.2, 7.2]) k(BAND, 5.4, 0.9, 0.1, -2.5, y, 1.77);                   // башня: фасад
+  for (const y of [5.2, 7.2, 9.2]) k(BAND, 0.1, 0.9, 4.4, 0.77, y, -1);                // башня: бок
+  k(DARK, 3.8, 1.2, 0.2, -2.5, 9.1, 1.85);                   // плашка HOTEL
+  k(DARK, 0.7, 2.6, 1.4, -4.3, 11.4, -2.2);                  // пилон
+  k(RED, 0.9, 0.9, 1.6, -4.3, 14, -2.2);
+  k(WHITE, 5, 0.5, 2.6, 3, 3, 5.8, EDGE);                    // портик на двух колоннах
+  for (const x of [0.9, 5.1]) k(WHITE, 0.5, 3, 0.5, x, 0, 6.8);
   k.into(g);
   // Вращающаяся дверь — единственный цилиндр в мире, крупная
-  const door = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 3, 16), GLASS);
-  door.position.set(3.5, 1.5, 5);
+  const door = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2.7, 16), GLASS);
+  door.position.set(3, 1.35, 4.5);
   g.add(door);
-  g.userData.top = 18;
+  g.userData.top = 15;
+  g.userData.ring = [-12, -13, Math.hypot(12, 12) / 2 + 1];
   return g;
 }
 
-// Сцена мероприятия перед отелем: подиум, экран, колонки, флаг. Растёт из земли.
+// Сцена мероприятия на площади перед отелем: подиум, экран, колонки, флаг. Растёт из земли.
 function buildStage() {
   const g = new THREE.Group();
-  g.position.set(-13.5, 0, -4);
-  const body = own(T.card), edge = new THREE.LineBasicMaterial({ color: T.line }), k = kit();
-  k(body, 7, 0.8, 3.2, 0, 0, 0, edge);
-  k(STEEL, 7.4, 4, 0.3, 0, 0.8, -1.72);                       // рама задника
-  k(DARK, 6.8, 3.4, 0.1, 0, 1.1, -1.52);                      // экран
-  k(RED, 6.8, 0.3, 0.12, 0, 1.3, -1.45);
-  for (const s of [-1, 1]) k(DARK, 1, 2, 1, s * 4.1, 0, 0.6);
-  k(DARK, 0.25, 7.5, 0.25, 0, 0, -2.1);
-  k(RED, 2.2, 1.3, 0.1, 1.2, 6.1, -2.1);
+  g.position.set(-6, 0, -3.5);
+  const body = own(T.card), edge = EDGE, k = kit();
+  k(body, 5, 0.6, 2.4, 0, 0, 0, edge);
+  k(STEEL, 5.3, 3, 0.25, 0, 0.6, -1.3);                       // рама задника
+  k(DARK, 4.9, 2.5, 0.1, 0, 0.85, -1.13);                     // экран
+  k(RED, 4.9, 0.25, 0.12, 0, 1, -1.07);
+  for (const s of [-1, 1]) k(DARK, 0.8, 1.6, 0.8, s * 2.95, 0, 0.4);
+  k(DARK, 0.22, 5.5, 0.22, 0, 0, -1.6);
+  k(RED, 1.6, 1, 0.1, 0.9, 4.4, -1.6);
   k.into(g);
-  g.userData = { id: 'stage', mats: [body], edge };
+  g.userData = { id: 'stage', mats: [body], top: 5.5, ring: [-6, -3.3, Math.hypot(6.7, 3) / 2 + 1] };
   g.visible = false;
   roots.stage = g;
   return g;
@@ -651,13 +672,13 @@ const SPEC = {
 
 function makeCar(c, cargo = false) {
   const g = new THREE.Group();
-  const body = own(c.hex), edge = new THREE.LineBasicMaterial({ color: T.line }), k = kit();
+  const body = mat(c.hex), edge = EDGE, k = kit();
   const dark = new THREE.Color(c.hex).getHSL({}).l < 0.4, glass = dark ? DARK : GLASS;
   const lamp = mat(T.warnBg);
   const s = SPEC[c.kind], { w, l, wheel } = s;
   // Колесо — графитовый куб крупнее «настоящего», чуть выступает из кузова
   const wheelAt = (x, z) => k(DARK, 0.32, wheel, wheel, x, 0, z);
-  let top, markZ = 0;
+  let top;
   if (c.kind === 'bongo') {
     // Cab-over: высокая кабина без капота + низкая платформа
     const cz = l / 2 - 0.8, pl = l - 1.7, pz = -l / 2 + pl / 2;
@@ -668,7 +689,7 @@ function makeCar(c, cargo = false) {
     k(lamp, w - 0.3, 0.2, 0.06, 0, 0.62, l / 2 + 0.02);
     for (const sx of [-1, 1]) for (const z of [l / 2 - 0.7, -l / 2 + 1.05]) wheelAt(sx * (w / 2 - 0.12), z);
     if (cargo) { crate(k, -0.4, 1.0, -1.2); crate(k, 0.4, 1.0, -0.4); }
-    top = 2.2; markZ = cz;
+    top = 2.2;
   } else {
     const { ax, ride, belt, cabW } = s, wz = l / 2 - ax;
     const [g0, g1, gh] = s.glass, [r0, r1] = s.roof;
@@ -678,14 +699,68 @@ function makeCar(c, cargo = false) {
     if (s.trunk) { const t0 = -l / 2 + 0.15, t1 = g0 - 0.1; k(body, w - 0.1, s.trunk, t1 - t0, 0, belt, (t0 + t1) / 2, edge); }   // выраженный багажник
     k(lamp, w - 0.3, 0.16, 0.06, 0, belt - 0.24, l / 2 + 0.02);   // фары одним блоком
     for (const sx of [-1, 1]) { wheelAt(sx * (w / 2 - 0.12), wz); wheelAt(sx * (w / 2 - 0.12), -wz); }
-    top = belt + gh + 0.12; markZ = (r0 + r1) / 2;
+    top = belt + gh + 0.12;
   }
   k.into(g);
-  // Красная полоска на крыше — метка выбора
-  const mark = box(g, RED, w * 0.5, 0.06, 1, 0, top, markZ);
-  mark.visible = false;
-  g.userData = { mats: [body], edge, mark, top };
+  g.userData = { top };
   return g;
+}
+
+/* ============== Кольцо на полу: одно на машины и здания ==============
+   Наведение/фокус — тонкое серое (--ctl, 0,6) за 150 мс из scale g0 → 1.
+   Выбор/активация — красное толще, «бам»-пульс 0,8 → 1,08 → 1 за 350 мс; снятие — схлопывается за 150 мс.
+   Состояние кольца задают showRing/selectRing/hideRing, кадры считает tickRings. */
+const RINGS = [];
+// Значение, плавно идущее к цели по --ease-out
+const glide = (v, to, dur, now) => { if (v.to !== to) Object.assign(v, { from: v.val, to, t0: now, dur }); };
+const glideStep = (v, now) => (v.val = v.from + (v.to - v.from) * easeOut(reduced || !v.dur ? 1 : Math.min(1, Math.max(0, (now - v.t0) / v.dur))));
+function makeRing(parent, r, x, z, { half = 0.07, g0 = 0.85, y = 0.1 } = {}) {
+  const disc = (w, color) => {
+    const m = new THREE.Mesh(new THREE.RingGeometry(r - w, r + w, 72), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(x, y, z);
+    m.renderOrder = 2;
+    m.visible = false;
+    parent.add(m);
+    return m;
+  };
+  const ring = { gray: disc(half, T.ctl), red: disc(half * 1.9, T.red), g0, hovOn: false, h: { val: 0, from: 0, to: 0, t0: 0, dur: 0 }, selOn: false, sT0: -1e9, s0: 0 };
+  RINGS.push(ring);
+  return ring;
+}
+const showRing = (ring, on) => { if (ring) ring.hovOn = on; };
+function selectRing(ring, on) {
+  if (!ring || ring.selOn === on) return;
+  ring.selOn = on;
+  ring.sT0 = performance.now();
+  ring.s0 = ring.red.visible ? ring.red.scale.x : 0;
+}
+// Мгновенно погасить — при смене сцены под шторкой
+function hideRing(ring) {
+  if (!ring) return;
+  Object.assign(ring, { hovOn: false, selOn: false, s0: 0, sT0: -1e9 });
+  Object.assign(ring.h, { val: 0, from: 0, to: 0, dur: 0 });
+}
+// Пульс: 0,8 → 1,08 за 45 % времени, затем → 1
+const pulse = (k) => k < 0.45 ? 0.8 + 0.28 * easeOut(k / 0.45) : 1.08 - 0.08 * easeOut((k - 0.45) / 0.55);
+function tickRings(now) {
+  for (const r of RINGS) {
+    glide(r.h, r.hovOn && !r.selOn ? 1 : 0, 150, now);
+    const p = glideStep(r.h, now);
+    r.gray.visible = p > 0.001;
+    r.gray.scale.setScalar(r.g0 + (1 - r.g0) * p);
+    r.gray.material.opacity = 0.6 * p;
+    if (r.selOn) {
+      const k = reduced ? 1 : Math.min(1, Math.max(0, (now - r.sT0) / 350));
+      r.red.visible = true;
+      r.red.scale.setScalar(pulse(k));
+      r.red.material.opacity = Math.min(1, k * 4);
+    } else {
+      const k = reduced ? 1 : Math.min(1, Math.max(0, (now - r.sT0) / 150)), s = r.s0 * (1 - easeOut(k));
+      r.red.visible = s > 0.001;
+      r.red.scale.setScalar(Math.max(s, 0.001));
+    }
+  }
 }
 
 /* ============== Фигурки ============== */
@@ -734,16 +809,17 @@ function ground(parent, size) {
   parent.add(grid);
 }
 
-// Дорожки — широкие светлые полосы без бордюров; два толстых фонаря
+// Дорожки — короткие светлые полосы без бордюров; два толстых фонаря.
+// Кампус 2×2: сзади отель и склад, спереди офис и гараж, между ними поперечная.
 function roads(k) {
   const ROAD = flat(T.line);
   const rect = (x0, x1, z0, z1) => k(ROAD, x1 - x0, 0.04, z1 - z0, (x0 + x1) / 2, 0, (z0 + z1) / 2);
-  rect(-34, 30, 16.5, 19.5);                       // главная дорога вдоль фронта
-  rect(-9, -6, -10, 16.5);                         // поперечная к отелю
-  rect(-28, -9, -10, 2.5);                         // площадь перед отелем
-  rect(-16.75, -14.75, 13.5, 16.5);                // вход в офис
-  rect(-1, 1, -6, 16.5);                           // от склада к дороге
-  for (const [x, z] of [[-4, 15.4], [-10, 3.4]]) { k(DARK, 0.4, 4.2, 0.4, x, 0, z); k(GLASS, 1, 0.8, 1, x, 4.2, z, EDGE); }
+  rect(-22, 20, 13, 15.5);                         // главная дорога вдоль фронта
+  rect(-2, 0.5, -6.5, 13);                         // поперечная
+  rect(-14, -2, -6.5, 0.3);                        // площадь перед отелем
+  rect(-9.9, -7.6, 11, 13);                        // вход в офис
+  rect(0.5, 4, -6.5, -4.5);                        // от рампы склада к поперечной
+  for (const [x, z] of [[2.2, 12], [-3, -6.2]]) { k(DARK, 0.35, 3.6, 0.35, x, 0, z); k(GLASS, 0.9, 0.7, 0.9, x, 3.6, z, EDGE); }
 }
 
 function buildCampus() {
@@ -755,47 +831,96 @@ function buildCampus() {
   for (const make of [buildOffice, buildWarehouse, buildGarage, buildHotel]) g.add(make());
   for (const s of SITES) labels[s.id] = label(roots[s.id], `<b>${s.title}</b><span>${s.sub}</span>`, 'tag', 0, roots[s.id].userData.top + 1.2, 0);
   g.add(buildStage());
+  // Кольца зданий лежат в группе кампуса, а не в здании: гараж при полёте растёт, кольцо — нет
+  for (const id of ['office', 'warehouse', 'garage', 'hotel', 'stage']) {
+    const [x, z, r] = roots[id].userData.ring;
+    roots[id].userData.ring = makeRing(g, r, x, z, { half: 0.16, g0: 0.9, y: 0.08 });
+  }
   labels.event = label(roots.hotel, `<div><b>Bionorica Workshop</b><span class="where">Double Tree by HILTON · 12.10</span><span class="st">идёт</span><small>32 позиции · Jupiter&amp;Uranus</small></div>`, 'evcard', 0, roots.hotel.userData.top - 3, 0);
   labels.event.visible = false;
 
-  // Bongo 3 стоит перед своим проёмом носом к дороге
+  // Bongo 3 стоит на площадке перед гаражом носом к дороге
   const van = makeCar(CARS[VAN], true);
   g.add(van);
-  // Люди: трое ходят между офисом и складом, шестеро стоят, четверо с кейсами — бригада у рампы склада
+  // Люди: трое ходят по поперечной и площади, шестеро стоят, четверо с кейсами — бригада у рампы склада
   const walkers = [
-    [[0, 14.5], [0, -4.5], 0], [[-0.4, -3.5], [-0.4, 13], 4], [[-8.3, 13], [-8.3, 4], 2],
+    [[-1.3, 12.4], [-1.3, -5.6], 0], [[-0.2, -5], [-0.2, 12], 4], [[-13, -0.4], [-3, -0.4], 2],
   ].map(([a, b, ph], i) => ({ p: makePerson(g, a[0], a[1], 0, CLOTH[i % 3]), pts: [a, b], ph }));
-  [[-13.2, 14.3, 2.6], [-12.4, 14.9, -1.8], [-3.6, 5, 1.2], [-2.6, 5.6, -2.3], [-21.9, 15.6, 0.4], [6, 13.6, 2.8]]
+  [[-10.6, 12.1, 2.6], [-9.8, 12.6, -1.8], [-12.6, -5.3, 1.2], [-11.6, -4.8, -2.3], [-17.4, 12.3, 0.4], [3, 11.4, 2.8]]
     .forEach(([x, z, r], i) => makePerson(g, x, z, r, CLOTH[(i + 1) % 3]));
-  const crew = [[12.5, -2.2], [14, -2], [15.5, -2.3], [17, -2]].map((h, i) => {
-    const fin = [[-17.2, -0.7], [-15.9, -0.2], [-14.5, -0.7], [-13.2, -0.2]][i];
-    return { p: makePerson(g, h[0], h[1], 0.3, CLOTH[i % 3], true), pts: [h, [-5, 3], fin], home: h };
+  const crew = [[5.2, -3.4], [6.4, -3.2], [7.6, -3.4], [8.8, -3.2]].map((h, i) => {
+    const fin = [[-8.4, -1.6], [-7.3, -1.2], [-6.2, -1.6], [-5.1, -1.2]][i];
+    return { p: makePerson(g, h[0], h[1], 0.3, CLOTH[i % 3], true), pts: [h, [2.5, 1.2], [-2.5, 0.8], fin], home: h };
   });
   W.life = { van, walkers, crew };
   return g;
 }
 
+// Интерьер гаража — та же миниатюра: крупные объёмы, немного, но «есть чем жить». ≤ 60 объёмов без машин.
+const STEP = 4.4, carX = (i) => (i - 2.5) * STEP, LIFT = 5;   // BYD стоит на подъёмнике
 function buildGarageView() {
   const g = new THREE.Group();
-  ground(g, 44);
-  const k = kit(), wall = own(T.card);
-  k(wall, 40, 4.5, 0.3, 0, 0, -5.5, EDGE);
-  k(DARK, 40, 0.4, 0.34, 0, 0, -5.5);
-  k(wall, 0.3, 4.5, 10, -20, 0, -0.5, EDGE);
-  k(wall, 0.3, 4.5, 10, 20, 0, -0.5, EDGE);
-  const step = 4.4;
-  for (let i = 0; i <= 6; i++) k(flat(T.line), 0.12, 0.04, 8, (i - 3) * step, 0, 0.1);
+  ground(g, 60);
+  const k = kit(), wall = own(T.card), PAINT = flat(T.card), LAMP = mat(T.select);
+  // Пол и стены: задняя целиком, левая с проёмом ворот, правая глухая; за воротами светлый двор
+  k(flat(T.select), 28.4, 0.04, 10, 0, 0, -0.5);
+  k(PAINT, 11, 0.04, 14, -19.8, 0, -0.5);
+  k(wall, 28.7, 4.5, 0.3, 0, 0, -5.5, EDGE);
+  k(DARK, 28.7, 0.4, 0.34, 0, 0, -5.5);
+  k(wall, 0.3, 4.5, 3, -14.2, 0, -4, EDGE);
+  k(wall, 0.3, 4.5, 3, -14.2, 0, 3, EDGE);
+  k(wall, 0.3, 4.5, 10, 14.2, 0, -0.5, EDGE);
+  // Разметка мест: 7 поперечин + две продольные = рамка под каждой машиной
+  for (let i = 0; i <= 6; i++) k(PAINT, 0.12, 0.08, 6, (i - 3) * STEP, 0, 0);
+  for (const z of [-3, 3]) k(PAINT, 6 * STEP + 0.12, 0.08, 0.12, 0, 0, z);
+  // Стеллаж: две стойки, три полки, пять коробок (одна красная)
+  for (const x of [-9.4, -4.6]) k(STEEL, 0.16, 3.2, 1, x, 0, -4.8);
+  for (const y of [0.3, 1.35, 2.4]) k(WHITE, 5, 0.12, 1, -7, y, -4.8, EDGE);
+  for (const [x, y, s, m] of [[-8.5, 0.42, 0.9, DARK], [-7.3, 0.42, 0.8, WHITE], [-8.2, 1.47, 0.8, WHITE], [-5.6, 1.47, 0.85, RED], [-6.6, 2.52, 0.9, DARK]])
+    k(m, s, s, s * 0.9, x, y, -4.8, m === WHITE ? EDGE : undefined);
+  // Доска инструментов над верстаком
+  k(LAMP, 4, 1.6, 0.08, 3, 1.9, -5.31, EDGE);
+  for (const [x, h] of [[1.8, 0.9], [2.6, 1.2], [3.4, 0.7], [4.2, 1]]) k(DARK, 0.14, h, 0.06, x, 2.15, -5.24);
+  k(DARK, 3.4, 0.16, 1.2, 3, 1, -4.6);
+  for (const x of [1.5, 4.5]) k(STEEL, 0.16, 1, 1, x, 0, -4.6);
+  // Подъёмник под BYD: две низкие балки
+  for (const dx of [-0.55, 0.55]) k(STEEL, 0.4, 0.2, 4.4, carX(LIFT) + dx, 0, 0);
+  // Три подвесных светильника между машинами
+  for (const x of [-8.8, 0, 8.8]) { k(STEEL, 0.06, 1.6, 0.06, x, 4.6, -1); k(LAMP, 2.4, 0.16, 0.7, x, 4.44, -1, EDGE); }
+  crate(k, -13.3, 0, 2.6); crate(k, -12.7, 0, 3.4, 0.6);
   k.into(g);
+  // Ворота приоткрыты наружу: две створки на петлях у краёв проёма
+  for (const [hz, s] of [[-2.5, 1], [1.5, -1]]) {
+    const pivot = new THREE.Group();
+    pivot.position.set(-14.2, 0, hz);
+    pivot.rotation.y = -s * 0.75;
+    box(pivot, STEEL, 0.12, 4, 2, 0, 0, s);
+    g.add(pivot);
+  }
+  // Стопка шин у правой стены
+  const tire = new THREE.CylinderGeometry(0.6, 0.6, 0.3, 14);
+  for (let i = 0; i < 3; i++) { const t = new THREE.Mesh(tire, DARK); t.position.set(13.2, 0.15 + i * 0.32, -3.8); g.add(t); }
+
   CARS.forEach((c, i) => {
-    const v = makeCar(c);
-    v.position.set((i - 2.5) * step, 0, 0);
-    v.userData.id = 'car' + i;
+    const v = makeCar(c), s = SPEC[c.kind], base = i === LIFT ? 0.2 : 0;
+    v.position.set(carX(i), base, 0);
+    // Кольцо: половина диагонали основания + 0,3; лежит на полу, а не на машине — машина при выборе поднимается
+    const ring = makeRing(g, Math.hypot(s.w, s.l) / 2 + 0.3, carX(i), 0);
+    Object.assign(v.userData, { id: 'car' + i, base, ring, lift: { val: 0, from: 0, to: 0, t0: 0, dur: 0 } });
     roots['car' + i] = v;
     const [r, ...rest] = c.plate.split(' ');
     labels['car' + i] = label(v, `<b>${r}</b><span>${rest.join(' ')}</span>`, 'ptag', 0, v.userData.top + 0.5, 0);
     g.add(v);
   });
   return g;
+}
+// Выбранная машина мягко поднимается на 0,15 за 250 мс и остаётся
+function tickGarage(now) {
+  CARS.forEach((_, i) => {
+    const v = roots['car' + i], u = v.userData;
+    glide(u.lift, state.sel === i ? 0.15 : 0, 250, now);
+    v.position.y = u.base + glideStep(u.lift, now);
+  });
 }
 
 /* ============== 3D: мир, камера, цикл ============== */
@@ -806,8 +931,8 @@ function hasGL() {
 
 // Камера по виду: направление (сверху-сбоку), цель, охват сцены в метрах — дистанция подбирается под аспект
 const CAM = {
-  campus: { dir: [0.6, 0.5, 0.64], target: [-3, 7, -1], span: [60, 50], min: 22, max: 220 },
-  garage: { dir: [0.05, 0.72, 0.7], target: [0, 0.8, 0.4], span: [26, 8], min: 8, max: 70 },
+  campus: { dir: [0.6, 0.5, 0.64], target: [0, 2.5, -1], span: [54, 44], min: 14, max: 120 },
+  garage: { dir: [0.05, 0.72, 0.7], target: [0, 0.8, -1.4], span: [29, 9], min: 8, max: 70 },
 };
 
 function initWorld() {
@@ -820,6 +945,9 @@ function initWorld() {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(T.bg);
+  // Туман цвета фона включён всегда, но вынесен за горизонт: полёт лишь сдвигает near/far.
+  // Включать/выключать его нельзя — смена fog пересобирает шейдеры и даёт рывок в начале полёта.
+  scene.fog = new THREE.Fog(T.bg, 1e4, 1e4 + 1);
   // Свет: заливка + один направленный, теней нет — схема, а не «как в жизни»
   scene.add(new THREE.AmbientLight(0xffffff, 2));
   const sun = new THREE.DirectionalLight(0xffffff, 1.6);
@@ -835,26 +963,18 @@ function initWorld() {
   controls.maxPolarAngle = 1.38;          // не под землю
   controls.addEventListener('start', () => { state.userMoved = true; });
 
-  W = { renderer, css2d, scene, camera, controls, elapsed: 0 };
+  W = { renderer, css2d, scene, camera, controls, elapsed: 0, anim: null };
   W.campus = buildCampus();
   W.garage = buildGarageView();
   scene.add(W.campus, W.garage);
   homeLife();
 
-  // Кликабельное — только меши объектов; рёбра и земля в raycast не идут
+  // Кликабельное — только меши объектов; рёбра, кольца и земля в raycast не идут
   const collect = (ids, list) => ids.forEach((id) => roots[id].traverse((o) => { if (o.isMesh) { o.userData.root = id; list.push(o); } }));
   collect(['office', 'warehouse', 'garage', 'hotel', 'stage'], pickables.campus);
   collect(CARS.map((_, i) => 'car' + i), pickables.garage);
 
-  new ResizeObserver(([e]) => {
-    const { width, height } = e.contentRect;
-    if (!width || !height) return;
-    renderer.setSize(width, height);
-    css2d.setSize(width, height);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    if (!state.userMoved) placeCamera();
-  }).observe(sceneEl);
+  new ResizeObserver(() => { fit(); if (!state.userMoved && !state.flying) placeCamera(); }).observe(sceneEl);
 
   bindPointer();
   const timer = new THREE.Timer();   // Clock в r186 устарел
@@ -862,38 +982,63 @@ function initWorld() {
   renderer.setAnimationLoop((now) => {
     timer.update(now);
     const dt = Math.min(timer.getDelta(), 0.1);
-    controls.update();
-    // Сдвиг камеры не уводит цель за пределы сцены
-    const t = controls.target;
-    bounds.set(THREE.MathUtils.clamp(t.x, -40, 40), THREE.MathUtils.clamp(t.y, 0, 14), THREE.MathUtils.clamp(t.z, -40, 40));
-    shift.subVectors(bounds, t);
-    if (shift.lengthSq() > 0) { t.add(shift); camera.position.add(shift); }
+    if (W.anim) {
+      // Полёт: камерой правит анимация, OrbitControls выключены и не обновляются
+      const a = W.anim, k = Math.min(1, Math.max(0, (now - a.t0) / a.dur));
+      a.step(k, easeOut(k));
+      if (k >= 1) { W.anim = null; a.done(); }
+    } else {
+      controls.update();
+      // Сдвиг камеры не уводит цель за пределы сцены
+      const t = controls.target;
+      bounds.set(THREE.MathUtils.clamp(t.x, -30, 30), THREE.MathUtils.clamp(t.y, 0, 14), THREE.MathUtils.clamp(t.z, -30, 30));
+      shift.subVectors(bounds, t);
+      if (shift.lengthSq() > 0) { t.add(shift); camera.position.add(shift); }
+    }
     W.elapsed = timer.getElapsed();
     tickLife(W.elapsed, dt, now);
+    tickRings(now);
+    if (W.garage.visible) tickGarage(now);
     renderer.render(scene, camera);
     css2d.render(scene, camera);
   });
 }
 
-function placeCamera() {
-  if (!W) return;
-  const c = CAM[state.view], { camera, controls } = W;
+// Размер canvas — синхронно: при смене страницы сцена переезжает в другой слот, а полёту нужен новый аспект сразу
+function fit() {
+  const w = sceneEl.clientWidth, h = sceneEl.clientHeight;
+  if (!W || !w || !h) return false;
+  W.renderer.setSize(w, h);
+  W.css2d.setSize(w, h);
+  W.camera.aspect = w / h;
+  W.camera.updateProjectionMatrix();
+  return true;
+}
+
+// Рабочий ракурс вида: цель и позиция камеры под текущий аспект
+function viewPose(view) {
+  const c = CAM[view], { camera } = W;
   const tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   const dist = Math.max(c.span[1] / 2 / tan, c.span[0] / 2 / (tan * camera.aspect)) * 1.12;
-  const dir = new THREE.Vector3(...c.dir).normalize();
-  controls.target.set(...c.target);
-  camera.position.copy(controls.target).addScaledVector(dir, dist);
+  const t = new THREE.Vector3(...c.target);
+  return { t, p: t.clone().addScaledVector(new THREE.Vector3(...c.dir).normalize(), dist), dist };
+}
+function placeCamera() {
+  if (!W) return;
+  const c = CAM[state.view], { camera, controls } = W, v = viewPose(state.view);
+  controls.target.copy(v.t);
+  camera.position.copy(v.p);
   controls.minDistance = c.min;
-  controls.maxDistance = Math.max(c.max, dist * 1.3);
+  controls.maxDistance = Math.max(c.max, v.dist * 1.3);
   controls.update();
 }
 
 /* ============== Жизнь кампуса: фургон, бригада, прохожие, появление сцены ============== */
-// Маршрут Bongo: из проёма → дорога → поперечная → к сцене.
-const HOME = [12 + bayX(VAN), 14.6];   // гараж — сплошной объём, Bongo стоит на площадке перед своим проёмом
-// Обратно — разворот в три приёма: задом на площадь, вперёд на поперечную, домой, задом в проём.
-const OUT = [HOME, [HOME[0], 18], [-7.5, 18], [-7.5, -2.2]];
-const BACK = [[-7.5, -2.2], [-10.6, 1], [-7.5, 4.5], [-7.5, 18], [HOME[0], 18], HOME];
+// Маршрут Bongo: с площадки гаража → главная дорога → поперечная → к сцене у отеля.
+const HOME = [GX + bayX(2), GZ + 6.9];   // Bongo стоит на площадке перед правым проёмом
+// Обратно — разворот в три приёма: задом к офису, вперёд на поперечную, домой, задом на площадку.
+const OUT = [HOME, [HOME[0], 14.25], [-0.75, 14.25], [-0.75, -2.5]];
+const BACK = [[-0.75, -2.5], [-3.2, 1.6], [-0.75, 4.5], [-0.75, 14.25], [HOME[0], 14.25], HOME];
 const OUT_LEN = pathLen(OUT), BACK_LEN = pathLen(BACK), LEG_FIRST = pathLen(BACK.slice(0, 2)), LEG_LAST = pathLen(BACK.slice(-2));
 const CYCLE = 16, DRIVE = 6.5, STOP = 2;           // 6,5 с туда, 2 с у сцены, 6,5 с обратно, 1 с в гараже
 let vanYaw = 0;
@@ -973,11 +1118,11 @@ function pickAt(ev) {
 function bindPointer() {
   const el = W.renderer.domElement;
   let down = null;
-  el.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' && !e.buttons) setHover(pickAt(e)); });
+  el.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' && !e.buttons && !state.flying) setHover(pickAt(e)); });
   el.addEventListener('pointerleave', () => setHover(null));
   el.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; });
   el.addEventListener('pointerup', (e) => {
-    if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;   // это был поворот, не клик
+    if (state.flying || !down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;   // поворот, не клик
     const id = pickAt(e);
     if (id) activate(id);
     else if (state.view === 'garage') select(null);
@@ -989,14 +1134,14 @@ function nameOf(id) {
   return NAMES[id];
 }
 
+// Наведение и выбор показывает только кольцо на полу и табличка; корпус и рёбра не меняются
 function paint(id) {
   const r = roots[id];
   if (!r) return;
   const hot = state.hover === id;
-  r.userData.mats.forEach((m) => m.emissive.set(hot ? 0x5a5a5a : 0x000000));
-  r.userData.edge.color.set(hot ? T.ink : T.line);
   const sel = id === 'car' + state.sel;
-  if (r.userData.mark) r.userData.mark.visible = sel;
+  showRing(r.userData.ring, hot);
+  if (id.startsWith('car')) selectRing(r.userData.ring, sel);
   const el = labels[id]?.element;
   if (el) { el.classList.toggle('is-hot', hot); el.classList.toggle('is-sel', sel); }
 }
@@ -1020,10 +1165,22 @@ function toast(text) {
   toastTimer = setTimeout(() => t.classList.remove('is-on'), 2400);
 }
 
+// Активация здания: кольцо краснеет с пульсом; у гаража из этого состояния стартует полёт,
+// у остальных — тост, и кольцо гаснет через 600 мс
+let ringTimer;
 function activate(id) {
+  if (state.flying) return;
   if (id.startsWith('car')) return select(+id.slice(3));
-  if (id === 'garage') return setView('garage');
+  const ring = roots[id]?.userData.ring;
+  if (W && state.view === 'campus') {
+    clearTimeout(ringTimer);
+    for (const s of SITES) if (s.id !== id) selectRing(roots[s.id].userData.ring, false);
+    selectRing(roots.stage.userData.ring, false);
+    selectRing(ring, true);
+  }
+  if (id === 'garage') return go('garage');
   toast(`${nameOf(id)} — в макете не раскрыт`);
+  if (ring) ringTimer = setTimeout(() => selectRing(ring, false), 600);
 }
 
 function select(i) {
@@ -1156,7 +1313,7 @@ document.addEventListener('click', (e) => {
   const p = e.target.closest('[data-page], [data-go]');
   if (!p) return;
   const page = p.dataset.page || p.dataset.go;
-  if (PAGE_VIEW[page]) setView(PAGE_VIEW[page]);
+  if (PAGE_VIEW[page]) PAGE_VIEW[page] === 'garage' && state.view === 'campus' ? activate('garage') : go(PAGE_VIEW[page]);
   else toast(`${PAGE_NAME[page]} — в макете не раскрыт`);
 });
 
@@ -1190,10 +1347,12 @@ function setFlat(on, save = true) {
 }
 flatBtn.addEventListener('click', () => setFlat(!garageEl.classList.contains('is-flat')));
 
-function setView(view) {
+// enter — страница въезжает (полёт): шапка, карточка и реестр стартуют из .is-in и проявляются CSS-переходом
+function setView(view, enter = false) {
   state.view = view;
   setHover(null);
-  const page = view === 'garage' ? 'vehicles' : 'home';
+  const page = view === 'garage' ? 'vehicles' : 'home', pageEl = $('page-' + page);
+  pageEl.classList.toggle('is-in', enter);
   $('page-home').hidden = page !== 'home';
   $('page-vehicles').hidden = page !== 'vehicles';
   // Один renderer: сцена переезжает в слот открытой страницы, ResizeObserver подстроит размер
@@ -1212,9 +1371,107 @@ function setView(view) {
     W.campus.visible = view === 'campus';
     W.garage.visible = view === 'garage';
     state.userMoved = false;
+    fit();
     placeCamera();
   }
+  if (location.hash !== '#debug') history.replaceState(null, '', view === 'garage' ? '#vehicles' : location.pathname + location.search);
+  scrollTo(0, 0);
+  if (enter) { void pageEl.offsetWidth; pageEl.classList.remove('is-in'); }
 }
+
+/* ============== Полёт в гараж и обратно ==============
+   Туда: камера кампуса 900 мс летит к проёмам гаража, гараж чуть растёт, остальное уходит в туман цвета фона,
+   последние 250 мс — шторка. Под шторкой — смена страницы и сцены; камера интерьера стартует ближе и ниже
+   и за 500 мс доезжает до рабочего ракурса, справа въезжает панель. Обратно — то же в обратном порядке. */
+const curtain = $('curtain');
+const lerp = (a, b, k) => a + (b - a) * k;
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+const anim = (dur, step) => new Promise((done) => { W.anim = { t0: performance.now(), dur, step, done }; });
+// Камера и цель — от текущих к pose по уже посчитанному easing
+function camTo(pose) {
+  const { camera, controls } = W, p0 = camera.position.clone(), t0 = controls.target.clone();
+  return (e) => { camera.position.lerpVectors(p0, pose.p, e); controls.target.lerpVectors(t0, pose.t, e); camera.lookAt(controls.target); };
+}
+const setCam = (pose) => { W.camera.position.copy(pose.p); W.controls.target.copy(pose.t); W.camera.lookAt(pose.t); };
+// Точка максимального приближения: над площадкой, лицом к среднему проёму (ниже — камера режет машины на площадке)
+const GFRONT = new THREE.Vector3(GX, 1.8, GZ + 3.6);
+const garageClose = () => ({ t: GFRONT.clone(), p: GFRONT.clone().add(new THREE.Vector3(1.5, 6, 11)) });
+// e = 0 — обычный кампус, 1 — гараж крупно, остальное в тумане
+function campusFx(e) {
+  const g = roots.garage, d = W.camera.position.distanceTo(GFRONT);
+  g.scale.setScalar(1 + 0.05 * e);
+  g.userData.mats[0].emissive.setScalar(0.06 * e);
+  W.scene.fog.near = e ? d + lerp(150, 5, e) : 1e4;
+  W.scene.fog.far = e ? d + lerp(300, 22, e) : 1e4 + 1;
+}
+const canFly = () => W && !reduced && !$('page-home').classList.contains('is-list');
+function go(view) {
+  if (state.flying || view === state.view) return;
+  if (!canFly()) return setView(view);
+  view === 'garage' ? enterGarage() : leaveGarage();
+}
+function flyStart() {
+  state.flying = true;
+  setHover(null);
+  W.controls.enabled = false;
+  stageEl.classList.add('is-flying');
+}
+function flyEnd() {
+  curtain.style.opacity = 0;
+  stageEl.classList.remove('is-flying');
+  W.controls.enabled = true;
+  state.flying = false;
+}
+async function enterGarage() {
+  flyStart();
+  $('page-home').classList.add('is-out');
+  // Красное кольцо «бамкает» параллельно старту полёта: без отдельной паузы вход укладывается в 1,4 с
+  const cam = camTo(garageClose());
+  await anim(900, (k, e) => { cam(e); campusFx(e); curtain.style.opacity = clamp01((k - 0.72) / 0.28); });
+  // Под шторкой: страница «Автомобили», интерьер; кампус возвращаем в обычный вид
+  $('page-home').classList.remove('is-out');
+  hideRing(roots.garage.userData.ring);
+  campusFx(0);
+  setView('garage', true);
+  stageEl.classList.remove('is-flying');
+  if (!sceneEl.clientWidth) return flyEnd();          // 3D свёрнуто — только панель
+  const work = viewPose('garage'), off = work.p.clone().sub(work.t).multiplyScalar(0.55);
+  off.y *= 0.6;
+  setCam({ t: work.t, p: work.t.clone().add(off) });
+  const cam2 = camTo(work);
+  await anim(500, (k, e) => { cam2(e); curtain.style.opacity = 1 - clamp01(k / 0.4); });
+  flyEnd();
+}
+async function leaveGarage() {
+  flyStart();
+  $('page-vehicles').classList.add('is-out');
+  if (sceneEl.clientWidth) {
+    // Камера интерьера отъезжает назад и вверх, под конец — шторка
+    const { camera, controls } = W, off = camera.position.clone().sub(controls.target).multiplyScalar(1.6);
+    off.y *= 1.3;
+    const cam = camTo({ t: controls.target.clone(), p: controls.target.clone().add(off) });
+    await anim(450, (k, e) => { cam(e); curtain.style.opacity = clamp01((k - 0.45) / 0.55); });
+  } else {
+    curtain.style.opacity = 1;
+    await anim(350, () => {});
+  }
+  $('page-vehicles').classList.remove('is-out');
+  setView('campus', true);
+  // Кампус открывается с камерой у гаража и возвращается к общему виду
+  const work = viewPose('campus');
+  setCam(garageClose());
+  campusFx(1);
+  const cam = camTo(work);
+  await anim(900, (k, e) => {
+    cam(e);
+    campusFx(1 - e);
+    curtain.style.opacity = 1 - clamp01(k / 0.28);
+    if (k > 0.6) stageEl.classList.remove('is-flying');
+  });
+  campusFx(0);
+  flyEnd();
+}
+$('backBtn').addEventListener('click', () => go('campus'));
 // Стрелки при фокусе в сцене гаража листают машины; Esc снимает выбор
 sceneEl.addEventListener('keydown', (e) => {
   if (state.view !== 'garage') return;
@@ -1239,8 +1496,10 @@ if (hasGL()) {
   setHomeList(true);
   setFlat(true, false);   // вынужденный режим не запоминаем
 }
-if (location.hash === '#debug') window.__world = W;   // для проверок: число мешей, позиция фургона
-setView('campus');
+// Для проверок: число мешей, позиция фургона, камера. Прямой вход ?debug или #debug.
+if (location.hash === '#debug' || new URLSearchParams(location.search).has('debug')) Object.assign(window, { __world: W, __state: state });
+// Прямое открытие «Автомобилей» (#vehicles) — без полёта
+setView(location.hash === '#vehicles' ? 'garage' : 'campus');
 </script>
 </body>
 </html>
