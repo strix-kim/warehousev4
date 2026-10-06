@@ -40,14 +40,23 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
   Белый верх ≈ белый при `AmbientLight(…, 2)` + `DirectionalLight(…, 1.6)`.
 - **Цвета:** `new Color('#EEF0F3')` трактуется как sRGB — токены можно отдавать как есть.
   Фон = земля 1:1 только с `MeshBasicMaterial` (без освещения).
+- **Слияние геометрий:** `import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'`,
+  `mergeGeometries(list, useGroups = false)` → `BufferGeometry` или `null`, если атрибуты несовместимы
+  (все indexed либо все нет; `BoxGeometry.clone().applyMatrix4(m)` совместимы между собой).
+  `applyMatrix4` сам пересчитывает нормали. Исходники после слияния — `dispose()`.
+- **CSS2DObject + CSS-анимация:** рендерер каждый кадр пишет `transform` в style элемента —
+  анимировать `transform` можно только на ВНУТРЕННЕМ блоке, иначе табличка прыгает.
+  Смена `visible` → `display:none` и обратно перезапускает CSS-анимацию (появление «из коробки»).
 - **Disposal:** `geometry.dispose()`, `material.dispose()`, `texture.dispose()`,
   `controls.dispose()`, `renderer.dispose()`; при размонтировании — `setAnimationLoop(null)`.
 
 ## Наши конвенции
-- **Схема, не реализм.** Только `BoxGeometry` (одна общая `1×1×1`, размер — `scale`),
+- **Схема, не реализм.** Только `BoxGeometry` (одна общая `1×1×1`, размер — `scale` у отдельного меша
+  или матрица в сборке `kit()`: детали здания копятся и сливаются в один меш на пару «материал + рёбра»),
   `MeshLambertMaterial`/`MeshStandardMaterial` без текстур, теней нет, неба и тумана нет.
 - **Цвета — только из токенов ARGO**, читать через `getComputedStyle(:root)`: тела `--card`,
-  `--select`; крыши/детали `--night`; рёбра `EdgesGeometry` + `LineSegments` цвета `--line`;
+  `--select`; крыши/детали `--night-3` (чистый `--night` в мире не используем — тяжёлый, он только
+  в HTML-хроме); пара для двух тёмных рядом (шина/диск, ворота/ламели) — `--night-3` + `--ctl`; рёбра `EdgesGeometry` + `LineSegments` цвета `--line`;
   акцент `--red` — знак и выбранный объект; статусы `--ok-dot` / `--warn-dot`.
 - Подсветка наведения — свой материал корпуса на объект (`emissive`) + рёбра `--ink`.
 - Каждый 3D-объект дублируется кнопкой в DOM (фокус = подсветка, Enter = выбор).

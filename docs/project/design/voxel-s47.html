@@ -75,7 +75,14 @@ body{display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
 .tabs button{min-height:36px;padding:0 14px;border:0;border-radius:9px;background:transparent;font:600 14px/1 var(--f-text);color:var(--muted);white-space:nowrap}
 .tabs button[aria-selected="true"]{background:var(--night);color:#fff}
 .tabs button:hover:not([aria-selected="true"]){background:var(--hover);color:var(--ink)}
-.tabs .s{display:none}
+.ev{display:flex;align-items:center;gap:10px}
+/* Тумблер «Сегодня мероприятие»: выкл — дорожка --ctl, вкл — чёрная */
+.switch{display:inline-flex;align-items:center;gap:10px;min-height:40px;padding:0 12px 0 8px;border:0;border-radius:11px;background:transparent;font:600 14px/1 var(--f-text);color:var(--ink);white-space:nowrap}
+.switch:hover{background:var(--hover)}
+.switch .trk{position:relative;flex:none;width:40px;height:24px;border-radius:999px;background:var(--ctl);transition:background-color .18s var(--ease-out)}
+.switch .trk::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(15,17,21,.25);transition:transform .18s var(--ease-out)}
+.switch[aria-checked="true"] .trk{background:var(--night)}
+.switch[aria-checked="true"] .trk::after{transform:translateX(16px)}
 .today{display:inline-flex;align-items:center;gap:8px;min-height:32px;padding:0 12px;border-radius:999px;background:var(--ok-bg);color:var(--ok);font:600 13px/1 var(--f-text);white-space:nowrap}
 .today::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok-dot)}
 
@@ -108,10 +115,15 @@ body{display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
 .tag b{font:700 13px/1.2 var(--f-display);letter-spacing:-.01em;color:var(--ink)}
 .tag span{font:500 12px/1.3 var(--f-text);color:var(--muted);font-variant-numeric:tabular-nums}
 .tag.is-hot{border-color:var(--ink);box-shadow:var(--shadow-pop)}
-.tag--event{border-color:var(--ok-dot)}
-.tag--event b::before{content:"";display:inline-block;width:8px;height:8px;margin-right:7px;border-radius:50%;background:var(--ok-dot);vertical-align:1px}
-.live{pointer-events:none;display:inline-flex;align-items:center;gap:6px;padding:4px 9px;margin-bottom:6px;border-radius:999px;background:var(--ok-bg);color:var(--ok);font:700 11.5px/1 var(--f-text)}
-.live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ok-dot)}
+/* Карточка события над отелем. Анимируем ВНУТРЕННИЙ блок: transform внешнего пишет CSS2DRenderer каждый кадр. */
+.evcard{pointer-events:none;margin-bottom:12px}
+.evcard>div{display:grid;gap:4px;padding:12px 16px 13px;border-radius:14px;background:var(--card);box-shadow:var(--shadow-pop);white-space:nowrap;animation:evpop .4s var(--ease-out)}
+.evcard b{font:800 16px/1.15 var(--f-display);letter-spacing:-.02em;color:var(--ink)}
+.evcard .where{font:500 13px/1.3 var(--f-text);color:var(--ink-2)}
+.evcard .st{display:inline-flex;align-items:center;gap:6px;font:600 12.5px/1.2 var(--f-text);color:var(--ok)}
+.evcard .st::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok-dot)}
+.evcard small{font:500 12px/1.3 var(--f-text);color:var(--muted);font-variant-numeric:tabular-nums}
+@keyframes evpop{from{opacity:0;transform:translateY(8px) scale(.96)}}
 .ptag{pointer-events:none;display:inline-flex;margin-bottom:8px;border:1px solid var(--line);border-radius:6px;background:var(--card);font:600 12px/1 var(--f-mono);color:var(--ink);white-space:nowrap;overflow:hidden;transition:background-color .12s,border-color .12s}
 .ptag b{padding:5px 6px;border-right:1px solid var(--line);font-weight:600}
 .ptag span{padding:5px 7px}
@@ -153,11 +165,12 @@ body{display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
   html{height:auto}
   .top{flex-wrap:wrap;padding:10px 16px}
   .brand small{display:none}
-  .tabs{order:3;width:100%;display:grid;grid-template-columns:repeat(3,1fr)}
-  .tabs .l-long{display:none}
-  .tabs .s{display:inline}
+  .tabs{order:3;width:100%;display:grid;grid-template-columns:repeat(2,1fr)}
+  .ev{order:2;width:100%;flex-direction:row-reverse;justify-content:space-between;gap:8px}
+  .switch{padding-left:0}
+  .today .l-long{display:none}
   .app,.app.is-garage{display:block;padding:0}
-  .stage{height:calc(100svh - 112px);min-height:420px}
+  .stage{height:calc(100svh - 160px);min-height:420px}
   .app.is-garage .stage{height:52svh;min-height:320px;border:0;border-radius:0}
   .dock{justify-content:flex-start}
   .app.is-garage .dock{padding-bottom:28px}
@@ -170,7 +183,7 @@ body{display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
   /* 6 номеров в 390 не помещаются — на телефоне виден только наведённый/выбранный, остальные в нижней панели */
   .ptag:not(.is-hot):not(.is-sel){opacity:0}
 }
-@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}</script>
 </head>
@@ -180,10 +193,12 @@ body{display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
     <svg id="argoDots" viewBox="0 0 420 249" fill="currentColor" aria-hidden="true" focusable="false"></svg>
     <b>Воксельный мир</b><small>· макет с47</small>
   </div>
-  <span class="today" id="today" hidden>Сегодня: 1 мероприятие</span>
+  <div class="ev">
+    <span class="today" id="today" hidden><span><span class="l-long">Сегодня: </span>1 мероприятие</span></span>
+    <button type="button" class="switch" id="evSwitch" role="switch" aria-checked="false"><span class="trk" aria-hidden="true"></span>Сегодня мероприятие</button>
+  </div>
   <div class="tabs" role="tablist" aria-label="Вид мира" id="tabs">
     <button type="button" role="tab" id="tab-campus" data-view="campus" aria-controls="stage" aria-selected="true">Кампус</button>
-    <button type="button" role="tab" id="tab-event" data-view="event" aria-controls="stage" aria-selected="false" tabindex="-1"><span class="l-long">Мероприятие сегодня</span><span class="s">Сегодня</span></button>
     <button type="button" role="tab" id="tab-garage" data-view="garage" aria-controls="stage" aria-selected="false" tabindex="-1">Гараж</button>
   </div>
 </header>
@@ -208,64 +223,100 @@ body{display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Знак ARGO — те же 57 точек, что в продукте (src/react/components/ArgoDots.tsx)
 const ARGO_DOTS = [[138.6,16.5,9.5],[187.6,16.5,11.9],[236.7,16.5,10.6],[285.7,16.5,10.7],[163.1,41,13.2],[212.2,41.1,12.9],[261.2,41.1,13],[310.3,41,10.6],[138.6,65.6,9.8],[187.7,65.6,13.5],[236.5,65.7,14.8],[285.6,65.6,14.2],[64.8,90.3,13.7],[163.1,90.1,12.9],[212.3,89.8,14.6],[261.2,90,12.9],[310.3,90.1,11.2],[40.7,114.7,14.8],[236.7,114.5,11.8],[383.9,114.4,8.5],[15.9,138.9,12.3],[64.7,138.9,14.2],[212.1,138.9,12.8],[260.6,137.7,10.5],[359.3,138.9,9],[40.7,163.4,14.9],[89.5,163.5,13.8],[138.5,163.5,13.7],[187.5,163.5,13.7],[236.8,163.5,14],[285.7,163.4,13.5],[334.8,163.3,11.8],[383.9,163.4,8.1],[15.9,187.9,9.8],[64.9,187.7,14.2],[113.9,187.8,14],[163.2,187.6,14.7],[212.1,187.8,13.8],[261.2,187.7,14.1],[310.3,187.9,12.8],[359.4,187.8,11.7],[408.4,187.9,8.1],[40.4,212.4,10.6],[89.5,212.4,11.3],[138.5,212.4,12],[187.6,212.4,12.2],[236.7,212.4,11.1],[285.7,212.4,11.8],[334.8,212.4,10.4],[383.9,212.4,10.6],[64.9,237,9],[114,237,9.1],[163.1,237,9.3],[212.1,237,9.1],[261.2,237,9.2],[310.3,237,8.5],[359.3,237,8.5]];
 document.getElementById('argoDots').innerHTML = ARGO_DOTS.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join('');
 
-// Данные прода (vehicles) — зашиты в макет. kind решает силуэт.
+// Данные прода (vehicles) — зашиты в макет. kind решает силуэт: у каждой модели свои пропорции.
 const CARS = [
-  { brand: 'Lynk & Co', model: '900', plate: '01 439 SNA', color: 'Белый', hex: '#F5F6F8', kind: 'suv' },
-  { brand: 'KIA', model: 'Bongo 3', plate: '10 D 412 GB', color: 'Белый', hex: '#F5F6F8', kind: 'truck' },
-  { brand: 'Chevrolet', model: 'Cobalt', plate: '30 T 815 TB', color: 'Белый', hex: '#F5F6F8', kind: 'sedan' },
-  { brand: 'Chevrolet', model: 'Cobalt', plate: '01 H 235 JC', color: 'Тёмно-серый', hex: '#3A3E46', kind: 'sedan' },
-  { brand: 'Daewoo', model: 'Nexia', plate: '01 S 569 GC', color: 'Серебристый', hex: '#C9CDD4', kind: 'sedan' },
-  { brand: 'BYD', model: 'Chazor', plate: '01 T 769 MC', color: 'Белый', hex: '#F5F6F8', kind: 'sedan' },
+  { brand: 'Lynk & Co', model: '900', plate: '01 439 SNA', color: 'Белый', hex: '#F5F6F8', kind: 'lynk' },
+  { brand: 'KIA', model: 'Bongo 3', plate: '10 D 412 GB', color: 'Белый', hex: '#F5F6F8', kind: 'bongo' },
+  { brand: 'Chevrolet', model: 'Cobalt', plate: '30 T 815 TB', color: 'Белый', hex: '#F5F6F8', kind: 'cobalt' },
+  { brand: 'Chevrolet', model: 'Cobalt', plate: '01 H 235 JC', color: 'Тёмно-серый', hex: '#3A3E46', kind: 'cobalt' },
+  { brand: 'Daewoo', model: 'Nexia', plate: '01 S 569 GC', color: 'Серебристый', hex: '#C9CDD4', kind: 'nexia' },
+  { brand: 'BYD', model: 'Chazor', plate: '01 T 769 MC', color: 'Белый', hex: '#F5F6F8', kind: 'chazor' },
 ];
-// Здания кампуса: числа на табличках — как в home_summary
+const VAN = 1;   // Bongo 3 — он и везёт оборудование на мероприятие
+// Здания кампуса: числа на табличках — как в home_summary; ev — подпись в день мероприятия
 const SITES = [
   { id: 'office', name: 'Офис', title: 'Офис · Списки', sub: '6 списков' },
-  { id: 'warehouse', name: 'Склад', title: 'Склад · Оборудование', sub: '1 867 единиц · 217 моделей' },
-  { id: 'garage', name: 'Гараж', title: 'Гараж · Машины', sub: '6 машин' },
+  { id: 'warehouse', name: 'Склад', title: 'Склад · Оборудование', sub: '1 867 единиц · 217 моделей', ev: '1 867 единиц · 86 на выезде' },
+  { id: 'garage', name: 'Гараж', title: 'Гараж · Машины', sub: '6 машин', ev: '6 машин · 1 в пути' },
   { id: 'hotel', name: 'Отель', title: 'Double Tree by HILTON', sub: 'площадка' },
 ];
-const VIEW_CAP = {
+const NAMES = { office: 'Офис', warehouse: 'Склад', garage: 'Гараж', hotel: 'Отель', stage: 'Сцена' };
+const CAPS = {
   campus: ['Кампус ARGO', 'Наведи на здание · клик по гаражу — внутрь'],
-  event: ['Мероприятие сегодня', 'Bionorica Workshop · фургон в пути'],
+  event: ['Кампус ARGO · день мероприятия', 'Bionorica Workshop · Bongo 3 везёт 32 позиции к отелю'],
   garage: ['Гараж · 6 машин', 'Клик или ←/→ — выбрать машину'],
 };
 
 const $ = (id) => document.getElementById(id);
-const app = $('app'), stageEl = $('stage'), sceneEl = $('scene'), dock = $('dock'), panel = $('panel');
+const app = $('app'), stageEl = $('stage'), sceneEl = $('scene'), dock = $('dock'), panel = $('panel'), evSwitch = $('evSwitch');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const css = getComputedStyle(document.documentElement);
 const tok = (name) => css.getPropertyValue(name).trim();
 const T = {
-  bg: tok('--bg'), card: tok('--card'), sunk: tok('--sunk'), select: tok('--select'), line: tok('--line'),
-  ink: tok('--ink'), night: tok('--night'), night3: tok('--night-3'), red: tok('--red'), ok: tok('--ok-dot'), warn: tok('--warn-dot'),
+  bg: tok('--bg'), card: tok('--card'), sunk: tok('--sunk'), select: tok('--select'), line: tok('--line'), ctl: tok('--ctl'),
+  ink: tok('--ink'), night3: tok('--night-3'), red: tok('--red'), redTint: tok('--red-tint'),
+  ok: tok('--ok-dot'), warnBg: tok('--warn-bg'),
 };
 
-const state = { view: 'campus', hover: null, sel: null, userMoved: false };
+const state = { view: 'campus', event: false, hover: null, sel: null, userMoved: false };
 const roots = {};             // id → корневая группа объекта (для подсветки)
-const pickables = { campus: [], event: [], garage: [] };
+const pickables = { campus: [], garage: [] };
 const labels = {};            // id → CSS2DObject
 let W = null;                 // 3D-мир; null — WebGL нет, работает только текстовый путь
 
 /* ============== 3D: примитивы ============== */
+// Одна геометрия 1×1×1 на всё: размер — scale (отдельные меши) или матрица (сборки kit)
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const BOX_EDGES = new THREE.EdgesGeometry(BOX);
-const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
-const M = { night: lam(T.night), night3: lam(T.night3), red: lam(T.red), ok: lam(T.ok), select: lam(T.select), card: lam(T.card) };
+const MATS = new Map(), FLATS = new Map();
+const mat = (c) => MATS.get(c) || MATS.set(c, new THREE.MeshLambertMaterial({ color: c })).get(c);
+const flat = (c) => FLATS.get(c) || FLATS.set(c, new THREE.MeshBasicMaterial({ color: c })).get(c);   // земля и разметка — без света, 1:1 с токеном
+const own = (c) => new THREE.MeshLambertMaterial({ color: c });   // свой материал корпуса — под подсветку наведения
+const shade = (c, k) => '#' + new THREE.Color(c).multiplyScalar(k).getHexString();
+const mix = (a, b, k) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString();
 const EDGE = new THREE.LineBasicMaterial({ color: T.line });
+// Графит мира — только --night-3: чистый --night слишком тяжёлый, он остаётся за HTML-хромом
+const GLASS = mat(T.select), DARK = mat(T.night3), WHITE = mat(T.card), RED = mat(T.red), STEEL = mat(T.ctl);
+const LEAF = mat(mix(T.ok, T.card, 0.4));   // зелень приглушённая
 
-// Куб: размеры w×h×d, (x, z) — центр, y0 — низ. edgeMat — подчеркнуть рёбра (схемность).
-function box(parent, mat, w, h, d, x, y0, z, edgeMat) {
-  const m = new THREE.Mesh(BOX, mat);
-  m.scale.set(w, h, d);
-  m.position.set(x, y0 + h / 2, z);
-  if (edgeMat) m.add(new THREE.LineSegments(BOX_EDGES, edgeMat));
-  parent.add(m);
-  return m;
+// Отдельный куб: размеры w×h×d, (x, z) — центр, y0 — низ. edgeMat — подчеркнуть рёбра.
+function box(parent, m, w, h, d, x, y0, z, edgeMat) {
+  const o = new THREE.Mesh(BOX, m);
+  o.scale.set(w, h, d);
+  o.position.set(x, y0 + h / 2, z);
+  if (edgeMat) o.add(new THREE.LineSegments(BOX_EDGES, edgeMat));
+  parent.add(o);
+  return o;
+}
+
+// Сборка: копит кубы и в конце сливает их в один меш на пару (материал, рёбра).
+// Здание из 150 деталей = 6–8 мешей вместо 150.
+const _mx = new THREE.Matrix4(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _q = new THREE.Quaternion();
+function kit() {
+  const buckets = new Map();
+  const k = (m, w, h, d, x, y0, z, edge) => {
+    const key = m.uuid + (edge ? edge.uuid : '');
+    if (!buckets.has(key)) buckets.set(key, { m, edge, list: [] });
+    _mx.compose(_p.set(x, y0 + h / 2, z), _q, _s.set(w, h, d));
+    buckets.get(key).list.push(BOX.clone().applyMatrix4(_mx));
+  };
+  k.into = (parent) => {
+    for (const { m, edge, list } of buckets.values()) {
+      const geo = mergeGeometries(list);
+      list.forEach((g) => g.dispose());
+      const mesh = new THREE.Mesh(geo, m);
+      if (edge) mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edge));
+      parent.add(mesh);
+    }
+    buckets.clear();
+  };
+  return k;
 }
 
 // Табличка CSS2D: якорь — нижний центр элемента
@@ -280,93 +331,404 @@ function label(parent, html, cls, x, y, z) {
   return o;
 }
 
-// Ряды окон по этажам на всех четырёх фасадах
-function windows(g, w, d, floors, fh, nx, nz, ww, wh, y0 = 0) {
-  for (let f = 0; f < floors; f++) {
-    const y = y0 + f * fh + (fh - wh) / 2 + 0.2;
-    for (let i = 0; i < nx; i++) {
-      const x = -w / 2 + (w / nx) * (i + 0.5);
-      box(g, M.night3, ww, wh, 0.12, x, y, d / 2);
-      box(g, M.night3, ww, wh, 0.12, x, y, -d / 2);
+// Окна-вставки по фасадам прямоугольника [x0, x1, z0, z1]: тёмное стекло + белый отлив с рёбрами.
+// faces: F — +z, B — −z, R — +x, L — −x. skip(face, a, y) — пропустить окно (вход, ворота).
+function windows(k, [x0, x1, z0, z1], ys, ww, wh, nx, nz, faces = 'FBRL', skip) {
+  const pane = (face, a, y) => {
+    if (skip?.(face, a, y)) return;
+    if (face === 'F' || face === 'B') {
+      const z = face === 'F' ? z1 : z0, s = face === 'F' ? 1 : -1;
+      k(DARK, ww, wh, 0.1, a, y, z);
+      k(WHITE, ww + 0.24, 0.1, 0.26, a, y - 0.1, z + s * 0.08, EDGE);
+    } else {
+      const x = face === 'R' ? x1 : x0, s = face === 'R' ? 1 : -1;
+      k(DARK, 0.1, wh, ww, x, y, a);
+      k(WHITE, 0.26, 0.1, ww + 0.24, x + s * 0.08, y - 0.1, a, EDGE);
     }
-    for (let i = 0; i < nz; i++) {
-      const z = -d / 2 + (d / nz) * (i + 0.5);
-      box(g, M.night3, 0.12, wh, ww, w / 2, y, z);
-      box(g, M.night3, 0.12, wh, ww, -w / 2, y, z);
-    }
+  };
+  for (const y of ys) {
+    for (let i = 0; i < nx; i++) { const a = x0 + ((x1 - x0) / nx) * (i + 0.5); if (faces.includes('F')) pane('F', a, y); if (faces.includes('B')) pane('B', a, y); }
+    for (let i = 0; i < nz; i++) { const a = z0 + ((z1 - z0) / nz) * (i + 0.5); if (faces.includes('R')) pane('R', a, y); if (faces.includes('L')) pane('L', a, y); }
   }
 }
+// Парапет по краю крыши [x0, x1, z0, z1] на высоте y
+function parapet(k, [x0, x1, z0, z1], y, h = 0.6) {
+  k(WHITE, x1 - x0, h, 0.25, (x0 + x1) / 2, y, z1 - 0.125, EDGE);
+  k(WHITE, x1 - x0, h, 0.25, (x0 + x1) / 2, y, z0 + 0.125, EDGE);
+  k(WHITE, 0.25, h, z1 - z0 - 0.5, x1 - 0.125, y, (z0 + z1) / 2, EDGE);
+  k(WHITE, 0.25, h, z1 - z0 - 0.5, x0 + 0.125, y, (z0 + z1) / 2, EDGE);
+}
+// Дерево: графитовый ствол + крона из 2–3 светлых кубов
+function tree(k, x, z, s = 1) {
+  k(DARK, 0.3, 1.5 * s, 0.3, x, 0, z);
+  k(mat(T.sunk), 1.9 * s, 1.5 * s, 1.9 * s, x, 1.5 * s, z, EDGE);
+  k(mat(T.sunk), 1.3 * s, 1.1 * s, 1.3 * s, x + 0.2, 3 * s, z - 0.15, EDGE);
+  if (s > 1) k(mat(T.sunk), 0.8, 0.7, 0.8, x - 0.1, 3 * s + 1.1 * s, z + 0.1, EDGE);
+}
+// Кейс: графитовый куб с белой ручкой
+function crate(k, x, y0, z, s = 0.62) {
+  k(DARK, s, s, s, x, y0, z);
+  k(WHITE, s * 0.4, 0.06, 0.08, x, y0 + s, z);
+}
 
-// Здание: белый корпус с рёбрами + графитовая крыша. Корпусу — свой материал, чтобы подсвечивать только его.
-function makeBuilding({ id, w, d, h, x, z }) {
+// Здание: группа с собственным материалом корпуса и рёбер — их подсвечивает наведение
+function building(id, x, z) {
   const g = new THREE.Group();
   g.position.set(x, 0, z);
-  const mat = lam(T.card), edge = new THREE.LineBasicMaterial({ color: T.line });
-  box(g, mat, w, h, d, 0, 0, 0, edge);
-  box(g, M.night, w + 0.3, 0.4, d + 0.3, 0, h, 0);
-  g.userData = { id, mats: [mat], edge, top: h + 0.4 };
+  const body = own(T.card), edge = new THREE.LineBasicMaterial({ color: T.line });
+  g.userData = { id, mats: [body], edge };
   roots[id] = g;
+  return { g, body, edge, k: kit() };
+}
+
+/* ============== Здания: у каждого свой силуэт и свой «жест» ============== */
+// Офис: Г-образный план, второй этаж консолью над входом, угол — стеклянный атриум, терраса на крыше
+function buildOffice() {
+  const { g, body, edge, k } = building('office', -18, 8);
+  // локальные координаты: центр (−18, 8). Западное крыло (вдоль z), южное крыло (вдоль x), атриум на стыке
+  k(body, 4.5, 7, 6, -3.75, 0, -1.5, edge);                 // западное крыло, 2 этажа
+  k(body, 7.5, 3.5, 5, 2.25, 0, 1.5, edge);                 // южное крыло, первый этаж
+  k(body, 7.5, 3.5, 6.5, 2.25, 3.5, 2.25, edge);            // второй этаж — консоль на 1,5 м наружу
+  k(GLASS, 7.5, 0.2, 6.5, 2.25, 7, 2.25);                   // светлый настил террасы
+  k(DARK, 7.7, 0.08, 6.7, 2.25, 6.95, 2.25);
+  k(DARK, 4.7, 0.3, 6.2, -3.75, 7, -1.5);
+  // Атриум во всю высоту: стекло, графитовые импосты
+  k(GLASS, 4.5, 7.6, 3, -3.75, 0, 3, EDGE);
+  for (const y of [2.5, 5]) { k(DARK, 4.56, 0.08, 0.06, -3.75, y, 4.52); k(DARK, 0.06, 0.08, 3.04, -6.02, y, 3); }
+  for (const x of [-5.25, -3.75, -2.25]) k(DARK, 0.08, 7.6, 0.06, x, 0, 4.52);
+  k(DARK, 4.7, 0.25, 3.2, -3.75, 7.6, 3);
+  // Стойки под консолью и вход
+  for (const x of [-1, 5.5]) k(DARK, 0.3, 3.5, 0.3, x, 0, 5.3);
+  k(GLASS, 2, 2.6, 0.12, 2.25, 0, 4.02, EDGE);
+  k(DARK, 2.2, 0.15, 0.14, 2.25, 2.6, 4.03);
+  k(WHITE, 3, 0.15, 1.4, 2.25, 0, 4.7, EDGE);               // ступени
+  k(WHITE, 2.4, 0.15, 0.7, 2.25, 0.15, 4.35, EDGE);
+  // Вывеска ARGO на торце консоли: графит + три красных кубика
+  k(DARK, 3.4, 1, 0.16, 2.25, 4.8, 5.58);
+  for (const dx of [-0.8, 0, 0.8]) k(RED, 0.42, 0.42, 0.3, 2.25 + dx, 5.09, 5.66);
+  // Окна
+  windows(k, [-6, -1.5, -4.5, 1.5], [1, 4.5], 1.1, 1.5, 0, 3, 'BL');
+  windows(k, [-6, -1.5, -4.5, 1.5], [1, 4.5], 1.1, 1.5, 3, 0, 'B');
+  windows(k, [-1.5, 6, -1, 5.5], [4.5], 1.2, 1.5, 4, 0, 'F', (f, a) => Math.abs(a - 2.25) < 1);
+  windows(k, [-1.5, 6, -1, 4], [1], 1.2, 1.5, 0, 3, 'R');
+  windows(k, [-1.5, 6, -1, 5.5], [4.5], 1.2, 1.5, 0, 4, 'R');
+  windows(k, [-1.5, 6, -1, 4], [1, 4.5], 1.2, 1.5, 3, 0, 'B');
+  // Терраса: парапет и кадки с зеленью; на западном крыле — два кондиционера
+  parapet(k, [-1.5, 6, -1, 5.5], 7.2, 0.7);
+  for (const x of [0.5, 4]) { k(mat(T.sunk), 0.9, 0.7, 0.9, x, 7.2, 3.8, EDGE); k(LEAF, 0.6, 0.5, 0.6, x, 7.9, 3.8); }
+  for (const z of [-3, -0.5]) { k(WHITE, 1.4, 1, 1.2, -3.75, 7.3, z, EDGE); k(DARK, 0.8, 0.08, 0.8, -3.75, 8.3, z); }
+  // Флагшток у входа, два дерева, скамейки
+  k(DARK, 0.12, 6.5, 0.12, 6.9, 0, 5.9);
+  k(RED, 1.3, 0.8, 0.06, 7.6, 5.6, 5.9);
+  tree(k, -7.6, 5.2, 1.1);
+  tree(k, 7.4, 1.5);
+  for (const x of [-5.2, -2.6]) { k(WHITE, 1.8, 0.12, 0.6, x, 0.45, 6.9, EDGE); k(WHITE, 1.8, 0.5, 0.1, x, 0.57, 6.65, EDGE); k(DARK, 0.1, 0.45, 0.5, x - 0.75, 0, 6.9); k(DARK, 0.1, 0.45, 0.5, x + 0.75, 0, 6.9); }
+  k.into(g);
+  g.userData.top = 8.4;
   return g;
 }
 
-// Фигурка сотрудника: тело --select, голова --card, ~1,6 м
-function makePerson(parent, x, z, rot) {
+// Склад: ангар с пилообразной крышей (4 зуба, каждый — 3 ступени), башня-офис с торца, рампа с навесом
+function buildWarehouse() {
+  const { g, body, edge, k } = building('warehouse', 7, -12);
+  // локальные: x −13..13, z −6..6
+  k(body, 26, 5, 12, 0, 0, 0, edge);
+  for (let t = 0; t < 4; t++) {
+    const a = -13 + t * 6.5;
+    k(body, 6.5, 0.7, 12, a + 3.25, 5, 0, edge);
+    k(body, 4.3, 0.7, 12, a + 4.35, 5.7, 0, edge);
+    k(body, 2.2, 0.7, 12, a + 5.4, 6.4, 0, edge);
+    k(GLASS, 0.1, 1.3, 11.4, a + 6.5, 5.75, 0, EDGE);      // остекление на вертикальной грани зуба
+  }
+  // Башня — офис склада, выше ангара
+  k(body, 4.5, 11, 7, 15.25, 0, -2.5, edge);
+  k(DARK, 4.7, 0.3, 7.2, 15.25, 11, -2.5);
+  windows(k, [13, 17.5, -6, 1], [1.2, 4.2, 7.2], 1.1, 1.5, 2, 3, 'FR');
+  k(WHITE, 1.4, 1, 1.4, 15.6, 11.3, -3.5, EDGE);
+  // Ворота с ламелями: у рампы (поднятые) и на земле
+  for (const [x, y0] of [[8.75, 1.1], [-6, 0]]) {
+    k(DARK, 4.4, 3.4, 0.12, x, y0, 6.02);
+    for (let i = 1; i <= 4; i++) k(mat(T.ctl), 4.2, 0.07, 0.06, x, y0 + i * 0.68, 6.1);
+  }
+  // Высокие узкие окна под крышей + задний фасад
+  windows(k, [-13, 13, -6, 6], [3], 0.6, 1.6, 13, 0, 'F', (f, a) => Math.abs(a - 8.75) < 3 || Math.abs(a + 6) < 3);
+  windows(k, [-13, 13, -6, 6], [3], 0.6, 1.6, 13, 4, 'BL');
+  // Рампа: платформа + две ступени, навес на двух стойках
+  k(WHITE, 7.5, 1.1, 2.8, 8.75, 0, 7.4, EDGE);
+  k(WHITE, 0.6, 0.73, 2.8, 4.7, 0, 7.4, EDGE);
+  k(WHITE, 0.6, 0.37, 2.8, 4.1, 0, 7.4, EDGE);
+  k(WHITE, 8.8, 0.2, 3.6, 8.75, 4.3, 7.8, EDGE);
+  for (const x of [4.8, 12.6]) k(DARK, 0.2, 4.3, 0.2, x, 0, 9.4);
+  // Вентиляция на нижних ступенях зубьев
+  for (const x of [-11.9, -5.4, 1.1]) { k(WHITE, 0.9, 0.9, 0.9, x, 5.7, -3, EDGE); k(DARK, 0.6, 0.1, 0.6, x, 6.6, -3); }
+  // Кейсы у рампы (два штабелем) и ручная тележка
+  for (const [x, z, y] of [[5.6, 6.6, 1.1], [6.3, 6.6, 1.1], [5.6, 6.6, 1.72], [7, 7.3, 1.1], [5.9, 7.5, 1.1], [7.7, 6.6, 1.1]]) crate(k, x, y, z);
+  k(DARK, 0.7, 0.08, 0.6, 11.3, 1.1, 7.6);
+  k(DARK, 0.08, 1.3, 0.6, 11.66, 1.1, 7.6);
+  k(DARK, 0.3, 0.06, 0.6, 11.8, 2.34, 7.6);
+  crate(k, 11.2, 1.18, 7.6, 0.5);
+  k.into(g);
+  g.userData.top = 11.5;
+  return g;
+}
+
+// Гараж: 6 открытых проёмов с воротами-козырьками, односкатная крыша ступенями, мезонин сверху, навес-мойка сбоку
+const bayX = (i) => -7.5 + i * 3;     // локальный x проёма; мир: +12
+function buildGarage() {
+  const { g, body, edge, k } = building('garage', 12, 8);
+  // локальные: x −9..9, z −4.5..4.5; фронт +z
+  k(body, 18, 4.5, 0.3, 0, 0, -4.35, edge);                  // задняя стена
+  k(body, 0.3, 4.5, 9, -8.85, 0, 0, edge);
+  k(body, 0.3, 4.5, 9, 8.85, 0, 0, edge);
+  for (let i = 0; i <= 6; i++) { const x0 = i === 0 ? -9 : bayX(i - 1) + 1.1, x1 = i === 6 ? 9 : bayX(i) - 1.1; k(body, x1 - x0, 3, 0.3, (x0 + x1) / 2, 0, 4.35, edge); }
+  k(body, 18, 1.5, 0.3, 0, 3, 4.35, edge);                   // перемычка над проёмами
+  k(DARK, 17.4, 3, 7.9, 0, 0, -0.35);                        // тёмная глубина внутри
+  k(body, 18.2, 0.3, 9.2, 0, 4.5, 0, edge);                  // односкатная крыша: три ступени к задней стене
+  k(body, 18.2, 0.5, 6, 0, 4.8, -1.6, edge);
+  k(body, 18.2, 0.5, 3, 0, 5.3, -3.1, edge);
+  k(DARK, 18.4, 0.12, 0.2, 0, 4.4, 4.62);
+  // Ворота-козырьки: поднятое полотно над каждым проёмом
+  for (let i = 0; i < 6; i++) {
+    k(WHITE, 2.3, 0.08, 0.9, bayX(i), 3.05, 4.95, EDGE);
+    k(DARK, 0.05, 0.3, 0.9, bayX(i) - 1.12, 2.8, 4.95);
+    k(DARK, 0.05, 0.3, 0.9, bayX(i) + 1.12, 2.8, 4.95);
+  }
+  // Мезонин с окнами и вывеской
+  k(body, 7, 2.6, 4, 4.5, 5.8, -2.5, edge);
+  k(DARK, 7.2, 0.2, 4.2, 4.5, 8.4, -2.5);
+  windows(k, [1, 8, -4.5, -0.5], [6.5], 1.2, 1.1, 4, 0, 'F');
+  k(DARK, 5, 1, 0.2, -3, 5.8, -0.8);
+  k(WHITE, 3.6, 0.14, 0.06, -3.4, 6.2, -0.68);
+  for (const dx of [0.9, 1.45, 2]) k(RED, 0.3, 0.3, 0.12, -3 + dx, 6.1, -0.68);
+  for (const x of [-5, -1]) k(DARK, 0.12, 0.5, 0.12, x, 5.3, -0.9);
+  // Навес-мойка справа: плита на 4 стойках, светлая площадка
+  k(mat(T.sunk), 4.8, 0.05, 6.4, 11.6, 0, 0.6, EDGE);
+  for (const x of [9.6, 13.6]) for (const z of [-2.2, 3.4]) k(DARK, 0.2, 3.6, 0.2, x, 0, z);
+  k(WHITE, 5.2, 0.25, 6.8, 11.6, 3.6, 0.6, EDGE);
+  k(GLASS, 0.8, 1.4, 0.8, 13.2, 0, -1.6, EDGE);
+  // Передки машин в проёмах (Bongo — целой моделью, он уезжает на мероприятие)
+  CARS.forEach((c, i) => {
+    if (i === VAN) return;
+    const cm = mat(c.hex), x = bayX(i), dark = new THREE.Color(c.hex).getHSL({}).l < 0.4;
+    k(cm, 1.7, 0.6, 1.4, x, 0.38, 3.9, EDGE);
+    k(dark ? DARK : GLASS, 1.4, 0.4, 0.7, x, 0.98, 3.55);
+    k(cm, 1.44, 0.08, 0.6, x, 1.38, 3.5);
+    for (const s of [-1, 1]) { k(mat(T.warnBg), 0.34, 0.14, 0.06, x + s * 0.55, 0.78, 4.62); k(DARK, 0.22, 0.6, 0.6, x + s * 0.72, 0, 4.0); }
+    k(mat(shade(c.hex, 0.8)), 1.72, 0.2, 0.14, x, 0.36, 4.62);
+  });
+  // Парковочная разметка перед гаражом: светлая площадка, полосы --line
+  k(mat(T.sunk), 18, 0.03, 4, 0, 0, 6.5);
+  for (let i = 0; i <= 6; i++) k(flat(T.line), 0.14, 0.05, 3.4, -9 + i * 3, 0, 6.6);
+  k.into(g);
+  g.userData.top = 8.6;
+  return g;
+}
+
+// Отель: подиум 2 этажа во весь план + башня у края с двумя уступами, пилон на крыше, портик, терраса с зонтиками
+function buildHotel() {
+  const { g, body, edge, k } = building('hotel', -20, -15);
+  // локальные: подиум x −7..7, z −5..5; башня у западного края
+  k(body, 14, 7, 10, 0, 0, 0, edge);
+  k(GLASS, 14, 0.2, 10, 0, 7, 0);                          // настил террасы подиума
+  k(DARK, 14.2, 0.08, 10.2, 0, 6.95, 0);
+  const T1 = [-7, 0.5, -5, 1.5], T2 = [-6.3, -0.2, -4.3, 0.8], T3 = [-5.6, -0.9, -3.6, 0.1];
+  const slab = (r, y0, h) => k(body, r[1] - r[0], h, r[3] - r[2], (r[0] + r[1]) / 2, y0, (r[2] + r[3]) / 2, edge);
+  slab(T1, 7.2, 12); slab(T2, 19.2, 3); slab(T3, 22.2, 3);
+  for (const [r, y] of [[T1, 19.2], [T2, 22.2], [T3, 25.2]]) k(DARK, r[1] - r[0] + 0.2, 0.15, r[3] - r[2] + 0.2, (r[0] + r[1]) / 2, y - 0.08, (r[2] + r[3]) / 2);
+  windows(k, T1, [7.9, 10.9, 13.9, 16.9], 1.1, 1.6, 4, 3);
+  windows(k, T2, [19.9], 1, 1.5, 3, 3);
+  windows(k, T3, [22.9], 0.9, 1.5, 2, 2, 'BRL');
+  // Плашка HOTEL на верхнем этаже: графитовая полоса с белыми «буквами»
+  k(DARK, 3.8, 1, 0.16, -3.25, 23.2, 0.15);
+  for (let i = 0; i < 5; i++) k(WHITE, 0.42, 0.5, 0.1, -4.45 + i * 0.6, 23.45, 0.25);
+  // Пилон-знак на крыше башни
+  k(DARK, 0.5, 6, 1.4, -3.25, 25.3, -1.75);
+  k(RED, 0.6, 0.6, 1.5, -3.25, 31.3, -1.75);
+  k(WHITE, 1.6, 1, 1.6, -4.6, 25.3, -2.6, EDGE);              // техблок
+  // Подиум: окна, кроме места портика
+  windows(k, [-7, 7, -5, 5], [0.9, 4.4], 1.3, 1.7, 5, 4, 'FBRL', (f, a, y) => f === 'F' && y < 2 && a > -0.5 && a < 6);
+  // Терраса на крыше подиума: парапет и зонтики
+  parapet(k, [-7, 7, -5, 5], 7.2, 0.6);
+  for (const [x, z] of [[3, -2.5], [5.2, 0], [3, 2.6], [-2.5, 3.4]]) {
+    k(DARK, 0.1, 1.9, 0.1, x, 7.2, z);
+    k(GLASS, 1.8, 0.1, 1.8, x, 9.1, z, EDGE);
+    k(WHITE, 0.7, 0.08, 0.7, x, 7.9, z, EDGE);
+  }
+  // Портик на 4 колоннах, вращающаяся дверь, ступени
+  for (const x of [1.1, 2.5, 4.5, 5.9]) k(WHITE, 0.4, 3.4, 0.4, x, 0, 7.2, EDGE);
+  k(WHITE, 5.8, 0.4, 2.8, 3.5, 3.4, 6.3, EDGE);
+  k(DARK, 5.9, 0.12, 2.9, 3.5, 3.8, 6.3);
+  k(DARK, 2.4, 0.3, 0.3, 3.5, 2.6, 5.2);
+  k(WHITE, 4.4, 0.14, 1.6, 3.5, 0, 6, EDGE);
+  // Клумба и два дерева
+  k(mat(T.sunk), 4, 0.4, 1.2, -3.5, 0, 7.2, EDGE);
+  for (const dx of [-1.2, 0, 1.2]) k(LEAF, 0.6, 0.45, 0.6, -3.5 + dx, 0.4, 7.2);
+  tree(k, -6.4, 8.6);
+  tree(k, 8.4, 6.2, 1.1);
+  k.into(g);
+  // Вращающаяся дверь — единственный цилиндр в мире
+  const door = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 2.6, 20), GLASS);
+  door.position.set(3.5, 1.3, 5);
+  door.add(new THREE.LineSegments(new THREE.EdgesGeometry(door.geometry, 30), EDGE));
+  g.add(door);
+  g.userData.top = 32;
+  return g;
+}
+
+// Сцена мероприятия перед отелем: подиум, задник-экран, колонки, 4 стойки света, флаг. Растёт из земли.
+function buildStage() {
+  const g = new THREE.Group();
+  g.position.set(-13.5, 0, -4);
+  const body = own(T.card), edge = new THREE.LineBasicMaterial({ color: T.line }), k = kit();
+  k(body, 7, 0.6, 3.2, 0, 0, 0, edge);
+  k(body, 2, 0.3, 0.8, 0, 0, 2, edge);
+  k(STEEL, 7.4, 3.8, 0.25, 0, 0.6, -1.72);                  // рама задника
+  k(DARK, 7, 3.4, 0.08, 0, 0.8, -1.56);                     // экран
+  k(RED, 7, 0.22, 0.1, 0, 0.95, -1.5);
+  for (const s of [-1, 1]) { k(DARK, 0.8, 1.8, 0.8, s * 3.95, 0, 0.6); k(mat(T.ctl), 0.4, 0.4, 0.06, s * 3.95, 1.1, 1.01); }
+  for (const [x, z] of [[-4.6, 1.6], [4.6, 1.6], [-4.6, -1.6], [4.6, -1.6]]) { k(DARK, 0.12, 3.6, 0.12, x, 0, z); k(GLASS, 0.5, 0.4, 0.5, x, 3.6, z, EDGE); }
+  k(DARK, 0.14, 7.5, 0.14, 0, 0, -2.05);
+  k(RED, 1.8, 1, 0.06, 0.95, 6.3, -2.05);
+  k.into(g);
+  g.userData = { id: 'stage', mats: [body], edge };
+  g.visible = false;
+  roots.stage = g;
+  return g;
+}
+
+/* ============== Машины: силуэт по модели. Перёд — +z. ============== */
+// Спецификации: w×l, колесо (размер) и отступ осей, пояс (верх капота), салон и т. д.
+const SPEC = {
+  lynk:   { w: 2.0, l: 5.0, wheel: 0.8, ax: 0.95, ride: 0.42, belt: 1.25, cabW: 1.84, glass: [-2.1, 1.0, 0.52], roof: [-1.35, 0.75], step: [-2.3, -2.1, 0.32], lamp: 0.42, bump: 0.26 },
+  cobalt: { w: 1.74, l: 4.5, wheel: 0.64, ax: 0.85, ride: 0.3, belt: 0.92, cabW: 1.5, glass: [-1.0, 0.85, 0.44], roof: [-0.75, 0.55], trunk: 0.1, lamp: 0.36, bump: 0.22 },
+  nexia:  { w: 1.66, l: 4.26, wheel: 0.6, ax: 0.8, ride: 0.28, belt: 0.86, cabW: 1.5, glass: [-0.95, 0.8, 0.4], roof: [-0.95, 0.8], trunk: 0.04, lamp: 0.3, bump: 0.12 },
+  chazor: { w: 1.72, l: 4.4, wheel: 0.64, ax: 0.82, ride: 0.3, belt: 0.92, cabW: 1.52, glass: [-0.9, 0.7, 0.48], roof: [-0.7, 0.45], trunk: 0.06, lamp: 0.46, bump: 0.2, cowl: true },
+  bongo:  { w: 1.74, l: 5.1, wheel: 0.6 },
+};
+
+function makeCar(c, cargo = false) {
+  const g = new THREE.Group();
+  const body = own(c.hex), edge = new THREE.LineBasicMaterial({ color: T.line }), k = kit();
+  const dark = new THREE.Color(c.hex).getHSL({}).l < 0.4, glass = dark ? DARK : GLASS;
+  const bump = mat(shade(c.hex, dark ? 0.7 : 0.82)), lampF = mat(T.warnBg), lampR = mat(T.redTint);
+  const s = SPEC[c.kind], { w, l, wheel } = s;
+  // Колесо: графитовая шина + светлый диск, чуть утоплено под кузов
+  const wheelAt = (x, z, sz = wheel) => {
+    const sx = Math.sign(x);
+    k(DARK, 0.26, sz, sz, x, 0, z);
+    k(STEEL, 0.05, sz * 0.5, sz * 0.5, x + sx * 0.15, sz * 0.25, z);
+  };
+  let top, markZ = 0;
+  if (c.kind === 'bongo') {
+    // Cab-over: высокая плоская кабина без капота, низкая платформа с тремя бортами, задние колёса сдвоенные
+    const cz = l / 2 - 0.8;
+    k(body, w, 1.65, 1.6, 0, 0.5, cz, edge);
+    k(body, w - 0.1, 0.12, 1.5, 0, 2.15, cz, edge);
+    k(glass, w - 0.24, 0.72, 0.08, 0, 1.3, l / 2 + 0.01);
+    for (const sx of [-1, 1]) { k(glass, 0.08, 0.6, 0.9, sx * (w / 2 + 0.01), 1.38, cz + 0.25); k(DARK, 0.08, 0.34, 0.18, sx * (w / 2 + 0.2), 1.45, l / 2 - 0.2); }
+    k(DARK, w - 0.5, 0.25, l - 1.6, 0, 0.45, -0.8);
+    const pl = l - 1.7, pz = -l / 2 + pl / 2;
+    k(body, w, 0.12, pl, 0, 0.7, pz, edge);
+    k(body, 0.07, 0.4, pl, w / 2 - 0.035, 0.82, pz, edge);
+    k(body, 0.07, 0.4, pl, -w / 2 + 0.035, 0.82, pz, edge);
+    k(body, w, 0.4, 0.07, 0, 0.82, -l / 2 + 0.035, edge);
+    k(bump, w + 0.04, 0.24, 0.16, 0, 0.36, l / 2 + 0.02);
+    k(WHITE, 0.5, 0.13, 0.04, 0, 0.42, l / 2 + 0.11);
+    for (const sx of [-1, 1]) {
+      k(lampF, 0.34, 0.2, 0.06, sx * (w / 2 - 0.3), 0.66, l / 2 + 0.02);
+      k(lampR, 0.16, 0.12, 0.06, sx * (w / 2 - 0.12), 0.6, -l / 2 - 0.02);
+      wheelAt(sx * (w / 2 - 0.15), l / 2 - 0.7);
+      wheelAt(sx * (w / 2 - 0.15), -l / 2 + 1.05);
+      wheelAt(sx * (w / 2 - 0.43), -l / 2 + 1.05);
+    }
+    if (cargo) for (const [x, z, y] of [[-0.4, -1.2, 0.82], [0.35, -1.2, 0.82], [-0.4, -1.2, 1.44], [0, -0.2, 0.82]]) crate(k, x, y, z);
+    top = 2.27; markZ = cz;
+  } else {
+    const { ax, ride, belt, cabW, lamp } = s, wz = l / 2 - ax, wTop = wheel * 0.82;
+    // Кузов из двух боксов: нижний короче (между арками), верхний во всю длину — колёса уходят в вырез
+    k(body, w - 0.06, wTop - ride, 2 * wz - wheel - 0.2, 0, ride, 0, edge);
+    k(body, w, belt - wTop, l - 0.3, 0, wTop, 0, edge);
+    // Салон уже кузова: стекло + крыша (короче стекла — завал стоек)
+    const [g0, g1, gh] = s.glass, [r0, r1] = s.roof;
+    k(glass, cabW, gh, g1 - g0, 0, belt, (g0 + g1) / 2);
+    k(body, cabW + 0.02, 0.1, r1 - r0, 0, belt + gh, (r0 + r1) / 2, edge);
+    if (s.step) k(glass, cabW, s.step[2], s.step[1] - s.step[0], 0, belt, (s.step[0] + s.step[1]) / 2);   // задник ступенью
+    if (s.trunk) { const t0 = -l / 2 + 0.15, t1 = g0 - 0.1; k(body, w - 0.1, s.trunk, t1 - t0, 0, belt, (t0 + t1) / 2, edge); }   // выраженный багажник
+    if (s.cowl) k(body, cabW + 0.06, 0.12, 0.45, 0, belt, g1 + 0.22, edge);   // ступень капот → лобовое
+    if (c.kind === 'lynk') {
+      for (const sx of [-1, 1]) {
+        k(DARK, 0.07, 0.07, r1 - r0 + 0.3, sx * (cabW / 2 - 0.1), belt + gh + 0.1, (r0 + r1) / 2);   // рейлинги
+        for (const z of [-wz, wz]) k(DARK, 0.1, 0.22, wheel + 0.4, sx * (w / 2 + 0.03), wTop - 0.06, z);   // широкие арки
+      }
+      k(DARK, w - 0.3, 0.16, l - 2 * ax - wheel, 0, ride - 0.05, 0);
+    }
+    // Бампера темнее кузова, фары, фонари, зеркала, номер
+    const by = ride + 0.02;
+    k(bump, w + 0.02, s.bump, 0.16, 0, by, l / 2 - 0.1);
+    k(bump, w + 0.02, s.bump, 0.16, 0, by, -l / 2 + 0.1);
+    k(WHITE, 0.5, 0.12, 0.04, 0, by + 0.02, l / 2 + 0.0);
+    for (const sx of [-1, 1]) {
+      k(lampF, lamp, 0.15, 0.06, sx * (w / 2 - 0.32), belt - 0.25, l / 2 - 0.14);
+      k(lampR, 0.3, 0.13, 0.06, sx * (w / 2 - 0.26), belt - 0.22, -l / 2 + 0.14);
+      k(body, 0.16, 0.12, 0.2, sx * (cabW / 2 + 0.12), belt + 0.06, g1 - 0.25);
+      wheelAt(sx * (w / 2 - 0.15), wz);
+      wheelAt(sx * (w / 2 - 0.15), -wz);
+    }
+    top = belt + gh + 0.1; markZ = (r0 + r1) / 2;
+  }
+  k.into(g);
+  // Красная полоска на крыше — метка выбора
+  const mark = box(g, RED, w * 0.5, 0.06, 1, 0, top, markZ);
+  mark.visible = false;
+  g.userData = { mats: [body], edge, mark, top };
+  return g;
+}
+
+/* ============== Фигурки ============== */
+const CLOTH = [T.select, T.night3, T.line];
+// Сотрудник ~1,6 м: ноги и руки на шарнирах (группа в бедре/плече), кейс — в правой руке
+function makePerson(parent, x, z, rot, cloth, withCase) {
   const g = new THREE.Group();
   g.position.set(x, 0, z);
   g.rotation.y = rot;
-  box(g, M.select, 0.24, 0.8, 0.24, -0.14, 0, 0, EDGE);
-  box(g, M.select, 0.24, 0.8, 0.24, 0.14, 0, 0, EDGE);
-  box(g, M.select, 0.62, 0.42 + 0.0, 0.36, 0, 0.8, 0, EDGE);
-  box(g, M.card, 0.36, 0.36, 0.36, 0, 1.24, 0, EDGE);
+  const cm = mat(cloth);
+  const limb = (m, w, h, d, px, py) => {
+    const p = new THREE.Group();
+    p.position.set(px, py, 0);
+    const me = new THREE.Mesh(BOX, m);
+    me.scale.set(w, h, d);
+    me.position.y = -h / 2;
+    p.add(me);
+    g.add(p);
+    return p;
+  };
+  const legs = [limb(DARK, 0.2, 0.8, 0.22, -0.12, 0.8), limb(DARK, 0.2, 0.8, 0.22, 0.12, 0.8)];
+  box(g, cm, 0.56, 0.6, 0.3, 0, 0.8, 0, EDGE);
+  const arms = [limb(cm, 0.14, 0.6, 0.16, -0.36, 1.38), limb(cm, 0.14, 0.6, 0.16, 0.36, 1.38)];
+  box(g, WHITE, 0.34, 0.34, 0.34, 0, 1.42, 0, EDGE);
+  if (withCase) box(arms[1], DARK, 0.14, 0.36, 0.5, 0.06, -0.92, 0);
+  g.userData = { legs, arms };
   parent.add(g);
   return g;
 }
-
-// Машина из кубов. Перёд — +z. kind: suv | truck | sedan | van.
-function makeVan({ hex, kind }) {
-  const g = new THREE.Group();
-  const mat = lam(hex), edge = new THREE.LineBasicMaterial({ color: T.line });
-  const glass = M.night3;
-  const D = { suv: [1.95, 4.8], truck: [1.75, 4.9], sedan: [1.75, 4.4], van: [2, 5.2] }[kind];
-  const [w, l] = D;
-  let top;
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(g, M.night, 0.26, 0.66, 0.66, sx * (w / 2 - 0.1), 0, sz * (l / 2 - 0.85));
-  if (kind === 'sedan') {
-    box(g, mat, w, 0.7, l, 0, 0.3, 0, edge);
-    box(g, glass, w - 0.2, 0.36, l * 0.5, 0, 1.0, -0.1);
-    box(g, mat, w - 0.18, 0.1, l * 0.46, 0, 1.36, -0.1, edge);
-    top = 1.46;
-  } else if (kind === 'suv') {
-    box(g, mat, w, 0.9, l, 0, 0.32, 0, edge);
-    box(g, glass, w - 0.16, 0.42, l * 0.64, 0, 1.22, -0.2);
-    box(g, mat, w - 0.12, 0.12, l * 0.62, 0, 1.64, -0.2, edge);
-    top = 1.76;
-  } else if (kind === 'truck') {
-    box(g, M.night, w - 0.3, 0.3, l, 0, 0.35, 0);
-    box(g, mat, w, 1.25, 1.7, 0, 0.6, l / 2 - 0.85, edge);
-    box(g, glass, w - 0.1, 0.45, 0.12, 0, 1.25, l / 2 + 0.01);
-    const bl = l - 1.9, bz = -l / 2 + bl / 2;
-    box(g, mat, w, 0.14, bl, 0, 0.65, bz, edge);
-    box(g, mat, 0.08, 0.32, bl, w / 2 - 0.04, 0.79, bz, edge);
-    box(g, mat, 0.08, 0.32, bl, -w / 2 + 0.04, 0.79, bz, edge);
-    box(g, mat, w, 0.32, 0.08, 0, 0.79, -l / 2 + 0.04, edge);
-    top = 1.85;
-  } else {
-    box(g, mat, w, 1.9, l, 0, 0.35, 0, edge);
-    box(g, glass, w - 0.1, 0.5, 0.12, 0, 1.45, l / 2 + 0.01);
-    box(g, glass, 0.12, 0.45, 1.0, w / 2 + 0.01, 1.48, l / 2 - 0.8);
-    box(g, glass, 0.12, 0.45, 1.0, -w / 2 - 0.01, 1.48, l / 2 - 0.8);
-    top = 2.25;
-  }
-  // Красная полоска на крыше — метка выбора
-  const mark = box(g, M.red, w * 0.6, 0.08, l * 0.4, 0, top, kind === 'truck' ? l / 2 - 0.85 : -0.15);
-  mark.visible = false;
-  g.userData = { mats: [mat], edge, mark, top };
-  return g;
+function pose(p, t) {
+  const a = Math.sin(t * 9) * 0.5, { legs, arms } = p.userData;
+  legs[0].rotation.x = a; legs[1].rotation.x = -a;
+  arms[0].rotation.x = -a * 0.8; arms[1].rotation.x = a * 0.3;
 }
+// Точка на ломаной по пройденному пути: позиция + направление
+function along(pts, d) {
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, az] = pts[i - 1], [bx, bz] = pts[i], len = Math.hypot(bx - ax, bz - az);
+    if (d <= len || i === pts.length - 1) { const k = Math.min(1, d / len); return [ax + (bx - ax) * k, az + (bz - az) * k, Math.atan2(bx - ax, bz - az), d >= len]; }
+    d -= len;
+  }
+}
+const pathLen = (pts) => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
 
+/* ============== Мир кампуса ============== */
 function ground(parent, size) {
-  const plane = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ color: T.bg }));
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(size, size), flat(T.bg));
   plane.rotation.x = -Math.PI / 2;
   parent.add(plane);
   // Сетка шагом 1 м: цвет --ink с низкой непрозрачностью, как --grid в токенах
@@ -378,88 +740,79 @@ function ground(parent, size) {
   parent.add(grid);
 }
 
-// Плоская дорожка: от (x1,z1) до (x2,z2), ширина wd
-const PATH_MAT = new THREE.MeshBasicMaterial({ color: T.select });
-function path(parent, x1, z1, x2, z2, wd) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(Math.abs(x2 - x1) || wd, Math.abs(z2 - z1) || wd), PATH_MAT);
-  m.rotation.x = -Math.PI / 2;
-  m.position.set((x1 + x2) / 2, 0.03, (z1 + z2) / 2);
-  parent.add(m);
+// Дорожки --line с бордюрами --ctl. Бордюр по стороне — с разрывами под примыкания.
+function roads(k) {
+  const ROAD = flat(T.line), CURB = mat(T.ctl);
+  const rect = (x0, x1, z0, z1) => k(ROAD, x1 - x0, 0.04, z1 - z0, (x0 + x1) / 2, 0, (z0 + z1) / 2);
+  const curbX = (z, x0, x1, gaps = []) => {   // бордюр вдоль x
+    let a = x0;
+    for (const [g0, g1] of [...gaps, [x1, x1]]) { if (g0 > a) k(CURB, g0 - a, 0.12, 0.16, (a + g0) / 2, 0, z); a = g1; }
+  };
+  const curbZ = (x, z0, z1, gaps = []) => {
+    let a = z0;
+    for (const [g0, g1] of [...gaps, [z1, z1]]) { if (g0 > a) k(CURB, 0.16, 0.12, g0 - a, x, 0, (a + g0) / 2); a = g1; }
+  };
+  rect(-34, 30, 16.5, 19.5);                       // главная дорога вдоль фронта
+  curbX(16.5, -34, 30, [[-16.75, -14.75], [-9, -6], [-1, 1], [3, 21]]);
+  curbX(19.5, -34, 30);
+  rect(-9, -6, -10, 16.5);                         // поперечная к отелю
+  curbZ(-9, 2.5, 16.5); curbZ(-6, -6, 16.5, [[-1, 1]]);
+  rect(-28, -9, -10, 2.5);                         // площадь перед отелем
+  curbZ(-28, -10, 2.5); curbX(2.5, -28, -9);
+  rect(-16.75, -14.75, 13.5, 16.5);                // вход в офис
+  curbZ(-16.75, 13.5, 16.5); curbZ(-14.75, 13.5, 16.5);
+  rect(-1, 1, -6, 16.5);                           // от склада к дороге
+  curbZ(-1, -6, 16.5); curbZ(1, -6, 16.5);
+  // Фонари: стойка + куб-светильник
+  for (const [x, z] of [[-29, 15.7], [-4, 15.7], [25, 15.7], [-9.7, 3.2]]) { k(DARK, 0.16, 3.6, 0.16, x, 0, z); k(DARK, 0.9, 0.1, 0.2, x + 0.35, 3.5, z); k(GLASS, 0.5, 0.4, 0.5, x + 0.7, 3.2, z, EDGE); }
+  // Указатель на перекрёстке: столб и две стрелки-плашки
+  k(DARK, 0.14, 3.2, 0.14, -9.8, 0, 15.7);
+  k(WHITE, 1.6, 0.4, 0.08, -9.1, 2.5, 15.7, EDGE); k(RED, 0.2, 0.4, 0.1, -8.2, 2.5, 15.7);
+  k(WHITE, 0.08, 0.4, 1.6, -9.8, 1.9, 15, EDGE); k(RED, 0.1, 0.4, 0.2, -9.8, 1.9, 14.1);
 }
 
-/* ============== 3D: сцены ============== */
 function buildCampus() {
   const g = new THREE.Group();
   ground(g, 400);
-  path(g, -34, 16.5, 28, 19.5, 3);       // главная дорога вдоль фронта
-  path(g, -10.5, -14, -7.5, 16.5, 3);    // поперечная к отелю
-  path(g, -15, -15, -10.5, -13, 2);      // вход в отель
-  path(g, -19, 12.5, -17, 16.5, 2);      // вход в офис
-  path(g, 3, 14.5, 21, 16.5, 2);         // площадка перед воротами гаража
-  path(g, -1, -6, 1, 16.5, 2);           // от склада к дороге
+  const k = kit();
+  roads(k);
+  k.into(g);
+  for (const make of [buildOffice, buildWarehouse, buildGarage, buildHotel]) g.add(make());
+  for (const s of SITES) labels[s.id] = label(roots[s.id], `<b>${s.title}</b><span>${s.sub}</span>`, 'tag', 0, roots[s.id].userData.top + 1.2, 0);
+  g.add(buildStage());
+  labels.event = label(roots.hotel, `<div><b>Bionorica Workshop</b><span class="where">Double Tree by HILTON · 12.10</span><span class="st">идёт</span><small>32 позиции · Jupiter&amp;Uranus</small></div>`, 'evcard', 0, roots.hotel.userData.top - 3, 0);
+  labels.event.visible = false;
 
-  // Офис: 2 этажа, красный знак — три кубика-точки на фасаде
-  const office = makeBuilding({ id: 'office', w: 12, d: 9, h: 7, x: -18, z: 8 });
-  windows(office, 12, 9, 2, 3.5, 5, 3, 1.3, 1.4);
-  box(office, M.night3, 1.6, 2.4, 0.14, 0, 0, 4.5);
-  for (const dx of [-0.9, 0, 0.9]) box(office, M.red, 0.6, 0.6, 0.6, dx, 6.1, 4.6);
-  // Склад: длинный низкий ангар
-  const wh = makeBuilding({ id: 'warehouse', w: 26, d: 12, h: 6, x: 7, z: -12 });
-  for (const dx of [-8, 0, 8]) box(wh, M.night3, 4, 3.6, 0.14, dx, 0, 6);
-  windows(wh, 26, 12, 1, 2.4, 8, 4, 2, 0.6, 3.6);
-  // Гараж: 6 проёмов на фронте
-  const gar = makeBuilding({ id: 'garage', w: 18, d: 9, h: 5, x: 12, z: 10 });
-  for (let i = 0; i < 6; i++) box(gar, M.night3, 2.2, 3, 0.14, -7.5 + i * 3, 0, 4.5);
-  // Отель / площадка: 6 этажей
-  const hotel = makeBuilding({ id: 'hotel', w: 10, d: 10, h: 21, x: -20, z: -14 });
-  windows(hotel, 10, 10, 6, 3.5, 4, 4, 1.4, 1.5);
-  box(hotel, M.night3, 2, 2.6, 0.14, 0, 0, 5);
-
-  for (const s of SITES) {
-    const r = roots[s.id];
-    labels[s.id] = label(r, `<b>${s.title}</b><span>${s.sub}</span>`, 'tag', 0, r.userData.top + 1.2, 0);
-    g.add(r);
-  }
-  // 12 сотрудников между офисом и складом
-  [[-5, -3, 0.4], [-3.6, -2.2, 2.2], [-2, 0.5, -0.6], [-4.4, 1.8, 1.1], [-1.8, -3.6, 3], [-5.6, 3.6, -1.2],
-   [-12, 13.6, 0.2], [-13.4, 14.2, 2.6], [-3, 4.6, 0.9], [-6.2, -0.4, -2], [-2.6, 2.6, 1.6], [4, -4.2, 0]]
-    .forEach(([x, z, r]) => makePerson(g, x, z, r));
-  return g;
-}
-
-// Слой «мероприятие сегодня»: сцена на крыше отеля + фургон в пути
-function buildEvent() {
-  const g = new THREE.Group();
-  const top = roots.hotel.userData.top;
-  const st = new THREE.Group();
-  st.position.set(-20, top, -14);
-  box(st, M.card, 6, 0.5, 4, 0, 0, 0.6, EDGE);
-  box(st, M.card, 6.4, 3.2, 0.25, 0, 0, -1.7, EDGE);
-  box(st, M.night, 0.7, 1.8, 0.7, -3.6, 0, 0.8);
-  box(st, M.night, 0.7, 1.8, 0.7, 3.6, 0, 0.8);
-  box(st, M.ok, 0.5, 0.5, 0.5, 2.4, 0.5, 2);
-  label(st, 'идёт', 'live', 2.4, 1.2, 2);
-  g.add(st);
-  labels.event = label(g, '<b>Bionorica Workshop · Double Tree by HILTON · 12.10</b><span>Jupiter&amp;Uranus</span>', 'tag tag--event', -20, top + 5, -14);
-
-  const van = makeVan({ hex: T.card, kind: 'van' });
+  // Bongo 3 стоит в своём проёме носом наружу
+  const van = makeCar(CARS[VAN], true);
   g.add(van);
-  W.van = van;
+  // Люди: трое ходят между офисом и складом, шестеро стоят, четверо с кейсами — бригада у рампы склада
+  const walkers = [
+    [[0, 14.5], [0, -4.5], 0], [[-0.4, -3.5], [-0.4, 13], 4], [[-8.3, 13], [-8.3, 4], 2],
+  ].map(([a, b, ph], i) => ({ p: makePerson(g, a[0], a[1], 0, CLOTH[i % 3]), pts: [a, b], ph }));
+  [[-13.2, 14.3, 2.6], [-12.4, 14.9, -1.8], [-3.6, 5, 1.2], [-2.6, 5.6, -2.3], [-21.9, 15.6, 0.4], [6, 13.6, 2.8]]
+    .forEach(([x, z, r], i) => makePerson(g, x, z, r, CLOTH[(i + 1) % 3]));
+  const crew = [[12.5, -2.2], [14, -2], [15.5, -2.3], [17, -2]].map((h, i) => {
+    const fin = [[-17.2, -0.7], [-15.9, -0.2], [-14.5, -0.7], [-13.2, -0.2]][i];
+    return { p: makePerson(g, h[0], h[1], 0.3, CLOTH[i % 3], true), pts: [h, [-5, 3], fin], home: h };
+  });
+  W.life = { van, walkers, crew };
   return g;
 }
 
-function buildGarage() {
+function buildGarageView() {
   const g = new THREE.Group();
   ground(g, 44);
-  const wall = lam(T.card);
-  box(g, wall, 40, 4.5, 0.3, 0, 0, -5.5, EDGE);
-  box(g, M.night, 40, 0.4, 0.34, 0, 0, -5.5);
-  box(g, wall, 0.3, 4.5, 10, -20, 0, -0.5, EDGE);
-  box(g, wall, 0.3, 4.5, 10, 20, 0, -0.5, EDGE);
+  const k = kit(), wall = own(T.card);
+  k(wall, 40, 4.5, 0.3, 0, 0, -5.5, EDGE);
+  k(DARK, 40, 0.4, 0.34, 0, 0, -5.5);
+  k(wall, 0.3, 4.5, 10, -20, 0, -0.5, EDGE);
+  k(wall, 0.3, 4.5, 10, 20, 0, -0.5, EDGE);
   const step = 4.4;
-  for (let i = 0; i <= 6; i++) path(g, -13.2 + i * step - 0.05, -4, -13.2 + i * step + 0.05, 4.2, 0.1);
+  for (let i = 0; i <= 6; i++) k(flat(T.line), 0.12, 0.04, 8, (i - 3) * step, 0, 0.1);
+  k.into(g);
   CARS.forEach((c, i) => {
-    const v = makeVan(c);
+    const v = makeCar(c);
     v.position.set((i - 2.5) * step, 0, 0);
     v.userData.id = 'car' + i;
     roots['car' + i] = v;
@@ -478,8 +831,7 @@ function hasGL() {
 
 // Камера по виду: направление (сверху-сбоку), цель, охват сцены в метрах — дистанция подбирается под аспект
 const CAM = {
-  campus: { dir: [0.62, 0.5, 0.6], target: [-4, 4, 0], span: [62, 58], min: 22, max: 220 },
-  event: { dir: [0.52, 0.5, 0.68], target: [-8, 7, -1], span: [60, 60], min: 22, max: 220 },
+  campus: { dir: [0.6, 0.5, 0.64], target: [-3, 12, -1], span: [54, 60], min: 22, max: 220 },
   garage: { dir: [0.04, 0.46, 0.89], target: [0, 1.2, 0.5], span: [28, 9], min: 8, max: 70 },
 };
 
@@ -508,16 +860,15 @@ function initWorld() {
   controls.maxPolarAngle = 1.38;          // не под землю
   controls.addEventListener('start', () => { state.userMoved = true; });
 
-  W = { renderer, css2d, scene, camera, controls };
+  W = { renderer, css2d, scene, camera, controls, elapsed: 0 };
   W.campus = buildCampus();
-  W.event = buildEvent();
-  W.garage = buildGarage();
-  scene.add(W.campus, W.event, W.garage);
+  W.garage = buildGarageView();
+  scene.add(W.campus, W.garage);
+  homeLife();
 
-  // Кликабельное — только корпуса объектов; рёбра и земля в raycast не идут
+  // Кликабельное — только меши объектов; рёбра и земля в raycast не идут
   const collect = (ids, list) => ids.forEach((id) => roots[id].traverse((o) => { if (o.isMesh) { o.userData.root = id; list.push(o); } }));
-  collect(['office', 'warehouse', 'garage', 'hotel'], pickables.campus);
-  pickables.event = pickables.campus;
+  collect(['office', 'warehouse', 'garage', 'hotel', 'stage'], pickables.campus);
   collect(CARS.map((_, i) => 'car' + i), pickables.garage);
 
   new ResizeObserver(([e]) => {
@@ -542,7 +893,8 @@ function initWorld() {
     bounds.set(THREE.MathUtils.clamp(t.x, -40, 40), THREE.MathUtils.clamp(t.y, 0, 14), THREE.MathUtils.clamp(t.z, -40, 40));
     shift.subVectors(bounds, t);
     if (shift.lengthSq() > 0) { t.add(shift); camera.position.add(shift); }
-    if (state.view === 'event') driveVan(timer.getElapsed(), dt);
+    W.elapsed = timer.getElapsed();
+    tickLife(W.elapsed, dt, now);
     renderer.render(scene, camera);
     css2d.render(scene, camera);
   });
@@ -561,23 +913,76 @@ function placeCamera() {
   controls.update();
 }
 
-// Фургон: гараж → дорога → отель и обратно, ~12 с на круг. Reduced motion — стоит у отеля.
-const ROUTE = [[8, 18], [-9, 18], [-9, -11], [-9, 18], [8, 18]];
-const SEG = ROUTE.slice(1).map((p, i) => Math.hypot(p[0] - ROUTE[i][0], p[1] - ROUTE[i][1]));
-const ROUTE_LEN = SEG.reduce((a, b) => a + b, 0);
-let vanYaw = -Math.PI / 2;
-function driveVan(time, dt) {
-  const v = W.van;
-  if (reduced) { v.position.set(-9, 0, -10); v.rotation.y = Math.PI; return; }
-  let s = ((time % 12) / 12) * ROUTE_LEN, i = 0;
-  while (s > SEG[i]) { s -= SEG[i]; i++; }
-  const [a, b] = [ROUTE[i], ROUTE[i + 1]], k = s / SEG[i];
-  v.position.set(a[0] + (b[0] - a[0]) * k, 0, a[1] + (b[1] - a[1]) * k);
-  const want = Math.atan2(b[0] - a[0], b[1] - a[1]);
-  let d = want - vanYaw;
-  d = Math.atan2(Math.sin(d), Math.cos(d));   // кратчайший поворот
-  vanYaw += d * Math.min(1, dt * 7);
-  v.rotation.y = vanYaw;
+/* ============== Жизнь кампуса: фургон, бригада, прохожие, появление сцены ============== */
+// Маршрут Bongo: из проёма → дорога → поперечная → к сцене.
+const HOME = [12 + bayX(VAN), 10.25];
+// Обратно — разворот в три приёма: задом на площадь, вперёд на поперечную, домой, задом в проём.
+const OUT = [HOME, [HOME[0], 18], [-7.5, 18], [-7.5, -2.2]];
+const BACK = [[-7.5, -2.2], [-10.6, 1], [-7.5, 4.5], [-7.5, 18], [HOME[0], 18], HOME];
+const OUT_LEN = pathLen(OUT), BACK_LEN = pathLen(BACK), LEG_FIRST = pathLen(BACK.slice(0, 2)), LEG_LAST = pathLen(BACK.slice(-2));
+const CYCLE = 16, DRIVE = 6.5, STOP = 2;           // 6,5 с туда, 2 с у сцены, 6,5 с обратно, 1 с в гараже
+let vanYaw = 0;
+// cubic-bezier(.2,.8,.2,1) = --ease-out: x(s) решаем делением пополам
+const bz = (s, a, b) => 3 * a * s * (1 - s) ** 2 + 3 * b * s * s * (1 - s) + s ** 3;
+function easeOut(t) {
+  let lo = 0, hi = 1, s = t;
+  for (let i = 0; i < 18; i++) { s = (lo + hi) / 2; if (bz(s, 0.2, 0.2) < t) lo = s; else hi = s; }
+  return bz(s, 0.8, 1);
+}
+
+function homeLife() {
+  const { van, crew } = W.life;
+  van.position.set(HOME[0], 0, HOME[1]);
+  van.rotation.y = vanYaw = 0;
+  crew.forEach((c) => { c.p.position.set(c.home[0], 0, c.home[1]); c.p.rotation.y = 0.3; pose(c.p, 0); });
+}
+
+function tickLife(time, dt, now) {
+  const { van, walkers, crew } = W.life;
+  // Сцена растёт из земли за 400 мс (--ease-out); при reduced motion — сразу
+  if (W.pop) {
+    const k = reduced ? 1 : Math.min(1, (now - W.pop.t0) / 400), e = easeOut(k), s = W.pop.on ? e : 1 - e;
+    roots.stage.scale.setScalar(Math.max(s, 0.001));
+    roots.stage.visible = s > 0.001;
+    if (k >= 1) W.pop = null;
+  }
+  // Прохожие ходят туда-обратно всегда
+  for (const w of walkers) {
+    if (reduced) break;
+    const L = pathLen(w.pts), d = ((time * 1.3 + w.ph) % (2 * L));
+    const [x, z, yaw] = d < L ? along(w.pts, d) : along(w.pts.slice().reverse(), d - L);
+    w.p.position.set(x, 0, z); w.p.rotation.y = yaw; pose(w.p, time + w.ph);
+  }
+  if (!state.event) return;
+  const t = time - W.evT0;
+  // Бригада идёт к сцене с кейсами и остаётся
+  crew.forEach((c, i) => {
+    const d = reduced ? 1e3 : Math.max(0, t - i * 0.4) * 4;
+    const [x, z, yaw, done] = along(c.pts, d);
+    c.p.position.set(x, 0, z);
+    c.p.rotation.y = done ? Math.PI : yaw;
+    pose(c.p, done ? 0 : time);
+  });
+  // Фургон
+  let pos, rev = false;
+  if (reduced) pos = [OUT.at(-1)[0], OUT.at(-1)[1], Math.PI];
+  else {
+    const c = t % CYCLE;
+    if (c < DRIVE) pos = along(OUT, (c / DRIVE) * OUT_LEN);
+    else if (c < DRIVE + STOP) pos = along(OUT, OUT_LEN);
+    else if (c < 2 * DRIVE + STOP) {
+      const d = ((c - DRIVE - STOP) / DRIVE) * BACK_LEN;
+      pos = along(BACK, d);
+      // задом: первый отрезок (от сцены) и последний (в проём)
+      rev = d < LEG_FIRST || d > BACK_LEN - LEG_LAST;
+    } else pos = [HOME[0], HOME[1], 0];
+  }
+  const [x, z, dir] = pos;
+  van.position.set(x, 0, z);
+  const want = rev ? dir + Math.PI : dir;
+  let d = Math.atan2(Math.sin(want - vanYaw), Math.cos(want - vanYaw));   // кратчайший поворот
+  vanYaw += reduced ? d : d * Math.min(1, dt * 7);
+  van.rotation.y = vanYaw;
 }
 
 /* ============== Наведение, выбор, клавиатура ============== */
@@ -586,7 +991,8 @@ function pickAt(ev) {
   const r = W.renderer.domElement.getBoundingClientRect();
   ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
   ray.setFromCamera(ndc, W.camera);
-  const hit = ray.intersectObjects(pickables[state.view], false)[0];
+  // raycast не смотрит на visible: сцену без мероприятия отсекаем руками
+  const hit = ray.intersectObjects(pickables[state.view], false).find((h) => h.object.userData.root !== 'stage' || state.event);
   return hit ? hit.object.userData.root : null;
 }
 function bindPointer() {
@@ -605,7 +1011,7 @@ function bindPointer() {
 
 function nameOf(id) {
   if (id.startsWith('car')) { const c = CARS[+id.slice(3)]; return `${c.brand} ${c.model} · ${c.plate}`; }
-  return SITES.find((s) => s.id === id).name;
+  return NAMES[id];
 }
 
 function paint(id) {
@@ -676,11 +1082,11 @@ function renderPanel() {
 }
 panel.addEventListener('click', (e) => { const b = e.target.closest('[data-stub]'); if (b) toast(`${b.dataset.stub} — в макете не подключено`); });
 
-/* ============== Вкладки и нижняя панель ============== */
+/* ============== Вкладки, тумблер, нижняя панель ============== */
 function renderDock() {
   const items = state.view === 'garage'
     ? CARS.map((c, i) => `<button type="button" class="chip chip--plate" data-id="car${i}" aria-pressed="${state.sel === i}" aria-label="${c.brand} ${c.model}, госномер ${c.plate}">${c.plate}</button>`)
-    : SITES.map((s) => `<button type="button" class="chip" data-id="${s.id}">${s.name}</button>`);
+    : [...SITES.map((s) => s.id), ...(state.event ? ['stage'] : [])].map((id) => `<button type="button" class="chip" data-id="${id}">${NAMES[id]}</button>`);
   dock.innerHTML = items.join('');
 }
 // Фокус кнопки = подсветка объекта в 3D, Enter/клик = выбор
@@ -689,6 +1095,29 @@ dock.addEventListener('focusout', () => setHover(null));
 dock.addEventListener('mouseover', (e) => { const b = e.target.closest('[data-id]'); if (b) setHover(b.dataset.id); });
 dock.addEventListener('mouseleave', () => { if (!dock.contains(document.activeElement)) setHover(null); });
 dock.addEventListener('click', (e) => { const b = e.target.closest('[data-id]'); if (b) activate(b.dataset.id); });
+
+function renderCap() {
+  const c = CAPS[state.view === 'garage' ? 'garage' : state.event ? 'event' : 'campus'];
+  $('cap').innerHTML = `<b>${c[0]}</b><span>${c[1]}</span>`;
+}
+
+// Мероприятие сегодня: слой поверх кампуса, а не отдельный вид
+function setEvent(on) {
+  state.event = on;
+  evSwitch.setAttribute('aria-checked', String(on));
+  $('today').hidden = !on;
+  if (state.hover === 'stage') setHover(null);
+  renderCap();
+  if (state.view === 'campus') renderDock();
+  if (!W) return;
+  for (const s of SITES) if (s.ev) labels[s.id].element.querySelector('span').textContent = on ? s.ev : s.sub;
+  labels.hotel.visible = !on;
+  labels.event.visible = on;
+  W.pop = { on, t0: performance.now() };
+  if (on) { roots.stage.visible = true; W.evT0 = W.elapsed; }
+  if (!on) homeLife();
+}
+evSwitch.addEventListener('click', () => setEvent(!state.event));
 
 const tabs = [...document.querySelectorAll('[role="tab"]')];
 function setView(view, focusTab) {
@@ -703,15 +1132,13 @@ function setView(view, focusTab) {
   stageEl.setAttribute('aria-labelledby', 'tab-' + view);
   app.classList.toggle('is-garage', view === 'garage');
   panel.hidden = view !== 'garage';
-  $('today').hidden = view !== 'event';
-  $('cap').innerHTML = `<b>${VIEW_CAP[view][0]}</b><span>${VIEW_CAP[view][1]}</span>`;
+  evSwitch.hidden = view === 'garage';
+  renderCap();
   renderDock();
   renderPanel();
   if (W) {
-    W.campus.visible = view !== 'garage';
-    W.event.visible = view === 'event';
+    W.campus.visible = view === 'campus';
     W.garage.visible = view === 'garage';
-    labels.hotel.visible = view !== 'event';   // в день мероприятия над отелем — табличка события
     state.userMoved = false;
     placeCamera();
   }
@@ -735,6 +1162,7 @@ sceneEl.addEventListener('keydown', (e) => {
 });
 
 if (hasGL()) initWorld();
+if (location.hash === '#debug') window.__world = W;   // для проверок: число мешей, позиция фургона
 else sceneEl.innerHTML = '<p class="fallback">3D недоступно — объекты доступны кнопками внизу</p>';
 setView('campus');
 </script>
