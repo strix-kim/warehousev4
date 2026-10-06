@@ -41,7 +41,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 svg.i{width:1.15em;height:1.15em;flex:none;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 [hidden]{display:none!important}
-.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.vh{position:absolute!important;top:0;left:0;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* Кнопки и госномер — из s31 */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 16px;border-radius:11px;border:1px solid transparent;font:600 14px/1 var(--f-text);white-space:nowrap;transition:background-color .12s,border-color .12s,transform .12s var(--ease-out)}
@@ -62,21 +62,76 @@ svg.i{width:1.15em;height:1.15em;flex:none;stroke:currentColor;fill:none;stroke-
 .plate--lg i::before{width:20px;height:13px}
 
 /* =========================================================
-   1. Каркас: шапка + рабочая область
+   1. Оболочка приложения — из redesign-s31: сайдбар, контент, нижние вкладки.
+      Второй вариант (body.nav-top) — та же навигация узкой полосой сверху.
    ========================================================= */
 html,body{height:100%}
-body{display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
-.top{display:flex;align-items:center;gap:12px 16px;padding:12px 20px;background:var(--card);border-bottom:1px solid var(--line);position:relative;z-index:5}
-.brand{display:flex;align-items:center;gap:12px;min-width:0;margin-right:auto}
-.brand svg{width:40px;height:24px;color:var(--red);flex:none}
-.brand b{font:800 17px/1.1 var(--f-display);letter-spacing:-.02em;white-space:nowrap}
-.brand small{font:600 12px/1 var(--f-text);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
-.tabs{display:inline-flex;padding:3px;gap:2px;border-radius:12px;background:var(--card);border:1px solid var(--line)}
-.tabs button{min-height:36px;padding:0 14px;border:0;border-radius:9px;background:transparent;font:600 14px/1 var(--f-text);color:var(--muted);white-space:nowrap}
-.tabs button[aria-selected="true"]{background:var(--night);color:#fff}
-.tabs button:hover:not([aria-selected="true"]){background:var(--hover);color:var(--ink)}
+body{overflow:hidden}
+.shell{display:grid;grid-template-columns:248px minmax(0,1fr);height:100%}
+body.nav-top .shell{grid-template-columns:minmax(0,1fr);grid-template-rows:56px minmax(0,1fr)}
+body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
+
+/* Сайдбар — дословно s31; знак — ArgoDots, как в продукте */
+.u-side{background:var(--night);color:var(--on-night);display:flex;flex-direction:column;padding:22px 14px 16px;gap:4px;min-height:0;position:relative;overflow:hidden}
+.u-side::after{content:"";position:absolute;left:-40px;right:-40px;bottom:0;height:260px;background:radial-gradient(ellipse 60% 80% at 20% 100%,rgba(229,45,39,.16),transparent 70%);pointer-events:none}
+.u-brand{display:flex;align-items:center;gap:12px;color:var(--on-night)}
+.u-brand svg{width:40px;height:24px;display:block;flex:none}
+.u-brand small{font:600 11px/1 var(--f-text);letter-spacing:.14em;text-transform:uppercase;color:var(--on-night-2)}
+.u-side .u-brand{padding:4px 10px 22px}
+.u-side__group{font:600 11px/1 var(--f-text);letter-spacing:.14em;text-transform:uppercase;color:var(--on-night-2);padding:18px 12px 8px}
+.u-nav{display:flex;align-items:center;gap:12px;min-height:40px;padding:0 12px;border:0;border-radius:10px;background:transparent;color:var(--on-night);font:500 14px/1 var(--f-text);position:relative;text-align:left;white-space:nowrap}
+.u-nav svg{color:var(--on-night-2)}
+.u-nav:hover{background:var(--night-2)}
+.u-nav.is-on{background:var(--night-3);font-weight:600}
+.u-nav.is-on svg{color:#fff}
+.u-nav.is-on::before{content:"";position:absolute;left:-14px;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--red)}
+.u-nav em{margin-left:auto;font:600 12px/1 var(--f-text);font-style:normal;color:var(--on-night-2)}
+.u-side__new{margin-top:14px;display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;border:1px solid var(--night-line);background:rgba(255,255,255,.02);color:var(--on-night);text-align:left}
+.u-side__new span.plus{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:var(--red-act);color:#fff}
+.u-side__new b{display:block;font:600 14px/1.2 var(--f-text)}
+.u-side__new small{display:block;font:400 12px/1.3 var(--f-text);color:var(--on-night-2)}
+.u-side__foot{margin-top:auto;display:grid;gap:10px;position:relative;z-index:1}
+.u-loc{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--night-line);font:600 13px/1 var(--f-text)}
+.u-loc svg{color:var(--on-night-2)}
+.u-lang{display:grid;grid-template-columns:1fr 1fr;padding:3px;border-radius:12px;border:1px solid var(--night-line)}
+.u-lang button{min-height:32px;padding:0 10px;border:0;border-radius:9px;background:transparent;color:var(--on-night-2);font:700 12px/1 var(--f-text);letter-spacing:.06em}
+.u-lang button[aria-pressed="true"]{background:#fff;color:var(--ink)}
+.u-user{display:flex;align-items:center;gap:10px;padding:10px 6px 0;border-top:1px solid var(--night-line)}
+.u-ava{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#3A3F48;color:#fff;font:700 12px/1 var(--f-text);flex:none}
+.u-user b{display:block;font:600 13px/1.2 var(--f-text)}
+.u-user small{display:block;font:400 12px/1.2 var(--f-text);color:var(--on-night-2)}
+.u-out{margin-left:auto;width:36px;height:36px;border:0;border-radius:10px;background:transparent;color:var(--on-night-2);display:grid;place-items:center}
+.u-out:hover{background:var(--night-2);color:var(--on-night)}
+
+/* Верхняя полоса: тот же хром лентой 56 px. Шапка страницы под ней — без своего фона,
+   иначе две полосы хрома подряд. */
+.u-topbar{display:flex;align-items:center;gap:20px;padding:0 14px 0 22px;background:var(--night);color:var(--on-night);min-width:0}
+.u-topbar nav{display:flex;gap:2px;min-width:0;overflow-x:auto;scrollbar-width:none}
+.u-topbar nav::-webkit-scrollbar{display:none}
+.u-topbar .u-nav{min-height:36px;padding:0 11px;gap:8px;font-size:13.5px}
+.u-topbar .u-nav.is-on::before{left:11px;right:11px;top:auto;bottom:-10px;width:auto;height:3px;border-radius:3px 3px 0 0}
+.u-top-end{margin-left:auto;display:flex;align-items:center;gap:10px;flex:none}
+.u-topbar .u-lang{width:84px}
+.u-topbar .u-lang button{min-height:28px}
+
+/* Контент */
+.u-main{min-width:0;min-height:0;display:flex;flex-direction:column;padding:26px 32px 28px}
+.page{flex:1;min-height:0;display:flex;flex-direction:column}
+.u-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px 20px;margin-bottom:18px;flex-wrap:wrap}
+.u-eyebrow{font:600 11.5px/1 var(--f-text);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.u-h1{font:800 32px/1.08 var(--f-display);letter-spacing:-.035em;display:flex;align-items:center;gap:12px}
+.u-sub{margin-top:8px;color:var(--muted);font-size:14px}
+.u-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.count{display:inline-grid;place-items:center;min-width:28px;height:26px;padding:0 8px;border-radius:999px;background:var(--select);color:var(--ink);font:700 13px/1 var(--f-text);letter-spacing:0;font-variant-numeric:tabular-nums}
+.btn--primary{background:var(--red-act);color:#fff}
+.btn--primary:hover{background:var(--red-press)}
+.btn--sm{min-height:32px;padding:0 11px;font-size:13px;border-radius:9px}
+.field{display:flex;align-items:center;gap:10px;min-height:40px;width:260px;padding:0 12px;border:1px solid var(--ctl);border-radius:11px;background:var(--card);color:var(--faint)}
+.field input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font:400 14px/1 var(--f-text)}
+.field input::placeholder{color:var(--faint)}
+.field:focus-within{outline:2px solid var(--focus);outline-offset:2px}
 .ev{display:flex;align-items:center;gap:10px}
-/* Тумблер «Сегодня мероприятие»: выкл — дорожка --ctl, вкл — чёрная */
+/* Тумблер дня мероприятия: выкл — дорожка --ctl, вкл — чёрная */
 .switch{display:inline-flex;align-items:center;gap:10px;min-height:40px;padding:0 12px 0 8px;border:0;border-radius:11px;background:transparent;font:600 14px/1 var(--f-text);color:var(--ink);white-space:nowrap}
 .switch:hover{background:var(--hover)}
 .switch .trk{position:relative;flex:none;width:40px;height:24px;border-radius:999px;background:var(--ctl);transition:background-color .18s var(--ease-out)}
@@ -86,29 +141,53 @@ body{display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
 .today{display:inline-flex;align-items:center;gap:8px;min-height:32px;padding:0 12px;border-radius:999px;background:var(--ok-bg);color:var(--ok);font:600 13px/1 var(--f-text);white-space:nowrap}
 .today::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok-dot)}
 
-.app{display:grid;grid-template-columns:minmax(0,1fr);min-height:0}
-.app.is-garage{grid-template-columns:minmax(0,1fr) 420px;gap:16px;padding:16px}
-.stage{position:relative;min-height:0;overflow:hidden;background:var(--bg)}
-.app.is-garage .stage{border:1px solid var(--line);border-radius:var(--r-lg)}
+/* Сцена — один renderer на всё приложение: узел переезжает между слотами страниц */
+.slot{flex:1;min-height:0;display:grid}
+.stage{position:relative;min-height:0;overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-lg)}
 .scene{position:absolute;inset:0}
 .scene:focus-visible{outline-offset:-3px}
 .scene canvas{display:block;touch-action:none}
 .scene.is-pick canvas{cursor:pointer}
 .labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-.fallback{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);font:600 15px/1.5 var(--f-text);padding:24px}
 .cap{position:absolute;left:16px;top:14px;display:grid;gap:2px;pointer-events:none}
 .cap b{font:800 18px/1.15 var(--f-display);letter-spacing:-.02em}
 .cap span{font:500 12.5px/1.3 var(--f-text);color:var(--muted)}
+.stage-btn{position:absolute;right:12px;top:12px;background:rgba(255,255,255,.92)}
 
-/* Нижняя панель — клавиатурный и текстовый путь к каждому объекту сцены */
+/* Нижний ряд сцены — клавиатурный и текстовый путь к каждому объекту */
 .dock{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:center;padding:12px 16px;overflow-x:auto;scrollbar-width:none}
 .dock::-webkit-scrollbar{display:none}
 .chip{flex:none;display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border:1px solid var(--line);border-radius:999px;background:var(--card);font:600 14px/1 var(--f-text);color:var(--ink);box-shadow:0 1px 2px rgba(15,17,21,.05)}
 .chip:hover{border-color:var(--ctl)}
 .chip--plate{font:600 13.5px/1 var(--f-mono);letter-spacing:.02em}
 .chip[aria-pressed="true"]{background:var(--night);border-color:var(--night);color:#fff}
-.toast{position:absolute;left:50%;bottom:72px;transform:translate(-50%,8px);opacity:0;padding:10px 16px;border-radius:12px;background:var(--night);color:var(--on-night);font:500 14px/1.3 var(--f-text);white-space:nowrap;pointer-events:none;transition:opacity .18s,transform .18s var(--ease-out)}
+.toast{position:fixed;left:50%;bottom:28px;z-index:80;transform:translate(-50%,8px);opacity:0;padding:10px 16px;border-radius:12px;background:var(--night);color:var(--on-night);font:500 14px/1.3 var(--f-text);white-space:nowrap;pointer-events:none;transition:opacity .18s,transform .18s var(--ease-out)}
 .toast.is-on{opacity:1;transform:translate(-50%,0)}
+
+/* Главная: откат без 3D — плитки s31 с числами home_summary */
+.home-list{display:grid;gap:14px;align-content:start}
+.home-list__bar{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;color:var(--muted);font:500 14px/1.3 var(--f-text)}
+.p-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.p-tile{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;display:grid;gap:10px;min-height:150px;align-content:space-between;justify-items:start;text-align:left;color:var(--ink)}
+.p-tile:hover{border-color:var(--ctl)}
+.p-tile svg.i{width:22px;height:22px}
+.p-tile b{font:800 30px/1 var(--f-display);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.p-tile span{font:600 14px/1.2 var(--f-text)}
+.p-tile small{color:var(--faint);font-size:12.5px;display:block;margin-top:4px}
+.p-tile small.warn{color:var(--warn)}
+.p-tile--dark{background:var(--ink);border-color:var(--ink);color:#fff}
+.p-tile--dark:hover{border-color:var(--ink)}
+.p-tile--dark small{color:var(--on-night-2)}
+.p-tile--wide{grid-column:span 2;min-height:0;grid-template-columns:1fr auto;align-items:center;justify-items:stretch}
+.hallsdots{display:flex;gap:5px}
+.hallsdots i{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font:700 11px/1 var(--f-text);font-style:normal;color:#fff;background:var(--c)}
+.page-home.is-list .slot,.no-gl .slot{display:none!important}
+
+/* Переключатель вариантов оболочки — только макет */
+.mock-nav{position:fixed;right:16px;bottom:16px;z-index:90;display:flex;align-items:center;gap:8px;padding:5px 5px 5px 12px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-pop);font:600 12px/1 var(--f-text);color:var(--muted)}
+.mock-nav div{display:inline-flex;padding:2px;gap:2px;border-radius:10px;background:var(--sunk)}
+.mock-nav button{min-height:30px;padding:0 11px;border:0;border-radius:8px;background:transparent;font:600 13px/1 var(--f-text);color:var(--muted)}
+.mock-nav button[aria-pressed="true"]{background:var(--night);color:#fff}
 
 /* Таблички CSS2D. Слой не ловит мышь — всё решает raycast по 3D. */
 .tag{pointer-events:none;display:grid;gap:1px;padding:7px 11px 8px;margin-bottom:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);box-shadow:0 2px 8px rgba(15,17,21,.06);white-space:nowrap;transition:border-color .12s,box-shadow .12s}
@@ -132,91 +211,190 @@ body{display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
 .ptag.is-sel b{border-color:var(--night-line)}
 
 /* =========================================================
-   2. Рабочая панель гаража — облик профиля машины из s31
+   2. Автомобили: сцена слева, справа карточка выбранной + реестр строками.
+      «Свернуть 3D» (.is-flat) — реестр на всю ширину, карточка остаётся справа.
    ========================================================= */
-.panel{display:flex;flex-direction:column;min-height:0;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
-.p-head{padding:22px;display:grid;grid-template-columns:auto 1fr;gap:16px;border-bottom:1px solid var(--line-2)}
-.p-photo{width:64px;height:64px;border-radius:14px;background:var(--sunk);border:1px solid var(--line-2);display:grid;place-items:center;color:var(--muted);font-size:26px}
-.p-name{font:800 24px/1.1 var(--f-display);letter-spacing:-.025em}
+.garage{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 400px;grid-template-rows:auto minmax(0,1fr);gap:16px}
+.garage>.slot{grid-row:1/3}
+.garage.is-flat>.slot{display:none}
+.garage.is-flat .g-list{grid-column:1;grid-row:1/3}
+.panel{grid-column:2;grid-row:1;display:flex;flex-direction:column;min-height:0;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.p-head{padding:18px 20px;display:grid;grid-template-columns:auto 1fr auto;gap:16px;border-bottom:1px solid var(--line-2)}
+.p-photo{width:56px;height:56px;border-radius:14px;background:var(--sunk);border:1px solid var(--line-2);display:grid;place-items:center;color:var(--muted);font-size:24px}
+.p-name{font:800 22px/1.1 var(--f-display);letter-spacing:-.025em}
 .p-role{color:var(--muted);margin-top:4px;font-size:14px}
-.p-plate{margin-top:14px}
-.p-body{flex:1;min-height:0;overflow:auto;padding:18px 22px}
-.p-body h4{font:600 11px/1 var(--f-text);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
-.kv{display:grid;grid-template-columns:130px minmax(0,1fr);gap:12px;align-items:center;min-height:44px;border-bottom:1px solid var(--line-2);margin:0}
+.p-plate{margin-top:12px}
+.p-close{display:none}
+.p-body{padding:8px 20px}
+.kv{display:grid;grid-template-columns:120px minmax(0,1fr);gap:12px;align-items:center;min-height:40px;border-bottom:1px solid var(--line-2);margin:0}
 .kv:last-child{border-bottom:0}
 .kv dt{color:var(--faint);font-size:13px}
 .kv dd{margin:0;font-weight:500;font-size:14px;display:flex;align-items:center;gap:8px}
-.kv dd.m{font-family:var(--f-mono)}
 .kv dd.q{color:var(--soft);font-weight:400}
-.sw{width:16px;height:16px;border-radius:5px;border:1px solid var(--line)}
-.p-foot{padding:14px 22px;border-top:1px solid var(--line-2);display:flex;gap:8px}
+.sw{width:16px;height:16px;border-radius:5px;border:1px solid var(--line);flex:none}
+.p-foot{padding:12px 20px 14px;border-top:1px solid var(--line-2);display:flex;gap:8px}
 .p-foot .btn{flex:1}
-.p-empty{flex:1;display:grid;place-content:center;justify-items:center;gap:8px;padding:32px;text-align:center}
+.p-empty{display:grid;justify-items:center;gap:6px;padding:26px 24px;text-align:center}
 .p-empty .p-photo{border-style:dashed;margin-bottom:6px}
-.p-empty h3{font-size:19px;font-weight:800}
+.p-empty h3{font-size:18px;font-weight:800}
 .p-empty p{color:var(--muted);font-size:14px}
 .p-empty kbd{font:600 12px/1 var(--f-mono);padding:3px 6px;border-radius:5px;border:1px solid var(--line);background:var(--sunk)}
 
+/* Реестр строками — текстовый путь к каждой машине */
+.g-list{grid-column:2;grid-row:2;display:flex;flex-direction:column;min-height:0;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.g-list__head,.car-row{display:grid;grid-template-columns:168px minmax(0,1fr);gap:14px;align-items:center;padding:0 16px}
+.g-list__head{min-height:40px;background:var(--sunk);border-bottom:1px solid var(--line);font:600 11px/1 var(--f-text);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.g-rows{flex:1;min-height:0;overflow:auto;position:relative}
+.car-row{width:100%;min-height:58px;border:0;border-bottom:1px solid var(--line-2);background:transparent;text-align:left;color:var(--ink);position:relative}
+.car-row:hover{background:var(--sunk)}
+.car-row[aria-selected="true"]{background:var(--select)}
+.car-row[aria-selected="true"]::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--red)}
+.c-name b{display:block;font-weight:600;font-size:14.5px}
+.c-name small{display:flex;align-items:center;gap:6px;margin-top:3px;color:var(--faint);font-size:12.5px}
+.c-name small .sw{width:12px;height:12px;border-radius:4px}
+.c-col,.c-drv,.c-files{display:none;font-size:14px}
+.c-drv,.c-files{color:var(--soft)}
+.c-col{align-items:center;gap:8px}
+.garage.is-flat .g-list__head,.garage.is-flat .car-row{grid-template-columns:168px minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) 90px}
+.garage.is-flat .c-col{display:flex}
+.garage.is-flat .c-drv,.garage.is-flat .c-files{display:block}
+.garage.is-flat .c-name small{display:none}
+.g-list__head span{font:inherit;color:inherit}
+.g-none{padding:22px 16px;color:var(--muted);font-size:14px}
+
 /* =========================================================
-   3. Телефон 390: колонки становятся строками, панель — листом
+   3. Телефон 390: нижние вкладки s31, сцена картой сверху, карточка — лист снизу
    ========================================================= */
 @media (max-width:640px){
-  body{display:block;height:auto;overflow-x:hidden;overflow-y:auto}
-  html{height:auto}
-  .top{flex-wrap:wrap;padding:10px 16px}
-  .brand small{display:none}
-  .tabs{order:3;width:100%;display:grid;grid-template-columns:repeat(2,1fr)}
-  .ev{order:2;width:100%;flex-direction:row-reverse;justify-content:space-between;gap:8px}
-  .switch{padding-left:0}
-  .today .l-long{display:none}
-  .app,.app.is-garage{display:block;padding:0}
-  .stage{height:calc(100svh - 160px);min-height:420px}
-  .app.is-garage .stage{height:52svh;min-height:320px;border:0;border-radius:0}
-  .dock{justify-content:flex-start}
-  .app.is-garage .dock{padding-bottom:28px}
-  .app.is-garage .toast{bottom:88px}
-  .panel{position:relative;z-index:3;margin-top:-18px;border-radius:var(--r-xl) var(--r-xl) 0 0;border-bottom:0;box-shadow:var(--shadow-pop);min-height:48svh}
-  .p-head,.p-body{padding-inline:18px}
-  .p-foot{padding:14px 18px 22px}
-  .kv{grid-template-columns:110px minmax(0,1fr)}
+  html,body{height:auto}
+  body{overflow-x:hidden;overflow-y:auto}
+  .shell,body.nav-top .shell{display:block;height:auto;padding-bottom:84px}
+  .u-side,.u-topbar,.mock-nav{display:none!important}
+  .u-main{padding:18px 16px 16px}
+  .u-head{margin-bottom:14px}
+  .u-h1{font-size:28px}
+  .u-actions{justify-content:flex-start;width:100%}
+  .field{width:100%}
+  .ev{width:100%;flex-direction:row-reverse;justify-content:space-between;gap:8px}
+  .switch{padding-left:0;white-space:normal;text-align:left;line-height:1.25}
+  .slot{display:block}
+  .page-home .stage{height:45svh;min-height:300px}
+  .page-home.is-list .slot{display:block}
+  .stage-btn,.home-list__bar{display:none}
+  .home-list{margin-top:14px}
+  .home-list[hidden]{display:grid!important}
+  .p-tiles{grid-template-columns:1fr 1fr;gap:10px}
+  .p-tile{min-height:118px;padding:14px}
+  .p-tile b{font-size:26px}
+  .p-tile--wide{grid-column:1/-1}
   .cap b{font-size:16px}
-  /* 6 номеров в 390 не помещаются — на телефоне виден только наведённый/выбранный, остальные в нижней панели */
+  .toast{bottom:96px}
+  .garage,.garage.is-flat{display:block}
+  .garage .stage{height:40svh;min-height:280px}
+  .g-list{margin-top:14px}
+  .garage.is-flat .g-list__head{display:none}
+  .garage.is-flat .car-row{grid-template-columns:168px minmax(0,1fr)}
+  .garage.is-flat .c-col,.garage.is-flat .c-drv,.garage.is-flat .c-files{display:none}
+  .garage.is-flat .c-name small{display:flex}
+  .g-rows{overflow:visible}
+  /* Карточка — лист снизу только при выбранной машине */
+  .panel{position:fixed;left:0;right:0;bottom:0;z-index:60;max-height:72svh;overflow:auto;border-radius:var(--r-xl) var(--r-xl) 0 0;border-bottom:0;box-shadow:var(--shadow-pop)}
+  .panel.is-empty{display:none}
+  .p-close{display:grid;place-items:center;width:40px;height:40px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font-size:20px;line-height:1}
+  .p-head,.p-body{padding-inline:18px}
+  .p-head{grid-template-columns:minmax(0,1fr) auto}
+  .p-head>.p-photo{display:none}
+  .p-foot{padding:12px 18px 22px}
+  .kv{grid-template-columns:110px minmax(0,1fr)}
+  /* 6 номеров в 390 не помещаются — виден только наведённый/выбранный, остальные в нижнем ряду */
   .ptag:not(.is-hot):not(.is-sel){opacity:0}
+  /* Нижние вкладки s31: 6 слотов */
+  .p-tabs{position:fixed;left:0;right:0;bottom:0;z-index:50;padding:6px 6px calc(10px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(6,1fr);background:rgba(250,251,252,.92);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-top:1px solid rgba(22,24,29,.08)}
+  .p-tab{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:52px;border:0;border-radius:14px;background:transparent;color:var(--muted);font:600 11px/1 var(--f-text)}
+  .p-tab svg.i{width:22px;height:22px}
+  .p-tab[aria-current="page"]{color:var(--ink);background:var(--select)}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}</script>
 </head>
 <body>
-<header class="top">
-  <div class="brand">
-    <svg id="argoDots" viewBox="0 0 420 249" fill="currentColor" aria-hidden="true" focusable="false"></svg>
-    <b>Воксельный мир</b><small>· макет с47</small>
-  </div>
-  <div class="ev">
-    <span class="today" id="today" hidden><span><span class="l-long">Сегодня: </span>1 мероприятие</span></span>
-    <button type="button" class="switch" id="evSwitch" role="switch" aria-checked="false"><span class="trk" aria-hidden="true"></span>Сегодня мероприятие</button>
-  </div>
-  <div class="tabs" role="tablist" aria-label="Вид мира" id="tabs">
-    <button type="button" role="tab" id="tab-campus" data-view="campus" aria-controls="stage" aria-selected="true">Кампус</button>
-    <button type="button" role="tab" id="tab-garage" data-view="garage" aria-controls="stage" aria-selected="false" tabindex="-1">Гараж</button>
-  </div>
-</header>
+<div class="shell">
+  <aside class="u-side" id="side" aria-label="Меню"></aside>
+  <header class="u-topbar" id="topbar"></header>
 
-<main class="app" id="app">
-  <section class="stage" id="stage" role="tabpanel" aria-labelledby="tab-campus">
-    <div class="scene" id="scene" tabindex="0" aria-roledescription="3D-сцена" aria-label="Сцена: тяни — вращать, колесо — масштаб, правая кнопка — сдвиг"></div>
-    <div class="cap" id="cap"></div>
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <nav class="dock" id="dock" aria-label="Объекты сцены"></nav>
-  </section>
-  <aside class="panel" id="panel" aria-label="Рабочая панель машины" hidden></aside>
-</main>
+  <main class="u-main">
+    <!-- Главная = кампус -->
+    <section class="page page-home" id="page-home" aria-labelledby="h-home">
+      <div class="u-head">
+        <div><div class="u-eyebrow">Офис · Ташкент</div><h1 class="u-h1" id="h-home">Главная</h1><p class="u-sub">Вторник, 6 октября · Добрый день, Дилноза</p></div>
+        <div class="u-actions ev">
+          <span class="today" id="today" hidden>Сегодня: 1 мероприятие</span>
+          <button type="button" class="switch" id="evSwitch" role="switch" aria-checked="false"><span class="trk" aria-hidden="true"></span>Показать день мероприятия (12.10)</button>
+        </div>
+      </div>
+      <div class="slot" id="slot-home">
+        <section class="stage" id="stage" aria-label="3D-мир">
+          <div class="scene" id="scene" tabindex="0" aria-roledescription="3D-сцена" aria-label="Сцена: тяни — вращать, колесо — масштаб, правая кнопка — сдвиг"></div>
+          <div class="cap" id="cap"></div>
+          <button type="button" class="btn btn--secondary btn--sm stage-btn" id="toList">Показать списком</button>
+          <nav class="dock" id="dock" aria-label="Объекты сцены"></nav>
+        </section>
+      </div>
+      <!-- Откат без WebGL / reduced-motion: плитки главной s31 -->
+      <div class="home-list" id="homeList" hidden>
+        <div class="home-list__bar"><span id="listNote">3D выключено — разделы списком</span><button type="button" class="btn btn--secondary btn--sm" id="toWorld">Показать 3D</button></div>
+        <div class="p-tiles">
+          <button type="button" class="p-tile p-tile--dark" data-go="equipment"><svg class="i"><use href="#i-boxes"/></svg><div><b>1 867</b><small>единиц · 217 моделей</small></div><span>Оборудование</span></button>
+          <button type="button" class="p-tile" data-go="lists"><svg class="i"><use href="#i-list"/></svg><div><b>6</b><small>последний 28.09</small></div><span>Списки</span></button>
+          <button type="button" class="p-tile" data-go="employees"><svg class="i"><use href="#i-users"/></svg><div><b>12</b><small class="warn">1 паспорт истекает</small></div><span>Сотрудники</span></button>
+          <button type="button" class="p-tile" data-go="vehicles"><svg class="i"><use href="#i-car"/></svg><div><b>6</b><small>9 водителей</small></div><span>Автомобили</span></button>
+          <button type="button" class="p-tile p-tile--wide" data-go="halls"><div><span>Залы</span><small>Форум в Hyatt · 8 залов · 2 наёма</small></div><span class="hallsdots"><i style="--c:#2563eb">1</i><i style="--c:#15803d">2</i><i style="--c:#c2410c">3</i><i style="--c:#9333ea">4</i><i style="--c:#C3C7CE;color:var(--ink)">+4</i></span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Автомобили = гараж -->
+    <section class="page page-vehicles" id="page-vehicles" aria-labelledby="h-veh" hidden>
+      <div class="u-head">
+        <div><div class="u-eyebrow">Люди и площадка</div><h1 class="u-h1" id="h-veh">Автомобили <span class="count">6</span></h1></div>
+        <div class="u-actions">
+          <label class="field"><svg class="i"><use href="#i-search"/></svg><input id="carSearch" type="search" placeholder="Госномер, бренд, модель" aria-label="Поиск машины"></label>
+          <button type="button" class="btn btn--secondary" id="flatBtn" aria-pressed="false">Свернуть 3D</button>
+          <button type="button" class="btn btn--primary" data-stub="Добавить машину"><svg class="i"><use href="#i-plus"/></svg>Добавить</button>
+        </div>
+      </div>
+      <div class="garage" id="garage">
+        <div class="slot" id="slot-garage"></div>
+        <aside class="panel" id="panel" aria-label="Карточка машины"></aside>
+        <section class="g-list" aria-label="Все машины">
+          <div class="g-list__head"><span>Госномер</span><span>Машина</span><span class="c-col">Цвет</span><span class="c-drv">Водитель</span><span class="c-files">Файлы</span></div>
+          <div class="g-rows" id="carList" role="listbox" aria-label="Машины"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <nav class="p-tabs" id="tabs" aria-label="Разделы"></nav>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="mock-nav" data-mock role="group" aria-label="Макет: вариант навигации">Навигация<div><button type="button" data-nav="side" aria-pressed="true">Сайдбар</button><button type="button" data-nav="top" aria-pressed="false">Верх</button></div></div>
 <p class="vh" id="hoverLive" aria-live="polite"></p>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-car" viewBox="0 0 24 24"><path d="M4 16.5V12l2-5.5h12l2 5.5v4.5"/><path d="M3 12h18"/><path d="M4 16.5h16"/><circle cx="7.5" cy="16.5" r="2"/><circle cx="16.5" cy="16.5" r="2"/></symbol>
   <symbol id="i-sheet" viewBox="0 0 24 24"><path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5"/><path d="M9 12h7M9 16h7M12.5 10.5V19"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v11.5h13V9"/><path d="M10 20.5v-6h4v6"/></symbol>
+  <symbol id="i-boxes" viewBox="0 0 24 24"><rect x="3" y="12.5" width="8" height="8" rx="1.5"/><rect x="13" y="12.5" width="8" height="8" rx="1.5"/><rect x="8" y="3.5" width="8" height="8" rx="1.5"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><rect x="5.5" y="4.5" width="13" height="16.5" rx="2"/><path d="M9 4.5V3h6v1.5"/><path d="M9 10h6M9 13.5h6M9 17h3.5"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.7a3.5 3.5 0 0 1 0 6.6M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></symbol>
+  <symbol id="i-screen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M12 16v4M8 20h8"/></symbol>
+  <symbol id="i-signal" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.8"/><path d="M8.6 8.6a4.8 4.8 0 0 0 0 6.8M15.4 8.6a4.8 4.8 0 0 1 0 6.8M5.7 5.7a8.9 8.9 0 0 0 0 12.6M18.3 5.7a8.9 8.9 0 0 1 0 12.6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-building" viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="1.5"/><path d="M9 20.5v-4h6v4M8 8h2M14 8h2M8 12h2M14 12h2"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="18.5" cy="12" r="1.6" fill="currentColor" stroke="none"/></symbol>
 </svg>
 
 <script type="module">
@@ -227,7 +405,6 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Знак ARGO — те же 57 точек, что в продукте (src/react/components/ArgoDots.tsx)
 const ARGO_DOTS = [[138.6,16.5,9.5],[187.6,16.5,11.9],[236.7,16.5,10.6],[285.7,16.5,10.7],[163.1,41,13.2],[212.2,41.1,12.9],[261.2,41.1,13],[310.3,41,10.6],[138.6,65.6,9.8],[187.7,65.6,13.5],[236.5,65.7,14.8],[285.6,65.6,14.2],[64.8,90.3,13.7],[163.1,90.1,12.9],[212.3,89.8,14.6],[261.2,90,12.9],[310.3,90.1,11.2],[40.7,114.7,14.8],[236.7,114.5,11.8],[383.9,114.4,8.5],[15.9,138.9,12.3],[64.7,138.9,14.2],[212.1,138.9,12.8],[260.6,137.7,10.5],[359.3,138.9,9],[40.7,163.4,14.9],[89.5,163.5,13.8],[138.5,163.5,13.7],[187.5,163.5,13.7],[236.8,163.5,14],[285.7,163.4,13.5],[334.8,163.3,11.8],[383.9,163.4,8.1],[15.9,187.9,9.8],[64.9,187.7,14.2],[113.9,187.8,14],[163.2,187.6,14.7],[212.1,187.8,13.8],[261.2,187.7,14.1],[310.3,187.9,12.8],[359.4,187.8,11.7],[408.4,187.9,8.1],[40.4,212.4,10.6],[89.5,212.4,11.3],[138.5,212.4,12],[187.6,212.4,12.2],[236.7,212.4,11.1],[285.7,212.4,11.8],[334.8,212.4,10.4],[383.9,212.4,10.6],[64.9,237,9],[114,237,9.1],[163.1,237,9.3],[212.1,237,9.1],[261.2,237,9.2],[310.3,237,8.5],[359.3,237,8.5]];
-document.getElementById('argoDots').innerHTML = ARGO_DOTS.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join('');
 
 // Данные прода (vehicles) — зашиты в макет. kind решает силуэт: у каждой модели свои пропорции.
 const CARS = [
@@ -254,7 +431,7 @@ const CAPS = {
 };
 
 const $ = (id) => document.getElementById(id);
-const app = $('app'), stageEl = $('stage'), sceneEl = $('scene'), dock = $('dock'), panel = $('panel'), evSwitch = $('evSwitch');
+const stageEl = $('stage'), sceneEl = $('scene'), dock = $('dock'), panel = $('panel'), evSwitch = $('evSwitch');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const css = getComputedStyle(document.documentElement);
 const tok = (name) => css.getPropertyValue(name).trim();
@@ -331,45 +508,17 @@ function label(parent, html, cls, x, y, z) {
   return o;
 }
 
-// Окна-вставки по фасадам прямоугольника [x0, x1, z0, z1]: тёмное стекло + белый отлив с рёбрами.
-// faces: F — +z, B — −z, R — +x, L — −x. skip(face, a, y) — пропустить окно (вход, ворота).
-function windows(k, [x0, x1, z0, z1], ys, ww, wh, nx, nz, faces = 'FBRL', skip) {
-  const pane = (face, a, y) => {
-    if (skip?.(face, a, y)) return;
-    if (face === 'F' || face === 'B') {
-      const z = face === 'F' ? z1 : z0, s = face === 'F' ? 1 : -1;
-      k(DARK, ww, wh, 0.1, a, y, z);
-      k(WHITE, ww + 0.24, 0.1, 0.26, a, y - 0.1, z + s * 0.08, EDGE);
-    } else {
-      const x = face === 'R' ? x1 : x0, s = face === 'R' ? 1 : -1;
-      k(DARK, 0.1, wh, ww, x, y, a);
-      k(WHITE, 0.26, 0.1, ww + 0.24, x + s * 0.08, y - 0.1, a, EDGE);
-    }
-  };
-  for (const y of ys) {
-    for (let i = 0; i < nx; i++) { const a = x0 + ((x1 - x0) / nx) * (i + 0.5); if (faces.includes('F')) pane('F', a, y); if (faces.includes('B')) pane('B', a, y); }
-    for (let i = 0; i < nz; i++) { const a = z0 + ((z1 - z0) / nz) * (i + 0.5); if (faces.includes('R')) pane('R', a, y); if (faces.includes('L')) pane('L', a, y); }
-  }
-}
-// Парапет по краю крыши [x0, x1, z0, z1] на высоте y
-function parapet(k, [x0, x1, z0, z1], y, h = 0.6) {
-  k(WHITE, x1 - x0, h, 0.25, (x0 + x1) / 2, y, z1 - 0.125, EDGE);
-  k(WHITE, x1 - x0, h, 0.25, (x0 + x1) / 2, y, z0 + 0.125, EDGE);
-  k(WHITE, 0.25, h, z1 - z0 - 0.5, x1 - 0.125, y, (z0 + z1) / 2, EDGE);
-  k(WHITE, 0.25, h, z1 - z0 - 0.5, x0 + 0.125, y, (z0 + z1) / 2, EDGE);
-}
-// Дерево: графитовый ствол + крона из 2–3 светлых кубов
+// Миниатюра, а не макет района: здание — 8–20 объёмов, окна — 1–3 широкие ленты --select,
+// детали крупнее «реальных», рёбра — только у основных объёмов.
+const BAND = mat(T.select);
+// Дерево-игрушка: куб-ствол + одна-две крупные кроны
 function tree(k, x, z, s = 1) {
-  k(DARK, 0.3, 1.5 * s, 0.3, x, 0, z);
-  k(mat(T.sunk), 1.9 * s, 1.5 * s, 1.9 * s, x, 1.5 * s, z, EDGE);
-  k(mat(T.sunk), 1.3 * s, 1.1 * s, 1.3 * s, x + 0.2, 3 * s, z - 0.15, EDGE);
-  if (s > 1) k(mat(T.sunk), 0.8, 0.7, 0.8, x - 0.1, 3 * s + 1.1 * s, z + 0.1, EDGE);
+  k(DARK, 0.5 * s, 1.6 * s, 0.5 * s, x, 0, z);
+  k(LEAF, 2.6 * s, 2.2 * s, 2.6 * s, x, 1.6 * s, z, EDGE);
+  if (s > 1) k(LEAF, 1.5, 1.2, 1.5, x + 0.2, 1.6 * s + 2.2 * s, z - 0.1, EDGE);
 }
-// Кейс: графитовый куб с белой ручкой
-function crate(k, x, y0, z, s = 0.62) {
-  k(DARK, s, s, s, x, y0, z);
-  k(WHITE, s * 0.4, 0.06, 0.08, x, y0 + s, z);
-}
+// Кейс — один графитовый куб
+const crate = (k, x, y0, z, s = 0.7) => k(DARK, s, s, s, x, y0, z);
 
 // Здание: группа с собственным материалом корпуса и рёбер — их подсвечивает наведение
 function building(id, x, z) {
@@ -382,213 +531,107 @@ function building(id, x, z) {
 }
 
 /* ============== Здания: у каждого свой силуэт и свой «жест» ============== */
-// Офис: Г-образный план, второй этаж консолью над входом, угол — стеклянный атриум, терраса на крыше
+// Офис: Г-образный план, второй этаж консолью над входом, угол — стеклянный атриум
 function buildOffice() {
   const { g, body, edge, k } = building('office', -18, 8);
-  // локальные координаты: центр (−18, 8). Западное крыло (вдоль z), южное крыло (вдоль x), атриум на стыке
   k(body, 4.5, 7, 6, -3.75, 0, -1.5, edge);                 // западное крыло, 2 этажа
   k(body, 7.5, 3.5, 5, 2.25, 0, 1.5, edge);                 // южное крыло, первый этаж
-  k(body, 7.5, 3.5, 6.5, 2.25, 3.5, 2.25, edge);            // второй этаж — консоль на 1,5 м наружу
-  k(GLASS, 7.5, 0.2, 6.5, 2.25, 7, 2.25);                   // светлый настил террасы
-  k(DARK, 7.7, 0.08, 6.7, 2.25, 6.95, 2.25);
-  k(DARK, 4.7, 0.3, 6.2, -3.75, 7, -1.5);
-  // Атриум во всю высоту: стекло, графитовые импосты
-  k(GLASS, 4.5, 7.6, 3, -3.75, 0, 3, EDGE);
-  for (const y of [2.5, 5]) { k(DARK, 4.56, 0.08, 0.06, -3.75, y, 4.52); k(DARK, 0.06, 0.08, 3.04, -6.02, y, 3); }
-  for (const x of [-5.25, -3.75, -2.25]) k(DARK, 0.08, 7.6, 0.06, x, 0, 4.52);
-  k(DARK, 4.7, 0.25, 3.2, -3.75, 7.6, 3);
-  // Стойки под консолью и вход
-  for (const x of [-1, 5.5]) k(DARK, 0.3, 3.5, 0.3, x, 0, 5.3);
-  k(GLASS, 2, 2.6, 0.12, 2.25, 0, 4.02, EDGE);
-  k(DARK, 2.2, 0.15, 0.14, 2.25, 2.6, 4.03);
-  k(WHITE, 3, 0.15, 1.4, 2.25, 0, 4.7, EDGE);               // ступени
-  k(WHITE, 2.4, 0.15, 0.7, 2.25, 0.15, 4.35, EDGE);
-  // Вывеска ARGO на торце консоли: графит + три красных кубика
-  k(DARK, 3.4, 1, 0.16, 2.25, 4.8, 5.58);
-  for (const dx of [-0.8, 0, 0.8]) k(RED, 0.42, 0.42, 0.3, 2.25 + dx, 5.09, 5.66);
-  // Окна
-  windows(k, [-6, -1.5, -4.5, 1.5], [1, 4.5], 1.1, 1.5, 0, 3, 'BL');
-  windows(k, [-6, -1.5, -4.5, 1.5], [1, 4.5], 1.1, 1.5, 3, 0, 'B');
-  windows(k, [-1.5, 6, -1, 5.5], [4.5], 1.2, 1.5, 4, 0, 'F', (f, a) => Math.abs(a - 2.25) < 1);
-  windows(k, [-1.5, 6, -1, 4], [1], 1.2, 1.5, 0, 3, 'R');
-  windows(k, [-1.5, 6, -1, 5.5], [4.5], 1.2, 1.5, 0, 4, 'R');
-  windows(k, [-1.5, 6, -1, 4], [1, 4.5], 1.2, 1.5, 3, 0, 'B');
-  // Терраса: парапет и кадки с зеленью; на западном крыле — два кондиционера
-  parapet(k, [-1.5, 6, -1, 5.5], 7.2, 0.7);
-  for (const x of [0.5, 4]) { k(mat(T.sunk), 0.9, 0.7, 0.9, x, 7.2, 3.8, EDGE); k(LEAF, 0.6, 0.5, 0.6, x, 7.9, 3.8); }
-  for (const z of [-3, -0.5]) { k(WHITE, 1.4, 1, 1.2, -3.75, 7.3, z, EDGE); k(DARK, 0.8, 0.08, 0.8, -3.75, 8.3, z); }
-  // Флагшток у входа, два дерева, скамейки
-  k(DARK, 0.12, 6.5, 0.12, 6.9, 0, 5.9);
-  k(RED, 1.3, 0.8, 0.06, 7.6, 5.6, 5.9);
-  tree(k, -7.6, 5.2, 1.1);
-  tree(k, 7.4, 1.5);
-  for (const x of [-5.2, -2.6]) { k(WHITE, 1.8, 0.12, 0.6, x, 0.45, 6.9, EDGE); k(WHITE, 1.8, 0.5, 0.1, x, 0.57, 6.65, EDGE); k(DARK, 0.1, 0.45, 0.5, x - 0.75, 0, 6.9); k(DARK, 0.1, 0.45, 0.5, x + 0.75, 0, 6.9); }
+  k(body, 7.5, 3.5, 6.5, 2.25, 3.5, 2.25, edge);            // второй этаж — консоль наружу
+  k(DARK, 4.7, 0.3, 6.2, -3.75, 7, -1.5);                   // крыша крыла
+  k(GLASS, 4.5, 7.6, 3, -3.75, 0, 3, EDGE);                 // атриум во всю высоту
+  k(BAND, 6.6, 1.3, 0.1, 2.25, 4.6, 5.52);                  // лента окон консоли
+  k(BAND, 0.1, 1.3, 4.4, -6.02, 4.6, -1.8);                 // лента окон крыла
+  k(DARK, 2.8, 2.9, 0.14, 2.25, 0, 4.02);                   // вход — крупный проём
+  // Вывеска ARGO на торце консоли: графит + три крупных красных кубика
+  k(DARK, 4.4, 1.5, 0.2, 2.25, 4.9, 5.66);
+  for (const dx of [-1.1, 0, 1.1]) k(RED, 0.7, 0.7, 0.3, 2.25 + dx, 5.3, 5.8);
+  // Флаг у входа — крупнее «настоящего»
+  k(DARK, 0.3, 7.5, 0.3, 7.2, 0, 6.2);
+  k(RED, 2.2, 1.4, 0.12, 8.35, 5.9, 6.2);
+  tree(k, -7.8, 5.6, 1.1);
   k.into(g);
-  g.userData.top = 8.4;
+  g.userData.top = 7.6;
   return g;
 }
 
-// Склад: ангар с пилообразной крышей (4 зуба, каждый — 3 ступени), башня-офис с торца, рампа с навесом
+// Склад: ангар с пилообразной крышей (4 зуба), башня-офис с торца, рампа с навесом
 function buildWarehouse() {
   const { g, body, edge, k } = building('warehouse', 7, -12);
-  // локальные: x −13..13, z −6..6
   k(body, 26, 5, 12, 0, 0, 0, edge);
   for (let t = 0; t < 4; t++) {
     const a = -13 + t * 6.5;
-    k(body, 6.5, 0.7, 12, a + 3.25, 5, 0, edge);
-    k(body, 4.3, 0.7, 12, a + 4.35, 5.7, 0, edge);
-    k(body, 2.2, 0.7, 12, a + 5.4, 6.4, 0, edge);
-    k(GLASS, 0.1, 1.3, 11.4, a + 6.5, 5.75, 0, EDGE);      // остекление на вертикальной грани зуба
+    k(body, 4.4, 1.1, 12, a + 4.3, 5, 0, edge);             // зуб: две ступени
+    k(body, 2.2, 1.1, 12, a + 5.4, 6.1, 0, edge);
   }
-  // Башня — офис склада, выше ангара
-  k(body, 4.5, 11, 7, 15.25, 0, -2.5, edge);
-  k(DARK, 4.7, 0.3, 7.2, 15.25, 11, -2.5);
-  windows(k, [13, 17.5, -6, 1], [1.2, 4.2, 7.2], 1.1, 1.5, 2, 3, 'FR');
-  k(WHITE, 1.4, 1, 1.4, 15.6, 11.3, -3.5, EDGE);
-  // Ворота с ламелями: у рампы (поднятые) и на земле
-  for (const [x, y0] of [[8.75, 1.1], [-6, 0]]) {
-    k(DARK, 4.4, 3.4, 0.12, x, y0, 6.02);
-    for (let i = 1; i <= 4; i++) k(mat(T.ctl), 4.2, 0.07, 0.06, x, y0 + i * 0.68, 6.1);
-  }
-  // Высокие узкие окна под крышей + задний фасад
-  windows(k, [-13, 13, -6, 6], [3], 0.6, 1.6, 13, 0, 'F', (f, a) => Math.abs(a - 8.75) < 3 || Math.abs(a + 6) < 3);
-  windows(k, [-13, 13, -6, 6], [3], 0.6, 1.6, 13, 4, 'BL');
-  // Рампа: платформа + две ступени, навес на двух стойках
-  k(WHITE, 7.5, 1.1, 2.8, 8.75, 0, 7.4, EDGE);
-  k(WHITE, 0.6, 0.73, 2.8, 4.7, 0, 7.4, EDGE);
-  k(WHITE, 0.6, 0.37, 2.8, 4.1, 0, 7.4, EDGE);
-  k(WHITE, 8.8, 0.2, 3.6, 8.75, 4.3, 7.8, EDGE);
-  for (const x of [4.8, 12.6]) k(DARK, 0.2, 4.3, 0.2, x, 0, 9.4);
-  // Вентиляция на нижних ступенях зубьев
-  for (const x of [-11.9, -5.4, 1.1]) { k(WHITE, 0.9, 0.9, 0.9, x, 5.7, -3, EDGE); k(DARK, 0.6, 0.1, 0.6, x, 6.6, -3); }
-  // Кейсы у рампы (два штабелем) и ручная тележка
-  for (const [x, z, y] of [[5.6, 6.6, 1.1], [6.3, 6.6, 1.1], [5.6, 6.6, 1.72], [7, 7.3, 1.1], [5.9, 7.5, 1.1], [7.7, 6.6, 1.1]]) crate(k, x, y, z);
-  k(DARK, 0.7, 0.08, 0.6, 11.3, 1.1, 7.6);
-  k(DARK, 0.08, 1.3, 0.6, 11.66, 1.1, 7.6);
-  k(DARK, 0.3, 0.06, 0.6, 11.8, 2.34, 7.6);
-  crate(k, 11.2, 1.18, 7.6, 0.5);
+  k(body, 4.5, 11, 7, 15.25, 0, -2.5, edge);                 // башня
+  k(DARK, 4.7, 0.4, 7.2, 15.25, 11, -2.5);
+  k(BAND, 0.1, 1.4, 5.6, 17.52, 7.6, -2.5);                  // лента окон башни
+  k(DARK, 5, 3.6, 0.14, 8.75, 1.1, 6.02);                    // ворота у рампы
+  k(WHITE, 7.5, 1.1, 2.8, 8.75, 0, 7.4, EDGE);               // рампа
+  k(WHITE, 8.8, 0.35, 3.6, 8.75, 4.3, 7.8, EDGE);            // навес
+  for (const x of [4.9, 12.6]) k(DARK, 0.4, 4.3, 0.4, x, 0, 9.3);
+  crate(k, 6, 1.1, 6.7); crate(k, 6.9, 1.1, 7.4);
   k.into(g);
   g.userData.top = 11.5;
   return g;
 }
 
-// Гараж: 6 открытых проёмов с воротами-козырьками, односкатная крыша ступенями, мезонин сверху, навес-мойка сбоку
+// Гараж: 6 открытых проёмов, односкатная крыша ступенями, мезонин сверху
 const bayX = (i) => -7.5 + i * 3;     // локальный x проёма; мир: +12
 function buildGarage() {
   const { g, body, edge, k } = building('garage', 12, 8);
-  // локальные: x −9..9, z −4.5..4.5; фронт +z
-  k(body, 18, 4.5, 0.3, 0, 0, -4.35, edge);                  // задняя стена
-  k(body, 0.3, 4.5, 9, -8.85, 0, 0, edge);
-  k(body, 0.3, 4.5, 9, 8.85, 0, 0, edge);
-  for (let i = 0; i <= 6; i++) { const x0 = i === 0 ? -9 : bayX(i - 1) + 1.1, x1 = i === 6 ? 9 : bayX(i) - 1.1; k(body, x1 - x0, 3, 0.3, (x0 + x1) / 2, 0, 4.35, edge); }
-  k(body, 18, 1.5, 0.3, 0, 3, 4.35, edge);                   // перемычка над проёмами
-  k(DARK, 17.4, 3, 7.9, 0, 0, -0.35);                        // тёмная глубина внутри
-  k(body, 18.2, 0.3, 9.2, 0, 4.5, 0, edge);                  // односкатная крыша: три ступени к задней стене
-  k(body, 18.2, 0.5, 6, 0, 4.8, -1.6, edge);
-  k(body, 18.2, 0.5, 3, 0, 5.3, -3.1, edge);
-  k(DARK, 18.4, 0.12, 0.2, 0, 4.4, 4.62);
-  // Ворота-козырьки: поднятое полотно над каждым проёмом
-  for (let i = 0; i < 6; i++) {
-    k(WHITE, 2.3, 0.08, 0.9, bayX(i), 3.05, 4.95, EDGE);
-    k(DARK, 0.05, 0.3, 0.9, bayX(i) - 1.12, 2.8, 4.95);
-    k(DARK, 0.05, 0.3, 0.9, bayX(i) + 1.12, 2.8, 4.95);
-  }
-  // Мезонин с окнами и вывеской
-  k(body, 7, 2.6, 4, 4.5, 5.8, -2.5, edge);
-  k(DARK, 7.2, 0.2, 4.2, 4.5, 8.4, -2.5);
-  windows(k, [1, 8, -4.5, -0.5], [6.5], 1.2, 1.1, 4, 0, 'F');
-  k(DARK, 5, 1, 0.2, -3, 5.8, -0.8);
-  k(WHITE, 3.6, 0.14, 0.06, -3.4, 6.2, -0.68);
-  for (const dx of [0.9, 1.45, 2]) k(RED, 0.3, 0.3, 0.12, -3 + dx, 6.1, -0.68);
-  for (const x of [-5, -1]) k(DARK, 0.12, 0.5, 0.12, x, 5.3, -0.9);
-  // Навес-мойка справа: плита на 4 стойках, светлая площадка
-  k(mat(T.sunk), 4.8, 0.05, 6.4, 11.6, 0, 0.6, EDGE);
-  for (const x of [9.6, 13.6]) for (const z of [-2.2, 3.4]) k(DARK, 0.2, 3.6, 0.2, x, 0, z);
-  k(WHITE, 5.2, 0.25, 6.8, 11.6, 3.6, 0.6, EDGE);
-  k(GLASS, 0.8, 1.4, 0.8, 13.2, 0, -1.6, EDGE);
-  // Передки машин в проёмах (Bongo — целой моделью, он уезжает на мероприятие)
-  CARS.forEach((c, i) => {
-    if (i === VAN) return;
-    const cm = mat(c.hex), x = bayX(i), dark = new THREE.Color(c.hex).getHSL({}).l < 0.4;
-    k(cm, 1.7, 0.6, 1.4, x, 0.38, 3.9, EDGE);
-    k(dark ? DARK : GLASS, 1.4, 0.4, 0.7, x, 0.98, 3.55);
-    k(cm, 1.44, 0.08, 0.6, x, 1.38, 3.5);
-    for (const s of [-1, 1]) { k(mat(T.warnBg), 0.34, 0.14, 0.06, x + s * 0.55, 0.78, 4.62); k(DARK, 0.22, 0.6, 0.6, x + s * 0.72, 0, 4.0); }
-    k(mat(shade(c.hex, 0.8)), 1.72, 0.2, 0.14, x, 0.36, 4.62);
-  });
-  // Парковочная разметка перед гаражом: светлая площадка, полосы --line
-  k(mat(T.sunk), 18, 0.03, 4, 0, 0, 6.5);
-  for (let i = 0; i <= 6; i++) k(flat(T.line), 0.14, 0.05, 3.4, -9 + i * 3, 0, 6.6);
+  k(body, 18, 4.5, 9, 0, 0, 0, edge);
+  k(DARK, 17, 3, 0.1, 0, 0, 4.52);                           // проёмы — одна тёмная лента
+  for (let i = 1; i < 6; i++) k(body, 0.5, 3, 0.3, bayX(i) - 1.5, 0, 4.6);   // простенки между проёмами
+  k(body, 18.2, 0.6, 6, 0, 4.5, -1.5, edge);                 // односкат: две ступени к задней стене
+  k(body, 18.2, 0.6, 3, 0, 5.1, -3, edge);
+  k(body, 7, 2.6, 4, 4.5, 5.7, -2.5, edge);                  // мезонин
+  k(BAND, 5.6, 1.1, 0.1, 4.5, 6.5, -0.48);
+  k(DARK, 5, 1.3, 0.2, -3, 5.1, -0.4);                       // вывеска
+  for (const dx of [0.6, 1.5]) k(RED, 0.6, 0.6, 0.2, -3 + dx, 5.45, -0.25);
+  // Машины в проёмах — по одному кубу цвета кузова (Bongo — целой моделью, он уезжает на мероприятие)
+  CARS.forEach((c, i) => { if (i !== VAN) k(mat(c.hex), 1.9, 1.2, 1.6, bayX(i), 0.3, 4.9, EDGE); });
+  k(mat(T.sunk), 18, 0.03, 4, 0, 0, 6.5);                    // площадка перед гаражом
   k.into(g);
-  g.userData.top = 8.6;
+  g.userData.top = 8.3;
   return g;
 }
 
-// Отель: подиум 2 этажа во весь план + башня у края с двумя уступами, пилон на крыше, портик, терраса с зонтиками
+// Отель: широкий подиум + коренастая башня у края, пилон-знак, портик. Окна — ленты по этажам на двух фасадах.
 function buildHotel() {
   const { g, body, edge, k } = building('hotel', -20, -15);
-  // локальные: подиум x −7..7, z −5..5; башня у западного края
-  k(body, 14, 7, 10, 0, 0, 0, edge);
-  k(GLASS, 14, 0.2, 10, 0, 7, 0);                          // настил террасы подиума
-  k(DARK, 14.2, 0.08, 10.2, 0, 6.95, 0);
-  const T1 = [-7, 0.5, -5, 1.5], T2 = [-6.3, -0.2, -4.3, 0.8], T3 = [-5.6, -0.9, -3.6, 0.1];
-  const slab = (r, y0, h) => k(body, r[1] - r[0], h, r[3] - r[2], (r[0] + r[1]) / 2, y0, (r[2] + r[3]) / 2, edge);
-  slab(T1, 7.2, 12); slab(T2, 19.2, 3); slab(T3, 22.2, 3);
-  for (const [r, y] of [[T1, 19.2], [T2, 22.2], [T3, 25.2]]) k(DARK, r[1] - r[0] + 0.2, 0.15, r[3] - r[2] + 0.2, (r[0] + r[1]) / 2, y - 0.08, (r[2] + r[3]) / 2);
-  windows(k, T1, [7.9, 10.9, 13.9, 16.9], 1.1, 1.6, 4, 3);
-  windows(k, T2, [19.9], 1, 1.5, 3, 3);
-  windows(k, T3, [22.9], 0.9, 1.5, 2, 2, 'BRL');
-  // Плашка HOTEL на верхнем этаже: графитовая полоса с белыми «буквами»
-  k(DARK, 3.8, 1, 0.16, -3.25, 23.2, 0.15);
-  for (let i = 0; i < 5; i++) k(WHITE, 0.42, 0.5, 0.1, -4.45 + i * 0.6, 23.45, 0.25);
-  // Пилон-знак на крыше башни
-  k(DARK, 0.5, 6, 1.4, -3.25, 25.3, -1.75);
-  k(RED, 0.6, 0.6, 1.5, -3.25, 31.3, -1.75);
-  k(WHITE, 1.6, 1, 1.6, -4.6, 25.3, -2.6, EDGE);              // техблок
-  // Подиум: окна, кроме места портика
-  windows(k, [-7, 7, -5, 5], [0.9, 4.4], 1.3, 1.7, 5, 4, 'FBRL', (f, a, y) => f === 'F' && y < 2 && a > -0.5 && a < 6);
-  // Терраса на крыше подиума: парапет и зонтики
-  parapet(k, [-7, 7, -5, 5], 7.2, 0.6);
-  for (const [x, z] of [[3, -2.5], [5.2, 0], [3, 2.6], [-2.5, 3.4]]) {
-    k(DARK, 0.1, 1.9, 0.1, x, 7.2, z);
-    k(GLASS, 1.8, 0.1, 1.8, x, 9.1, z, EDGE);
-    k(WHITE, 0.7, 0.08, 0.7, x, 7.9, z, EDGE);
-  }
-  // Портик на 4 колоннах, вращающаяся дверь, ступени
-  for (const x of [1.1, 2.5, 4.5, 5.9]) k(WHITE, 0.4, 3.4, 0.4, x, 0, 7.2, EDGE);
-  k(WHITE, 5.8, 0.4, 2.8, 3.5, 3.4, 6.3, EDGE);
-  k(DARK, 5.9, 0.12, 2.9, 3.5, 3.8, 6.3);
-  k(DARK, 2.4, 0.3, 0.3, 3.5, 2.6, 5.2);
-  k(WHITE, 4.4, 0.14, 1.6, 3.5, 0, 6, EDGE);
-  // Клумба и два дерева
-  k(mat(T.sunk), 4, 0.4, 1.2, -3.5, 0, 7.2, EDGE);
-  for (const dx of [-1.2, 0, 1.2]) k(LEAF, 0.6, 0.45, 0.6, -3.5 + dx, 0.4, 7.2);
-  tree(k, -6.4, 8.6);
-  tree(k, 8.4, 6.2, 1.1);
+  k(body, 14, 5, 10, 0, 0, 0, edge);                         // подиум, 2 этажа
+  k(body, 7.5, 7.5, 6.5, -3.25, 5, -1.25, edge);             // башня, 3 этажа
+  k(DARK, 7.7, 0.4, 6.7, -3.25, 12.5, -1.25);
+  for (const y of [1.3, 3.5]) k(BAND, 12.4, 1.1, 0.1, 0.4, y, 5.02);                 // подиум: фасад
+  for (const y of [5.8, 8]) k(BAND, 6.2, 1.1, 0.1, -3.25, y, 2.02);                   // башня: фасад
+  for (const y of [5.8, 8, 10.3]) k(BAND, 0.1, 1.1, 5.2, 0.52, y, -1.25);             // башня: бок
+  k(DARK, 4.4, 1.4, 0.2, -3.25, 10.1, 2.1);                  // плашка HOTEL
+  k(DARK, 0.8, 4, 1.6, -5, 12.9, -2.5);                       // пилон
+  k(RED, 1, 1, 1.8, -5, 16.9, -2.5);
+  k(WHITE, 6, 0.6, 3, 3.5, 3.4, 6.3, EDGE);                   // портик на двух колоннах
+  for (const x of [1, 6]) k(WHITE, 0.6, 3.4, 0.6, x, 0, 7.4);
   k.into(g);
-  // Вращающаяся дверь — единственный цилиндр в мире
-  const door = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 2.6, 20), GLASS);
-  door.position.set(3.5, 1.3, 5);
-  door.add(new THREE.LineSegments(new THREE.EdgesGeometry(door.geometry, 30), EDGE));
+  // Вращающаяся дверь — единственный цилиндр в мире, крупная
+  const door = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 3, 16), GLASS);
+  door.position.set(3.5, 1.5, 5);
   g.add(door);
-  g.userData.top = 32;
+  g.userData.top = 18;
   return g;
 }
 
-// Сцена мероприятия перед отелем: подиум, задник-экран, колонки, 4 стойки света, флаг. Растёт из земли.
+// Сцена мероприятия перед отелем: подиум, экран, колонки, флаг. Растёт из земли.
 function buildStage() {
   const g = new THREE.Group();
   g.position.set(-13.5, 0, -4);
   const body = own(T.card), edge = new THREE.LineBasicMaterial({ color: T.line }), k = kit();
-  k(body, 7, 0.6, 3.2, 0, 0, 0, edge);
-  k(body, 2, 0.3, 0.8, 0, 0, 2, edge);
-  k(STEEL, 7.4, 3.8, 0.25, 0, 0.6, -1.72);                  // рама задника
-  k(DARK, 7, 3.4, 0.08, 0, 0.8, -1.56);                     // экран
-  k(RED, 7, 0.22, 0.1, 0, 0.95, -1.5);
-  for (const s of [-1, 1]) { k(DARK, 0.8, 1.8, 0.8, s * 3.95, 0, 0.6); k(mat(T.ctl), 0.4, 0.4, 0.06, s * 3.95, 1.1, 1.01); }
-  for (const [x, z] of [[-4.6, 1.6], [4.6, 1.6], [-4.6, -1.6], [4.6, -1.6]]) { k(DARK, 0.12, 3.6, 0.12, x, 0, z); k(GLASS, 0.5, 0.4, 0.5, x, 3.6, z, EDGE); }
-  k(DARK, 0.14, 7.5, 0.14, 0, 0, -2.05);
-  k(RED, 1.8, 1, 0.06, 0.95, 6.3, -2.05);
+  k(body, 7, 0.8, 3.2, 0, 0, 0, edge);
+  k(STEEL, 7.4, 4, 0.3, 0, 0.8, -1.72);                       // рама задника
+  k(DARK, 6.8, 3.4, 0.1, 0, 1.1, -1.52);                      // экран
+  k(RED, 6.8, 0.3, 0.12, 0, 1.3, -1.45);
+  for (const s of [-1, 1]) k(DARK, 1, 2, 1, s * 4.1, 0, 0.6);
+  k(DARK, 0.25, 7.5, 0.25, 0, 0, -2.1);
+  k(RED, 2.2, 1.3, 0.1, 1.2, 6.1, -2.1);
   k.into(g);
   g.userData = { id: 'stage', mats: [body], edge };
   g.visible = false;
@@ -596,85 +639,46 @@ function buildStage() {
   return g;
 }
 
-/* ============== Машины: силуэт по модели. Перёд — +z. ============== */
-// Спецификации: w×l, колесо (размер) и отступ осей, пояс (верх капота), салон и т. д.
+/* ============== Машины: силуэт по модели из 6–10 объёмов. Перёд — +z. ============== */
+// w×l, колесо, отступ осей, клиренс, пояс, салон: стекло [z0, z1, высота], крыша [z0, z1]
 const SPEC = {
-  lynk:   { w: 2.0, l: 5.0, wheel: 0.8, ax: 0.95, ride: 0.42, belt: 1.25, cabW: 1.84, glass: [-2.1, 1.0, 0.52], roof: [-1.35, 0.75], step: [-2.3, -2.1, 0.32], lamp: 0.42, bump: 0.26 },
-  cobalt: { w: 1.74, l: 4.5, wheel: 0.64, ax: 0.85, ride: 0.3, belt: 0.92, cabW: 1.5, glass: [-1.0, 0.85, 0.44], roof: [-0.75, 0.55], trunk: 0.1, lamp: 0.36, bump: 0.22 },
-  nexia:  { w: 1.66, l: 4.26, wheel: 0.6, ax: 0.8, ride: 0.28, belt: 0.86, cabW: 1.5, glass: [-0.95, 0.8, 0.4], roof: [-0.95, 0.8], trunk: 0.04, lamp: 0.3, bump: 0.12 },
-  chazor: { w: 1.72, l: 4.4, wheel: 0.64, ax: 0.82, ride: 0.3, belt: 0.92, cabW: 1.52, glass: [-0.9, 0.7, 0.48], roof: [-0.7, 0.45], trunk: 0.06, lamp: 0.46, bump: 0.2, cowl: true },
-  bongo:  { w: 1.74, l: 5.1, wheel: 0.6 },
+  lynk:   { w: 2.0, l: 5.0, wheel: 0.95, ax: 0.95, ride: 0.42, belt: 1.25, cabW: 1.84, glass: [-2.2, 1.0, 0.55], roof: [-2.2, 0.75] },
+  cobalt: { w: 1.74, l: 4.5, wheel: 0.8, ax: 0.85, ride: 0.32, belt: 0.92, cabW: 1.5, glass: [-1.0, 0.85, 0.46], roof: [-0.75, 0.55], trunk: 0.1 },
+  nexia:  { w: 1.66, l: 4.26, wheel: 0.76, ax: 0.8, ride: 0.3, belt: 0.86, cabW: 1.5, glass: [-0.95, 0.8, 0.42], roof: [-0.95, 0.8] },
+  chazor: { w: 1.72, l: 4.4, wheel: 0.8, ax: 0.82, ride: 0.32, belt: 0.92, cabW: 1.52, glass: [-0.9, 0.7, 0.5], roof: [-0.7, 0.45], trunk: 0.06 },
+  bongo:  { w: 1.74, l: 5.1, wheel: 0.78 },
 };
 
 function makeCar(c, cargo = false) {
   const g = new THREE.Group();
   const body = own(c.hex), edge = new THREE.LineBasicMaterial({ color: T.line }), k = kit();
   const dark = new THREE.Color(c.hex).getHSL({}).l < 0.4, glass = dark ? DARK : GLASS;
-  const bump = mat(shade(c.hex, dark ? 0.7 : 0.82)), lampF = mat(T.warnBg), lampR = mat(T.redTint);
+  const lamp = mat(T.warnBg);
   const s = SPEC[c.kind], { w, l, wheel } = s;
-  // Колесо: графитовая шина + светлый диск, чуть утоплено под кузов
-  const wheelAt = (x, z, sz = wheel) => {
-    const sx = Math.sign(x);
-    k(DARK, 0.26, sz, sz, x, 0, z);
-    k(STEEL, 0.05, sz * 0.5, sz * 0.5, x + sx * 0.15, sz * 0.25, z);
-  };
+  // Колесо — графитовый куб крупнее «настоящего», чуть выступает из кузова
+  const wheelAt = (x, z) => k(DARK, 0.32, wheel, wheel, x, 0, z);
   let top, markZ = 0;
   if (c.kind === 'bongo') {
-    // Cab-over: высокая плоская кабина без капота, низкая платформа с тремя бортами, задние колёса сдвоенные
-    const cz = l / 2 - 0.8;
-    k(body, w, 1.65, 1.6, 0, 0.5, cz, edge);
-    k(body, w - 0.1, 0.12, 1.5, 0, 2.15, cz, edge);
-    k(glass, w - 0.24, 0.72, 0.08, 0, 1.3, l / 2 + 0.01);
-    for (const sx of [-1, 1]) { k(glass, 0.08, 0.6, 0.9, sx * (w / 2 + 0.01), 1.38, cz + 0.25); k(DARK, 0.08, 0.34, 0.18, sx * (w / 2 + 0.2), 1.45, l / 2 - 0.2); }
-    k(DARK, w - 0.5, 0.25, l - 1.6, 0, 0.45, -0.8);
-    const pl = l - 1.7, pz = -l / 2 + pl / 2;
-    k(body, w, 0.12, pl, 0, 0.7, pz, edge);
-    k(body, 0.07, 0.4, pl, w / 2 - 0.035, 0.82, pz, edge);
-    k(body, 0.07, 0.4, pl, -w / 2 + 0.035, 0.82, pz, edge);
-    k(body, w, 0.4, 0.07, 0, 0.82, -l / 2 + 0.035, edge);
-    k(bump, w + 0.04, 0.24, 0.16, 0, 0.36, l / 2 + 0.02);
-    k(WHITE, 0.5, 0.13, 0.04, 0, 0.42, l / 2 + 0.11);
-    for (const sx of [-1, 1]) {
-      k(lampF, 0.34, 0.2, 0.06, sx * (w / 2 - 0.3), 0.66, l / 2 + 0.02);
-      k(lampR, 0.16, 0.12, 0.06, sx * (w / 2 - 0.12), 0.6, -l / 2 - 0.02);
-      wheelAt(sx * (w / 2 - 0.15), l / 2 - 0.7);
-      wheelAt(sx * (w / 2 - 0.15), -l / 2 + 1.05);
-      wheelAt(sx * (w / 2 - 0.43), -l / 2 + 1.05);
-    }
-    if (cargo) for (const [x, z, y] of [[-0.4, -1.2, 0.82], [0.35, -1.2, 0.82], [-0.4, -1.2, 1.44], [0, -0.2, 0.82]]) crate(k, x, y, z);
-    top = 2.27; markZ = cz;
+    // Cab-over: высокая кабина без капота + низкая платформа
+    const cz = l / 2 - 0.8, pl = l - 1.7, pz = -l / 2 + pl / 2;
+    k(body, w, 1.75, 1.6, 0, 0.45, cz, edge);
+    k(glass, w + 0.02, 0.62, 0.9, 0, 1.3, cz + 0.36);           // стекло — одна полоса вокруг кабины
+    k(body, w, 0.55, pl, 0, 0.45, pz, edge);                     // платформа с бортами одним объёмом
+    k(DARK, w - 0.2, 0.06, pl - 0.2, 0, 1.0, pz);                // тёмное дно кузова сверху
+    k(lamp, w - 0.3, 0.2, 0.06, 0, 0.62, l / 2 + 0.02);
+    for (const sx of [-1, 1]) for (const z of [l / 2 - 0.7, -l / 2 + 1.05]) wheelAt(sx * (w / 2 - 0.12), z);
+    if (cargo) { crate(k, -0.4, 1.0, -1.2); crate(k, 0.4, 1.0, -0.4); }
+    top = 2.2; markZ = cz;
   } else {
-    const { ax, ride, belt, cabW, lamp } = s, wz = l / 2 - ax, wTop = wheel * 0.82;
-    // Кузов из двух боксов: нижний короче (между арками), верхний во всю длину — колёса уходят в вырез
-    k(body, w - 0.06, wTop - ride, 2 * wz - wheel - 0.2, 0, ride, 0, edge);
-    k(body, w, belt - wTop, l - 0.3, 0, wTop, 0, edge);
-    // Салон уже кузова: стекло + крыша (короче стекла — завал стоек)
+    const { ax, ride, belt, cabW } = s, wz = l / 2 - ax;
     const [g0, g1, gh] = s.glass, [r0, r1] = s.roof;
-    k(glass, cabW, gh, g1 - g0, 0, belt, (g0 + g1) / 2);
-    k(body, cabW + 0.02, 0.1, r1 - r0, 0, belt + gh, (r0 + r1) / 2, edge);
-    if (s.step) k(glass, cabW, s.step[2], s.step[1] - s.step[0], 0, belt, (s.step[0] + s.step[1]) / 2);   // задник ступенью
+    k(body, w, belt - ride, l, 0, ride, 0, edge);                // кузов одним объёмом
+    k(glass, cabW, gh, g1 - g0, 0, belt, (g0 + g1) / 2);         // полоса стекла
+    k(body, cabW + 0.04, 0.12, r1 - r0, 0, belt + gh, (r0 + r1) / 2, edge);   // крыша
     if (s.trunk) { const t0 = -l / 2 + 0.15, t1 = g0 - 0.1; k(body, w - 0.1, s.trunk, t1 - t0, 0, belt, (t0 + t1) / 2, edge); }   // выраженный багажник
-    if (s.cowl) k(body, cabW + 0.06, 0.12, 0.45, 0, belt, g1 + 0.22, edge);   // ступень капот → лобовое
-    if (c.kind === 'lynk') {
-      for (const sx of [-1, 1]) {
-        k(DARK, 0.07, 0.07, r1 - r0 + 0.3, sx * (cabW / 2 - 0.1), belt + gh + 0.1, (r0 + r1) / 2);   // рейлинги
-        for (const z of [-wz, wz]) k(DARK, 0.1, 0.22, wheel + 0.4, sx * (w / 2 + 0.03), wTop - 0.06, z);   // широкие арки
-      }
-      k(DARK, w - 0.3, 0.16, l - 2 * ax - wheel, 0, ride - 0.05, 0);
-    }
-    // Бампера темнее кузова, фары, фонари, зеркала, номер
-    const by = ride + 0.02;
-    k(bump, w + 0.02, s.bump, 0.16, 0, by, l / 2 - 0.1);
-    k(bump, w + 0.02, s.bump, 0.16, 0, by, -l / 2 + 0.1);
-    k(WHITE, 0.5, 0.12, 0.04, 0, by + 0.02, l / 2 + 0.0);
-    for (const sx of [-1, 1]) {
-      k(lampF, lamp, 0.15, 0.06, sx * (w / 2 - 0.32), belt - 0.25, l / 2 - 0.14);
-      k(lampR, 0.3, 0.13, 0.06, sx * (w / 2 - 0.26), belt - 0.22, -l / 2 + 0.14);
-      k(body, 0.16, 0.12, 0.2, sx * (cabW / 2 + 0.12), belt + 0.06, g1 - 0.25);
-      wheelAt(sx * (w / 2 - 0.15), wz);
-      wheelAt(sx * (w / 2 - 0.15), -wz);
-    }
-    top = belt + gh + 0.1; markZ = (r0 + r1) / 2;
+    k(lamp, w - 0.3, 0.16, 0.06, 0, belt - 0.24, l / 2 + 0.02);   // фары одним блоком
+    for (const sx of [-1, 1]) { wheelAt(sx * (w / 2 - 0.12), wz); wheelAt(sx * (w / 2 - 0.12), -wz); }
+    top = belt + gh + 0.12; markZ = (r0 + r1) / 2;
   }
   k.into(g);
   // Красная полоска на крыше — метка выбора
@@ -686,35 +690,25 @@ function makeCar(c, cargo = false) {
 
 /* ============== Фигурки ============== */
 const CLOTH = [T.select, T.night3, T.line];
-// Сотрудник ~1,6 м: ноги и руки на шарнирах (группа в бедре/плече), кейс — в правой руке
+// Сотрудник-игрушка: ноги, тело, голова — три объёма. Ходьба — покачивание, без шарниров.
 function makePerson(parent, x, z, rot, cloth, withCase) {
   const g = new THREE.Group();
   g.position.set(x, 0, z);
   g.rotation.y = rot;
-  const cm = mat(cloth);
-  const limb = (m, w, h, d, px, py) => {
-    const p = new THREE.Group();
-    p.position.set(px, py, 0);
-    const me = new THREE.Mesh(BOX, m);
-    me.scale.set(w, h, d);
-    me.position.y = -h / 2;
-    p.add(me);
-    g.add(p);
-    return p;
-  };
-  const legs = [limb(DARK, 0.2, 0.8, 0.22, -0.12, 0.8), limb(DARK, 0.2, 0.8, 0.22, 0.12, 0.8)];
-  box(g, cm, 0.56, 0.6, 0.3, 0, 0.8, 0, EDGE);
-  const arms = [limb(cm, 0.14, 0.6, 0.16, -0.36, 1.38), limb(cm, 0.14, 0.6, 0.16, 0.36, 1.38)];
-  box(g, WHITE, 0.34, 0.34, 0.34, 0, 1.42, 0, EDGE);
-  if (withCase) box(arms[1], DARK, 0.14, 0.36, 0.5, 0.06, -0.92, 0);
-  g.userData = { legs, arms };
+  const inner = new THREE.Group();
+  g.add(inner);
+  box(inner, DARK, 0.5, 0.8, 0.34, 0, 0, 0);
+  box(inner, mat(cloth), 0.66, 0.75, 0.42, 0, 0.8, 0, EDGE);
+  box(inner, WHITE, 0.46, 0.46, 0.46, 0, 1.55, 0, EDGE);
+  if (withCase) box(inner, DARK, 0.2, 0.5, 0.6, 0.48, 0.4, 0);
+  g.userData = { inner };
   parent.add(g);
   return g;
 }
 function pose(p, t) {
-  const a = Math.sin(t * 9) * 0.5, { legs, arms } = p.userData;
-  legs[0].rotation.x = a; legs[1].rotation.x = -a;
-  arms[0].rotation.x = -a * 0.8; arms[1].rotation.x = a * 0.3;
+  const a = Math.sin(t * 9), { inner } = p.userData;
+  inner.position.y = Math.abs(a) * 0.1;
+  inner.rotation.z = a * 0.07;
 }
 // Точка на ломаной по пройденному пути: позиция + направление
 function along(pts, d) {
@@ -740,35 +734,16 @@ function ground(parent, size) {
   parent.add(grid);
 }
 
-// Дорожки --line с бордюрами --ctl. Бордюр по стороне — с разрывами под примыкания.
+// Дорожки — широкие светлые полосы без бордюров; два толстых фонаря
 function roads(k) {
-  const ROAD = flat(T.line), CURB = mat(T.ctl);
+  const ROAD = flat(T.line);
   const rect = (x0, x1, z0, z1) => k(ROAD, x1 - x0, 0.04, z1 - z0, (x0 + x1) / 2, 0, (z0 + z1) / 2);
-  const curbX = (z, x0, x1, gaps = []) => {   // бордюр вдоль x
-    let a = x0;
-    for (const [g0, g1] of [...gaps, [x1, x1]]) { if (g0 > a) k(CURB, g0 - a, 0.12, 0.16, (a + g0) / 2, 0, z); a = g1; }
-  };
-  const curbZ = (x, z0, z1, gaps = []) => {
-    let a = z0;
-    for (const [g0, g1] of [...gaps, [z1, z1]]) { if (g0 > a) k(CURB, 0.16, 0.12, g0 - a, x, 0, (a + g0) / 2); a = g1; }
-  };
   rect(-34, 30, 16.5, 19.5);                       // главная дорога вдоль фронта
-  curbX(16.5, -34, 30, [[-16.75, -14.75], [-9, -6], [-1, 1], [3, 21]]);
-  curbX(19.5, -34, 30);
   rect(-9, -6, -10, 16.5);                         // поперечная к отелю
-  curbZ(-9, 2.5, 16.5); curbZ(-6, -6, 16.5, [[-1, 1]]);
   rect(-28, -9, -10, 2.5);                         // площадь перед отелем
-  curbZ(-28, -10, 2.5); curbX(2.5, -28, -9);
   rect(-16.75, -14.75, 13.5, 16.5);                // вход в офис
-  curbZ(-16.75, 13.5, 16.5); curbZ(-14.75, 13.5, 16.5);
   rect(-1, 1, -6, 16.5);                           // от склада к дороге
-  curbZ(-1, -6, 16.5); curbZ(1, -6, 16.5);
-  // Фонари: стойка + куб-светильник
-  for (const [x, z] of [[-29, 15.7], [-4, 15.7], [25, 15.7], [-9.7, 3.2]]) { k(DARK, 0.16, 3.6, 0.16, x, 0, z); k(DARK, 0.9, 0.1, 0.2, x + 0.35, 3.5, z); k(GLASS, 0.5, 0.4, 0.5, x + 0.7, 3.2, z, EDGE); }
-  // Указатель на перекрёстке: столб и две стрелки-плашки
-  k(DARK, 0.14, 3.2, 0.14, -9.8, 0, 15.7);
-  k(WHITE, 1.6, 0.4, 0.08, -9.1, 2.5, 15.7, EDGE); k(RED, 0.2, 0.4, 0.1, -8.2, 2.5, 15.7);
-  k(WHITE, 0.08, 0.4, 1.6, -9.8, 1.9, 15, EDGE); k(RED, 0.1, 0.4, 0.2, -9.8, 1.9, 14.1);
+  for (const [x, z] of [[-4, 15.4], [-10, 3.4]]) { k(DARK, 0.4, 4.2, 0.4, x, 0, z); k(GLASS, 1, 0.8, 1, x, 4.2, z, EDGE); }
 }
 
 function buildCampus() {
@@ -783,7 +758,7 @@ function buildCampus() {
   labels.event = label(roots.hotel, `<div><b>Bionorica Workshop</b><span class="where">Double Tree by HILTON · 12.10</span><span class="st">идёт</span><small>32 позиции · Jupiter&amp;Uranus</small></div>`, 'evcard', 0, roots.hotel.userData.top - 3, 0);
   labels.event.visible = false;
 
-  // Bongo 3 стоит в своём проёме носом наружу
+  // Bongo 3 стоит перед своим проёмом носом к дороге
   const van = makeCar(CARS[VAN], true);
   g.add(van);
   // Люди: трое ходят между офисом и складом, шестеро стоят, четверо с кейсами — бригада у рампы склада
@@ -831,8 +806,8 @@ function hasGL() {
 
 // Камера по виду: направление (сверху-сбоку), цель, охват сцены в метрах — дистанция подбирается под аспект
 const CAM = {
-  campus: { dir: [0.6, 0.5, 0.64], target: [-3, 12, -1], span: [54, 60], min: 22, max: 220 },
-  garage: { dir: [0.04, 0.46, 0.89], target: [0, 1.2, 0.5], span: [28, 9], min: 8, max: 70 },
+  campus: { dir: [0.6, 0.5, 0.64], target: [-3, 7, -1], span: [60, 50], min: 22, max: 220 },
+  garage: { dir: [0.05, 0.72, 0.7], target: [0, 0.8, 0.4], span: [26, 8], min: 8, max: 70 },
 };
 
 function initWorld() {
@@ -915,7 +890,7 @@ function placeCamera() {
 
 /* ============== Жизнь кампуса: фургон, бригада, прохожие, появление сцены ============== */
 // Маршрут Bongo: из проёма → дорога → поперечная → к сцене.
-const HOME = [12 + bayX(VAN), 10.25];
+const HOME = [12 + bayX(VAN), 14.6];   // гараж — сплошной объём, Bongo стоит на площадке перед своим проёмом
 // Обратно — разворот в три приёма: задом на площадь, вперёд на поперечную, домой, задом в проём.
 const OUT = [HOME, [HOME[0], 18], [-7.5, 18], [-7.5, -2.2]];
 const BACK = [[-7.5, -2.2], [-10.6, 1], [-7.5, 4.5], [-7.5, 18], [HOME[0], 18], HOME];
@@ -1047,8 +1022,8 @@ function toast(text) {
 
 function activate(id) {
   if (id.startsWith('car')) return select(+id.slice(3));
-  if (id === 'garage') return setView('garage', true);
-  toast(`${nameOf(id)} — в макете с47 не раскрыт`);
+  if (id === 'garage') return setView('garage');
+  toast(`${nameOf(id)} — в макете не раскрыт`);
 }
 
 function select(i) {
@@ -1057,32 +1032,64 @@ function select(i) {
   if (prev != null) paint('car' + prev);
   if (i != null) paint('car' + i);
   dock.querySelectorAll('[data-id]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.id === 'car' + i)));
+  carList.querySelectorAll('[data-car]').forEach((r) => r.setAttribute('aria-selected', String(+r.dataset.car === i)));
+  if (i != null) revealRow(i);
   renderPanel();
 }
 
-/* ============== Панель гаража ============== */
-const plateHTML = (p) => { const [r, ...rest] = p.split(' '); return `<span class="plate plate--lg" aria-label="Госномер ${p}"><b>${r}</b><span>${rest.join(' ')}</span><i>UZ</i></span>`; };
+/* ============== Карточка машины и реестр строками ============== */
+const plateHTML = (p, lg) => { const [r, ...rest] = p.split(' '); return `<span class="plate${lg ? ' plate--lg' : ''}" aria-label="Госномер ${p}"><b>${r}</b><span>${rest.join(' ')}</span><i>UZ</i></span>`; };
 function renderPanel() {
+  panel.classList.toggle('is-empty', state.sel == null);
   if (state.sel == null) {
     panel.innerHTML = `<div class="p-empty"><span class="p-photo"><svg class="i"><use href="#i-car"/></svg></span>
-      <h3>Выберите машину в гараже</h3><p>или клавишами <kbd>Tab</kbd> / стрелками <kbd>←</kbd> <kbd>→</kbd></p></div>`;
+      <h3>Выберите машину в гараже</h3><p>или в списке ниже · в сцене <kbd>←</kbd> <kbd>→</kbd></p></div>`;
     return;
   }
   const c = CARS[state.sel];
   panel.innerHTML = `<div class="p-head"><span class="p-photo"><svg class="i"><use href="#i-car"/></svg></span>
       <div><h2 class="p-name" id="panelTitle">${c.brand} ${c.model}</h2><p class="p-role">Машина · гараж ARGO</p>
-      <div class="p-plate">${plateHTML(c.plate)}</div></div></div>
-    <div class="p-body"><h4>Данные</h4><dl>
+      <div class="p-plate">${plateHTML(c.plate, true)}</div></div>
+      <button type="button" class="p-close" data-close aria-label="Закрыть карточку">×</button></div>
+    <div class="p-body"><dl>
       <div class="kv"><dt>Цвет</dt><dd><span class="sw" style="background:${c.hex}"></span>${c.color}</dd></div>
-      <div class="kv"><dt>Госномер</dt><dd class="m">${c.plate}</dd></div>
       <div class="kv"><dt>Водитель</dt><dd class="q">не назначен</dd></div>
       <div class="kv"><dt>Файлы</dt><dd class="q">нет</dd></div></dl></div>
     <div class="p-foot"><button type="button" class="btn btn--ink" data-stub="Карточка">Открыть карточку</button>
       <button type="button" class="btn btn--secondary" data-stub="Экспорт"><svg class="i"><use href="#i-sheet"/></svg>Экспорт</button></div>`;
 }
-panel.addEventListener('click', (e) => { const b = e.target.closest('[data-stub]'); if (b) toast(`${b.dataset.stub} — в макете не подключено`); });
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-stub]'); if (b) toast(`${b.dataset.stub} — в макете не подключено`); });
+panel.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) select(null); });
 
-/* ============== Вкладки, тумблер, нижняя панель ============== */
+const carList = $('carList');
+carList.innerHTML = CARS.map((c, i) => `<button type="button" class="car-row" role="option" data-car="${i}" aria-selected="false">
+    ${plateHTML(c.plate)}<span class="c-name"><b>${c.brand} ${c.model}</b><small><span class="sw" style="background:${c.hex}"></span>${c.color}</small></span>
+    <span class="c-col"><span class="sw" style="background:${c.hex}"></span>${c.color}</span><span class="c-drv">не назначен</span><span class="c-files">нет</span></button>`).join('')
+  + '<p class="g-none" id="carNone" hidden>Ничего не найдено</p>';
+// Строка = выбор в 3D; наведение/фокус строки = подсветка машины в сцене
+carList.addEventListener('click', (e) => { const r = e.target.closest('[data-car]'); if (r) select(+r.dataset.car); });
+carList.addEventListener('mouseover', (e) => { const r = e.target.closest('[data-car]'); if (r) setHover('car' + r.dataset.car); });
+carList.addEventListener('mouseleave', () => setHover(null));
+carList.addEventListener('focusin', (e) => { const r = e.target.closest('[data-car]'); if (r) setHover('car' + r.dataset.car); });
+carList.addEventListener('focusout', () => setHover(null));
+$('carSearch').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase().replace(/\s+/g, '');
+  let n = 0;
+  carList.querySelectorAll('[data-car]').forEach((r) => {
+    const c = CARS[+r.dataset.car], hit = !q || `${c.plate}${c.brand}${c.model}`.toLowerCase().replace(/\s+/g, '').includes(q);
+    r.hidden = !hit; n += hit;
+  });
+  $('carNone').hidden = n > 0;
+});
+// Прокрутка к строке — только внутри списка, страницу не дёргаем
+function revealRow(i) {
+  const r = carList.querySelector(`[data-car="${i}"]`);
+  if (!r || carList.scrollHeight <= carList.clientHeight) return;
+  if (r.offsetTop < carList.scrollTop) carList.scrollTop = r.offsetTop;
+  else if (r.offsetTop + r.offsetHeight > carList.scrollTop + carList.clientHeight) carList.scrollTop = r.offsetTop + r.offsetHeight - carList.clientHeight;
+}
+
+/* ============== Нижний ряд сцены, подпись, тумблер ============== */
 function renderDock() {
   const items = state.view === 'garage'
     ? CARS.map((c, i) => `<button type="button" class="chip chip--plate" data-id="car${i}" aria-pressed="${state.sel === i}" aria-label="${c.brand} ${c.model}, госномер ${c.plate}">${c.plate}</button>`)
@@ -1101,7 +1108,7 @@ function renderCap() {
   $('cap').innerHTML = `<b>${c[0]}</b><span>${c[1]}</span>`;
 }
 
-// Мероприятие сегодня: слой поверх кампуса, а не отдельный вид
+// День мероприятия: слой поверх кампуса, а не отдельный вид. В продукте включается датой списка.
 function setEvent(on) {
   state.event = on;
   evSwitch.setAttribute('aria-checked', String(on));
@@ -1119,20 +1126,85 @@ function setEvent(on) {
 }
 evSwitch.addEventListener('click', () => setEvent(!state.event));
 
-const tabs = [...document.querySelectorAll('[role="tab"]')];
-function setView(view, focusTab) {
+/* ============== Оболочка: навигация, страницы ============== */
+const DOTS = `<svg viewBox="0 0 420 249" fill="currentColor" aria-hidden="true" focusable="false">${ARGO_DOTS.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join('')}</svg>`;
+const ic = (id) => `<svg class="i"><use href="#${id}"/></svg>`;
+// Разделы s31. Раскрыты два: главная (кампус) и автомобили (гараж).
+const NAV = [
+  ['Склад', [['home', 'Главная', 'i-home', ''], ['equipment', 'Оборудование', 'i-boxes', '217'], ['lists', 'Списки', 'i-list', '6']]],
+  ['Люди и площадка', [['employees', 'Сотрудники', 'i-users', '12'], ['vehicles', 'Автомобили', 'i-car', '6'], ['halls', 'Залы', 'i-screen', '']]],
+  ['Инструменты', [['delay', 'Задержка', 'i-signal', '']]],
+];
+const TABS = [['home', 'Главная', 'i-home'], ['equipment', 'Техника', 'i-boxes'], ['lists', 'Списки', 'i-list'], ['vehicles', 'Авто', 'i-car'], ['halls', 'Залы', 'i-screen'], ['more', 'Ещё', 'i-more']];
+const PAGE_VIEW = { home: 'campus', vehicles: 'garage' };
+const PAGE_NAME = { equipment: 'Оборудование', lists: 'Списки', employees: 'Сотрудники', halls: 'Залы', delay: 'Задержка', more: 'Ещё', new: 'Новый список' };
+const navItem = (it, count) => `<button type="button" class="u-nav" data-page="${it[0]}">${ic(it[2])}${it[1]}${count && it[3] ? `<em>${it[3]}</em>` : ''}</button>`;
+const lang = '<div class="u-lang" role="group" aria-label="Язык"><button type="button" aria-pressed="true">RU</button><button type="button" aria-pressed="false">UZ</button></div>';
+const brand = `<div class="u-brand">${DOTS}<small>Склад</small></div>`;
+$('side').innerHTML = brand
+  + NAV.map(([g, items]) => `<div class="u-side__group">${g}</div>` + items.map((it) => navItem(it, true)).join('')).join('')
+  + `<button type="button" class="u-side__new" data-page="new"><span class="plus">${ic('i-plus')}</span><span><b>Новый список</b><small>Собрать комплект на выезд</small></span></button>`
+  + `<div class="u-side__foot"><div class="u-loc">${ic('i-building')}Офис · Ташкент</div>${lang}`
+  + `<div class="u-user"><span class="u-ava">ДР</span><span><b>Дилноза Рашидова</b><small>Менеджер склада</small></span><button type="button" class="u-out" data-stub="Выход" aria-label="Выйти">${ic('i-logout')}</button></div></div>`;
+$('topbar').innerHTML = brand + `<nav aria-label="Меню">${NAV.flatMap(([, items]) => items).map((it) => navItem(it, false)).join('')}</nav>`
+  + `<div class="u-top-end">${lang}<span class="u-ava" title="Дилноза Рашидова · Менеджер склада">ДР</span><button type="button" class="u-out" data-stub="Выход" aria-label="Выйти">${ic('i-logout')}</button></div>`;
+$('tabs').innerHTML = TABS.map((t) => `<button type="button" class="p-tab" data-page="${t[0]}">${ic(t[2])}${t[1]}</button>`).join('');
+
+document.addEventListener('click', (e) => {
+  const l = e.target.closest('.u-lang button');
+  if (l) l.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === l)));
+  const p = e.target.closest('[data-page], [data-go]');
+  if (!p) return;
+  const page = p.dataset.page || p.dataset.go;
+  if (PAGE_VIEW[page]) setView(PAGE_VIEW[page]);
+  else toast(`${PAGE_NAME[page]} — в макете не раскрыт`);
+});
+
+// Макет: вариант навигации. Хранится в localStorage (mock-nav), на телефоне не влияет.
+const store = {
+  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* приватный режим — без памяти */ } },
+};
+function setNav(v) {
+  document.body.classList.toggle('nav-top', v === 'top');
+  document.querySelectorAll('[data-nav]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.nav === v)));
+  store.set('mock-nav', v);
+}
+document.querySelector('.mock-nav').addEventListener('click', (e) => { const b = e.target.closest('[data-nav]'); if (b) setNav(b.dataset.nav); });
+
+// Главная списком: мир выключаемый. Без WebGL — только список.
+function setHomeList(on) {
+  $('page-home').classList.toggle('is-list', on);
+  $('homeList').hidden = !on;
+}
+$('toList').addEventListener('click', () => setHomeList(true));
+$('toWorld').addEventListener('click', () => setHomeList(false));
+
+// «Свернуть 3D» у машин: реестр на всю ширину. Хранится в localStorage (mock-garage-flat).
+const garageEl = $('garage'), flatBtn = $('flatBtn');
+function setFlat(on, save = true) {
+  garageEl.classList.toggle('is-flat', on);
+  flatBtn.setAttribute('aria-pressed', String(on));
+  flatBtn.textContent = on ? 'Показать 3D' : 'Свернуть 3D';
+  if (save) store.set('mock-garage-flat', on ? '1' : '0');
+}
+flatBtn.addEventListener('click', () => setFlat(!garageEl.classList.contains('is-flat')));
+
+function setView(view) {
   state.view = view;
   setHover(null);
-  tabs.forEach((t) => {
-    const on = t.dataset.view === view;
-    t.setAttribute('aria-selected', String(on));
-    t.tabIndex = on ? 0 : -1;
-    if (on && focusTab) t.focus();
+  const page = view === 'garage' ? 'vehicles' : 'home';
+  $('page-home').hidden = page !== 'home';
+  $('page-vehicles').hidden = page !== 'vehicles';
+  // Один renderer: сцена переезжает в слот открытой страницы, ResizeObserver подстроит размер
+  $('slot-' + (view === 'garage' ? 'garage' : 'home')).appendChild(stageEl);
+  $('toList').hidden = view === 'garage';
+  document.querySelectorAll('[data-page]').forEach((b) => {
+    const on = b.dataset.page === page;
+    b.classList.toggle('is-on', on && b.classList.contains('u-nav'));
+    if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
-  stageEl.setAttribute('aria-labelledby', 'tab-' + view);
-  app.classList.toggle('is-garage', view === 'garage');
-  panel.hidden = view !== 'garage';
-  evSwitch.hidden = view === 'garage';
+  document.title = (view === 'garage' ? 'Автомобили' : 'Главная') + ' · ARGO Склад';
   renderCap();
   renderDock();
   renderPanel();
@@ -1143,13 +1215,6 @@ function setView(view, focusTab) {
     placeCamera();
   }
 }
-tabs.forEach((t, i) => {
-  t.addEventListener('click', () => setView(t.dataset.view));
-  t.addEventListener('keydown', (e) => {
-    const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
-    if (d) { e.preventDefault(); setView(tabs[(i + d + tabs.length) % tabs.length].dataset.view, true); }
-  });
-});
 // Стрелки при фокусе в сцене гаража листают машины; Esc снимает выбор
 sceneEl.addEventListener('keydown', (e) => {
   if (state.view !== 'garage') return;
@@ -1161,9 +1226,20 @@ sceneEl.addEventListener('keydown', (e) => {
   } else if (e.key === 'Escape') select(null);
 });
 
-if (hasGL()) initWorld();
+setNav(store.get('mock-nav') === 'top' ? 'top' : 'side');
+setFlat(store.get('mock-garage-flat') === '1', false);
+if (hasGL()) {
+  initWorld();
+  if (reduced) setHomeList(true);   // без движения — плитки по умолчанию, мир по кнопке
+} else {
+  // Без WebGL: главная — плитки, машины — реестр. Кнопки возврата в мир прячем.
+  document.body.classList.add('no-gl');
+  $('listNote').textContent = '3D недоступно на этом устройстве — разделы списком';
+  $('toWorld').hidden = flatBtn.hidden = true;
+  setHomeList(true);
+  setFlat(true, false);   // вынужденный режим не запоминаем
+}
 if (location.hash === '#debug') window.__world = W;   // для проверок: число мешей, позиция фургона
-else sceneEl.innerHTML = '<p class="fallback">3D недоступно — объекты доступны кнопками внизу</p>';
 setView('campus');
 </script>
 </body>
