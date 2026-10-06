@@ -92,7 +92,7 @@ comment on table public.hall_assignments is
   'Ячейки матрицы: человек (или вакансия при employee_id null) на пересечении позиции и зала.';
 
 -- Нормализация имени — только у строк матрицы: у ячейки имени нет, ей нечего
--- тримить. Функция та же, что у залов (создана миграцией 20260824090000).
+-- тримить. Функция та же, что у залов (создана миграцией 20260824022708).
 drop trigger if exists trg_normalize_hall_name on public.plan_positions;
 create trigger trg_normalize_hall_name
   before insert or update on public.plan_positions

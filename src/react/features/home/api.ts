@@ -2,7 +2,7 @@ import type { Json } from '../../lib/database.types'
 import { cachedQuery, readCachedQuery, readCachedQueryMeta } from '../../lib/persistentCache'
 import { supabase } from '../../lib/supabase'
 
-// Сводка главной — ответ RPC home_summary (миграция 20260928100000). Форму задаёт
+// Сводка главной — ответ RPC home_summary (миграция 20260928133529). Форму задаёт
 // функция; здесь она сужается из Json с проверкой, а не приведением: разъедется
 // RPC с клиентом — главная покажет «нет фактов», а не undefined в числах.
 export type HomeSummary = {

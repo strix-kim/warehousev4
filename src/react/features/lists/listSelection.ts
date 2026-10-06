@@ -20,7 +20,7 @@ export function selectionLabel(group: CatalogGroup): SelectionLabel {
 }
 
 // Потолок количества в позиции. Правило живёт в базе: триггер
-// trg_guard_equipment_list_items (миграция 20261006130000_equipment_list_items_guard.sql)
+// trg_guard_equipment_list_items (миграция 20261006125157_equipment_list_items_guard.sql)
 // пропускает только целое 1..999. Константа — зеркало, чтобы интерфейс не доводил до отказа.
 export const MAX_ITEM_COUNT = 999
 

@@ -44,7 +44,7 @@ export async function fetchAppendTargets(): Promise<AppendTarget[]> {
 
 /**
  * Точечное добавление единицы в сохранённый список — RPC append_equipment_to_list
- * (миграция 20260823080000). Сервер сам берёт brand/model/type/subtype из
+ * (миграция 20260823071427). Сервер сам берёт brand/model/type/subtype из
  * equipment по id и блокирует строку списка: параллельная правка в редакторе
  * не затирается, дубль серийной единицы не создаётся ('already' — не ошибка).
  */
@@ -66,7 +66,7 @@ export async function appendEquipmentToList(
   // create/update/delete в lists/api: под ним и реестр, и «Сейчас в списках».
   invalidateCachePrefix('equipment-lists:')
   // Два формата ответа — не подстраховка, а порядок выкатки: этот код уезжает
-  // в прод РАНЬШЕ миграции 20260823090000, пока RPC ещё отвечает строкой.
+  // в прод РАНЬШЕ миграции 20260823073808, пока RPC ещё отвечает строкой.
   if (data && typeof data === 'object' && !Array.isArray(data)) {
     const status = (data as { status?: unknown }).status === 'already' ? 'already' : 'added'
     const count = (data as { count?: unknown }).count

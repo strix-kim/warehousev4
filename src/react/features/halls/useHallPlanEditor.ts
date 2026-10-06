@@ -46,7 +46,7 @@ export type SilentRefreshResult = 'ok' | 'skipped' | 'failed'
 
 // Клетка матрицы адресуется парой «строка × зал» — своего id у неё нет и быть не
 // может: клетка это пересечение, а не запись. В самой клетке с миграции
-// 20260824140000 стоит РОВНО ОДИН человек или никто.
+// 20260824040101 стоит РОВНО ОДИН человек или никто.
 export type CellKey = { hallId: string; positionId: string }
 
 // Ключ клетки строкой — для Map раскладки и для «в какую клетку сейчас
@@ -394,7 +394,7 @@ export function useHallPlanEditor(planId: string | undefined) {
   }
 
   // Удаление из справочника. Планы не трогает — ни этот, ни прошлые: у строки
-  // плана своя копия имени, ссылки на справочник нет (миграция 20260824120000).
+  // плана своя копия имени, ссылки на справочник нет (миграция 20260824035109).
   function removeCatalogEntry(id: string) {
     setCatalog((current) => current.filter((entry) => entry.id !== id))
     void run('delete-catalog-entry', () => deleteCatalogEntry(id), () => {})
@@ -467,7 +467,7 @@ export function useHallPlanEditor(planId: string | undefined) {
   }
 
   // Освободить клетку — удалить запись: «место есть, человека нет» с миграции
-  // 20260824140000 выражается пустой клеткой, и хранить для этого строку больше
+  // 20260824040101 выражается пустой клеткой, и хранить для этого строку больше
   // не нужно. Слот снимается тем же путём: он тоже занятая ячейка.
   function clearCell(id: string) {
     setAssignments((current) => current.filter((cell) => cell.id !== id))

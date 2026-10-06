@@ -22,7 +22,7 @@
 -- явно переданным числом. Порядок выкатки любой.
 --
 -- Тело скопировано из ДЕЙСТВУЮЩЕЙ версии
--- (20260820163924_keep_equipment_location_on_empty_update.sql), а не из baseline:
+-- (20260820164957_keep_equipment_location_on_empty_update.sql), а не из baseline:
 -- в baseline нет обороны location от пустой строки.
 
 drop function if exists public.update_equipment_model_and_unit(uuid,text,text,text,text,text,text,text,text,text,integer);
@@ -110,7 +110,7 @@ $function$;
 
 -- Права выдаём заново: drop снёс прежние гранты, а default privileges Supabase
 -- отдают EXECUTE новой функции напрямую anon — `revoke from public` этого не
--- снимает (грабля из 20260820173459_revoke_anon_count_units.sql).
+-- снимает (грабля из 20260820173505_revoke_anon_count_units.sql).
 revoke all on function public.update_equipment_model_and_unit(uuid, text, text, text, text, text, text, text, text, text, integer, timestamptz) from public;
 revoke execute on function public.update_equipment_model_and_unit(uuid, text, text, text, text, text, text, text, text, text, integer, timestamptz) from anon;
 grant execute on function public.update_equipment_model_and_unit(uuid, text, text, text, text, text, text, text, text, text, integer, timestamptz) to authenticated;

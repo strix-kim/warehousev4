@@ -28,7 +28,7 @@ comment on table public.position_catalog is
   'Справочник позиций мероприятия: имена для чипов быстрого добавления строк матрицы. Связи с планами нет — строка плана хранит свою копию имени.';
 
 -- Та же нормализация, что у залов и строк матрицы (функция создана миграцией
--- 20260824090000): хвостовые пробелы срезаются до записи, а не при чтении.
+-- 20260824022708): хвостовые пробелы срезаются до записи, а не при чтении.
 drop trigger if exists trg_normalize_hall_name on public.position_catalog;
 create trigger trg_normalize_hall_name
   before insert or update on public.position_catalog

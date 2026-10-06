@@ -13,7 +13,7 @@ alter table public.hall_assignments
   alter column employee_id drop not null;
 
 -- 2. Флаг слота. Ровно одно из двух: либо человек, либо слот. Запись без обоих
--- (вакансия-призрак, упразднённая в 20260824140000) и запись с обоими база не
+-- (вакансия-призрак, упразднённая в 20260824040101) и запись с обоими база не
 -- пустит; существующие строки проходят CHECK как есть (человек + false).
 alter table public.hall_assignments
   add column if not exists is_external boolean not null default false;
