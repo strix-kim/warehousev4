@@ -131,7 +131,14 @@ export function selectionFromList(list: EquipmentList, equipment: Equipment[], g
     if (group) addRestored(group, 1, equipmentId)
   }
   for (const item of list.equipment_items ?? []) {
-    const group = groupsByKey.get(groupKey(item))
+    // В jsonb лежит СНИМОК бренда и модели на момент сохранения. После
+    // переименования модели поиск по тексту промахивался, позиция молча
+    // пропадала из редактора, а следующее «Сохранить» стирала её из списка.
+    // equipment_id авторитетнее текста (то же правило, что в
+    // loadSavedListComposition); снимок — фолбэк для planned-позиций и
+    // оборудования, которого в каталоге больше нет.
+    const unit = item.equipment_id ? equipmentById.get(item.equipment_id) : undefined
+    const group = groupsByKey.get(groupKey(unit ?? item))
     if (group) addRestored(group, Math.max(1, Number(item.count) || 1), item.tracking_mode === 'serialized' ? item.equipment_id : undefined)
   }
 

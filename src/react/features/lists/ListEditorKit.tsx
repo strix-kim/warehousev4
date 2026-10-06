@@ -6,6 +6,7 @@ import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
 import { useArmedAction } from '../../lib/useArmedAction'
 import type { ResolvedSelection } from './listDocument'
+import { MAX_ITEM_COUNT } from './listSelection'
 
 // Половина редактора «Комплект»: позиции с количеством и серийниками, итог,
 // очистка и экспорт. Сама выборка живёт на странице — панель только просит её
@@ -82,7 +83,7 @@ export function KitPanel({ panelRef, isMobileActive, resolvedSelection, selected
                   onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }}
                   onBlur={() => commitCountDraft(item.key)}
                 />
-                <button onClick={() => onChangeCount(item.key, 1)} aria-label={tr('Увеличить', 'Ko‘paytirish')}><Plus size={14} /></button>
+                <button onClick={() => onChangeCount(item.key, 1)} disabled={item.count >= MAX_ITEM_COUNT} aria-label={tr('Увеличить', 'Ko‘paytirish')}><Plus size={14} /></button>
               </div>
               {group && group.serializedItems.length > 0 && (
                 <button
