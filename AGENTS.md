@@ -204,6 +204,7 @@ markdown-файлы по этому списку — читай нужный ц�
 | `.claude/skills/doc-audit/SKILL.md` | по команде прораба, перед вехой или после переписанной подсистемы |
 | `.claude/skills/rls-verify/SKILL.md` | затронуты права, роли, RLS, чужие записи |
 | `.claude/skills/deploy-verify/SKILL.md` | надо убедиться, что правка доехала; перед выкаткой |
+| `.claude/skills/design-game-ui/SKILL.md` | игровой UI поверх 3D-мира (таблички, HUD, карточки, переходы) — метод из Roblox-скилла, стиль ARGO |
 | `.claude/skills/motion/SKILL.md` | анимация: `motion`, CSS-переходы и пружины (сторонний, `npx motion-ai`; Motion+ не берём) |
 
 Новый или изменённый скилл отражай в этой таблице тем же коммитом.
