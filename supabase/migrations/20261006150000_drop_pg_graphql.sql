@@ -1,0 +1,12 @@
+-- Веха 4, advisors security, lint 0027: 13 таблиц public видны вошедшему пользователю
+-- в GraphQL-схеме. Совет линтера «снять SELECT с authenticated» не подходит — этим
+-- SELECT живёт всё приложение (Data API под RLS).
+--
+-- GraphQL продукт не использует: клиент ходит только через PostgREST (supabase-js),
+-- зависимых от расширения объектов в базе нет (pg_depend — 0). Поэтому снимается сама
+-- точка входа /graphql/v1, а не права на таблицы. Вернуть — `create extension
+-- pg_graphql with schema graphql;`.
+--
+-- Применяется прорабом в SQL Editor: MCP-коннектор отклоняет вызовы со словом drop
+-- (gotchas §3).
+drop extension if exists pg_graphql;
