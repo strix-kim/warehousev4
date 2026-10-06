@@ -246,7 +246,7 @@ export function EquipmentCreatePage() {
       return result
     } catch {
       // Отказ проверки НЕ означает «дубля нет»: разрешает только база
-      // (триггер trg_equipment_serial_unique), подсказка тут лишь бережёт попытку.
+      // (UNIQUE-индекс equipment_serialnumber_unique), подсказка тут лишь бережёт попытку.
       setSerialCheck('failed')
       return 'failed'
     } finally {
@@ -327,7 +327,7 @@ export function EquipmentCreatePage() {
       })
       setCreatedId(id)
     } catch (cause) {
-      // 23505 бросает триггер trg_equipment_serial_unique: между checkSerial и
+      // 23505 бросает UNIQUE-индекс equipment_serialnumber_unique: между checkSerial и
       // вставкой номер успела занять другая вкладка. Решает база, не подсказка.
       if (isUniqueViolation(cause)) {
         if (kind === 'serialized') setSerialCheck('duplicate')

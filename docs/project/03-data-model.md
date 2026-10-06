@@ -72,10 +72,12 @@ default `'N/A'` · `count` integer default 1 · `availability` text default `'av
 Ограничения: `availability in ('available','unavailable','diagnostics','issued')`;
 `count >= 0`.
 
-**Внешних ключей у таблицы нет ни одного. `UNIQUE` на `serialnumber` НЕТ** — есть только
-обычный btree `idx_equipment_serialnumber` и `equipment_serial_normalized_idx` по
-`lower(btrim(serialnumber))`. Новые дубли отклоняет триггер `trg_equipment_serial_unique`
-(с44, код `23505`); 10 групп старых повторов остаются до сверки наклеек (`02-decisions` §5).
+**Внешних ключей у таблицы нет ни одного.** Уникальность серийника держит частичный
+`UNIQUE`-индекс `equipment_serialnumber_unique` по `lower(btrim(serialnumber))` (с45, код
+`23505`); вне предиката — заглушки, нули, `QTY::AUTO::`, `AUTO-`. Рядом обычные btree
+`idx_equipment_serialnumber` (сырая колонка) и `equipment_serial_normalized_idx` (под поиск
+дубля в RPC без предиката). Триггер с44 снят той же миграцией; старые повторы удалены
+(1482 → 1471, `02-decisions` §5).
 
 `serialnumber` объявлен not null, но наружу отдаётся `string | null`: для количественного
 учёта в колонке лежит служебный идентификатор `QTY::…`, который нормализация прячет (§7).
@@ -263,7 +265,7 @@ select/insert/delete; `equipment_movements` — **только select**; `users`
 brand/model берутся из `equipment`, а не из клиентского JSON (точечный append под
 `for update`; документ-RPC выше дыру §5.1-2 сохраняют). `create_equipment_batch`
 проверяет дубль серийника под `pg_advisory_xact_lock`; одиночный insert и прямую
-правку номера с с44 страхует триггер `trg_equipment_serial_unique` на том же ключе лока.
+правку номера с с45 закрывает `UNIQUE`-индекс `equipment_serialnumber_unique`.
 Дубль у неё — не исключение, а ответ `{status:'duplicates'}`: список занятых
 номеров переводит на язык клиент. `fetch_equipment_models` повторяет построчную
 семантику поиска старого каталога намеренно — чтобы серийник находил модель.
@@ -380,13 +382,14 @@ technicalspecification, lengthinmeters, description) обновляются **у
 
 ## 9. Индексы
 
-На `equipment` — десять. Девять рабочих: `equipment_pkey`, по `availability`, `brand`, `location`,
-`model`, `serialnumber` (**btree, НЕ unique**), `subtype`, `type`, плюс
+На `equipment` — двенадцать. Одиннадцать рабочих: `equipment_pkey`, по `availability`, `brand`, `location`,
+`model`, `serialnumber` (btree по сырой колонке), `subtype`, `type`, плюс
 `equipment_model_normalized_idx` по `(lower(btrim(brand)), lower(btrim(model)))` —
 он покрывает предикат, по которому работают `count_equipment_model_units` и
-`update_equipment_model_and_unit`.
+`update_equipment_model_and_unit`; `equipment_serial_normalized_idx` (с44) и частичный
+**`UNIQUE`** `equipment_serialnumber_unique` (с45) — оба по `lower(btrim(serialnumber))`, §1.1.
 
-Десятый, `idx_equipment_search`, — **GIN** по
+Двенадцатый, `idx_equipment_search`, — **GIN** по
 `to_tsvector('russian', model || brand || serialnumber || coalesce(description,''))`.
 **Продукт его не использует:** поиск идёт через `ilike`-фильтры, а не через `@@`. Индекс
 не работает ни на один запрос и только удорожает запись — либо переводить поиск на него,
@@ -442,7 +445,6 @@ technicalspecification, lengthinmeters, description) обновляются **у
   поломка приложения.
 - **Дубль внешнего ключа на `mount_points`** и четыре триггера пересчёта — §4.
 - **Неиспользуемый GIN-индекс** — §9.
-- **Нет `UNIQUE` на `equipment.serialnumber`** — уникальность новых держит триггер, §1.1.
 
 ## 12. Сотрудники и первый Storage-бакет (с17)
 
