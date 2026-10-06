@@ -44,6 +44,8 @@ export function exportFileName({ kind, name, date, language }: {
   language: 'ru' | 'uz'
 }) {
   const label = KIND_LABELS[kind]
-  const title = safeFileName(name, label.fallback).replace(/ /g, '_')
+  // Кавычки и слэши safeFileName заменяет дефисами, вокруг них стоят пробелы —
+  // без склейки «Гала-ужин: "VIP" / зал» даёт «Гала-ужин-_-VIP-_-_зал».
+  const title = safeFileName(name, label.fallback).replace(/ /g, '_').replace(/[-_]{2,}/g, '_')
   return `ARGOMEDIA_${label[language]}_${title}_${date || todayDateValue()}.xlsx`
 }
