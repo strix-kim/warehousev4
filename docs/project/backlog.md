@@ -825,8 +825,6 @@
 - **`equipment_ids` при прямой записи не проверяются на существование** (FK на массив невозможен):
   тем же триггером `trg_guard_equipment_list_items` закрывается десятком строк по правилу сирот
   (`update of equipment_ids`). Из интерфейса недостижимо — id идут из живого каталога.
-- **`saveList` в `ListEditorPage.tsx` глотает ошибку без `reportAppError`** (gotchas §11): отказ
-  триггера или RPC показывается общим текстом и не попадает в журнал.
 - **Отключённая «+» в позиции сохраняет подсветку при наведении:** `.quantity-stepper button:hover`
   в `05-editor.css` без `:not(:disabled)`.
 - **`append_equipment_to_list` не сверяет `p_tracking_mode` с самой единицей:** серийная строка

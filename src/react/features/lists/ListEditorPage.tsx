@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ErrorState } from '../../components/ErrorState'
 import { todayDateValue } from '../../lib/date'
 import { useLanguage } from '../../lib/i18n'
+import { reportAppError } from '../../lib/reportAppError'
 import {
   clearListDraft,
   createEquipmentList,
@@ -342,7 +343,8 @@ export function ListEditorPage() {
       if (isCreating) {
         navigate(`/lists/${saved.id}/edit`, { replace: true })
       }
-    } catch {
+    } catch (saveError: unknown) {
+      reportAppError(saveError, { scope: 'loader', route: listId ? '/lists/:id/edit' : '/lists/new', detail: { source: 'save-list' } })
       setSaveError(tr('Не удалось сохранить список. Файл всё ещё можно скачать.', 'Ro‘yxatni saqlab bo‘lmadi. Faylni baribir yuklab olish mumkin.'))
     } finally {
       setIsSaving(false)
