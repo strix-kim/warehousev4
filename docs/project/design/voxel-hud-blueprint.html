@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Чертёж зон HUD</title>
+<link rel="icon" href="data:,">
+<style>
+/* Чертёж зон HUD мира ARGO (с47). Синька: зоны, размеры, запреты — без стиля оболочки. */
+:root{--bg:#0E2A47;--ln:#fff;--dim:rgba(255,255,255,.6);--faint:rgba(255,255,255,.22)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ln);font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+h1{font-size:18px;font-weight:600;margin:0 0 6px;letter-spacing:.04em}
+h2{font-size:14px;font-weight:600;margin:0 0 4px;letter-spacing:.04em}
+h3{font-size:12px;font-weight:600;margin:0 0 12px;color:var(--dim);letter-spacing:.06em}
+.head{padding:40px 64px 8px;max-width:1100px}
+.head p{margin:4px 0;color:var(--dim)}
+.row{display:flex;gap:120px;align-items:flex-start;padding:32px 64px 48px 200px;width:max-content}
+.col{flex:none}
+.page{display:flex;gap:56px;align-items:flex-start;margin-bottom:96px}
+.page.v{flex-direction:column;gap:48px}
+.f{position:relative;flex:none;border:1px solid var(--ln);
+ background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:40px 40px}
+.z{position:absolute;border:1px dashed var(--ln)}
+.z.s{border-style:solid}
+.z.d{border-style:dotted;border-color:var(--dim)}
+.z.x{border-color:var(--faint)}
+.off{position:absolute;border:1px solid var(--dim);background:repeating-linear-gradient(45deg,transparent 0 7px,rgba(255,255,255,.1) 7px 8px)}
+.zl{position:absolute;left:6px;top:4px;font-size:11px;line-height:1.35;background:var(--bg);padding:1px 5px;white-space:nowrap}
+.zl.r{left:auto;right:6px}
+.zl.b{top:auto;bottom:4px}
+.zl.c{left:50%;top:50%;transform:translate(-50%,-50%);text-align:center}
+.k{display:inline-block;min-width:18px;text-align:center;border:1px solid var(--ln);padding:0 3px;margin-right:6px;font-weight:600}
+.tg{position:absolute;border:1px dashed var(--ln);font-size:10px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;background:var(--bg)}
+.ob{position:absolute;border:1px dotted var(--dim)}
+.ld{position:absolute;width:0;border-left:1px dashed var(--dim)}
+.dv{position:absolute;width:0;border-left:1px solid var(--ln)}
+.dv::before,.dv::after{content:"";position:absolute;left:-5px;width:9px;border-top:1px solid var(--ln)}
+.dv::before{top:0}.dv::after{bottom:0}
+.dh{position:absolute;height:0;border-top:1px solid var(--ln)}
+.dh::before,.dh::after{content:"";position:absolute;top:-5px;height:9px;border-left:1px solid var(--ln)}
+.dh::before{left:0}.dh::after{right:0}
+.dl{position:absolute;background:var(--bg);padding:0 4px;white-space:nowrap;font-size:11px}
+.dv .dl{top:50%;transform:translateY(-50%);right:6px}
+.dv.rt .dl{right:auto;left:6px}
+.dh .dl{left:50%;transform:translateX(-50%);top:-9px}
+.ro{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border:1.5px solid var(--ln);border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;z-index:2}
+svg.ar{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:1}
+svg.ar path{fill:none;stroke:var(--ln);stroke-width:1.5;stroke-dasharray:6 4}
+.notes{width:380px;flex:none}
+.page.v .notes{width:1440px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+.n{margin:0 0 14px;padding-left:10px;border-left:1px solid var(--faint)}
+.n b{font-weight:600}
+.n i{font-style:normal;color:var(--dim)}
+.no{color:var(--dim)}
+.foot{padding:0 64px 64px;max-width:1300px;display:grid;grid-template-columns:1fr 1fr;gap:48px}
+.foot ul{margin:0;padding-left:18px}
+.foot li{margin:0 0 6px}
+.lg{display:flex;align-items:center;gap:12px;margin:0 0 8px}
+.sw{position:relative;width:56px;height:22px;flex:none}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#fff"/></marker></defs></svg>
+
+<div class="head">
+<h1>ARGO · МИР · ЧЕРТЁЖ ЗОН HUD · с47</h1>
+<p>Шаг 2 скилла design-game-ui. Судим зоны, а не пиксели: здесь нет стиля, цвета и содержимого — только где что живёт, какого размера и куда не заходит.</p>
+<p>Порядок рамок: 390×844 (самый тесный режим, бюджет 390×560 над нижней панелью) → 1440×900 навигация «Верх» → 1440×900 сайдбар 248. В каждой — «Главная / кампус» над «Автомобили / гараж».</p>
+<p>Кружки ① ② ③ и пунктирные стрелки — порядок чтения. Все размеры в CSS-px.</p>
+</div>
+
+<div class="row">
+
+<!-- ============ 390 × 844 ============ -->
+<div class="col">
+<h2>390 × 844 · ТЕЛЕФОН</h2>
+<h3>ГЛАВНАЯ / КАМПУС</h3>
+<div class="page">
+<div class="f" style="width:390px;height:844px">
+ <div class="off" style="left:0;top:0;width:390px;height:186px"><span class="zl">вне бюджета · 186 =<br>status 47 + шапка оболочки 56<br>+ строка браузера 83</span></div>
+ <div class="z s" style="left:0;top:186px;width:390px;height:560px"><span class="zl b r" style="bottom:96px"><span class="k">S</span>канвас 390×560</span></div>
+ <div class="z s" style="left:16px;top:194px;width:358px;height:48px"><span class="zl c"><span class="k">C</span>КОНТЕКСТ ДНЯ · 358×48</span></div>
+ <div class="z x" style="left:16px;top:194px;width:358px;height:176px"><span class="zl b r">C′ раскрыта ≤ 176</span></div>
+ <div class="z d" style="left:16px;top:250px;width:358px;height:408px"><span class="zl b" style="bottom:22px">кадр объектов · камера по aspect</span></div>
+ <div class="ob" style="left:60px;top:410px;width:56px;height:40px"></div>
+ <div class="ld" style="left:88px;top:394px;height:16px"></div>
+ <div class="tg" style="left:28px;top:350px;width:120px;height:44px">T · офис<br>имя + число</div>
+ <div class="ob" style="left:250px;top:470px;width:64px;height:44px"></div>
+ <div class="ld" style="left:282px;top:452px;height:18px"></div>
+ <div class="tg" style="left:222px;top:408px;width:120px;height:44px">T · склад</div>
+ <div class="ob" style="left:140px;top:560px;width:60px;height:40px"></div>
+ <div class="ld" style="left:170px;top:548px;height:12px"></div>
+ <div class="tg" style="left:110px;top:504px;width:120px;height:44px">T · гараж</div>
+ <div class="z x" style="left:16px;top:666px;width:102px;height:64px"><span class="zl c no">∅ пусто</span></div>
+ <div class="z s" style="left:126px;top:666px;width:248px;height:64px"><span class="zl c"><span class="k">A</span>ДЕЙСТВИЯ · 248×64</span></div>
+ <div class="off" style="left:0;top:746px;width:390px;height:64px"><span class="zl">нижняя панель · 6 слотов · 64</span></div>
+ <div class="off" style="left:0;top:810px;width:390px;height:34px"><span class="zl">home-индикатор 34</span></div>
+ <div class="dv" style="left:-28px;top:186px;height:560px"><span class="dl">560</span></div>
+ <div class="dv" style="left:-62px;top:250px;height:408px"><span class="dl">кадр 408 = 73 %</span></div>
+ <div class="dv rt" style="left:400px;top:666px;height:64px"><span class="dl">A 64</span></div>
+ <div class="dv rt" style="left:400px;top:730px;height:16px"><span class="dl">16</span></div>
+ <div class="dh" style="left:0;top:630px;width:16px"><span class="dl" style="top:6px">16</span></div>
+ <div class="dh" style="left:374px;top:630px;width:16px"><span class="dl" style="top:6px">16</span></div>
+ <svg class="ar" width="390" height="844"><path d="M195 440 C 300 400, 330 300, 330 256" marker-end="url(#ah)"/><path d="M350 230 C 380 400, 250 600, 160 682" marker-end="url(#ah)"/></svg>
+ <div class="ro" style="left:195px;top:452px">1</div>
+ <div class="ro" style="left:330px;top:218px">2</div>
+ <div class="ro" style="left:150px;top:698px">3</div>
+</div>
+<div class="notes">
+ <p class="n"><b><span class="k">S</span>СЦЕНА</b> · канвас 390×560 на всю рабочую область, кадр объектов 358×408 (73 % высоты, бюджет ≥ 45 %).<br>Внутри: три здания и выезд. Камера подбирается по aspect так, чтобы здания лежали в кадре, а не под C и A.<br><i>Нельзя:</i> ставить здание в нижние 80 px и под C.</p>
+ <p class="n"><b><span class="k">T</span>СЛОЙ ТАБЛИЧЕК</b> · табличка ≤ 120×44, якорь — над своим зданием, связь — выноской.<br>Внутри: имя раздела + одно число дня.<br><i>Нельзя:</i> выходить за кадр объектов (safe 16 по краям), перекрывать A и C; при раскрытой C′ таблички под ней гаснут, а не съезжают.</p>
+ <p class="n"><b><span class="k">C</span>КОНТЕКСТ ДНЯ</b> · свёрнута 358×48, раскрыта ≤ 358×176.<br>Внутри: плашка «сегодня» — дата и «N мероприятий»; тап раскрывает карточку события (до двух строк-мероприятий, имя площадки 40 симв. → 2 строки, дальше «…»). Тумблер-демо — 44×44 у правого края плашки.<br><i>Нельзя:</i> раскрываться выше 176 — третье и далее уходят в «ещё N».</p>
+ <p class="n"><b><span class="k">A</span>ДЕЙСТВИЯ</b> · 248×64 справа-снизу, зона большого пальца. 4 цели 56×56, зазор 8: офис, склад, гараж (кнопки-дубли зданий), «Показать списком».<br><i>Нельзя:</i> левый нижний угол (102×64) — пусто; цели меньше 44; табличкам — заходить сюда.</p>
+</div>
+</div>
+
+<h3>АВТОМОБИЛИ / ГАРАЖ</h3>
+<div class="page">
+<div class="f" style="width:390px;height:844px">
+ <div class="off" style="left:0;top:0;width:390px;height:186px"><span class="zl">вне бюджета · 186</span></div>
+ <div class="z s" style="left:0;top:186px;width:390px;height:56px"><span class="zl c"><span class="k">A</span>390×56</span></div>
+ <div class="z" style="left:16px;top:192px;width:96px;height:44px"><span class="zl c" style="font-size:10px">← Кампус</span></div>
+ <div class="z" style="left:262px;top:192px;width:112px;height:44px"><span class="zl c" style="font-size:10px">Свернуть 3D</span></div>
+ <div class="z s" style="left:0;top:242px;width:390px;height:260px"><span class="zl"><span class="k">S</span>СЦЕНА · 390×260 · камера по aspect</span></div>
+ <div class="ob" style="left:40px;top:300px;width:84px;height:44px"></div><div class="ob" style="left:153px;top:300px;width:84px;height:44px"></div><div class="ob" style="left:266px;top:300px;width:84px;height:44px"></div>
+ <div class="ob" style="left:40px;top:390px;width:84px;height:44px"></div><div class="ob" style="left:153px;top:390px;width:84px;height:44px"></div><div class="ob" style="left:266px;top:390px;width:84px;height:44px"></div>
+ <div class="tg" style="left:146px;top:446px;width:98px;height:28px">T · выбранная</div>
+ <div class="z x" style="left:0;top:242px;width:390px;height:504px"><span class="zl b r" style="bottom:250px">P′ развёрнут до 504</span></div>
+ <div class="z s" style="left:0;top:502px;width:390px;height:244px"><span class="zl r" style="top:2px"><span class="k">P</span>ЛИСТ · 390×244</span></div>
+ <div class="z" style="left:16px;top:526px;width:358px;height:88px"><span class="zl">карточка машины · 88</span></div>
+ <div class="z" style="left:254px;top:564px;width:112px;height:44px"><span class="zl c" style="font-size:10px">форма / экспорт</span></div>
+ <div class="z" style="left:16px;top:618px;width:358px;height:128px"><span class="zl">реестр · строки по 44</span></div>
+ <div class="off" style="left:0;top:746px;width:390px;height:64px"><span class="zl">нижняя панель · 64</span></div>
+ <div class="off" style="left:0;top:810px;width:390px;height:34px"></div>
+ <div class="dv" style="left:-28px;top:242px;height:260px"><span class="dl">сцена 260 = 46 %</span></div>
+ <div class="dv" style="left:-28px;top:502px;height:244px"><span class="dl">лист 244</span></div>
+ <div class="dv rt" style="left:400px;top:186px;height:56px"><span class="dl">A 56</span></div>
+ <div class="dh" style="left:0;top:520px;width:16px"><span class="dl" style="top:4px">16</span></div>
+ <svg class="ar" width="390" height="844"><path d="M195 375 C 120 450, 100 520, 110 560" marker-end="url(#ah)"/><path d="M120 590 C 100 640, 100 660, 110 676" marker-end="url(#ah)"/></svg>
+ <div class="ro" style="left:195px;top:367px">1</div>
+ <div class="ro" style="left:110px;top:574px">2</div>
+ <div class="ro" style="left:110px;top:690px">3</div>
+</div>
+<div class="notes">
+ <p class="n"><b><span class="k">S</span>СЦЕНА</b> · 390×260 = 46 % рабочей высоты (порог 45 % — ровно на грани, не уменьшать).<br>Внутри: 6 машин сеткой 3×2, тап = выбор. 0 машин: пустой гараж, без подписей.<br><i>Нельзя:</i> HUD поверх сцены, кроме одной таблички выбранной машины.</p>
+ <p class="n"><b><span class="k">T</span>ТАБЛИЧКА</b> · одна, ≤ 98×28, под выбранной машиной.<br><i>Нельзя:</i> подписывать все 6 — список машин живёт в реестре.</p>
+ <p class="n"><b><span class="k">P</span>ЛИСТ СНИЗУ</b> · свёрнут 390×244, развёрнут 390×504 (до низа A).<br>Внутри: ручка 24, карточка выбранной 88 (кнопка формы/экспорта 112×44 — справа, в зоне пальца), реестр строками по 44.<br>0 машин: карточка → пустое состояние с действием «Добавить», реестр скрыт.<br><i>Нельзя:</i> развёртываться поверх A — выход из гаража виден всегда.</p>
+ <p class="n"><b><span class="k">A</span>НАВИГАЦИЯ МИРА</b> · 390×56: «← Кампус» 96×44 слева, «Свернуть 3D» 112×44 справа.<br><i>Нельзя:</i> прятать в лист. Верх-лево вне зоны пальца — допущено: выход вторичен, есть системное «назад».</p>
+</div>
+</div>
+</div>
+
+<!-- ============ 1440 × 900 · ВЕРХ ============ -->
+<div class="col">
+<h2>1440 × 900 · НАВИГАЦИЯ «ВЕРХ»</h2>
+<h3>ГЛАВНАЯ / КАМПУС</h3>
+<div class="page v">
+<div class="f" style="width:1440px;height:900px">
+ <div class="off" style="left:0;top:0;width:1440px;height:56px"><span class="zl">полоса навигации оболочки · 1440×56 — вне HUD</span></div>
+ <div class="z s" style="left:0;top:56px;width:1440px;height:844px"><span class="zl b" style="left:16px;bottom:96px"><span class="k">S</span>СЦЕНА · 1440×844 · канвас на всю рабочую область</span></div>
+ <div class="z d" style="left:120px;top:140px;width:1200px;height:648px"><span class="zl">кадр объектов 1200×648 · камера подбирается по aspect</span></div>
+ <div class="z s" style="left:1064px;top:72px;width:360px;height:56px"><span class="zl c"><span class="k">C</span>КОНТЕКСТ ДНЯ · 360×56</span></div>
+ <div class="z x" style="left:1064px;top:72px;width:360px;height:240px"><span class="zl b">C′ карточка события ≤ 360×240</span></div>
+ <div class="ob" style="left:300px;top:330px;width:140px;height:100px"></div><div class="ld" style="left:370px;top:306px;height:24px"></div>
+ <div class="tg" style="left:270px;top:250px;width:200px;height:56px">T · офис · имя + число</div>
+ <div class="ob" style="left:640px;top:380px;width:180px;height:120px"></div><div class="ld" style="left:730px;top:346px;height:34px"></div>
+ <div class="tg" style="left:630px;top:290px;width:200px;height:56px">T · склад</div>
+ <div class="ob" style="left:960px;top:440px;width:150px;height:100px"></div><div class="ld" style="left:1035px;top:412px;height:28px"></div>
+ <div class="tg" style="left:935px;top:356px;width:200px;height:56px">T · гараж</div>
+ <div class="ob" style="left:1210px;top:660px;width:90px;height:60px"></div><div class="tg" style="left:1160px;top:600px;width:150px;height:44px">T · выезд</div>
+ <div class="z s" style="left:420px;top:804px;width:600px;height:80px"><span class="zl c"><span class="k">A</span>ДЕЙСТВИЯ · 600×80</span></div>
+ <div class="dv rt" style="left:1030px;top:804px;height:80px"><span class="dl">A 80</span></div>
+ <div class="dv rt" style="left:1030px;top:884px;height:16px"><span class="dl">16</span></div>
+ <div class="dh" style="left:1424px;top:100px;width:16px"><span class="dl" style="top:-20px">16</span></div>
+ <div class="dv rt" style="left:1250px;top:56px;height:16px"><span class="dl">16</span></div>
+ <div class="dh" style="left:0;top:470px;width:120px"><span class="dl">≥ 16 safe · 120 кадр</span></div>
+ <svg class="ar" width="1440" height="900"><path d="M740 460 C 900 300, 1000 180, 1080 116" marker-end="url(#ah)"/><path d="M1092 116 C 1000 500, 700 760, 466 836" marker-end="url(#ah)"/></svg>
+ <div class="ro" style="left:720px;top:470px">1</div>
+ <div class="ro" style="left:1092px;top:100px">2</div>
+ <div class="ro" style="left:450px;top:844px">3</div>
+</div>
+<div class="notes">
+ <p class="n"><b><span class="k">S</span>СЦЕНА</b> · 1440×844, кадр 1200×648.<br>Камера по aspect держит здания в кадре: справа-сверху — место под C′, снизу — под A.<br><i>Нельзя:</i> строения под C′ и A.</p>
+ <p class="n"><b><span class="k">T</span>ТАБЛИЧКИ</b> · ≤ 200×56, над зданием, выноска к крыше. Выезд — своя ≤ 150×44, только в день мероприятия.<br><i>Нельзя:</i> safe 16 от краёв, заход в C/C′ и A; таблички не перекрывают друг друга — при столкновении сдвиг вверх.</p>
+ <p class="n"><b><span class="k">C</span>КОНТЕКСТ ДНЯ</b> · угол справа-сверху, 360×56; раскрыта ≤ 360×240 (2 мероприятия, имя площадки 40 симв. влезает в 2 строки). Тумблер-демо — внутри плашки справа.<br><i>Нельзя:</i> заходить левее 1064 — центр кадра принадлежит кампусу.</p>
+ <p class="n"><b><span class="k">A</span>ДЕЙСТВИЯ</b> · по центру снизу, 600×80: кнопки-дубли трёх зданий + «Показать списком», цели 56 высотой.<br><i>Нельзя:</i> разносить по углам — группа одна (§8.5: расстояние = связь).</p>
+</div>
+</div>
+
+<h3>АВТОМОБИЛИ / ГАРАЖ</h3>
+<div class="page v">
+<div class="f" style="width:1440px;height:900px">
+ <div class="off" style="left:0;top:0;width:1440px;height:56px"><span class="zl">полоса навигации · 56</span></div>
+ <div class="z s" style="left:0;top:56px;width:1020px;height:844px"><span class="zl b"><span class="k">S</span>СЦЕНА · 1020×844 · камера по aspect</span></div>
+ <div class="z s" style="left:16px;top:72px;width:988px;height:56px"><span class="zl c"><span class="k">A</span>НАВИГАЦИЯ МИРА · 988×56</span></div>
+ <div class="z" style="left:24px;top:78px;width:140px;height:44px"><span class="zl c" style="font-size:10px">← Кампус</span></div>
+ <div class="z" style="left:856px;top:78px;width:140px;height:44px"><span class="zl c" style="font-size:10px">Свернуть 3D</span></div>
+ <div class="z d" style="left:16px;top:144px;width:988px;height:724px"><span class="zl">кадр шести машин 988×724</span></div>
+ <div class="ob" style="left:150px;top:300px;width:180px;height:110px"></div><div class="ob" style="left:420px;top:300px;width:180px;height:110px"></div><div class="ob" style="left:690px;top:300px;width:180px;height:110px"></div>
+ <div class="ob" style="left:150px;top:520px;width:180px;height:110px"></div><div class="ob" style="left:420px;top:520px;width:180px;height:110px"></div><div class="ob" style="left:690px;top:520px;width:180px;height:110px"></div>
+ <div class="tg" style="left:440px;top:640px;width:140px;height:32px">T · выбранная</div>
+ <div class="z s" style="left:1020px;top:56px;width:420px;height:844px"><span class="zl r"><span class="k">P</span>ПАНЕЛЬ · 420×844</span></div>
+ <div class="z" style="left:1036px;top:88px;width:388px;height:340px"><span class="zl" style="top:20px">карточка машины · 388×340</span></div>
+ <div class="z" style="left:1052px;top:368px;width:356px;height:44px"><span class="zl c" style="font-size:10px">форма / экспорт</span></div>
+ <div class="z" style="left:1036px;top:444px;width:388px;height:440px"><span class="zl">реестр · строки по 44</span></div>
+ <div class="dh" style="left:1020px;top:918px;width:420px"><span class="dl" style="top:4px">панель 420</span></div>
+ <div class="dh" style="left:0;top:918px;width:1020px"><span class="dl" style="top:4px">сцена 1020</span></div>
+ <div class="dv" style="left:-16px;top:72px;height:56px"><span class="dl">A 56</span></div>
+ <div class="dh" style="left:0;top:100px;width:16px"><span class="dl" style="top:4px">16</span></div>
+ <svg class="ar" width="1440" height="900"><path d="M530 460 C 750 420, 950 260, 1060 230" marker-end="url(#ah)"/><path d="M1230 300 C 1300 380, 1300 440, 1240 480" marker-end="url(#ah)"/></svg>
+ <div class="ro" style="left:510px;top:465px">1</div>
+ <div class="ro" style="left:1230px;top:260px">2</div>
+ <div class="ro" style="left:1230px;top:500px">3</div>
+</div>
+<div class="notes">
+ <p class="n"><b><span class="k">S</span>СЦЕНА</b> · 1020×844, кадр 988×724 под навигацией. 6 машин сеткой 3×2; 0 машин — пустой гараж.<br><i>Нельзя:</i> машины под A.</p>
+ <p class="n"><b><span class="k">T</span>ТАБЛИЧКА</b> · одна, ≤ 140×32, у выбранной; выбор — кольцом.<br><i>Нельзя:</i> подписи у всех машин — это дубль реестра.</p>
+ <p class="n"><b><span class="k">P</span>ПАНЕЛЬ</b> · 420×844 справа, вне канваса. Карточка 388×340 (форма/экспорт — нижней строкой карточки), реестр — остаток, строки 44, прокрутка своя.<br>0 машин: карточка → пустое состояние с «Добавить», реестр скрыт.<br><i>Нельзя:</i> перекрывать сцену; сцена не уходит под панель.</p>
+ <p class="n"><b><span class="k">A</span>НАВИГАЦИЯ МИРА</b> · 988×56 по верху сцены: «← Кампус» слева, «Свернуть 3D» справа (цели 140×44).<br><i>Нельзя:</i> переносить в панель — выход принадлежит миру, не карточке.</p>
+</div>
+</div>
+</div>
+
+<!-- ============ 1440 × 900 · САЙДБАР ============ -->
+<div class="col">
+<h2>1440 × 900 · САЙДБАР 248</h2>
+<h3>ГЛАВНАЯ / КАМПУС</h3>
+<div class="page v">
+<div class="f" style="width:1440px;height:900px">
+ <div class="off" style="left:0;top:0;width:248px;height:900px"><span class="zl">сайдбар оболочки · 248×900 — вне HUD</span></div>
+ <div class="z s" style="left:248px;top:0;width:1192px;height:900px"><span class="zl b" style="left:16px;bottom:96px"><span class="k">S</span>СЦЕНА · 1192×900 · канвас на всю рабочую область</span></div>
+ <div class="z d" style="left:352px;top:96px;width:984px;height:692px"><span class="zl">кадр объектов 984×692 · камера подбирается по aspect</span></div>
+ <div class="z s" style="left:1064px;top:16px;width:360px;height:56px"><span class="zl c"><span class="k">C</span>КОНТЕКСТ ДНЯ · 360×56</span></div>
+ <div class="z x" style="left:1064px;top:16px;width:360px;height:240px"><span class="zl b">C′ карточка события ≤ 360×240</span></div>
+ <div class="ob" style="left:450px;top:320px;width:130px;height:100px"></div><div class="ld" style="left:515px;top:296px;height:24px"></div>
+ <div class="tg" style="left:415px;top:240px;width:200px;height:56px">T · офис · имя + число</div>
+ <div class="ob" style="left:740px;top:370px;width:170px;height:120px"></div><div class="ld" style="left:825px;top:336px;height:34px"></div>
+ <div class="tg" style="left:725px;top:280px;width:200px;height:56px">T · склад</div>
+ <div class="ob" style="left:1030px;top:430px;width:140px;height:100px"></div><div class="ld" style="left:1100px;top:402px;height:28px"></div>
+ <div class="tg" style="left:1000px;top:346px;width:200px;height:56px">T · гараж</div>
+ <div class="ob" style="left:1230px;top:660px;width:80px;height:60px"></div><div class="tg" style="left:1180px;top:600px;width:150px;height:44px">T · выезд</div>
+ <div class="z s" style="left:544px;top:804px;width:600px;height:80px"><span class="zl c"><span class="k">A</span>ДЕЙСТВИЯ · 600×80</span></div>
+ <div class="dv rt" style="left:1154px;top:804px;height:80px"><span class="dl">A 80</span></div>
+ <div class="dv rt" style="left:1154px;top:884px;height:16px"><span class="dl">16</span></div>
+ <div class="dv rt" style="left:1250px;top:0;height:16px"><span class="dl">16</span></div>
+ <div class="dh" style="left:1424px;top:44px;width:16px"><span class="dl" style="top:-20px">16</span></div>
+ <div class="dh" style="left:248px;top:470px;width:104px"><span class="dl">≥ 16 · 104</span></div>
+ <svg class="ar" width="1440" height="900"><path d="M864 460 C 960 300, 1020 130, 1080 60" marker-end="url(#ah)"/><path d="M1092 60 C 1000 500, 800 760, 590 836" marker-end="url(#ah)"/></svg>
+ <div class="ro" style="left:844px;top:470px">1</div>
+ <div class="ro" style="left:1092px;top:44px">2</div>
+ <div class="ro" style="left:574px;top:844px">3</div>
+</div>
+<div class="notes">
+ <p class="n"><b><span class="k">S</span>СЦЕНА</b> · 1192×900 (на 56 выше, чем при «Верх»), кадр 984×692. Центр кампуса — центр рабочей области (x 844), не экрана.<br><i>Нельзя:</i> строения под C′ и A.</p>
+ <p class="n"><b><span class="k">T</span>ТАБЛИЧКИ</b> · те же ≤ 200×56, якорь над зданием.<br><i>Нельзя:</i> ближе 16 к краю сайдбара и краям экрана, заход в C/C′ и A.</p>
+ <p class="n"><b><span class="k">C</span>КОНТЕКСТ ДНЯ</b> · справа-сверху, 360×56, раскрыта ≤ 360×240; место то же, что в «Верх», — меняется только отступ сверху (16 вместо 72).<br><i>Нельзя:</i> переезжать в сайдбар.</p>
+ <p class="n"><b><span class="k">A</span>ДЕЙСТВИЯ</b> · 600×80 по центру рабочей области.<br><i>Нельзя:</i> дублировать пункты сайдбара сверх трёх зданий и «списком».</p>
+</div>
+</div>
+
+<h3>АВТОМОБИЛИ / ГАРАЖ</h3>
+<div class="page v">
+<div class="f" style="width:1440px;height:900px">
+ <div class="off" style="left:0;top:0;width:248px;height:900px"><span class="zl">сайдбар · 248</span></div>
+ <div class="z s" style="left:248px;top:0;width:772px;height:900px"><span class="zl b"><span class="k">S</span>СЦЕНА · 772×900 · камера по aspect</span></div>
+ <div class="z s" style="left:264px;top:16px;width:740px;height:56px"><span class="zl c"><span class="k">A</span>НАВИГАЦИЯ МИРА · 740×56</span></div>
+ <div class="z" style="left:272px;top:22px;width:140px;height:44px"><span class="zl c" style="font-size:10px">← Кампус</span></div>
+ <div class="z" style="left:856px;top:22px;width:140px;height:44px"><span class="zl c" style="font-size:10px">Свернуть 3D</span></div>
+ <div class="z d" style="left:264px;top:88px;width:740px;height:780px"><span class="zl">кадр шести машин 740×780</span></div>
+ <div class="ob" style="left:320px;top:240px;width:180px;height:110px"></div><div class="ob" style="left:540px;top:240px;width:180px;height:110px"></div><div class="ob" style="left:760px;top:240px;width:180px;height:110px"></div>
+ <div class="ob" style="left:320px;top:480px;width:180px;height:110px"></div><div class="ob" style="left:540px;top:480px;width:180px;height:110px"></div><div class="ob" style="left:760px;top:480px;width:180px;height:110px"></div>
+ <div class="tg" style="left:560px;top:600px;width:140px;height:32px">T · выбранная</div>
+ <div class="z s" style="left:1020px;top:0;width:420px;height:900px"><span class="zl r"><span class="k">P</span>ПАНЕЛЬ · 420×900</span></div>
+ <div class="z" style="left:1036px;top:32px;width:388px;height:340px"><span class="zl" style="top:20px">карточка машины · 388×340</span></div>
+ <div class="z" style="left:1052px;top:312px;width:356px;height:44px"><span class="zl c" style="font-size:10px">форма / экспорт</span></div>
+ <div class="z" style="left:1036px;top:388px;width:388px;height:496px"><span class="zl">реестр · строки по 44</span></div>
+ <div class="dh" style="left:1020px;top:918px;width:420px"><span class="dl" style="top:4px">панель 420</span></div>
+ <div class="dh" style="left:248px;top:918px;width:772px"><span class="dl" style="top:4px">сцена 772</span></div>
+ <div class="dv rt" style="left:1008px;top:16px;height:56px"><span class="dl">A 56</span></div>
+ <div class="dh" style="left:248px;top:44px;width:16px"><span class="dl" style="top:4px">16</span></div>
+ <svg class="ar" width="1440" height="900"><path d="M650 420 C 800 380, 950 220, 1060 180" marker-end="url(#ah)"/><path d="M1230 240 C 1300 320, 1300 390, 1240 430" marker-end="url(#ah)"/></svg>
+ <div class="ro" style="left:630px;top:420px">1</div>
+ <div class="ro" style="left:1230px;top:210px">2</div>
+ <div class="ro" style="left:1230px;top:450px">3</div>
+</div>
+<div class="notes">
+ <p class="n"><b><span class="k">S</span>СЦЕНА</b> · 772×900 — самая узкая десктоп-сцена; кадр 740×780 почти квадратный, камера отъезжает дальше, чем при «Верх».<br><i>Нельзя:</i> сужать панель ради сцены.</p>
+ <p class="n"><b><span class="k">T</span>ТАБЛИЧКА</b> · одна, ≤ 140×32, у выбранной.</p>
+ <p class="n"><b><span class="k">P</span>ПАНЕЛЬ</b> · 420×900, та же, что при «Верх»: карточка 388×340, реестр 388×496.<br><i>Нельзя:</i> менять ширину от режима навигации — 420 постоянна.</p>
+ <p class="n"><b><span class="k">A</span>НАВИГАЦИЯ МИРА</b> · 740×56 по верху сцены, цели 140×44.<br><i>Нельзя:</i> налезать на панель.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+<div class="foot">
+<div>
+<h2>ЛЕГЕНДА</h2>
+<div class="lg"><div class="sw" style="border:1px solid #fff"></div>сплошная — зона HUD (бюджет, ей принадлежит место)</div>
+<div class="lg"><div class="sw" style="border:1px dashed #fff"></div>пунктир — вложенный элемент зоны, табличка T</div>
+<div class="lg"><div class="sw" style="border:1px dashed rgba(255,255,255,.22)"></div>бледный пунктир — раскрытое состояние (C′, P′) или пустой угол ∅</div>
+<div class="lg"><div class="sw" style="border:1px dotted rgba(255,255,255,.6)"></div>точки — кадр объектов (куда камера ставит мир) и сами объекты</div>
+<div class="lg"><div class="sw off" style="position:relative"></div>штриховка — не HUD: оболочка, системные полосы</div>
+<div class="lg"><div class="sw" style="display:flex;align-items:center;gap:6px"><span class="ro" style="position:static;margin:0;width:22px;height:22px">1</span>→</div>порядок чтения: ① кампус и числа → ② контекст дня → ③ действия; в гараже ① сцена → ② карточка → ③ реестр</div>
+<p class="n" style="margin-top:14px"><span class="k">S</span>сцена <span class="k">T</span>таблички <span class="k">C</span>контекст дня <span class="k">A</span>действия / навигация мира <span class="k">P</span>панель гаража</p>
+</div>
+<div>
+<h2>ЧТО НЕ РЕШЕНО ЧЕРТЕЖОМ</h2>
+<ul>
+<li>Стиль табличек, плашки C и кнопок A — форма, материал, оправа (шаг 3: направления целыми экранами на кадре мира).</li>
+<li>Иконки зданий в A и на табличках.</li>
+<li>Моушн: появление табличек, раскрытие C′, полёт камеры в гараж, подъём листа P′.</li>
+<li>Поведение табличек при столкновении на узких aspect (сейчас правило «сдвиг вверх» — проверить на кадре).</li>
+<li>Состояния: наведение, фокус с клавиатуры, выбор, без WebGL (шаг 4).</li>
+<li>Порядок Tab и Escape по input-матрице §12.4 — после выбора направления.</li>
+<li>Тумблер «день мероприятия» — демо макета; в продукте «сегодня» берётся из дат списков, тумблера нет.</li>
+<li>Склад и офис как интерьеры — вне этого чертежа.</li>
+</ul>
+</div>
+</div>
+</body>
+</html>
