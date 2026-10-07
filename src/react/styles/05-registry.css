@@ -27,6 +27,12 @@
 .data-table--registry td { height: 60px; padding-block: 6px; }
 .data-table--registry td strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .data-table--registry .registry-sub { display: none; }
+/* Метка «Наёмный» рядом с именем (с54): имя сжимается многоточием, метка — нет.
+   В форме сегмент отдела не тянется на всю клетку: .field — колонка со stretch. */
+.registry-name { min-width: 0; display: flex; align-items: center; gap: 8px; }
+.registry-name strong { min-width: 0; }
+.registry-name .badge { flex: none; min-height: 20px; padding: 0 7px; }
+.employee-form .field > .segmented { align-self: flex-start; }
 /* Открытый профиль — строка в цвет выбранной и полоска слева; отмеченные галкой
    строки фоном НЕ выделяются: галка — про состав списка, а не про «где я». */
 .data-table--registry tbody tr.is-open td { background: var(--select); }

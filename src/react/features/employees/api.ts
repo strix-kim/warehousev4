@@ -3,7 +3,7 @@ import { cachedQuery, invalidateCachePrefix, readCachedQuery, readCachedQueryMet
 import { escapeLikePattern } from '../../lib/postgrest'
 import { createSignedUrlCache } from '../../lib/signedUrlCache'
 import { EMPLOYEE_BRIEF_COLUMNS, EMPLOYEE_LIST_COLUMNS } from './types'
-import type { Employee, EmployeeBrief, EmployeeFile, EmployeeFileKind, EmployeeListItem, Tr } from './types'
+import type { Employee, EmployeeBrief, EmployeeDepartment, EmployeeFile, EmployeeFileKind, EmployeeListItem, Tr } from './types'
 
 // Приватный бакет: наружу файл уходит только по подписанной ссылке. Экспортируется
 // ради генератора документа: он качает фото байтами, а не подписанной ссылкой.
@@ -13,9 +13,11 @@ export const BUCKET = 'employee-files'
 // пикер водителей машины и пикер клетки залов, и оба открывались бы с сетевым
 // кругом за списком, который меняется раз в месяц. Сбрасывают его все три записи
 // в employees — одним префиксом, чтобы ключ и его сброс не разъезжались.
+// v2 у списка и briefs — в строке появился department (с54): запись прошлой
+// формы пережила бы выкатку на диске и отдала первый кадр без отдела (gotchas §4).
 const EMPLOYEES_CACHE_PREFIX = 'employees:'
-const EMPLOYEE_BRIEFS_CACHE_KEY = `${EMPLOYEES_CACHE_PREFIX}briefs`
-const EMPLOYEE_LIST_CACHE_KEY = `${EMPLOYEES_CACHE_PREFIX}list`
+const EMPLOYEE_BRIEFS_CACHE_KEY = `${EMPLOYEES_CACHE_PREFIX}briefs:v2`
+const EMPLOYEE_LIST_CACHE_KEY = `${EMPLOYEES_CACHE_PREFIX}list:v2`
 const EMPLOYEE_PHOTOS_CACHE_KEY = `${EMPLOYEES_CACHE_PREFIX}photos`
 const EMPLOYEES_CACHE_TTL = 10 * 60 * 1000
 
@@ -185,6 +187,7 @@ export type EmployeeInput = {
   first_name: string
   middle_name: string
   position: string
+  department: EmployeeDepartment
   phone: string
   passport_series: string
   passport_number: string
@@ -215,6 +218,7 @@ function employeeRow(fields: EmployeeInput) {
     first_name: fields.first_name.trim(),
     middle_name: orNull(fields.middle_name),
     position: orNull(fields.position),
+    department: fields.department,
     phone: orNull(fields.phone),
     passport_series: orNull(fields.passport_series),
     passport_number: orNull(fields.passport_number),
@@ -329,7 +333,7 @@ export async function uploadEmployeeFile(employeeId: string, kind: EmployeeFileK
 export const { getSignedUrls } = createSignedUrlCache(BUCKET)
 
 // Перевод отказа базы в человеческую фразу. Разбираем ИМЕНЕМ ограничения, а не
-// одним кодом: под 23514 у employees три разных CHECK, и «ПИНФЛ — 14 цифр»
+// одним кодом: под 23514 у employees четыре разных CHECK, и «ПИНФЛ — 14 цифр»
 // в ответ на перепутанные даты паспорта было бы враньём.
 export function employeeSaveErrorText(error: unknown, tr: Tr): string {
   const candidate = (typeof error === 'object' && error !== null ? error : {}) as { code?: unknown; message?: unknown }
@@ -344,6 +348,9 @@ export function employeeSaveErrorText(error: unknown, tr: Tr): string {
   }
   if (code === '23514' && message.includes('employees_passport_dates_check')) {
     return tr('«Действителен до» должен быть позже даты выдачи.', '«Amal qilish muddati» berilgan sanadan keyin bo‘lishi kerak.')
+  }
+  if (code === '23514' && message.includes('employees_department_check')) {
+    return tr('Такого отдела нет — выберите «Штат» или «Наёмные».', 'Bunday bo‘lim yo‘q — «Shtat» yoki «Yollanma»ni tanlang.')
   }
   if (code === '23514') {
     return tr('ПИНФЛ — 14 цифр.', 'JSHSHIR — 14 ta raqam.')

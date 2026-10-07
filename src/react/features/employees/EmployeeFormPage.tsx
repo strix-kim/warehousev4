@@ -5,7 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { createEmployee, employeeSaveErrorText, fetchEmployeeById, fetchEmployeeFiles, findNamesakes, getSignedUrls, setEmployeeDocumentPhoto, updateEmployee, uploadEmployeeFile, type EmployeeInput, type EmployeeNamesake } from './api'
 import { EmployeeFileFields, emptyFileSelection, selectedFiles, type EmployeeFileSelection } from './EmployeeFileFields'
 import { EmployeeFilesList, EmployeeFilesSkeleton } from './EmployeeFilesList'
-import { employeeFileKindLabel, employeeFullName, type Employee, type EmployeeFile, type EmployeeFileKind } from './types'
+import { employeeDepartmentLabel, employeeFileKindLabel, employeeFullName, isHiredEmployee, type Employee, type EmployeeDepartment, type EmployeeFile, type EmployeeFileKind } from './types'
 import { UnsavedPrompt } from '../../components/UnsavedPrompt'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState, RetryButton } from '../../components/ErrorState'
@@ -21,6 +21,7 @@ const emptyDraft: EmployeeInput = {
   first_name: '',
   middle_name: '',
   position: '',
+  department: 'staff',
   phone: '',
   passport_series: '',
   passport_number: '',
@@ -45,6 +46,7 @@ function draftFromEmployee(employee: Employee): EmployeeInput {
     first_name: employee.first_name ?? '',
     middle_name: employee.middle_name ?? '',
     position: employee.position ?? '',
+    department: isHiredEmployee(employee) ? 'hired' : 'staff',
     phone: employee.phone ?? '',
     passport_series: employee.passport_series ?? '',
     passport_number: employee.passport_number ?? '',
@@ -64,6 +66,9 @@ function draftFromEmployee(employee: Employee): EmployeeInput {
 type EmployeeUpload = UploadItem<EmployeeFileKind>
 
 const shirtSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
+
+// Порядок кнопок выбора отдела: штат первым — он же значение по умолчанию.
+const departments: EmployeeDepartment[] = ['staff', 'hired']
 
 // Одна форма на два режима: без employeeId в адресе — создание, с ним — правка
 // существующей карточки. Копия формы во втором файле разъехалась бы с первой на
@@ -422,6 +427,19 @@ export function EmployeeFormPage() {
             <label className="field"><span>{tr('Отчество', 'Otasining ismi')}</span><input value={draft.middle_name} onChange={(event) => changeField('middle_name', event.target.value)} /></label>
             <label className="field"><span>{tr('Должность', 'Lavozim')}</span><input value={draft.position} onChange={(event) => changeField('position', event.target.value)} placeholder={tr('Например, видеоинженер', 'Masalan, video muhandis')} /></label>
             <label className="field"><span>{tr('Телефон', 'Telefon')}</span><input type="tel" value={draft.phone} onChange={(event) => changeField('phone', event.target.value)} placeholder="+998 90 000 00 00" /></label>
+            {/* Отделов два, и оба видны сразу — сегмент, а не выпадающий список.
+                div, а не label: внутри группа кнопок, а не одно поле. */}
+            <div className="field">
+              <span>{tr('Отдел', 'Bo‘lim')}</span>
+              <div className="segmented" role="group" aria-label={tr('Отдел', 'Bo‘lim')}>
+                {departments.map((value) => (
+                  <button key={value} type="button" aria-pressed={draft.department === value} onClick={() => changeField('department', value)}>
+                    {draft.department === value && <span className="segmented__thumb" />}
+                    {employeeDepartmentLabel(value, tr)}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 

@@ -6,7 +6,7 @@ import { fetchEmployeeList, fetchEmployeePhotos, fetchEmployeesByIds, getSignedU
 import { EmployeeDrawer } from './EmployeeDrawer'
 import { EmployeeEventExportDrawer } from './EmployeeEventExportDrawer'
 import { downloadEmployeeEventXlsx, loadEventPhotos } from './eventExport'
-import { employeeFullName, type EmployeeListItem } from './types'
+import { employeeDepartmentLabel, employeeFullName, hiredMarkLabel, isHiredEmployee, type EmployeeDepartment, type EmployeeListItem } from './types'
 import { AppSelect } from '../../components/AppSelect'
 import { DataAge } from '../../components/DataAge'
 import { EmptyState } from '../../components/EmptyState'
@@ -58,6 +58,8 @@ export function EmployeesPage() {
   // Должность — такой же клиентский фильтр, как поиск, и складывается с ним:
   // выбранная должность сужает найденное, а не заменяет его.
   const [position, setPosition] = useState('')
+  // Отдел — третий клиентский фильтр того же рода; пустая строка — «Все».
+  const [department, setDepartment] = useState<EmployeeDepartment | ''>('')
   // Состав будущего документа — черновик действия, а не состояние экрана:
   // ни в адресе, ни в хранилище его нет, уход со страницы сбрасывает выбор.
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -155,15 +157,18 @@ export function EmployeesPage() {
   }, [reloadKey])
 
   const query = normalized(search)
-  const isFiltered = Boolean(query) || Boolean(position)
+  const isFiltered = Boolean(query) || Boolean(position) || Boolean(department)
   const visible = useMemo(() => {
     if (!isFiltered) return employees
     const digits = digitsOnly(query)
     return employees.filter((employee) => {
       if (position && employee.position !== position) return false
+      // Сверяем через isHiredEmployee, а не строкой: незнакомое значение колонки
+      // считается штатом везде одинаково.
+      if (department && isHiredEmployee(employee) !== (department === 'hired')) return false
       return !query || matchesSearch(employee, query, digits)
     })
-  }, [employees, query, position, isFiltered])
+  }, [employees, query, position, department, isFiltered])
 
   // Должности берём из самой выдачи — отдельного справочника у сотрудников нет,
   // а список здесь полный, так что счёт по нему честный. Считаем по ПОЛНОЙ
@@ -175,9 +180,16 @@ export function EmployeesPage() {
     return values
   }, [employees])
 
+  const departmentSegments: { value: EmployeeDepartment | ''; label: string }[] = [
+    { value: '', label: tr('Все', 'Barchasi') },
+    { value: 'staff', label: employeeDepartmentLabel('staff', tr) },
+    { value: 'hired', label: employeeDepartmentLabel('hired', tr) },
+  ]
+
   function resetFilters() {
     setSearch('')
     setPosition('')
+    setDepartment('')
   }
 
   // Карточка — тоже адрес. Открытие пушит запись, поэтому «назад» её закрывает;
@@ -305,6 +317,14 @@ export function EmployeesPage() {
             onChange={setPosition}
             ariaLabel={tr('Фильтр по должности', 'Lavozim bo‘yicha filtr')}
           />
+          <div className="segmented" role="group" aria-label={tr('Фильтр по отделу', 'Bo‘lim bo‘yicha filtr')}>
+            {departmentSegments.map((segment) => (
+              <button key={segment.value || 'all'} type="button" aria-pressed={department === segment.value} onClick={() => setDepartment(segment.value)}>
+                {department === segment.value && <span className="segmented__thumb" />}
+                {segment.label}
+              </button>
+            ))}
+          </div>
           <label className="select-all">
             <input type="checkbox" checked={allShownSelected} disabled={visible.length === 0} onChange={toggleAllShown} />
             {/* Числа в подписи нет намеренно: сколько сейчас показано, печатает
@@ -380,7 +400,11 @@ export function EmployeesPage() {
                               <div className="equipment-cell">
                                 <PhotoThumb className="registry-avatar" url={url} placeholder={<span aria-hidden="true">{employeeInitials(employee)}</span>} />
                                 <span>
-                                  <strong title={fullName}>{fullName}</strong>
+                                  {/* Метка только у наёмного: штат — значение по умолчанию. */}
+                                  <span className="registry-name">
+                                    <strong title={fullName}>{fullName}</strong>
+                                    {isHiredEmployee(employee) && <span className="badge badge--neutral">{hiredMarkLabel(tr)}</span>}
+                                  </span>
                                   {/* Должность в этой ячейке — только на телефоне: на десктопе
                                       у неё своя колонка, дубль в строке был бы шумом (V-10). */}
                                   <small className="registry-sub">{employee.position || tr('Должность не указана', 'Lavozim ko‘rsatilmagan')}</small>
@@ -412,12 +436,12 @@ export function EmployeesPage() {
               {!isLoading && employees.length > 0 && visible.length === 0 && (
                 <EmptyState
                   icon={<Search size={27} />}
-                  // Пусто может быть и от одной должности, без единой буквы в поиске —
+                  // Пусто может быть и от одной должности или отдела, без единой буквы в поиске —
                   // тогда заголовок с пустыми кавычками врал бы про запрос.
                   title={search.trim()
                     ? tr(`Ничего не найдено по «${search.trim()}»`, `«${search.trim()}» bo‘yicha hech narsa topilmadi`)
                     : tr('Ничего не найдено', 'Hech narsa topilmadi')}
-                  text={tr('Проверьте написание фамилии или снимите фильтр по должности — телефон можно набрать и одними цифрами.', 'Familiya yozilishini tekshiring yoki lavozim filtrini oling — telefonni faqat raqamlar bilan ham kiritish mumkin.')}
+                  text={tr('Проверьте написание фамилии или снимите фильтры по должности и отделу — телефон можно набрать и одними цифрами.', 'Familiya yozilishini tekshiring yoki lavozim va bo‘lim filtrlarini oling — telefonni faqat raqamlar bilan ham kiritish mumkin.')}
                   action={<button className="button button--secondary" onClick={resetFilters}>{tr('Сбросить фильтры', 'Filtrlarni tozalash')}</button>}
                 />
               )}

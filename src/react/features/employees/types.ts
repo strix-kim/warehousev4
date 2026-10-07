@@ -5,14 +5,19 @@ import type { Tables } from '../../lib/database.types'
 export type Employee = Tables<'employees'>
 export type EmployeeFile = Tables<'employee_files'>
 
+// Отдел повторяет CHECK employees_department_check: список закрыт базой. Наёмный
+// отличается от штатного ровно этим значением — карточка, файлы и права те же.
+export type EmployeeDepartment = 'staff' | 'hired'
+
 // Краткая карточка сотрудника — подмножество колонок для мест, где нужно только
 // «кого зовут и кому звонить»: чипы водителей у машины, выдача пикера. Полная
-// запись живёт в разделе «Сотрудники».
-export type EmployeeBrief = Pick<Tables<'employees'>, 'id' | 'last_name' | 'first_name' | 'middle_name' | 'phone' | 'position'>
+// запись живёт в разделе «Сотрудники». Отдел едет сюда же: пикеры показывают
+// всех, и пометить наёмного потребитель может только по этому полю.
+export type EmployeeBrief = Pick<Tables<'employees'>, 'id' | 'last_name' | 'first_name' | 'middle_name' | 'phone' | 'position' | 'department'>
 
 // Те же колонки строкой для select(): список полей обязан жить в одном месте
 // с типом EmployeeBrief, иначе они разъедутся на первой же новой колонке.
-export const EMPLOYEE_BRIEF_COLUMNS = 'id, last_name, first_name, middle_name, phone, position'
+export const EMPLOYEE_BRIEF_COLUMNS = 'id, last_name, first_name, middle_name, phone, position, department'
 
 // Строка РЕЕСТРА сотрудников: то, что видно в таблице, плюс выбранное фото для
 // документов (по нему рисуется миниатюра). Отдельный тип от EmployeeBrief не
@@ -23,9 +28,9 @@ export const EMPLOYEE_BRIEF_COLUMNS = 'id, last_name, first_name, middle_name, p
 // кэшируется НА ДИСК, потому что паспортных данных здесь нет вовсе, а карточка
 // с паспортом, ПИНФЛ и адресом прописки приезжает отдельным запросом ровно
 // тогда, когда её открывают. Пока выдача была одна, диск был закрыт для всей.
-export type EmployeeListItem = Pick<Tables<'employees'>, 'id' | 'last_name' | 'first_name' | 'middle_name' | 'phone' | 'position' | 'document_photo_id'>
+export type EmployeeListItem = Pick<Tables<'employees'>, 'id' | 'last_name' | 'first_name' | 'middle_name' | 'phone' | 'position' | 'department' | 'document_photo_id'>
 
-export const EMPLOYEE_LIST_COLUMNS = 'id, last_name, first_name, middle_name, phone, position, document_photo_id'
+export const EMPLOYEE_LIST_COLUMNS = 'id, last_name, first_name, middle_name, phone, position, department, document_photo_id'
 
 // Виды файлов повторяют CHECK на employee_files.kind: список закрыт базой,
 // клиент только раскладывает его по секциям формы и карточки.
@@ -44,6 +49,23 @@ export function employeeFileKindLabel(kind: string, tr: Tr): string {
     case 'residence_reg': return tr('Прописка', 'Propiska')
     default: return kind
   }
+}
+
+// department в базе — text, поэтому сравниваем со значением, а не доверяем союзу:
+// всё, что не 'hired', считается штатом — как default колонки.
+export function isHiredEmployee(employee: Pick<Employee, 'department'>) {
+  return employee.department === 'hired'
+}
+
+// Отдел во множественном числе — подпись выбора в форме и фильтра реестра.
+export function employeeDepartmentLabel(department: EmployeeDepartment, tr: Tr): string {
+  return department === 'hired' ? tr('Наёмные', 'Yollanma') : tr('Штат', 'Shtat')
+}
+
+// Метка одного человека. У штатного метки нет нигде — это значение по умолчанию,
+// и подписывать его значило бы шуметь в каждой строке.
+export function hiredMarkLabel(tr: Tr): string {
+  return tr('Наёмный', 'Yollanma')
 }
 
 // ФИО одной строкой. Отчество может отсутствовать — лишний пробел убираем здесь,

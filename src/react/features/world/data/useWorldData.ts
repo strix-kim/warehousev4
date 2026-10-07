@@ -74,7 +74,8 @@ export function useWorldData(): WorldData | null {
       archive: mock?.archive ?? null,
       mock: mock !== null,
       cars: (vehicles ?? []).map((row) => ({ id: row.id, brand: row.brand, model: row.model, color: row.color, plate: row.plate_number })),
-      people: (employees ?? []).map((row) => ({ id: row.id, firstName: row.first_name, lastName: row.last_name })),
+      // Только штат: наёмные в «Сотрудники» не входят (решение прораба с53, п. 11)
+      people: (employees ?? []).filter((row) => row.department === 'staff').map((row) => ({ id: row.id, firstName: row.first_name, lastName: row.last_name })),
       sites: {
         office: lists?.total ?? null,
         warehouse: summary?.equipment.units ?? null,

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchEmployeeById, fetchEmployeeFiles, getSignedUrls, setEmployeeDocumentPhoto } from './api'
 import { EmployeeFilesList, EmployeeFilesSkeleton } from './EmployeeFilesList'
-import { employeeFullName, type Employee, type EmployeeFile, type EmployeeListItem, type Tr } from './types'
+import { employeeFullName, hiredMarkLabel, isHiredEmployee, type Employee, type EmployeeFile, type EmployeeListItem, type Tr } from './types'
 import { DrawerFrame } from '../../components/DrawerFrame'
 import { ProfileHead, ProfileSections, type ProfileBadge, type ProfileSection } from '../../components/ProfileCard'
 import { formatEventDate, parseDateValue } from '../../lib/date'
@@ -178,7 +178,12 @@ export function EmployeeDrawer({ employee, photoUrl, onClose, onDocumentPhotoCha
   // Пока карточка едет, реквизитов нет — на их месте болванка: видно, что данные
   // не кончились, а грузятся.
   const sections = card ? detailSections(card, tr, locale) : []
-  const badges = card ? expiryPills(card, tr, locale) : []
+  const expiryBadges = card ? expiryPills(card, tr, locale) : []
+  // Отдел лежит в строке реестра, поэтому метка наёмного стоит в шапке с первого
+  // кадра и полной карточки не ждёт. У штатного метки нет.
+  const badges: ProfileBadge[] = isHiredEmployee(employee)
+    ? [{ key: 'department', className: 'badge badge--neutral', label: hiredMarkLabel(tr) }, ...expiryBadges]
+    : expiryBadges
 
   return (
     <DrawerFrame
@@ -205,7 +210,7 @@ export function EmployeeDrawer({ employee, photoUrl, onClose, onDocumentPhotoCha
 
       {isCardLoading && <div className="detail-skeleton employee-card-skeleton" />}
       {hasCardError && <p className="form-error"><CircleAlert size={15} /> {tr('Не удалось загрузить документы карточки.', 'Karta hujjatlarini yuklab bo‘lmadi.')}</p>}
-      {!isCardLoading && !hasCardError && !employee.position && !employee.phone && badges.length === 0 && sections.every((section) => section.fields.every((field) => !field.value)) && (
+      {!isCardLoading && !hasCardError && !employee.position && !employee.phone && expiryBadges.length === 0 && sections.every((section) => section.fields.every((field) => !field.value)) && (
         <p className="muted">{tr('Кроме имени, в карточке пока ничего нет.', 'Kartada ismdan boshqa hozircha hech narsa yo‘q.')}</p>
       )}
 
