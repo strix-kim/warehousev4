@@ -143,7 +143,12 @@ body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
 
 /* Сцена — один renderer на всё приложение: узел переезжает между слотами страниц */
 .slot{flex:1;min-height:0;display:grid}
-.stage{position:relative;min-height:0;overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-lg)}
+.stage{position:relative;min-height:0;overflow:hidden;background:var(--stage-bg,var(--bg));border:1px solid var(--line);border-radius:var(--r-lg)}
+/* Стенд облика: тёмная палитра — рамка и подпись сцены в тон сайдбару; таблички остаются белыми карточками */
+.stage.is-dark{border-color:var(--night-line)}
+.stage.is-dark .cap b{color:var(--on-night)}
+.stage.is-dark .cap span{color:var(--on-night)}
+.stage.is-dark .chip[aria-pressed="true"],.stage.is-dark .ptag.is-sel em{background:var(--night-3);border-color:var(--on-night-2)}
 .scene{position:absolute;inset:0}
 .scene:focus-visible{outline-offset:-3px}
 .scene canvas{display:block;touch-action:none}
@@ -155,7 +160,7 @@ body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
 .stage-btn{position:absolute;right:12px;top:12px;background:rgba(255,255,255,.92)}
 /* Полёт в гараж и обратно: таблички, подпись и нижний ряд гаснут, в конце — шторка цвета фона поверх canvas.
    Шторку ведёт JS покадрово, остальное — CSS-переходы по классам. */
-.curtain{position:absolute;inset:0;z-index:5;background:var(--bg);opacity:0;pointer-events:none}
+.curtain{position:absolute;inset:0;z-index:5;background:var(--stage-bg,var(--bg));opacity:0;pointer-events:none}
 .labels,.cap,.dock,.stage-btn{transition:opacity .21s var(--ease-out)}
 .stage.is-flying .labels,.stage.is-flying .cap,.stage.is-flying .dock,.stage.is-flying .stage-btn{opacity:0;pointer-events:none}
 .page .u-head,.panel,.g-list{transition:opacity .245s var(--ease-out),transform .245s var(--ease-out)}
@@ -192,11 +197,20 @@ body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
 .hallsdots i{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font:700 11px/1 var(--f-text);font-style:normal;color:#fff;background:var(--c)}
 .page-home.is-list .slot,.no-gl .slot{display:none!important}
 
-/* Переключатель вариантов оболочки — только макет */
-.mock-nav{position:fixed;right:16px;bottom:16px;z-index:90;display:flex;align-items:center;gap:8px;padding:5px 5px 5px 12px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-pop);font:600 12px/1 var(--f-text);color:var(--muted)}
-.mock-nav div{display:inline-flex;padding:2px;gap:2px;border-radius:10px;background:var(--sunk)}
-.mock-nav button{min-height:30px;padding:0 11px;border:0;border-radius:8px;background:transparent;font:600 13px/1 var(--f-text);color:var(--muted)}
-.mock-nav button[aria-pressed="true"]{background:var(--night);color:#fff}
+/* Стенд — только макет: облик мира (форма, цвет, насыщенность) и вариант навигации одной панелью.
+   Кнопка «Облик» сворачивает панель; на телефоне панель свёрнута и раскрывается листом снизу. */
+.mock{position:fixed;right:16px;bottom:16px;z-index:90;display:grid;justify-items:end;gap:8px}
+.mock__toggle{order:2;display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:var(--shadow-pop);font:600 13px/1 var(--f-text);color:var(--ink)}
+.mock__toggle::after{content:"";width:7px;height:7px;border-right:1.9px solid currentColor;border-bottom:1.9px solid currentColor;transform:translateY(-2px) rotate(45deg)}
+.mock.is-shut .mock__toggle::after{transform:translateY(2px) rotate(-135deg)}
+.mock__body{display:grid;gap:8px;min-width:432px;padding:10px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-pop)}
+.mock.is-shut .mock__body{display:none}
+.mock-row{display:grid;gap:5px;font:600 11px/1 var(--f-text);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.mock-row>span{padding-left:4px}
+.mock-row div{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(max-content,1fr);padding:2px;gap:2px;border-radius:10px;background:var(--sunk)}
+.mock-row button{min-height:40px;padding:0 9px;border:0;border-radius:8px;background:transparent;font:600 12.5px/1.15 var(--f-text);letter-spacing:0;text-transform:none;color:var(--muted);white-space:nowrap}
+.mock-row button[aria-pressed="true"]{background:var(--night);color:#fff}
+.mock__done{display:none}
 
 /* Таблички CSS2D. Слой не ловит мышь — всё решает raycast по 3D. */
 .tag{pointer-events:none;display:grid;gap:1px;padding:7px 11px 8px;margin-bottom:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);box-shadow:0 2px 8px rgba(15,17,21,.06);white-space:nowrap;transition:border-color .12s,box-shadow .12s}
@@ -284,6 +298,12 @@ body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
   body{overflow-x:hidden;overflow-y:auto}
   .shell,body.nav-top .shell{display:block;height:auto;padding-bottom:84px}
   .u-side,.u-topbar,.mock-nav{display:none!important}
+  .mock{right:12px;top:10px;bottom:auto}
+  .mock:not(.is-shut) .mock__toggle{display:none}
+  .mock__body{position:fixed;left:0;right:0;bottom:0;min-width:0;gap:10px;padding:16px 16px calc(18px + env(safe-area-inset-bottom));border-radius:var(--r-xl) var(--r-xl) 0 0;border-bottom:0}
+  .mock-row div{grid-auto-columns:minmax(0,1fr)}
+  .mock-row button{padding:0 4px;white-space:normal}
+  .mock__done{display:inline-flex;margin-top:4px}
   .u-main{padding:18px 16px 16px}
   .u-head{margin-bottom:14px}
   .u-h1{font-size:28px}
@@ -402,7 +422,16 @@ body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
   <nav class="p-tabs" id="tabs" aria-label="Разделы"></nav>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<div class="mock-nav" data-mock role="group" aria-label="Макет: вариант навигации">Навигация<div><button type="button" data-nav="side" aria-pressed="true">Сайдбар</button><button type="button" data-nav="top" aria-pressed="false">Верх</button></div></div>
+<div class="mock" id="mock" data-mock>
+  <button type="button" class="mock__toggle" id="mockToggle" aria-expanded="true" aria-controls="mockBody">Облик</button>
+  <div class="mock__body" id="mockBody" aria-label="Макет: облик мира">
+    <div class="mock-row" role="group" aria-label="Форма"><span>Форма</span><div data-axis="shape"></div></div>
+    <div class="mock-row" role="group" aria-label="Цвет"><span>Цвет</span><div data-axis="palette"></div></div>
+    <div class="mock-row" role="group" aria-label="Насыщенность"><span>Насыщенность</span><div data-axis="sat"></div></div>
+    <div class="mock-row mock-nav" role="group" aria-label="Макет: вариант навигации"><span>Навигация</span><div><button type="button" data-nav="side" aria-pressed="true">Сайдбар</button><button type="button" data-nav="top" aria-pressed="false">Верх</button></div></div>
+    <button type="button" class="btn btn--ink mock__done" id="mockDone">Готово</button>
+  </div>
+</div>
 <p class="vh" id="hoverLive" aria-live="polite"></p>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -426,6 +455,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 // Знак ARGO — те же 57 точек, что в продукте (src/react/components/ArgoDots.tsx)
 const ARGO_DOTS = [[138.6,16.5,9.5],[187.6,16.5,11.9],[236.7,16.5,10.6],[285.7,16.5,10.7],[163.1,41,13.2],[212.2,41.1,12.9],[261.2,41.1,13],[310.3,41,10.6],[138.6,65.6,9.8],[187.7,65.6,13.5],[236.5,65.7,14.8],[285.6,65.6,14.2],[64.8,90.3,13.7],[163.1,90.1,12.9],[212.3,89.8,14.6],[261.2,90,12.9],[310.3,90.1,11.2],[40.7,114.7,14.8],[236.7,114.5,11.8],[383.9,114.4,8.5],[15.9,138.9,12.3],[64.7,138.9,14.2],[212.1,138.9,12.8],[260.6,137.7,10.5],[359.3,138.9,9],[40.7,163.4,14.9],[89.5,163.5,13.8],[138.5,163.5,13.7],[187.5,163.5,13.7],[236.8,163.5,14],[285.7,163.4,13.5],[334.8,163.3,11.8],[383.9,163.4,8.1],[15.9,187.9,9.8],[64.9,187.7,14.2],[113.9,187.8,14],[163.2,187.6,14.7],[212.1,187.8,13.8],[261.2,187.7,14.1],[310.3,187.9,12.8],[359.4,187.8,11.7],[408.4,187.9,8.1],[40.4,212.4,10.6],[89.5,212.4,11.3],[138.5,212.4,12],[187.6,212.4,12.2],[236.7,212.4,11.1],[285.7,212.4,11.8],[334.8,212.4,10.4],[383.9,212.4,10.6],[64.9,237,9],[114,237,9.1],[163.1,237,9.3],[212.1,237,9.1],[261.2,237,9.2],[310.3,237,8.5],[359.3,237,8.5]];
@@ -468,6 +498,8 @@ const T = {
   bg: tok('--bg'), card: tok('--card'), sunk: tok('--sunk'), select: tok('--select'), line: tok('--line'), ctl: tok('--ctl'),
   ink: tok('--ink'), night3: tok('--night-3'), red: tok('--red'), redTint: tok('--red-tint'),
   ok: tok('--ok-dot'), warnBg: tok('--warn-bg'),
+  redAct: tok('--red-act'), redPress: tok('--red-press'), night: tok('--night'), night2: tok('--night-2'), nightLine: tok('--night-line'),
+  onNight: tok('--on-night'), onNight2: tok('--on-night-2'), redNight: tok('--red-night'),
 };
 
 const state = { view: 'campus', event: false, hover: null, sel: null, userMoved: false, flying: false, layout: null };
@@ -476,62 +508,295 @@ const pickables = { campus: [], garage: [] };
 const labels = {};            // id → CSS2DObject
 let W = null;                 // 3D-мир; null — WebGL нет, работает только текстовый путь
 
+/* ============== Стенд облика: три оси — форма, цвет, насыщенность ==============
+   Меняются только грани/силуэт объёмов и цвета материалов; габариты, расстановка, камера и поведение — общие.
+   Состояние — в адресе (?shape=…&palette=…&sat=…); по умолчанию cube / white / full = принятый макет с47. */
+const shade = (c, k) => '#' + new THREE.Color(c).multiplyScalar(k).getHexString();
+const mix = (a, b, k) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString();
+const SHAPES = { cube: 'Кубы', soft: 'Галька', toy: 'Игрушка', line: 'Контур' };
+const PALETTE_NAMES = { white: 'Белая схема', roofs: 'Крыши', night: 'Ночь', duo: 'Дуотон' };
+const SATS = { low: 'Сдержанно', mid: 'Средне', full: 'Ярко' };
+const SAT_K = { low: 0.35, mid: 0.7, full: 1 };
+const AXES = { shape: [SHAPES, 'cube'], palette: [PALETTE_NAMES, 'white'], sat: [SATS, 'full'] };
+const style = {};
+{
+  const q = new URLSearchParams(location.search);
+  for (const [axis, [table, def]] of Object.entries(AXES)) style[axis] = Object.hasOwn(table, q.get(axis) ?? '') ? q.get(axis) : def;
+}
+// Форма: ratio — радиус скругления в долях меньшей стороны объёма, cap — потолок радиуса (крупные стены не становятся
+// подушками), seg — сегментов на скругление. toy — дополнительно цилиндры, сферы, арки и свод (флаг round: 'toy').
+// line — геометрия soft + плоская заливка без света + контур «чернилами».
+const SHAPE_CFG = {
+  cube: { round: false },
+  soft: { round: true, ratio: 0.14, cap: 0.35, seg: 2 },
+  toy: { round: true, ratio: 0.42, cap: 0.75, seg: 3, toy: true },
+  line: { round: true, ratio: 0.14, cap: 0.35, seg: 2, ink: true },
+};
+// Палитра — одна таблица ролей на все материалы мира. Значения — токены и их смеси.
+//   ground земля (она же фон сцены, туман и шторка) · grid/gridA сетка и её непрозрачность · road дорога · mark осевая
+//   floor пол гаража · pad площадка перед гаражом · yard двор за воротами · paint разметка мест
+//   wall стена · wall2 вторая стена (рампа, полки, табличка, головы) · roof крыша-плита · roofMass крыша-объём (пила склада,
+//   скат гаража) · canopy навес · door ворота и вход · glass окна и светильники · carGlass салон машины
+//   dark тёмная деталь (столбы, кейсы, кладдинг) · sign/signMark вывеска и её знак · steel сталь · tire шина
+//   accent акцент · lamp фары · leaf зелень · edge тонкие рёбра · ink контур формы «Контур»
+//   ringSel кольцо выбора (всегда красное, насыщенность его не трогает) · ringHover кольцо наведения
+//   cloth одежда фигурок · skin головы · legs ноги
+const PALETTES = {
+  white: {
+    ground: T.bg, grid: T.ink, gridA: 0.07, road: T.line, mark: T.ctl, floor: T.select, pad: T.sunk, yard: T.card, paint: T.card,
+    wall: T.card, wall2: T.card, roof: T.night3, roofMass: T.card, canopy: T.card, door: T.night3, glass: T.select, carGlass: T.night3,
+    dark: T.night3, sign: T.night3, signMark: T.red, steel: T.ctl, tire: T.night3, accent: T.red, lamp: T.warnBg, leaf: mix(T.ok, T.card, 0.4),
+    edge: T.line, ink: T.ink, ringSel: T.red, ringHover: T.ctl, cloth: [T.select, T.night3, T.line], skin: T.card, legs: T.night3,
+  },
+  // Красный — массой: крыши, навес, ворота и вход; стены белые, земля светлая
+  roofs: {
+    ground: T.bg, grid: T.ink, gridA: 0.07, road: T.line, mark: T.ctl, floor: T.select, pad: T.sunk, yard: T.card, paint: T.card,
+    wall: T.card, wall2: T.card, roof: T.red, roofMass: T.red, canopy: T.redAct, door: T.redAct, glass: T.select, carGlass: T.night3,
+    dark: T.night3, sign: T.night3, signMark: T.red, steel: T.ctl, tire: T.night3, accent: T.red, lamp: T.warnBg, leaf: mix(T.ok, T.card, 0.4),
+    edge: T.line, ink: T.ink, ringSel: T.red, ringHover: T.ctl, cloth: [T.select, T.night3, T.redAct], skin: T.card, legs: T.night3,
+  },
+  // Тёмный мир в тон сайдбару: окна и проёмы светятся, акцент — --red-night
+  night: {
+    ground: T.night, grid: T.nightLine, gridA: 1, road: T.night2, mark: mix(T.night3, T.onNight2, 0.5), floor: T.night2, pad: T.night2, yard: T.night3, paint: mix(T.night3, T.onNight2, 0.6),
+    wall: mix(T.night3, T.onNight, 0.3), wall2: mix(T.night3, T.onNight, 0.42), roof: T.night3, roofMass: mix(T.night3, T.onNight, 0.16), canopy: mix(T.night3, T.onNight, 0.42), door: T.onNight2, glass: T.onNight, carGlass: T.night2,
+    dark: mix(T.night3, T.onNight2, 0.5), sign: T.night, signMark: T.redNight, steel: T.onNight2, tire: T.nightLine, accent: T.redNight, lamp: T.warnBg, leaf: mix(T.ok, T.night3, 0.35),
+    edge: mix(T.nightLine, T.onNight2, 0.35), ink: T.onNight, ringSel: T.red, ringHover: T.onNight2, cloth: [T.onNight2, mix(T.night3, T.onNight, 0.2), T.onNight], skin: T.onNight, legs: mix(T.night3, T.onNight2, 0.5),
+  },
+  // Два цвета: белый и красный. Графит — только салоны и шины
+  duo: {
+    ground: T.redTint, grid: T.red, gridA: 0.16, road: mix(T.card, T.red, 0.2), mark: T.card, floor: mix(T.card, T.red, 0.1), pad: T.card, yard: T.card, paint: T.card,
+    wall: T.card, wall2: T.card, roof: T.redAct, roofMass: T.redAct, canopy: T.redAct, door: T.redPress, glass: mix(T.card, T.red, 0.14), carGlass: T.night3,
+    dark: T.redPress, sign: T.redPress, signMark: T.card, steel: mix(T.card, T.red, 0.4), tire: T.night3, accent: T.red, lamp: T.card, leaf: mix(T.card, T.red, 0.42),
+    edge: mix(T.card, T.red, 0.3), ink: T.redPress, ringSel: T.red, ringHover: T.redPress, cloth: [mix(T.card, T.red, 0.14), T.redAct, mix(T.card, T.red, 0.4)], skin: T.card, legs: T.redPress,
+  },
+};
+// Насыщенность: цвет = mix(нейтраль, цвет палитры, k). Нейтраль — та же роль из white; в night — серый той же светлоты;
+// у самой white ось меняет контраст тонов: всё, кроме земли и тонких рёбер, тянется к --sunk (контур — к --ctl).
+const WHITE_KEEP = ['ground', 'grid', 'road', 'mark', 'floor', 'pad', 'yard', 'paint', 'edge', 'ringHover'];
+function gray(c) {
+  const hsl = new THREE.Color(c).getHSL({}, THREE.SRGBColorSpace);
+  return '#' + new THREE.Color().setHSL(0, 0, hsl.l, THREE.SRGBColorSpace).getHexString();
+}
+function resolvePalette() {
+  const id = style.palette, src = PALETTES[id], base = PALETTES.white, k = SAT_K[style.sat], out = {};
+  const neutral = (role, c, i) => id === 'night' ? gray(c) : id !== 'white' ? (i == null ? base[role] : base[role][i]) : WHITE_KEEP.includes(role) ? c : role === 'ink' ? T.ctl : T.sunk;
+  for (const [role, v] of Object.entries(src)) {
+    if (role === 'ringSel') out[role] = v;
+    else if (typeof v === 'number') out[role] = THREE.MathUtils.lerp(id === 'duo' ? base[role] : v, v, k);
+    else if (Array.isArray(v)) out[role] = v.map((c, i) => mix(neutral(role, c, i), c, k));
+    else out[role] = mix(neutral(role, v), v, k);
+  }
+  return out;
+}
+
 /* ============== 3D: примитивы ============== */
 // Одна геометрия 1×1×1 на всё: размер — scale (отдельные меши) или матрица (сборки kit)
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const BOX_EDGES = new THREE.EdgesGeometry(BOX);
 const MATS = new Map(), FLATS = new Map();
-const mat = (c) => MATS.get(c) || MATS.set(c, new THREE.MeshLambertMaterial({ color: c })).get(c);
-const flat = (c) => FLATS.get(c) || FLATS.set(c, new THREE.MeshBasicMaterial({ color: c })).get(c);   // земля и разметка — без света, 1:1 с токеном
-const own = (c) => new THREE.MeshLambertMaterial({ color: c });   // свой материал корпуса — под подсветку наведения
-const shade = (c, k) => '#' + new THREE.Color(c).multiplyScalar(k).getHexString();
-const mix = (a, b, k) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString();
-const EDGE = new THREE.LineBasicMaterial({ color: T.line });
-// Графит мира — только --night-3: чистый --night слишком тяжёлый, он остаётся за HTML-хромом
-const GLASS = mat(T.select), DARK = mat(T.night3), WHITE = mat(T.card), RED = mat(T.red), STEEL = mat(T.ctl);
-const LEAF = mat(mix(T.ok, T.card, 0.4));   // зелень приглушённая
+// Форма «Контур» — заливка без света: тот же кэш, но MeshBasicMaterial
+const lit = (c) => SH.ink ? new THREE.MeshBasicMaterial({ color: c }) : new THREE.MeshLambertMaterial({ color: c });
+const mat = (c) => MATS.get(c) || MATS.set(c, lit(c)).get(c);
+// Земля и разметка — без света, 1:1 с токеном; контур им не рисуем (userData.ground)
+const flat = (c) => FLATS.get(c) || FLATS.set(c, Object.assign(new THREE.MeshBasicMaterial({ color: c }), { userData: { ground: true } })).get(c);
+const own = (c) => lit(c);   // свой материал корпуса — под подсветку наведения
+// Материалы-роли: пересобираются из палитры в applyStyle() при каждой смене облика
+let SH, P, EDGE, INK, HULL, GLASS, BAND, DARK, WHITE, RED, STEEL, LEAF, ROOF, CANOPY, DOOR, SIGN, SIGN_MARK, CAR_GLASS, TIRE_MAT, HEADLAMP;
+// Контур-силуэт: тот же меш задними гранями, раздвинутый по нормали на постоянную толщину в пикселях экрана.
+// Скруглённым объёмам с гладкими нормалями это даёт сплошную линию по силуэту; ширину кадра знает fit().
+const HULL_PX = { value: new THREE.Vector2(0.002, 0.002) }, HULL_WIDTH = 1.4;
+function hullMaterial(color) {
+  const m = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uHullPx = HULL_PX;
+    sh.vertexShader = 'uniform vec2 uHullPx;\n' + sh.vertexShader.replace('#include <project_vertex>',
+      `#include <project_vertex>
+      vec4 hullN = projectionMatrix * vec4( normalize( normalMatrix * normal ), 0.0 );
+      gl_Position.xy += normalize( hullN.xy + vec2( 1e-6 ) ) * uHullPx * gl_Position.w;`);
+  };
+  return m;
+}
+function applyStyle() {
+  for (const m of [EDGE, INK, HULL]) m?.dispose();
+  SH = SHAPE_CFG[style.shape];
+  P = resolvePalette();
+  EDGE = new THREE.LineBasicMaterial({ color: P.edge });
+  INK = new THREE.LineBasicMaterial({ color: P.ink });
+  HULL = hullMaterial(P.ink);
+  // Графит мира — только --night-3: чистый --night слишком тяжёлый, он остаётся за HTML-хромом (и за палитрой «Ночь»)
+  GLASS = BAND = mat(P.glass); DARK = mat(P.dark); WHITE = mat(P.wall2); RED = mat(P.accent); STEEL = mat(P.steel);
+  LEAF = mat(P.leaf);   // зелень приглушённая
+  ROOF = mat(P.roof); CANOPY = mat(P.canopy); DOOR = mat(P.door); SIGN = mat(P.sign); SIGN_MARK = mat(P.signMark);
+  CAR_GLASS = mat(P.carGlass); TIRE_MAT = mat(P.tire); HEADLAMP = mat(P.lamp);
+  // Сцена и её рамка — в тон земле
+  stageEl.style.setProperty('--stage-bg', P.ground);
+  stageEl.classList.toggle('is-dark', style.palette === 'night');
+  if (W) { W.scene.background.set(P.ground); W.scene.fog.color.set(P.ground); }
+}
+
+// Скруглённый куб нельзя масштабировать как единичный BOX (радиус исказится) — геометрия по размерам, кэш по w|h|d|r.
+// Кэш живёт одну сборку мира: restyle() его освобождает.
+const GEO = new Map();
+const geoOf = (key, make) => GEO.get(key) || GEO.set(key, make()).get(key);
+const r3 = (v) => Math.round(v * 1000) / 1000;
+const rbox = (w, h, d, r) => geoOf(`${r3(w)}|${r3(h)}|${r3(d)}|${r3(r)}`, () => new RoundedBoxGeometry(w, h, d, SH.seg, r));
+// Радиус скругления объёма: доля меньшей стороны с потолком; тонкие пластины (< 3 см радиуса) остаются кубом
+function radiusOf(w, h, d, rr) {
+  if (!SH.round) return 0;
+  const r = Math.min(rr ?? Math.min(SH.ratio * Math.min(w, h, d), SH.cap), Math.min(w, h, d) / 2);
+  return r < 0.03 ? 0 : r;
+}
+// Контур скруглённого куба (форма «Контур»): по линии на каждое из 12 рёбер — она идёт по середине скругления
+// и на концах дугой уходит к «макушке» угла, где сходятся три ребра. EdgesGeometry здесь не годится: у скруглённого
+// куба нет острых рёбер — порог либо не даёт ни одной линии, либо частокол по граням скругления.
+// Точки — в осях объёма (sy — сжатие по высоте у плит), затем поворот q и перенос p.
+const _c = new THREE.Vector3();
+const ARC = [[0.5774, 0.5774], [0.303, 0.674], [0, 0.7071]];   // от макушки угла к середине ребра: [вдоль ребра, поперёк]
+function crease(out, w, h, d, r, p, q, sy = 1) {
+  const half = [w / 2, h / 2, d / 2], pts = [];
+  for (let ax = 0; ax < 3; ax++) {
+    const b = (ax + 1) % 3, c = (ax + 2) % 3;
+    for (const sb of [-1, 1]) for (const sc of [-1, 1]) {
+      pts.length = 0;
+      const add = (sa, [da, dbc]) => {
+        const v = [0, 0, 0];
+        v[ax] = sa * (half[ax] - r + da * r); v[b] = sb * (half[b] - r + dbc * r); v[c] = sc * (half[c] - r + dbc * r);
+        pts.push(v);
+      };
+      if (r) { ARC.forEach((a) => add(-1, a)); ARC.slice().reverse().forEach((a) => add(1, a)); }
+      else { add(-1, ARC[2]); add(1, ARC[2]); }
+      for (let i = 1; i < pts.length; i++) for (const v of [pts[i - 1], pts[i]]) {
+        _c.set(v[0], v[1] * sy, v[2]);
+        if (q) _c.applyQuaternion(q);
+        if (p) _c.add(p);
+        out.push(_c.x, _c.y, _c.z);
+      }
+    }
+  }
+}
+const lineGeo = (pts) => new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+// Силуэт «чернилами» для отдельного меша: тем же объёмом, задними гранями
+function hull(o) {
+  const hm = new THREE.Mesh(o.geometry, HULL);
+  hm.userData.hull = true;
+  o.add(hm);
+}
 
 // Отдельный куб: размеры w×h×d, (x, z) — центр, y0 — низ. edgeMat — подчеркнуть рёбра.
 function box(parent, m, w, h, d, x, y0, z, edgeMat) {
-  const o = new THREE.Mesh(BOX, m);
-  o.scale.set(w, h, d);
+  const r = radiusOf(w, h, d);
+  const o = new THREE.Mesh(r ? rbox(w, h, d, r) : BOX, m);
+  if (!r) o.scale.set(w, h, d);
   o.position.set(x, y0 + h / 2, z);
-  if (edgeMat) o.add(new THREE.LineSegments(BOX_EDGES, edgeMat));
+  if (edgeMat && !SH.round) o.add(new THREE.LineSegments(BOX_EDGES, edgeMat));
+  if (SH.ink) {
+    const pts = [];
+    r ? crease(pts, w, h, d, r) : crease(pts, 1, 1, 1, 0);
+    o.add(new THREE.LineSegments(lineGeo(pts), INK));
+    hull(o);
+  }
+  parent.add(o);
+  return o;
+}
+// Отдельный круглый объём (фигурки): готовая геометрия + масштаб
+function solid(parent, geo, m, x, y, z, sx = 1, sy = 1, sz = 1) {
+  const o = new THREE.Mesh(geo, m);
+  o.scale.set(sx, sy, sz);
+  o.position.set(x, y, z);
+  if (SH.ink) hull(o);
   parent.add(o);
   return o;
 }
 
 // Сборка: копит кубы и в конце сливает их в один меш на пару (материал, рёбра).
 // Здание из 150 деталей = 6–8 мешей вместо 150.
-// rx — наклон куба вокруг x (стёкла машин: положительный опускает передний край).
+// rx — наклон куба вокруг x (стёкла машин: положительный опускает передний край); rr — свой радиус скругления.
 // k.cyl — цилиндр с осью по x (колесо): радиус r, ширина w, (x, y, z) — центр. Сливается в тот же меш материала.
-const _mx = new THREE.Matrix4(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _q = new THREE.Quaternion();
-const AX = new THREE.Vector3(1, 0, 0), AZ = new THREE.Vector3(0, 0, 1);
+// Скруглённые формы: объём, стоящий на земле, утоплен на радиус — скругление низа уходит под землю и стена
+// встаёт на неё плоско (иначе двери и ворота висят перед скруглённым цоколем).
+// Круглый язык «Игрушки»: k.post — столб-цилиндр, k.drum — овальная башня, k.dome — крона-эллипсоид,
+// k.door — проём с арочным верхом, k.vault — бочкообразный свод, k.wrap — лента окон по дуге башни,
+// k.slab — плита со скруглёнными в плане углами (крыши, навесы). В остальных формах они сводятся к кубу.
+const _mx = new THREE.Matrix4(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
+const AX = new THREE.Vector3(1, 0, 0), AY = new THREE.Vector3(0, 1, 0), AZ = new THREE.Vector3(0, 0, 1), Q0 = new THREE.Quaternion();
 const WHEEL = new THREE.CylinderGeometry(1, 1, 1, 16);   // ось по y; в колесо — поворот на π/2 по z
+const DRUM = new THREE.CylinderGeometry(1, 1, 1, 28);
+const DOME = new THREE.SphereGeometry(1, 18, 12);
+const HALF = new THREE.CylinderGeometry(1, 1, 1, 20, 1, false, Math.PI / 2, Math.PI);   // половина цилиндра: z ≤ 0
+const WRAP = new THREE.CylinderGeometry(1, 1, 1, 14, 1, true, Math.PI / 2 - 0.93, 1.86);   // дуга боковой стенки вокруг +x
 function kit() {
-  const buckets = new Map();
+  const buckets = new Map(), ink = [];
   const put = (geo, m, edge) => {
     const key = m.uuid + (edge ? edge.uuid : '');
     if (!buckets.has(key)) buckets.set(key, { m, edge, list: [] });
-    buckets.get(key).list.push(geo.clone().applyMatrix4(_mx));
+    let g = geo.clone().applyMatrix4(_mx);
+    // RoundedBoxGeometry без индекса; mergeGeometries сливает только однородные — приводим всё к неиндексированному
+    if (SH.round && g.index) { const n = g.toNonIndexed(); g.dispose(); g = n; }
+    buckets.get(key).list.push(g);
   };
-  const k = (m, w, h, d, x, y0, z, edge, rx = 0) => {
-    _mx.compose(_p.set(x, y0 + h / 2, z), _q.setFromAxisAngle(AX, rx), _s.set(w, h, d));
-    put(BOX, m, edge);
+  const k = (m, w, h, d, x, y0, z, edge, rx = 0, rr) => {
+    const r = radiusOf(w, h, d, rr);
+    if (r && y0 < 0.001 && !rx && h > 2 * r) { h += r; y0 -= r; }
+    _p.set(x, y0 + h / 2, z); _q.setFromAxisAngle(AX, rx);
+    if (r) { _mx.compose(_p, _q, _s.set(1, 1, 1)); put(rbox(w, h, d, r), m, edge); }
+    else { _mx.compose(_p, _q, _s.set(w, h, d)); put(BOX, m, edge); }
+    if (SH.ink && !m.userData.ground) crease(ink, w, h, d, r, _p, _q);
   };
   k.cyl = (m, r, w, x, y, z) => {
     _mx.compose(_p.set(x, y, z), _q.setFromAxisAngle(AZ, Math.PI / 2), _s.set(r, w, r));
     put(WHEEL, m);
+  };
+  k.slab = (m, w, h, d, x, y0, z, edge) => {
+    const R = SH.round ? Math.min(SH.ratio * Math.min(w, d), SH.cap) : 0, H = Math.max(h, 2 * R);
+    if (R < 0.03 || H === h) return k(m, w, h, d, x, y0, z, edge);
+    _mx.compose(_p.set(x, y0 + h / 2, z), Q0, _s.set(1, h / H, 1));
+    put(rbox(w, H, d, R), m, edge);
+    if (SH.ink) crease(ink, w, H, d, R, _p, null, h / H);
+  };
+  k.post = (m, w, h, d, x, y0, z, edge) => {
+    if (!SH.toy || Math.max(w, d) > 2 * Math.min(w, d)) return k(m, w, h, d, x, y0, z, edge);
+    const r = Math.max(w, d) * 0.56;
+    _mx.compose(_p.set(x, y0 + h / 2, z), Q0, _s.set(r, h, r));
+    put(WHEEL, m);
+  };
+  k.drum = (m, w, h, d, x, y0, z) => {
+    _mx.compose(_p.set(x, y0 + h / 2, z), Q0, _s.set(w / 2, h, d / 2));
+    put(DRUM, m);
+  };
+  k.dome = (m, w, h, d, x, y0, z) => {
+    _mx.compose(_p.set(x, y0 + h / 2, z), Q0, _s.set(w / 2, h / 2, d / 2));
+    put(DOME, m);
+  };
+  // Проём на стене, обращённой к +z: ноги-прямоугольник + полукруг радиусом в половину ширины
+  k.door = (m, w, h, d, x, y0, z) => {
+    if (!SH.toy) return k(m, w, h, d, x, y0, z);
+    k(m, w, h - w / 2, d, x, y0, z);
+    _mx.compose(_p.set(x, y0 + h - w / 2, z), _q.setFromAxisAngle(AX, Math.PI / 2), _s.set(w / 2, d, w / 2));
+    put(HALF, m);
+  };
+  // Свод: половина овального цилиндра осью по x — длина w, высота h, глубина d; y0 — пята свода
+  k.vault = (m, w, h, d, x, y0, z) => {
+    _q.setFromAxisAngle(AY, Math.PI / 2).multiply(_q2.setFromAxisAngle(AX, Math.PI / 2));
+    _mx.compose(_p.set(x, y0, z), _q, _s.set(d / 2, w, h));
+    put(HALF, m);
+  };
+  k.wrap = (m, w, h, d, x, y0, z) => {
+    _mx.compose(_p.set(x, y0 + h / 2, z), Q0, _s.set(w / 2 + 0.04, h, d / 2 + 0.04));
+    put(WRAP, m);
   };
   k.into = (parent) => {
     for (const { m, edge, list } of buckets.values()) {
       const geo = mergeGeometries(list);
       list.forEach((g) => g.dispose());
       const mesh = new THREE.Mesh(geo, m);
-      if (edge) mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edge));
+      // Тонкие рёбра --line — только у острых кубов: у скруглённых форм грань читается светом, у «Контура» — чернилами
+      if (edge && !SH.round) mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edge));
       parent.add(mesh);
+      if (SH.ink && !m.userData.ground) hull(mesh);
     }
+    if (ink.length) parent.add(new THREE.LineSegments(lineGeo(ink), INK));
     buckets.clear();
+    ink.length = 0;
   };
   return k;
 }
@@ -551,12 +816,13 @@ function label(parent, html, cls, x, y, z) {
 // Диорама, а не макет района: ОФИС — эталон габаритов (≈12×10, высота 7,6, дверь 2,9),
 // остальные здания — игрушки того же калибра: склад ≤ 1,5 офиса, гараж шириной с офис. Фигурка (2,0) ≈ 2/3 двери — нарочито крупная, машины ей под стать.
 // Здание — 8–20 объёмов, окна — 1–3 широкие ленты --select, рёбра — только у основных объёмов.
-const BAND = mat(T.select);
-// Дерево-игрушка: куб-ствол + одна-две крупные кроны
+// Дерево-игрушка: куб-ствол + одна-две крупные кроны. «Галька» и «Контур» — крона сильно скруглена,
+// «Игрушка» — ствол-цилиндр и кроны-эллипсоиды (ствол на 0,4 выше: уходит в крону, иначе она касается его точкой).
 function tree(k, x, z, s = 1) {
-  k(DARK, 0.5 * s, 1.6 * s, 0.5 * s, x, 0, z);
-  k(LEAF, 2.6 * s, 2.2 * s, 2.6 * s, x, 1.6 * s, z, EDGE);
-  if (s > 1) k(LEAF, 1.5, 1.2, 1.5, x + 0.2, 1.6 * s + 2.2 * s, z - 0.1, EDGE);
+  k.post(DARK, 0.5 * s, 1.6 * s + (SH.toy ? 0.4 : 0), 0.5 * s, x, 0, z);
+  const crown = (w, h, d, cx, y0, cz) => SH.toy ? k.dome(LEAF, w, h, d, cx, y0, cz) : k(LEAF, w, h, d, cx, y0, cz, EDGE, 0, SH.round ? 0.3 * Math.min(w, h, d) : undefined);
+  crown(2.6 * s, 2.2 * s, 2.6 * s, x, 1.6 * s, z);
+  if (s > 1) crown(1.5, 1.2, 1.5, x + 0.2, 1.6 * s + 2.2 * s - (SH.toy ? 0.25 : 0), z - 0.1);
 }
 // Кейс — один графитовый куб
 const crate = (k, x, y0, z, s = 0.7) => k(DARK, s, s, s, x, y0, z);
@@ -566,10 +832,11 @@ const crate = (k, x, y0, z, s = 0.7) => k(DARK, s, s, s, x, y0, z);
 function building(id, x, z) {
   const g = new THREE.Group();
   g.position.set(x, 0, z);
-  const body = own(T.card);
+  const body = own(P.wall);
   g.userData = { id, mats: [body] };
   roots[id] = g;
-  return { g, body, edge: EDGE, k: kit() };
+  // roofMass — крыша-объём: в палитрах, где она цвета стены, это тот же материал корпуса (один меш, общие рёбра)
+  return { g, body, roofMass: P.roofMass === P.wall ? body : mat(P.roofMass), edge: EDGE, k: kit() };
 }
 
 /* ============== Здания: у каждого свой силуэт и свой «жест» ============== */
@@ -579,16 +846,16 @@ function buildOffice() {
   k(body, 4.5, 7, 6, -3.75, 0, -1.5, edge);                 // западное крыло, 2 этажа
   k(body, 7.5, 3.5, 5, 2.25, 0, 1.5, edge);                 // южное крыло, первый этаж
   k(body, 7.5, 3.5, 6.5, 2.25, 3.5, 2.25, edge);            // второй этаж — консоль наружу
-  k(DARK, 4.7, 0.3, 6.2, -3.75, 7, -1.5);                   // крыша крыла
+  k.slab(ROOF, 4.7, 0.3, 6.2, -3.75, 7, -1.5);              // крыша крыла
   k(GLASS, 4.5, 7.6, 3, -3.75, 0, 3, EDGE);                 // атриум во всю высоту
   k(BAND, 6.6, 1.3, 0.1, 2.25, 4.6, 5.52);                  // лента окон консоли
   k(BAND, 0.1, 1.3, 4.4, -6.02, 4.6, -1.8);                 // лента окон крыла
-  k(DARK, 2.8, 2.9, 0.14, 2.25, 0, 4.02);                   // вход — крупный проём
+  k.door(DOOR, 2.8, 2.9, 0.14, 2.25, 0, 4.02);              // вход — крупный проём
   // Вывеска ARGO на торце консоли: графит + три крупных красных кубика
-  k(DARK, 4.4, 1.5, 0.2, 2.25, 4.9, 5.66);
-  for (const dx of [-1.1, 0, 1.1]) k(RED, 0.7, 0.7, 0.3, 2.25 + dx, 5.3, 5.8);
+  k(SIGN, 4.4, 1.5, 0.2, 2.25, 4.9, 5.66);
+  for (const dx of [-1.1, 0, 1.1]) k(SIGN_MARK, 0.7, 0.7, 0.3, 2.25 + dx, 5.3, 5.8);
   // Флаг у входа — крупнее «настоящего»
-  k(DARK, 0.3, 7.5, 0.3, 7.2, 0, 6.2);
+  k.post(DARK, 0.3, 7.5, 0.3, 7.2, 0, 6.2);
   k(RED, 2.2, 1.4, 0.12, 8.35, 5.9, 6.2);
   tree(k, -7.8, 5.6, 1.1);
   k.into(g);
@@ -600,21 +867,30 @@ function buildOffice() {
 // Склад: ангар с пилой из 3 зубьев, башня-офис с торца чуть выше офиса, рампа с навесом.
 // Длина 17 = 1,4 офиса.
 function buildWarehouse() {
-  const [X, Z] = POS.warehouse, { g, body, edge, k } = building('warehouse', X, Z);
-  k(body, 13, 4.5, 9, -2, 0, 0, edge);                       // ангар: x −8,5…4,5
-  for (let t = 0; t < 3; t++) {
+  const [X, Z] = POS.warehouse, { g, body, roofMass, edge, k } = building('warehouse', X, Z);
+  // ангар: x −8,5…4,5. «Игрушка»: радиус меньше общего — над ним свод с прямыми углами в плане
+  k(body, 13, 4.5, 9, -2, 0, 0, edge, 0, SH.toy ? 0.4 : undefined);
+  if (SH.toy) k.vault(roofMass, 13, 2, 9, -2, 4.5, 0);       // бочкообразный свод той же высоты, что пила
+  else for (let t = 0; t < 3; t++) {
     const a = -8.5 + t * (13 / 3);
-    k(body, 2.9, 1, 9, a + 2.85, 4.5, 0, edge);              // зуб: две ступени
-    k(body, 1.45, 1, 9, a + 3.6, 5.5, 0, edge);
+    k(roofMass, 2.9, 1, 9, a + 2.85, 4.5, 0, edge);          // зуб: две ступени
+    k(roofMass, 1.45, 1, 9, a + 3.6, 5.5, 0, edge);
   }
-  k(body, 4, 8.6, 5.5, 6.5, 0, -1.75, edge);                 // башня: 8,6 против 7,6 у офиса
-  k(DARK, 4.2, 0.4, 5.7, 6.5, 8.6, -1.75);
-  k(BAND, 0.1, 1.2, 4.4, 8.52, 6, -1.75);                    // лента окон башни
+  // башня: 8,6 против 7,6 у офиса. «Игрушка»: овальный цилиндр в тех же габаритах, лента окон — по дуге
+  if (SH.toy) {
+    k.drum(body, 4, 8.6, 5.5, 6.5, 0, -1.75);
+    k.drum(ROOF, 4.2, 0.4, 5.7, 6.5, 8.6, -1.75);
+    k.wrap(BAND, 4, 1.2, 5.5, 6.5, 6, -1.75);
+  } else {
+    k(body, 4, 8.6, 5.5, 6.5, 0, -1.75, edge);
+    k.slab(ROOF, 4.2, 0.4, 5.7, 6.5, 8.6, -1.75);
+    k(BAND, 0.1, 1.2, 4.4, 8.52, 6, -1.75);                  // лента окон башни
+  }
   k(BAND, 4.6, 0.9, 0.1, 1.6, 2.6, 4.52);                    // лента окон ангара
-  k(DARK, 3.6, 3.2, 0.14, -4, 0.9, 4.52);                    // ворота у рампы
+  k.door(DOOR, 3.6, 3.2, 0.14, -4, 0.9, 4.52);               // ворота у рампы
   k(WHITE, 5, 0.9, 2, -4, 0, 5.5, EDGE);                     // рампа
-  k(WHITE, 6, 0.3, 2.6, -4, 4.2, 5.8, EDGE);                 // навес
-  for (const x of [-6.6, -1.4]) k(DARK, 0.35, 4.2, 0.35, x, 0, 6.9);
+  k.slab(CANOPY, 6, 0.3, 2.6, -4, 4.2, 5.8, EDGE);           // навес
+  for (const x of [-6.6, -1.4]) k.post(DARK, 0.35, 4.2, 0.35, x, 0, 6.9);
   crate(k, -5, 0.9, 5.3); crate(k, -4.2, 0.9, 5.9);
   k.into(g);
   g.userData.top = 9.4;
@@ -627,17 +903,20 @@ function buildWarehouse() {
 const [GX, GZ] = POS.garage;          // позиция гаража в мире
 const bayX = (b) => -3.8 + b * 3.8;   // локальный x проёма
 function buildGarage() {
-  const { g, body, edge, k } = building('garage', GX, GZ);
+  const { g, body, roofMass, edge, k } = building('garage', GX, GZ);
   k(body, 12, 4, 7, 0, 0, 0, edge);
-  k(DARK, 11.4, 3, 0.1, 0, 0, 3.52);                         // проёмы — одна тёмная лента
-  for (const x of [-1.9, 1.9]) k(body, 0.5, 3, 0.3, x, 0, 3.6);   // простенки
-  k(body, 12.2, 0.5, 4.5, 0, 4, -1.25, edge);                // односкат: две ступени к задней стене
-  k(body, 12.2, 0.5, 2, 0, 4.5, -2.5, edge);
+  if (SH.toy) for (let b = 0; b < 3; b++) k.door(DOOR, 3.3, 3, 0.1, bayX(b), 0, 3.52);   // три арочных проёма вместо ленты
+  else {
+    k(DOOR, 11.4, 3, 0.1, 0, 0, 3.52);                       // проёмы — одна тёмная лента
+    for (const x of [-1.9, 1.9]) k(body, 0.5, 3, 0.3, x, 0, 3.6);   // простенки
+  }
+  k.slab(roofMass, 12.2, 0.5, 4.5, 0, 4, -1.25, edge);       // односкат: две ступени к задней стене
+  k.slab(roofMass, 12.2, 0.5, 2, 0, 4.5, -2.5, edge);
   k(body, 4.5, 2, 3, 3, 5, -1.9, edge);                      // мезонин
   k(BAND, 3.6, 0.9, 0.1, 3, 5.6, -0.38);
-  k(DARK, 3.6, 1.1, 0.2, -2.5, 4.5, 0.6);                    // вывеска
-  for (const dx of [-0.6, 0.4]) k(RED, 0.55, 0.55, 0.2, -2.5 + dx, 4.8, 0.75);
-  k(mat(T.sunk), 12, 0.03, 5, 0, 0, 6);                      // площадка перед гаражом
+  k(SIGN, 3.6, 1.1, 0.2, -2.5, 4.5, 0.6);                    // вывеска
+  for (const dx of [-0.6, 0.4]) k(SIGN_MARK, 0.55, 0.55, 0.2, -2.5 + dx, 4.8, 0.75);
+  k(mat(P.pad), 12, 0.03, 5, 0, 0, 6);                       // площадка перед гаражом
   k.into(g);
   // Те же модели, что внутри: в проёмах торчат передки (остальное прячет коробка), двое — на площадке
   [0, 2, 3].forEach((ci, b) => { const v = makeCar(CARS[ci]); v.position.set(bayX(b), 0, 4.7 - SPEC[CARS[ci].kind].l / 2); g.add(v); });
@@ -652,7 +931,7 @@ function buildGarage() {
 const EXIT = POS.exit;
 function buildExit() {
   const { g, k } = building('exit', EXIT[0], EXIT[1]);
-  k(DARK, 0.3, 3.4, 0.3, 0, 0, 0);
+  k.post(DARK, 0.3, 3.4, 0.3, 0, 0, 0);
   k(WHITE, 2.4, 1.1, 0.16, 0.6, 2.2, 0.1, EDGE);              // табличка
   k(RED, 1.1, 0.28, 0.2, 0.45, 2.62, 0.2);                    // стрелка → к краю: древко и наконечник
   k(RED, 0.4, 0.62, 0.2, 1.2, 2.45, 0.2);
@@ -766,18 +1045,27 @@ for (const s of Object.values(SPEC)) {
   s.w = 2 * Math.max(...s.parts.map(([, w, , , x]) => Math.abs(x) + w / 2), ...s.wheels.map(([, w, x]) => x + w / 2)) * s.l;
 }
 
+const CAR_SINK = 0.07;   // на сколько (в долях длины) капот и багажник уходят в кузов в скруглённых формах
 function makeCar(c, cargo = false) {
   const g = new THREE.Group(), k = kit(), s = SPEC[c.kind], n = s.l;
-  const role = { body: mat(c.hex), glass: DARK, dark: DARK, lamp: mat(T.warnBg), red: RED };
+  // Цвет кузова — данные машины (CARS.hex), палитра его не трогает
+  const role = { body: mat(c.hex), glass: CAR_GLASS, dark: DARK, lamp: HEADLAMP, red: RED };
   let top = 0;
-  for (const [r, w, h, d, x, y, z, deg = 0] of s.parts) {
-    k(role[r], w * n, h * n, d * n, x * n, (y - h / 2) * n, z * n, r === 'body' ? EDGE : undefined, THREE.MathUtils.degToRad(deg));
+  for (let [r, w, h, d, x, y, z, deg = 0] of s.parts) {
     top = Math.max(top, (y + h / 2) * n);
+    const edge = r === 'body' ? EDGE : undefined, rx = THREE.MathUtils.degToRad(deg);
+    // Скруглённые формы: тонкая панель кузова на скруглённом объёме висела бы козырьком. Крыша — плита со скруглёнными
+    // в плане углами; капот и багажник утолщаются вниз, внутрь кузова, и скругляются вместе с ним.
+    if (SH.round && r === 'body' && !deg && h < 0.05 && w > 0.2) {
+      if (y > 0.28) { k.slab(role[r], w * n, h * n, d * n, x * n, (y - h / 2) * n, z * n, edge); continue; }
+      y -= CAR_SINK / 2; h += CAR_SINK;
+    }
+    k(role[r], w * n, h * n, d * n, x * n, (y - h / 2) * n, z * n, edge, rx);
   }
   // Колесо — шина --night-3 и тонкий диск --ctl на внешней стороне; рёбер нет
   for (const [dia, w, x, z] of s.wheels) for (const sx of [-1, 1]) {
     const r = (dia / 2) * n;
-    k.cyl(DARK, r, w * n, sx * x * n, r, z * n);
+    k.cyl(TIRE_MAT, r, w * n, sx * x * n, r, z * n);
     k.cyl(STEEL, r * 0.6, 0.006 * n, sx * (x + w / 2 + 0.002) * n, r, z * n);
   }
   if (cargo) { const y0 = s.deck * n; crate(k, -0.4, y0, -1.2); crate(k, 0.4, y0, -0.4); }   // кейсы на полу платформы
@@ -809,8 +1097,8 @@ function makeRing(parent, r, x, z, { half = 0.07, g0 = 0.85, y = 0.1 } = {}) {
   const disc = (w, color) => flatMesh(new THREE.RingGeometry(r - w, r + w, 72), color, 0, 0, 2);
   // Заливка лежит на 5 мм выше кольца, но рисуется до него. Цвет один, поэтому шва нет: кольцо — край диска.
   // Непрозрачность 1, но transparent + depthWrite: false остаются — диск не z-файтит с полом
-  const fill = flatMesh(new THREE.CircleGeometry(r, 72), T.red, 1, 0.005, 1);
-  const ring = { gray: disc(half, T.ctl), red: disc(half * 1.9, T.red), fill, g0, hovOn: false, h: { val: 0, from: 0, to: 0, t0: 0, dur: 0 }, f: { val: 0, from: 0, to: 0, t0: 0, dur: 0 }, selOn: false, sT0: -1e9, s0: 0 };
+  const fill = flatMesh(new THREE.CircleGeometry(r, 72), P.ringSel, 1, 0.005, 1);
+  const ring = { gray: disc(half, P.ringHover), red: disc(half * 1.9, P.ringSel), fill, g0, hovOn: false, h: { val: 0, from: 0, to: 0, t0: 0, dur: 0 }, f: { val: 0, from: 0, to: 0, t0: 0, dur: 0 }, selOn: false, sT0: -1e9, s0: 0 };
   RINGS.push(ring);
   return ring;
 }
@@ -829,6 +1117,11 @@ function hideRing(ring) {
   Object.assign(ring, { hovOn: false, selOn: false, s0: 0, sT0: -1e9 });
   Object.assign(ring.h, { val: 0, from: 0, to: 0, dur: 0 });
   Object.assign(ring.f, { val: 0, from: 0, to: 0, dur: 0 });
+}
+// Сразу в покое «выбрано» — после пересборки мира (смена облика), без повторного пульса
+function settleRing(ring) {
+  Object.assign(ring, { selOn: true, sT0: -1e9 });
+  Object.assign(ring.f, { val: 1, from: 1, to: 1, dur: 0 });
 }
 // Пульс: 0,8 → 1,08 за 45 % времени, затем → 1
 const pulse = (k) => k < 0.45 ? 0.8 + 0.28 * easeOut(k / 0.45) : 1.08 - 0.08 * easeOut((k - 0.45) / 0.55);
@@ -858,7 +1151,7 @@ function tickRings(now) {
 }
 
 /* ============== Фигурки ============== */
-const CLOTH = [T.select, T.night3, T.line];
+const LEGS_CAP = new THREE.CapsuleGeometry(0.25, 0.3, 4, 12), BODY_CAP = new THREE.CapsuleGeometry(0.33, 0.09, 4, 12);
 // Сотрудник-игрушка: ноги, тело, голова — три объёма. Ходьба — покачивание, без шарниров.
 function makePerson(parent, x, z, rot, cloth, withCase) {
   const g = new THREE.Group();
@@ -866,9 +1159,14 @@ function makePerson(parent, x, z, rot, cloth, withCase) {
   g.rotation.y = rot;
   const inner = new THREE.Group();
   g.add(inner);
-  box(inner, DARK, 0.5, 0.8, 0.34, 0, 0, 0);
-  box(inner, mat(cloth), 0.66, 0.75, 0.42, 0, 0.8, 0, EDGE);
-  box(inner, WHITE, 0.46, 0.46, 0.46, 0, 1.55, 0, EDGE);
+  const legs = mat(P.legs), skin = mat(P.skin);
+  // Скруглённые формы: тело — капсула; «Игрушка» — ноги тоже капсула, голова — шар. Габариты те же.
+  if (SH.toy) solid(inner, LEGS_CAP, legs, 0, 0.4, 0, 1, 1, 0.68);
+  else box(inner, legs, 0.5, 0.8, 0.34, 0, 0, 0);
+  if (SH.round) solid(inner, BODY_CAP, mat(cloth), 0, 1.175, 0, 1, 1, 0.64);
+  else box(inner, mat(cloth), 0.66, 0.75, 0.42, 0, 0.8, 0, EDGE);
+  if (SH.toy) solid(inner, DOME, skin, 0, 1.78, 0, 0.25, 0.25, 0.25);
+  else box(inner, skin, 0.46, 0.46, 0.46, 0, 1.55, 0, EDGE);
   if (withCase) box(inner, DARK, 0.2, 0.5, 0.6, 0.48, 0.4, 0);
   g.userData = { inner };
   parent.add(g);
@@ -891,13 +1189,13 @@ const pathLen = (pts) => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - 
 
 /* ============== Мир кампуса ============== */
 function ground(parent, size) {
-  const plane = new THREE.Mesh(new THREE.PlaneGeometry(size, size), flat(T.bg));
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(size, size), flat(P.ground));
   plane.rotation.x = -Math.PI / 2;
   parent.add(plane);
   // Сетка шагом 1 м: цвет --ink с низкой непрозрачностью, как --grid в токенах
-  const grid = new THREE.GridHelper(size, size, T.ink, T.ink);
+  const grid = new THREE.GridHelper(size, size, P.grid, P.grid);
   grid.material.transparent = true;
-  grid.material.opacity = 0.07;
+  grid.material.opacity = P.gridA;
   grid.material.depthWrite = false;
   grid.position.y = 0.06;
   parent.add(grid);
@@ -908,14 +1206,14 @@ function ground(parent, size) {
 // гараж слева-спереди, офис по центру, склад справа-сзади. Главная дорога — вдоль фронта, от площадки гаража
 // направо за край сетки (выезд); к ней от входа в офис и от рампы склада — по прямой полосе.
 function roads(k) {
-  const ROAD = flat(T.line), [OX, OZ] = POS.office, [WX, WZ] = POS.warehouse, r0 = ROAD_Z - 1.25;
+  const ROAD = flat(P.road), [OX, OZ] = POS.office, [WX, WZ] = POS.warehouse, r0 = ROAD_Z - 1.25;
   const rect = (x0, x1, z0, z1) => k(ROAD, x1 - x0, 0.04, z1 - z0, (x0 + x1) / 2, 0, (z0 + z1) / 2);
   rect(GX - 8, CAMPUS_HALF + 4, r0, r0 + 2.5);     // главная дорога: от гаража вдоль фронта за край сетки — выезд
   // Осевая пунктиром --ctl: без неё полотно --line на фоне --bg не читается как дорога
-  for (let x = GX - 7; x < CAMPUS_HALF + 4; x += 2) k(flat(T.ctl), 1, 0.05, 0.14, x + 0.5, 0, ROAD_Z);
+  for (let x = GX - 7; x < CAMPUS_HALF + 4; x += 2) k(flat(P.mark), 1, 0.05, 0.14, x + 0.5, 0, ROAD_Z);
   rect(WX - 5.25, WX - 2.75, WZ + 6.5, r0);        // от рампы склада к дороге
   rect(OX + 1.1, OX + 3.4, OZ + 4.1, r0);          // от входа в офис к дороге
-  for (const [x, z] of [[OX + 5, r0 - 1.2], [WX - 6.6, WZ + 9]]) { k(DARK, 0.35, 3.6, 0.35, x, 0, z); k(GLASS, 0.9, 0.7, 0.9, x, 3.6, z, EDGE); }
+  for (const [x, z] of [[OX + 5, r0 - 1.2], [WX - 6.6, WZ + 9]]) { k.post(DARK, 0.35, 3.6, 0.35, x, 0, z); SH.toy ? k.dome(GLASS, 0.9, 0.9, 0.9, x, 3.5, z) : k(GLASS, 0.9, 0.7, 0.9, x, 3.6, z, EDGE); }
 }
 
 function buildCampus() {
@@ -943,14 +1241,14 @@ function buildCampus() {
   const [OX, OZ] = POS.office, [WX, WZ] = POS.warehouse, side = ROAD_Z - 1.7;   // side — обочина главной дороги
   const walkers = [
     [[WX - 4.6, WZ + 8], [WX - 4.6, side], 0], [[OX + 1.7, OZ + 5], [OX + 1.7, side], 4], [[GX + 7, side], [OX - 3, side], 2],
-  ].map(([a, b, ph], i) => ({ p: makePerson(g, a[0], a[1], 0, CLOTH[i % 3]), pts: [a, b], ph }));
+  ].map(([a, b, ph], i) => ({ p: makePerson(g, a[0], a[1], 0, P.cloth[i % 3]), pts: [a, b], ph }));
   [[OX + 4.2, OZ + 6.6, 2.6], [OX + 5, OZ + 7.1, -1.8], [WX + 10, WZ + 2.5, 1.2], [WX + 10.8, WZ + 3.2, -2.3], [GX - 7.4, GZ + 7.8, 0.4], [OX - 6, OZ + 9, 2.8]]
-    .forEach(([x, z, r], i) => makePerson(g, x, z, r, CLOTH[(i + 1) % 3]));
+    .forEach(([x, z, r], i) => makePerson(g, x, z, r, P.cloth[(i + 1) % 3]));
   // Бригада: от рампы склада по полосе к главной дороге и вдоль неё к выезду, встаёт у указателя
   const lane = WX - 4, walk = EXIT[1] + 1;   // ось полосы от склада; тропа вдоль дороги перед указателем
   const crew = [[-6, 8.4], [-4.9, 8.6], [-3.8, 8.4], [-2.7, 8.6]].map(([dx, dz], i) => {
     const h = [WX + dx, WZ + dz], [fx, fz] = [[-3.6, 0.6], [-2.5, 0.3], [-1.4, 0.6], [-2.5, -0.7]][i], fin = [EXIT[0] + fx, EXIT[1] + fz];
-    return { p: makePerson(g, h[0], h[1], 0.3, CLOTH[i % 3], true), pts: [h, [lane, h[1] + 0.8], [lane, walk], [fin[0] - 1.5, walk], fin], home: h };
+    return { p: makePerson(g, h[0], h[1], 0.3, P.cloth[i % 3], true), pts: [h, [lane, h[1] + 0.8], [lane, walk], [fin[0] - 1.5, walk], fin], home: h };
   });
   W.life = { van, walkers, crew };
   return g;
@@ -976,10 +1274,10 @@ const layoutFor = (aspect) => aspect >= 1.5 ? 'row' : 'grid';   // Full HD и ш
 
 function garageShell(L) {
   const g = new THREE.Group(), { hw, zb, zf, fd } = L, zc = (zb + zf) / 2, d = zf - zb;
-  const k = kit(), wall = own(T.card), PAINT = flat(T.card), LAMP = mat(T.select);
+  const k = kit(), wall = own(P.wall), PAINT = flat(P.paint), LAMP = GLASS;
   // Пол и стены: задняя целиком, левая с проёмом ворот, правая глухая; за воротами светлый двор
-  k(flat(T.select), 2 * hw, 0.04, d, 0, 0, zc);
-  k(PAINT, 11, 0.04, d + 4, -hw - 5.6, 0, zc);
+  k(flat(P.floor), 2 * hw, 0.04, d, 0, 0, zc);
+  k(flat(P.yard), 11, 0.04, d + 4, -hw - 5.6, 0, zc);
   k(wall, 2 * hw + 0.3, 4.5, 0.3, 0, 0, zb, EDGE);
   k(DARK, 2 * hw + 0.3, 0.4, 0.34, 0, 0, zb);
   for (const [z0, z1] of [[zb, zc - 2], [zc + 2, zf]]) k(wall, 0.3, 4.5, z1 - z0, -hw, 0, (z0 + z1) / 2, EDGE);
@@ -1004,7 +1302,7 @@ function garageShell(L) {
   const [lx, lz] = L.slots[LIFT];
   for (const dx of [-0.55, 0.55]) k(STEEL, 0.4, 0.2, 4.4, lx + dx, 0, lz);
   // Три подвесных светильника над машинами
-  for (const x of [-hw * 0.62, 0, hw * 0.62]) { k(STEEL, 0.06, 1.6, 0.06, x, 4.6, zc - 0.5); k(LAMP, 2.4, 0.16, 0.7, x, 4.44, zc - 0.5, EDGE); }
+  for (const x of [-hw * 0.62, 0, hw * 0.62]) { k.post(STEEL, 0.06, 1.6, 0.06, x, 4.6, zc - 0.5); k(LAMP, 2.4, 0.16, 0.7, x, 4.44, zc - 0.5, EDGE); }
   crate(k, -hw + 0.9, 0, zf - 1.9); crate(k, -hw + 1.5, 0, zf - 1.1, 0.6);
   k.into(g);
   // Ворота приоткрыты наружу: две створки на петлях у краёв проёма
@@ -1016,7 +1314,7 @@ function garageShell(L) {
     g.add(pivot);
   }
   // Стопка шин у правой стены
-  for (let i = 0; i < 3; i++) { const t = new THREE.Mesh(TIRE, DARK); t.position.set(hw - 1, 0.15 + i * 0.32, zb + 1.7); g.add(t); }
+  for (let i = 0; i < 3; i++) solid(g, TIRE, TIRE_MAT, hw - 1, 0.15 + i * 0.32, zb + 1.7);
   return g;
 }
 const TIRE = new THREE.CylinderGeometry(0.6, 0.6, 0.3, 14);
@@ -1105,7 +1403,7 @@ function initWorld() {
   sceneEl.appendChild(css2d.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(T.bg);
+  scene.background = new THREE.Color(T.bg);   // цвет земли палитры ставит applyStyle()
   // Туман цвета фона включён всегда, но вынесен за горизонт: полёт лишь сдвигает near/far.
   // Включать/выключать его нельзя — смена fog пересобирает шейдеры и даёт рывок в начале полёта.
   scene.fog = new THREE.Fog(T.bg, 1e4, 1e4 + 1);
@@ -1125,16 +1423,9 @@ function initWorld() {
   controls.addEventListener('start', () => { state.userMoved = true; });
 
   W = { renderer, css2d, scene, camera, controls, elapsed: 0, anim: null };
-  W.campus = buildCampus();
-  W.garage = buildGarageView();
+  buildWorld();
   setLayout('row');
-  scene.add(W.campus, W.garage);
   homeLife();
-
-  // Кликабельное — только меши объектов; рёбра, кольца и земля в raycast не идут
-  const collect = (ids, list) => ids.forEach((id) => roots[id].traverse((o) => { if (o.isMesh) { o.userData.root = id; list.push(o); } }));
-  collect(CAMPUS_IDS, pickables.campus);
-  collect(CARS.map((_, i) => 'car' + i), pickables.garage);
 
   new ResizeObserver(() => { fit(); if (!state.userMoved && !state.flying) placeCamera(); }).observe(sceneEl);
 
@@ -1166,6 +1457,49 @@ function initWorld() {
   });
 }
 
+// Обе сцены в текущем облике: материалы из палитры → кампус и гараж → списки кликабельного
+function buildWorld() {
+  applyStyle();
+  W.campus = buildCampus();
+  W.garage = buildGarageView();
+  W.scene.add(W.campus, W.garage);
+  // Кликабельное — только меши объектов; рёбра, контур, кольца и земля в raycast не идут
+  const collect = (ids, list) => ids.forEach((id) => roots[id].traverse((o) => { if (o.isMesh && !o.userData.hull) { o.userData.root = id; list.push(o); } }));
+  collect(CAMPUS_IDS, pickables.campus);
+  collect(CARS.map((_, i) => 'car' + i), pickables.garage);
+}
+// Смена облика без перезагрузки: старую сборку снести и освободить, собрать заново; вид, раскладка гаража,
+// выбранная машина, день мероприятия и положение камеры остаются как были.
+function restyle() {
+  if (!W) return applyStyle();   // без WebGL — только рамка сцены
+  const { layout, hover, sel } = state;
+  for (const o of Object.values(labels)) o.element.remove();
+  for (const g of [W.campus, W.garage]) {
+    W.scene.remove(g);
+    g.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
+  }
+  for (const cache of [GEO, MATS, FLATS]) { cache.forEach((v) => v.dispose()); cache.clear(); }
+  for (const dict of [roots, labels]) for (const key of Object.keys(dict)) delete dict[key];
+  pickables.campus.length = pickables.garage.length = RINGS.length = 0;
+  campusPts = null;
+  state.layout = null;
+  buildWorld();
+  W.campus.visible = state.view === 'campus';
+  W.garage.visible = state.view === 'garage';
+  setLayout(layout);
+  if (state.event) {
+    for (const s of SITES) if (s.ev) labels[s.id].element.querySelector('span').textContent = s.ev;
+    labels.event.visible = true;
+  } else homeLife();
+  if (hover) paint(hover);
+  if (sel != null) {
+    const v = roots['car' + sel];
+    paint('car' + sel);
+    settleRing(v.userData.ring);
+    Object.assign(v.userData.lift, { val: 0.15, from: 0.15, to: 0.15 });
+  }
+}
+
 // Размер canvas — синхронно: при смене страницы сцена переезжает в другой слот, а полёту нужен новый аспект сразу
 function fit() {
   const w = sceneEl.clientWidth, h = sceneEl.clientHeight;
@@ -1174,6 +1508,7 @@ function fit() {
   W.css2d.setSize(w, h);
   W.camera.aspect = w / h;
   W.camera.updateProjectionMatrix();
+  HULL_PX.value.set(2 * HULL_WIDTH / w, 2 * HULL_WIDTH / h);
   // Раскладку гаража решает окно гаража: на кампусе (другой слот) её не трогаем
   if (state.view === 'garage') setLayout(layoutFor(w / h));
   return true;
@@ -1515,6 +1850,28 @@ function setNav(v) {
 }
 document.querySelector('.mock-nav').addEventListener('click', (e) => { const b = e.target.closest('[data-nav]'); if (b) setNav(b.dataset.nav); });
 
+// Макет: облик мира. Три сегментные группы; выбор живой — мир пересобирается, адрес обновляется (ссылкой можно поделиться).
+const mock = $('mock'), mockToggle = $('mockToggle');
+for (const [axis, [table]] of Object.entries(AXES))
+  mock.querySelector(`[data-axis="${axis}"]`).innerHTML = Object.entries(table).map(([id, name]) => `<button type="button" data-style="${id}" aria-pressed="${style[axis] === id}">${name}</button>`).join('');
+function setStyle(axis, id) {
+  if (style[axis] === id || state.flying) return;   // в полёте мир не пересобираем
+  style[axis] = id;
+  mock.querySelectorAll(`[data-axis="${axis}"] button`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.style === id)));
+  const q = new URLSearchParams(location.search);
+  for (const [a, [, def]] of Object.entries(AXES)) style[a] === def ? q.delete(a) : q.set(a, style[a]);
+  history.replaceState(null, '', location.pathname + (q.size ? '?' + q : '') + location.hash);
+  restyle();
+}
+mock.addEventListener('click', (e) => { const b = e.target.closest('[data-style]'); if (b) setStyle(b.closest('[data-axis]').dataset.axis, b.dataset.style); });
+function setMockOpen(on) {
+  mock.classList.toggle('is-shut', !on);
+  mockToggle.setAttribute('aria-expanded', String(on));
+}
+mockToggle.addEventListener('click', () => setMockOpen(mock.classList.contains('is-shut')));
+$('mockDone').addEventListener('click', () => { setMockOpen(false); mockToggle.focus(); });
+setMockOpen(!matchMedia('(max-width:640px)').matches);   // телефон: одна кнопка «Облик», группы — листом
+
 // Главная списком: мир выключаемый. Без WebGL — только список.
 function setHomeList(on) {
   $('page-home').classList.toggle('is-list', on);
@@ -1587,7 +1944,7 @@ const garageClose = () => ({ t: GFRONT.clone(), p: GFRONT.clone().add(new THREE.
 function campusFx(e) {
   const g = roots.garage, d = W.camera.position.distanceTo(GFRONT);
   g.scale.setScalar(1 + 0.05 * e);
-  g.userData.mats[0].emissive.setScalar(0.06 * e);
+  g.userData.mats[0].emissive?.setScalar(0.06 * e);   // у плоской заливки «Контура» свечения нет
   W.scene.fog.near = e ? d + lerp(150, 5, e) : 1e4;
   W.scene.fog.far = e ? d + lerp(300, 22, e) : 1e4 + 1;
 }
@@ -1678,13 +2035,14 @@ if (hasGL()) {
 } else {
   // Без WebGL: главная — плитки, машины — реестр. Кнопки возврата в мир прячем.
   document.body.classList.add('no-gl');
+  applyStyle();
   $('listNote').textContent = '3D недоступно на этом устройстве — разделы списком';
   $('toWorld').hidden = flatBtn.hidden = true;
   setHomeList(true);
   setFlat(true, false);   // вынужденный режим не запоминаем
 }
 // Для проверок: число мешей, позиция фургона, камера, проекция габаритов (__THREE). Прямой вход ?debug или #debug.
-if (location.hash === '#debug' || new URLSearchParams(location.search).has('debug')) Object.assign(window, { __world: W, __state: state, __THREE: THREE });
+if (location.hash === '#debug' || new URLSearchParams(location.search).has('debug')) Object.assign(window, { __world: W, __state: state, __THREE: THREE, __style: style, __setStyle: setStyle });
 // Прямое открытие «Автомобилей» (#vehicles) — без полёта
 setView(location.hash === '#vehicles' ? 'garage' : 'campus');
 </script>
