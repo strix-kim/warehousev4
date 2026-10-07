@@ -5,11 +5,12 @@ import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
-import type { WorldData } from './data/types'
+import { useWorldData } from './data/useWorldData'
 import { DayCap } from './hud/DayCap'
 import { Dock } from './hud/Dock'
 import { NameChip } from './hud/NameChip'
 import { Sign } from './hud/Sign'
+import type { World } from './engine/createWorld'
 import { loadWorld } from './loadWorld'
 import type { WorldLook } from './settings'
 import { hasWebGL2, prefersReducedMotion } from './support'
@@ -44,9 +45,9 @@ export function WorldStage({ look, onFirstFrame }: Props) {
   const navigate = useNavigate()
   const slotRef = useRef<HTMLDivElement>(null)
   const [store] = useState(createWorldStore)
-  // Те же данные, что получил движок (одна ссылка из loadWorld): HUD берёт из них
-  // числа вывесок и имена. null — данных нет, вывески стоят без чисел.
-  const [data, setData] = useState<WorldData | null>(null)
+  // Одна ссылка и движку, и HUD: машины в сцене, числа вывесок и имена — из одного
+  // объекта. null — данных нет, вывески стоят без чисел.
+  const data = useWorldData()
   const hover = useWorldState(store, (state) => state.hover)
   const hudCompact = useWorldState(store, (state) => state.hudCompact)
   const [status, setStatus] = useState<Status>(() => (hasWebGL2() ? 'loading' : 'unsupported'))
@@ -56,7 +57,9 @@ export function WorldStage({ look, onFirstFrame }: Props) {
   // Мир собирается после загрузки чанка — к тому моменту облик мог смениться, поэтому
   // стартовое значение читается из ref. Живому миру смену передаёт эффект ниже.
   const lookRef = useRef<WorldLook>({ palette, ink })
-  const worldRef = useRef<{ setStyle: (look: WorldLook) => void; dispose: () => void } | null>(null)
+  // То же с данными: к моменту сборки мира они могли прийти, а могли и нет
+  const dataRef = useRef(data)
+  const worldRef = useRef<Pick<World, 'setStyle' | 'setData' | 'dispose'> | null>(null)
 
   const names: Record<WorldSiteId, string> = { office: tr('Офис', 'Ofis'), warehouse: tr('Склад', 'Ombor'), garage: tr('Гараж', 'Garaj') }
   // Выбор и переход — один путь для вывески, клавиши и клика по зданию в сцене.
@@ -87,6 +90,7 @@ export function WorldStage({ look, onFirstFrame }: Props) {
         const world = engine.createWorld(slot, {
           store,
           look: lookRef.current,
+          data: dataRef.current,
           reducedMotion: prefersReducedMotion(),
           pose: (hot?.data.pose as CameraPose | undefined) ?? null,
           onActivate: (id) => activateRef.current(id),
@@ -102,7 +106,6 @@ export function WorldStage({ look, onFirstFrame }: Props) {
         dispose = world.dispose
         getPose = world.getPose
         worldRef.current = world
-        setData(engine.data)
       } catch (error) {
         reportAppError(error, { scope: 'loader', route: window.location.pathname, detail: { batch: 'world-create' } })
         setStatus('failed')
@@ -136,13 +139,26 @@ export function WorldStage({ look, onFirstFrame }: Props) {
     }
   }, [palette, ink])
 
+  useEffect(() => {
+    dataRef.current = data
+    const world = worldRef.current
+    if (!world) return
+    try {
+      world.setData(data)
+    } catch (error) {
+      reportAppError(error, { scope: 'loader', route: window.location.pathname, detail: { batch: 'world-refill' } })
+      world.dispose()
+      setStatus('failed')
+    }
+  }, [data])
+
   return (
     <div className={`w-stage${palette === 'night' ? ' is-dark' : ''}${hudCompact ? ' is-sm' : ''}`}>
       {/* Без aria-hidden: внутри слота живут вывески — настоящие кнопки с именем */}
       <div className="w-scene" ref={slotRef} />
       {/* Вывески и чипы — порталами в якоря движка; якорей нет (мир не собран или снесён) — пусто */}
       {WORLD_SITES.map((id) => (
-        <Sign key={id} store={store} id={id} name={names[id]} count={data?.sites?.[id] ?? null} onActivate={activate} />
+        <Sign key={id} store={store} id={id} name={names[id]} count={data?.sites[id] ?? null} onActivate={activate} />
       ))}
       {data?.people.map((person) => <NameChip key={person.id} store={store} person={person} />)}
       {status === 'ready' && (

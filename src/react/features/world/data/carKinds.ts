@@ -29,7 +29,8 @@ export function carKind(brand: string, model: string | null): CarKind {
 }
 
 // Цвета кузова — данные машины, а не палитра мира: смена облика их не трогает.
-// Значения — из принятого макета (voxel-world-s50, CARS.hex).
+// Значения — из принятого макета (voxel-world-s50, CARS.hex); в vehicles других
+// цветов сейчас нет (сверка с52).
 const COLORS: Readonly<Record<string, string>> = {
   белый: '#F5F6F8',
   темносерый: '#3A3E46',

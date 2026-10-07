@@ -54,8 +54,9 @@ export type WorldDeps = {
   look: WorldLook
   // Неподвижный мир: без инерции камеры, кадр рисуется по требованию
   reducedMotion: boolean
-  // Машины и люди кампуса; без данных кампус стоит пустым
-  data?: WorldData
+  // Машины и люди кампуса на момент сборки; без данных кампус стоит пустым.
+  // Дальше данные приходят через setData.
+  data?: WorldData | null
   pose?: CameraPose | null
   // Клик по объекту сцены (id здания): переход в раздел делает оболочка
   onActivate?: (id: string) => void
@@ -68,6 +69,8 @@ export type World = {
   getPose: () => CameraPose
   // Смена облика без перезагрузки: сцена пересобирается, камера остаётся на месте
   setStyle: (look: WorldLook) => void
+  // Новые данные: сцена пересобирается, только если изменились машины или люди
+  setData: (data: WorldData | null) => void
   dispose: () => void
 }
 
@@ -81,6 +84,22 @@ function release(root: THREE.Object3D) {
       m.dispose()
     }
   })
+}
+
+const NO_DATA: WorldData = { cars: [], people: [], sites: { office: null, warehouse: null, garage: null } }
+
+// Наполнение сцены зависит только от машин и людей (числа вывесок рисует оболочка),
+// причём от порядка тоже: место у гаража и на кампусе — по номеру в списке
+function sameFill(a: WorldData, b: WorldData) {
+  return a.cars.length === b.cars.length && a.people.length === b.people.length
+    && a.cars.every((car, i) => {
+      const other = b.cars[i]!
+      return car.id === other.id && car.brand === other.brand && car.model === other.model && car.color === other.color && car.plate === other.plate
+    })
+    && a.people.every((person, i) => {
+      const other = b.people[i]!
+      return person.id === other.id && person.firstName === other.firstName && person.lastName === other.lastName
+    })
 }
 
 export function createWorld(container: HTMLElement, deps: WorldDeps): World {
@@ -207,9 +226,10 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     css2d.domElement.remove()
   }
 
-  // Наполнение сцены — одно место и на первый кадр, и на смену облика
+  // Наполнение сцены — одно место и на первый кадр, и на смену облика или данных
+  let data = deps.data ?? NO_DATA
   const build = () => {
-    scene.add(buildCampus(ctx, deps.data ?? { cars: [], people: [], sites: null }))
+    scene.add(buildCampus(ctx, data))
     ctx.framePts = framePoints(ctx)
     collectPicks(ctx)
     // Карта — новым объектом: оболочка рисует в элементы порталом и следит за сменой
@@ -218,29 +238,49 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     hud.dirty()
   }
 
-  // Палитра меняет не только цвета, но и состав мешей: kit() сливает объёмы по
-  // материалу, а материал в кэше один на цвет. Роли, совпавшие цветом в белой схеме
-  // (стена, навес, вторая стена — все --card), в «Ночи» расходятся, и перекрасить
-  // слитый меш на месте нельзя. Поэтому, как restyle макета, наполнение сносится и
-  // собирается заново; renderer, свет, камера и её поза остаются.
-  let look = deps.look
-  const setStyle = (next: WorldLook) => {
-    if (disposed || (next.palette === look.palette && next.ink === look.ink)) return
-    look = next
+  // Пересборка наполнения: renderer, свет, камера и её поза остаются, выбор и наведение
+  // возвращает selection.rebuilt() внутри build(). change — что меняется между сносом
+  // и сборкой (облик); данным менять нечего, они уже лежат в data.
+  const refill = (change?: () => void) => {
     // Всё, кроме света: что именно лежит в сцене, этот код не знает и знать не должен
     for (const o of [...scene.children]) {
       if ((o as THREE.Light).isLight) continue
-      release(o)   // общие ctx.box и ctx.wheel тоже: three зальёт их буферы заново при первом кадре
+      // Общие ctx.box, ctx.wheel и материалы из кэша облика тоже: three зальёт буферы
+      // и соберёт шейдеры заново при первом кадре
+      release(o)
       scene.remove(o)
     }
     ctx.geo.forEach((g) => g.dispose())
     ctx.geo.clear()
     ctx.roots.clear()
     clearFill()
-    restyle(style, tokens, next)
-    background.set(style.P.ground)
-    fog.color.set(style.P.ground)
+    change?.()
     build()
+  }
+
+  // Палитра меняет не только цвета, но и состав мешей: kit() сливает объёмы по
+  // материалу, а материал в кэше один на цвет. Роли, совпавшие цветом в белой схеме
+  // (стена, навес, вторая стена — все --card), в «Ночи» расходятся, и перекрасить
+  // слитый меш на месте нельзя. Поэтому, как restyle макета, наполнение сносится и
+  // собирается заново.
+  let look = deps.look
+  const setStyle = (next: WorldLook) => {
+    if (disposed || (next.palette === look.palette && next.ink === look.ink)) return
+    look = next
+    refill(() => {
+      restyle(style, tokens, next)
+      background.set(style.P.ground)
+      fog.color.set(style.P.ground)
+    })
+  }
+
+  // Свежий ответ сервера обычно равен кэшу, с которого мир уже собран: сверяем по
+  // содержимому, иначе каждая загрузка страницы стоила бы лишней пересборки
+  const setData = (next: WorldData | null) => {
+    if (disposed) return
+    const prev = data
+    data = next ?? NO_DATA
+    if (!sameFill(prev, data)) refill()
   }
 
   try {
@@ -267,5 +307,5 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     throw error
   }
 
-  return { store: deps.store, getPose: () => readPose(ctx), setStyle, dispose }
+  return { store: deps.store, getPose: () => readPose(ctx), setStyle, setData, dispose }
 }

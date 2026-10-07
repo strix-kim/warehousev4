@@ -22,7 +22,7 @@ type Props = {
   store: WorldStore
   id: WorldSiteId
   name: string
-  // null — источника числа нет: вывеска без ячейки, только имя
+  // null — источник числа не ответил: вывеска без ячейки, только имя
   count: number | null
   onActivate: (id: WorldSiteId) => void
 }
