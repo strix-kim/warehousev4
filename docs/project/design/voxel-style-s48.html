@@ -197,7 +197,7 @@ body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
 .hallsdots i{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font:700 11px/1 var(--f-text);font-style:normal;color:#fff;background:var(--c)}
 .page-home.is-list .slot,.no-gl .slot{display:none!important}
 
-/* Стенд — только макет: облик мира (форма, цвет, насыщенность) и вариант навигации одной панелью.
+/* Стенд — только макет: облик мира (форма, цвет, тон контура) и вариант навигации одной панелью.
    Кнопка «Облик» сворачивает панель; на телефоне панель свёрнута и раскрывается листом снизу. */
 .mock{position:fixed;right:16px;bottom:16px;z-index:90;display:grid;justify-items:end;gap:8px}
 .mock__toggle{order:2;display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:var(--shadow-pop);font:600 13px/1 var(--f-text);color:var(--ink)}
@@ -208,6 +208,8 @@ body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
 .mock-row{display:grid;gap:5px;font:600 11px/1 var(--f-text);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .mock-row>span{padding-left:4px}
 .mock-row div{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(max-content,1fr);padding:2px;gap:2px;border-radius:10px;background:var(--sunk)}
+/* Форма — пять вариантов с длинным последним: колонки по содержимому, иначе панель шире и закрывает кнопки видов */
+.mock-row [data-axis="shape"]{grid-auto-columns:auto}
 .mock-row button{min-height:40px;padding:0 9px;border:0;border-radius:8px;background:transparent;font:600 12.5px/1.15 var(--f-text);letter-spacing:0;text-transform:none;color:var(--muted);white-space:nowrap}
 .mock-row button[aria-pressed="true"]{background:var(--night);color:#fff}
 .mock__done{display:none}
@@ -301,7 +303,7 @@ body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
   .mock{right:12px;top:10px;bottom:auto}
   .mock:not(.is-shut) .mock__toggle{display:none}
   .mock__body{position:fixed;left:0;right:0;bottom:0;min-width:0;gap:10px;padding:16px 16px calc(18px + env(safe-area-inset-bottom));border-radius:var(--r-xl) var(--r-xl) 0 0;border-bottom:0}
-  .mock-row div{grid-auto-columns:minmax(0,1fr)}
+  .mock-row div,.mock-row [data-axis="shape"]{grid-auto-columns:minmax(0,1fr)}
   .mock-row button{padding:0 4px;white-space:normal}
   .mock__done{display:inline-flex;margin-top:4px}
   .u-main{padding:18px 16px 16px}
@@ -427,7 +429,7 @@ body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
   <div class="mock__body" id="mockBody" aria-label="Макет: облик мира">
     <div class="mock-row" role="group" aria-label="Форма"><span>Форма</span><div data-axis="shape"></div></div>
     <div class="mock-row" role="group" aria-label="Цвет"><span>Цвет</span><div data-axis="palette"></div></div>
-    <div class="mock-row" role="group" aria-label="Насыщенность"><span>Насыщенность</span><div data-axis="sat"></div></div>
+    <div class="mock-row" role="group" aria-label="Контур"><span>Контур</span><div data-axis="ink"></div></div>
     <div class="mock-row mock-nav" role="group" aria-label="Макет: вариант навигации"><span>Навигация</span><div><button type="button" data-nav="side" aria-pressed="true">Сайдбар</button><button type="button" data-nav="top" aria-pressed="false">Верх</button></div></div>
     <button type="button" class="btn btn--ink mock__done" id="mockDone">Готово</button>
   </div>
@@ -456,6 +458,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 // Знак ARGO — те же 57 точек, что в продукте (src/react/components/ArgoDots.tsx)
 const ARGO_DOTS = [[138.6,16.5,9.5],[187.6,16.5,11.9],[236.7,16.5,10.6],[285.7,16.5,10.7],[163.1,41,13.2],[212.2,41.1,12.9],[261.2,41.1,13],[310.3,41,10.6],[138.6,65.6,9.8],[187.7,65.6,13.5],[236.5,65.7,14.8],[285.6,65.6,14.2],[64.8,90.3,13.7],[163.1,90.1,12.9],[212.3,89.8,14.6],[261.2,90,12.9],[310.3,90.1,11.2],[40.7,114.7,14.8],[236.7,114.5,11.8],[383.9,114.4,8.5],[15.9,138.9,12.3],[64.7,138.9,14.2],[212.1,138.9,12.8],[260.6,137.7,10.5],[359.3,138.9,9],[40.7,163.4,14.9],[89.5,163.5,13.8],[138.5,163.5,13.7],[187.5,163.5,13.7],[236.8,163.5,14],[285.7,163.4,13.5],[334.8,163.3,11.8],[383.9,163.4,8.1],[15.9,187.9,9.8],[64.9,187.7,14.2],[113.9,187.8,14],[163.2,187.6,14.7],[212.1,187.8,13.8],[261.2,187.7,14.1],[310.3,187.9,12.8],[359.4,187.8,11.7],[408.4,187.9,8.1],[40.4,212.4,10.6],[89.5,212.4,11.3],[138.5,212.4,12],[187.6,212.4,12.2],[236.7,212.4,11.1],[285.7,212.4,11.8],[334.8,212.4,10.4],[383.9,212.4,10.6],[64.9,237,9],[114,237,9.1],[163.1,237,9.3],[212.1,237,9.1],[261.2,237,9.2],[310.3,237,8.5],[359.3,237,8.5]];
@@ -496,9 +501,9 @@ const css = getComputedStyle(document.documentElement);
 const tok = (name) => css.getPropertyValue(name).trim();
 const T = {
   bg: tok('--bg'), card: tok('--card'), sunk: tok('--sunk'), select: tok('--select'), line: tok('--line'), ctl: tok('--ctl'),
-  ink: tok('--ink'), night3: tok('--night-3'), red: tok('--red'), redTint: tok('--red-tint'),
+  ink: tok('--ink'), muted: tok('--muted'), soft: tok('--soft'), night3: tok('--night-3'), red: tok('--red'),
   ok: tok('--ok-dot'), warnBg: tok('--warn-bg'),
-  redAct: tok('--red-act'), redPress: tok('--red-press'), night: tok('--night'), night2: tok('--night-2'), nightLine: tok('--night-line'),
+  night: tok('--night'), night2: tok('--night-2'), nightLine: tok('--night-line'),
   onNight: tok('--on-night'), onNight2: tok('--on-night-2'), redNight: tok('--red-night'),
 };
 
@@ -508,16 +513,15 @@ const pickables = { campus: [], garage: [] };
 const labels = {};            // id → CSS2DObject
 let W = null;                 // 3D-мир; null — WebGL нет, работает только текстовый путь
 
-/* ============== Стенд облика: три оси — форма, цвет, насыщенность ==============
+/* ============== Стенд облика: три оси — форма, цвет, тон контура ==============
    Меняются только грани/силуэт объёмов и цвета материалов; габариты, расстановка, камера и поведение — общие.
-   Состояние — в адресе (?shape=…&palette=…&sat=…); по умолчанию cube / white / full = принятый макет с47. */
-const shade = (c, k) => '#' + new THREE.Color(c).multiplyScalar(k).getHexString();
+   Состояние — в адресе (?shape=…&palette=…&ink=…); по умолчанию softline / white / ink1; принятый макет с47 — cube / white. */
 const mix = (a, b, k) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString();
-const SHAPES = { cube: 'Кубы', soft: 'Галька', toy: 'Игрушка', line: 'Контур' };
-const PALETTE_NAMES = { white: 'Белая схема', roofs: 'Крыши', night: 'Ночь', duo: 'Дуотон' };
-const SATS = { low: 'Сдержанно', mid: 'Средне', full: 'Ярко' };
-const SAT_K = { low: 0.35, mid: 0.7, full: 1 };
-const AXES = { shape: [SHAPES, 'cube'], palette: [PALETTE_NAMES, 'white'], sat: [SATS, 'full'] };
+const SHAPES = { cube: 'Кубы', soft: 'Галька', toy: 'Игрушка', line: 'Контур', softline: 'Галька + контур' };
+const PALETTE_NAMES = { white: 'Белая схема', night: 'Ночь' };
+// Тон контура: четыре ступени от нынешнего к самому светлому; цвета ступеней — роль ink палитры
+const INKS = { ink1: 'Мягче', ink2: 'Светлый', ink3: 'Бледный' };
+const AXES = { shape: [SHAPES, 'softline'], palette: [PALETTE_NAMES, 'white'], ink: [INKS, 'ink1'] };
 const style = {};
 {
   const q = new URLSearchParams(location.search);
@@ -525,12 +529,14 @@ const style = {};
 }
 // Форма: ratio — радиус скругления в долях меньшей стороны объёма, cap — потолок радиуса (крупные стены не становятся
 // подушками), seg — сегментов на скругление. toy — дополнительно цилиндры, сферы, арки и свод (флаг round: 'toy').
-// line — геометрия soft + плоская заливка без света + контур «чернилами».
+// line — геометрия soft + плоская заливка без света (unlit) + контур «чернилами» (ink).
+// softline — та же «Галька» со светом, поверх — тот же контур.
 const SHAPE_CFG = {
   cube: { round: false },
   soft: { round: true, ratio: 0.14, cap: 0.35, seg: 2 },
   toy: { round: true, ratio: 0.42, cap: 0.75, seg: 3, toy: true },
-  line: { round: true, ratio: 0.14, cap: 0.35, seg: 2, ink: true },
+  line: { round: true, ratio: 0.14, cap: 0.35, seg: 2, ink: true, unlit: true },
+  softline: { round: true, ratio: 0.14, cap: 0.35, seg: 2, ink: true },
 };
 // Палитра — одна таблица ролей на все материалы мира. Значения — токены и их смеси.
 //   ground земля (она же фон сцены, туман и шторка) · grid/gridA сетка и её непрозрачность · road дорога · mark осевая
@@ -538,56 +544,28 @@ const SHAPE_CFG = {
 //   wall стена · wall2 вторая стена (рампа, полки, табличка, головы) · roof крыша-плита · roofMass крыша-объём (пила склада,
 //   скат гаража) · canopy навес · door ворота и вход · glass окна и светильники · carGlass салон машины
 //   dark тёмная деталь (столбы, кейсы, кладдинг) · sign/signMark вывеска и её знак · steel сталь · tire шина
-//   accent акцент · lamp фары · leaf зелень · edge тонкие рёбра · ink контур формы «Контур»
-//   ringSel кольцо выбора (всегда красное, насыщенность его не трогает) · ringHover кольцо наведения
+//   accent акцент · lamp фары · leaf зелень · edge тонкие рёбра · ink контур форм «Контур» и «Галька + контур»: три тона по ступеням INKS,
+//   только линия и силуэт — тёмные заливки идут ролями dark / sign / roof
+//   ringSel кольцо выбора (всегда красное) · ringHover кольцо наведения
 //   cloth одежда фигурок · skin головы · legs ноги
 const PALETTES = {
   white: {
     ground: T.bg, grid: T.ink, gridA: 0.07, road: T.line, mark: T.ctl, floor: T.select, pad: T.sunk, yard: T.card, paint: T.card,
     wall: T.card, wall2: T.card, roof: T.night3, roofMass: T.card, canopy: T.card, door: T.night3, glass: T.select, carGlass: T.night3,
     dark: T.night3, sign: T.night3, signMark: T.red, steel: T.ctl, tire: T.night3, accent: T.red, lamp: T.warnBg, leaf: mix(T.ok, T.card, 0.4),
-    edge: T.line, ink: T.ink, ringSel: T.red, ringHover: T.ctl, cloth: [T.select, T.night3, T.line], skin: T.card, legs: T.night3,
+    edge: T.line, ink: [T.muted, T.soft, mix(T.soft, T.line, 0.4)], ringSel: T.red, ringHover: T.ctl, cloth: [T.select, T.night3, T.line], skin: T.card, legs: T.night3,
   },
-  // Красный — массой: крыши, навес, ворота и вход; стены белые, земля светлая
-  roofs: {
-    ground: T.bg, grid: T.ink, gridA: 0.07, road: T.line, mark: T.ctl, floor: T.select, pad: T.sunk, yard: T.card, paint: T.card,
-    wall: T.card, wall2: T.card, roof: T.red, roofMass: T.red, canopy: T.redAct, door: T.redAct, glass: T.select, carGlass: T.night3,
-    dark: T.night3, sign: T.night3, signMark: T.red, steel: T.ctl, tire: T.night3, accent: T.red, lamp: T.warnBg, leaf: mix(T.ok, T.card, 0.4),
-    edge: T.line, ink: T.ink, ringSel: T.red, ringHover: T.ctl, cloth: [T.select, T.night3, T.redAct], skin: T.card, legs: T.night3,
-  },
-  // Тёмный мир в тон сайдбару: окна и проёмы светятся, акцент — --red-night
+  // Тёмный мир в тон сайдбару: окна и проёмы светятся, акцент — --red-night.
+  // Контур в ночи ТЁМНЫЙ по серой стене (светлый, как был до с49, снят вместе со ступенью «Как сейчас»). Светлая линия по стене (~#8A8C90) даёт контраст
+  // не выше 2.8 и, тускнея к --night-line, проходит через цвет самой стены (пропадает); тёмная держит те же
+  // ступени контраста к заливке, что и в white. Силуэт к земле при этом слабый — объём от земли отделяет заливка.
   night: {
     ground: T.night, grid: T.nightLine, gridA: 1, road: T.night2, mark: mix(T.night3, T.onNight2, 0.5), floor: T.night2, pad: T.night2, yard: T.night3, paint: mix(T.night3, T.onNight2, 0.6),
     wall: mix(T.night3, T.onNight, 0.3), wall2: mix(T.night3, T.onNight, 0.42), roof: T.night3, roofMass: mix(T.night3, T.onNight, 0.16), canopy: mix(T.night3, T.onNight, 0.42), door: T.onNight2, glass: T.onNight, carGlass: T.night2,
     dark: mix(T.night3, T.onNight2, 0.5), sign: T.night, signMark: T.redNight, steel: T.onNight2, tire: T.nightLine, accent: T.redNight, lamp: T.warnBg, leaf: mix(T.ok, T.night3, 0.35),
-    edge: mix(T.nightLine, T.onNight2, 0.35), ink: T.onNight, ringSel: T.red, ringHover: T.onNight2, cloth: [T.onNight2, mix(T.night3, T.onNight, 0.2), T.onNight], skin: T.onNight, legs: mix(T.night3, T.onNight2, 0.5),
-  },
-  // Два цвета: белый и красный. Графит — только салоны и шины
-  duo: {
-    ground: T.redTint, grid: T.red, gridA: 0.16, road: mix(T.card, T.red, 0.2), mark: T.card, floor: mix(T.card, T.red, 0.1), pad: T.card, yard: T.card, paint: T.card,
-    wall: T.card, wall2: T.card, roof: T.redAct, roofMass: T.redAct, canopy: T.redAct, door: T.redPress, glass: mix(T.card, T.red, 0.14), carGlass: T.night3,
-    dark: T.redPress, sign: T.redPress, signMark: T.card, steel: mix(T.card, T.red, 0.4), tire: T.night3, accent: T.red, lamp: T.card, leaf: mix(T.card, T.red, 0.42),
-    edge: mix(T.card, T.red, 0.3), ink: T.redPress, ringSel: T.red, ringHover: T.redPress, cloth: [mix(T.card, T.red, 0.14), T.redAct, mix(T.card, T.red, 0.4)], skin: T.card, legs: T.redPress,
+    edge: mix(T.nightLine, T.onNight2, 0.35), ink: [T.night3, mix(T.night3, T.onNight2, 0.1), mix(T.night3, T.onNight2, 0.25)], ringSel: T.red, ringHover: T.onNight2, cloth: [T.onNight2, mix(T.night3, T.onNight, 0.2), T.onNight], skin: T.onNight, legs: mix(T.night3, T.onNight2, 0.5),
   },
 };
-// Насыщенность: цвет = mix(нейтраль, цвет палитры, k). Нейтраль — та же роль из white; в night — серый той же светлоты;
-// у самой white ось меняет контраст тонов: всё, кроме земли и тонких рёбер, тянется к --sunk (контур — к --ctl).
-const WHITE_KEEP = ['ground', 'grid', 'road', 'mark', 'floor', 'pad', 'yard', 'paint', 'edge', 'ringHover'];
-function gray(c) {
-  const hsl = new THREE.Color(c).getHSL({}, THREE.SRGBColorSpace);
-  return '#' + new THREE.Color().setHSL(0, 0, hsl.l, THREE.SRGBColorSpace).getHexString();
-}
-function resolvePalette() {
-  const id = style.palette, src = PALETTES[id], base = PALETTES.white, k = SAT_K[style.sat], out = {};
-  const neutral = (role, c, i) => id === 'night' ? gray(c) : id !== 'white' ? (i == null ? base[role] : base[role][i]) : WHITE_KEEP.includes(role) ? c : role === 'ink' ? T.ctl : T.sunk;
-  for (const [role, v] of Object.entries(src)) {
-    if (role === 'ringSel') out[role] = v;
-    else if (typeof v === 'number') out[role] = THREE.MathUtils.lerp(id === 'duo' ? base[role] : v, v, k);
-    else if (Array.isArray(v)) out[role] = v.map((c, i) => mix(neutral(role, c, i), c, k));
-    else out[role] = mix(neutral(role, v), v, k);
-  }
-  return out;
-}
 
 /* ============== 3D: примитивы ============== */
 // Одна геометрия 1×1×1 на всё: размер — scale (отдельные меши) или матрица (сборки kit)
@@ -595,7 +573,7 @@ const BOX = new THREE.BoxGeometry(1, 1, 1);
 const BOX_EDGES = new THREE.EdgesGeometry(BOX);
 const MATS = new Map(), FLATS = new Map();
 // Форма «Контур» — заливка без света: тот же кэш, но MeshBasicMaterial
-const lit = (c) => SH.ink ? new THREE.MeshBasicMaterial({ color: c }) : new THREE.MeshLambertMaterial({ color: c });
+const lit = (c) => SH.unlit ? new THREE.MeshBasicMaterial({ color: c }) : new THREE.MeshLambertMaterial({ color: c });
 const mat = (c) => MATS.get(c) || MATS.set(c, lit(c)).get(c);
 // Земля и разметка — без света, 1:1 с токеном; контур им не рисуем (userData.ground)
 const flat = (c) => FLATS.get(c) || FLATS.set(c, Object.assign(new THREE.MeshBasicMaterial({ color: c }), { userData: { ground: true } })).get(c);
@@ -604,7 +582,11 @@ const own = (c) => lit(c);   // свой материал корпуса — п�
 let SH, P, EDGE, INK, HULL, GLASS, BAND, DARK, WHITE, RED, STEEL, LEAF, ROOF, CANOPY, DOOR, SIGN, SIGN_MARK, CAR_GLASS, TIRE_MAT, HEADLAMP;
 // Контур-силуэт: тот же меш задними гранями, раздвинутый по нормали на постоянную толщину в пикселях экрана.
 // Скруглённым объёмам с гладкими нормалями это даёт сплошную линию по силуэту; ширину кадра знает fit().
-const HULL_PX = { value: new THREE.Vector2(0.002, 0.002) }, HULL_WIDTH = 1.4;
+// INK_WIDTH — толщина контура в px экрана, одна на силуэт и на линии рёбер. Рёбра — LineSegments2: обычный
+// LineSegments в WebGL всегда 1 px и без сглаживания (на DPR 1 — лесенка), а «толстая» линия — полоса из
+// треугольников, её сглаживает MSAA рендерера. Разрешение LineMaterial ставит сам LineSegments2 перед кадром.
+const INK_WIDTH = 2;
+const HULL_PX = { value: new THREE.Vector2(0.002, 0.002) };
 function hullMaterial(color) {
   const m = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide });
   m.onBeforeCompile = (sh) => {
@@ -619,10 +601,11 @@ function hullMaterial(color) {
 function applyStyle() {
   for (const m of [EDGE, INK, HULL]) m?.dispose();
   SH = SHAPE_CFG[style.shape];
-  P = resolvePalette();
+  P = PALETTES[style.palette];
   EDGE = new THREE.LineBasicMaterial({ color: P.edge });
-  INK = new THREE.LineBasicMaterial({ color: P.ink });
-  HULL = hullMaterial(P.ink);
+  const ink = P.ink[Object.keys(INKS).indexOf(style.ink)];
+  INK = new LineMaterial({ color: ink, linewidth: INK_WIDTH, fog: true });
+  HULL = hullMaterial(ink);
   // Графит мира — только --night-3: чистый --night слишком тяжёлый, он остаётся за HTML-хромом (и за палитрой «Ночь»)
   GLASS = BAND = mat(P.glass); DARK = mat(P.dark); WHITE = mat(P.wall2); RED = mat(P.accent); STEEL = mat(P.steel);
   LEAF = mat(P.leaf);   // зелень приглушённая
@@ -646,7 +629,7 @@ function radiusOf(w, h, d, rr) {
   const r = Math.min(rr ?? Math.min(SH.ratio * Math.min(w, h, d), SH.cap), Math.min(w, h, d) / 2);
   return r < 0.03 ? 0 : r;
 }
-// Контур скруглённого куба (форма «Контур»): по линии на каждое из 12 рёбер — она идёт по середине скругления
+// Контур скруглённого куба (формы с ink): по линии на каждое из 12 рёбер — она идёт по середине скругления
 // и на концах дугой уходит к «макушке» угла, где сходятся три ребра. EdgesGeometry здесь не годится: у скруглённого
 // куба нет острых рёбер — порог либо не даёт ни одной линии, либо частокол по граням скругления.
 // Точки — в осях объёма (sy — сжатие по высоте у плит), затем поворот q и перенос p.
@@ -674,7 +657,12 @@ function crease(out, w, h, d, r, p, q, sy = 1) {
     }
   }
 }
-const lineGeo = (pts) => new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+// Линии контура одним объектом: пары точек → толстые отрезки. userData.hull — как у силуэта: в raycast не идёт
+function inkLines(pts) {
+  const o = new LineSegments2(new LineSegmentsGeometry().setPositions(pts), INK);
+  o.userData.hull = true;
+  return o;
+}
 // Силуэт «чернилами» для отдельного меша: тем же объёмом, задними гранями
 function hull(o) {
   const hm = new THREE.Mesh(o.geometry, HULL);
@@ -692,7 +680,7 @@ function box(parent, m, w, h, d, x, y0, z, edgeMat) {
   if (SH.ink) {
     const pts = [];
     r ? crease(pts, w, h, d, r) : crease(pts, 1, 1, 1, 0);
-    o.add(new THREE.LineSegments(lineGeo(pts), INK));
+    o.add(inkLines(pts));
     hull(o);
   }
   parent.add(o);
@@ -794,7 +782,7 @@ function kit() {
       parent.add(mesh);
       if (SH.ink && !m.userData.ground) hull(mesh);
     }
-    if (ink.length) parent.add(new THREE.LineSegments(lineGeo(ink), INK));
+    if (ink.length) parent.add(inkLines(ink));
     buckets.clear();
     ink.length = 0;
   };
@@ -1508,7 +1496,7 @@ function fit() {
   W.css2d.setSize(w, h);
   W.camera.aspect = w / h;
   W.camera.updateProjectionMatrix();
-  HULL_PX.value.set(2 * HULL_WIDTH / w, 2 * HULL_WIDTH / h);
+  HULL_PX.value.set(2 * INK_WIDTH / w, 2 * INK_WIDTH / h);
   // Раскладку гаража решает окно гаража: на кампусе (другой слот) её не трогаем
   if (state.view === 'garage') setLayout(layoutFor(w / h));
   return true;
