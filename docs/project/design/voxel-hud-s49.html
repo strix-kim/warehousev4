@@ -571,7 +571,7 @@ body.nav-top .u-side,body:not(.nav-top) .u-topbar,.p-tabs{display:none}
         <div class="slot" id="slot-garage"></div>
         <aside class="panel" id="panel" aria-label="Карточка машины"></aside>
         <section class="g-list" aria-label="Все машины">
-          <div class="g-list__head"><span>Госномер</span><span>Машина</span><span class="c-col">Цвет</span><span class="c-drv">Владелец</span><span class="c-files">Файлы</span></div>
+          <div class="g-list__head"><span>Госномер</span><span>Машина</span><span class="c-col">Цвет</span><span class="c-drv">Водитель</span><span class="c-files">Файлы</span></div>
           <div class="g-rows" id="carList" role="listbox" aria-label="Машины"></div>
         </section>
       </div>
@@ -625,14 +625,15 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 const ARGO_DOTS = [[138.6,16.5,9.5],[187.6,16.5,11.9],[236.7,16.5,10.6],[285.7,16.5,10.7],[163.1,41,13.2],[212.2,41.1,12.9],[261.2,41.1,13],[310.3,41,10.6],[138.6,65.6,9.8],[187.7,65.6,13.5],[236.5,65.7,14.8],[285.6,65.6,14.2],[64.8,90.3,13.7],[163.1,90.1,12.9],[212.3,89.8,14.6],[261.2,90,12.9],[310.3,90.1,11.2],[40.7,114.7,14.8],[236.7,114.5,11.8],[383.9,114.4,8.5],[15.9,138.9,12.3],[64.7,138.9,14.2],[212.1,138.9,12.8],[260.6,137.7,10.5],[359.3,138.9,9],[40.7,163.4,14.9],[89.5,163.5,13.8],[138.5,163.5,13.7],[187.5,163.5,13.7],[236.8,163.5,14],[285.7,163.4,13.5],[334.8,163.3,11.8],[383.9,163.4,8.1],[15.9,187.9,9.8],[64.9,187.7,14.2],[113.9,187.8,14],[163.2,187.6,14.7],[212.1,187.8,13.8],[261.2,187.7,14.1],[310.3,187.9,12.8],[359.4,187.8,11.7],[408.4,187.9,8.1],[40.4,212.4,10.6],[89.5,212.4,11.3],[138.5,212.4,12],[187.6,212.4,12.2],[236.7,212.4,11.1],[285.7,212.4,11.8],[334.8,212.4,10.4],[383.9,212.4,10.6],[64.9,237,9],[114,237,9.1],[163.1,237,9.3],[212.1,237,9.1],[261.2,237,9.2],[310.3,237,8.5],[359.3,237,8.5]];
 
 // Данные прода (vehicles) — зашиты в макет. kind решает силуэт: у каждой модели свои пропорции.
-// owner — на кого оформлена машина (машины не компании): номер в EMPLOYEES; null — владелец не указан.
+// driver — водитель машины: номер в EMPLOYEES; null — водитель не назначен. Сущность одна — водитель
+// (прораб с50); в продукте их список (vehicle_drivers), макет показывает одного.
 const CARS = [
-  { brand: 'Lynk & Co', model: '900', plate: '01 439 SNA', color: 'Белый', hex: '#F5F6F8', kind: 'lynk', owner: 5 },
-  { brand: 'KIA', model: 'Bongo 3', plate: '10 D 412 GB', color: 'Белый', hex: '#F5F6F8', kind: 'bongo', owner: 1 },
-  { brand: 'Chevrolet', model: 'Cobalt', plate: '30 T 815 TB', color: 'Белый', hex: '#F5F6F8', kind: 'cobalt', owner: 8 },
-  { brand: 'Chevrolet', model: 'Cobalt', plate: '01 H 235 JC', color: 'Тёмно-серый', hex: '#3A3E46', kind: 'cobalt', owner: 3 },
-  { brand: 'Daewoo', model: 'Nexia', plate: '01 S 569 GC', color: 'Серебристый', hex: '#C9CDD4', kind: 'nexia', owner: null },
-  { brand: 'BYD', model: 'Chazor', plate: '01 T 769 MC', color: 'Белый', hex: '#F5F6F8', kind: 'chazor', owner: 10 },
+  { brand: 'Lynk & Co', model: '900', plate: '01 439 SNA', color: 'Белый', hex: '#F5F6F8', kind: 'lynk', driver: 5 },
+  { brand: 'KIA', model: 'Bongo 3', plate: '10 D 412 GB', color: 'Белый', hex: '#F5F6F8', kind: 'bongo', driver: 1 },
+  { brand: 'Chevrolet', model: 'Cobalt', plate: '30 T 815 TB', color: 'Белый', hex: '#F5F6F8', kind: 'cobalt', driver: 8 },
+  { brand: 'Chevrolet', model: 'Cobalt', plate: '01 H 235 JC', color: 'Тёмно-серый', hex: '#3A3E46', kind: 'cobalt', driver: 3 },
+  { brand: 'Daewoo', model: 'Nexia', plate: '01 S 569 GC', color: 'Серебристый', hex: '#C9CDD4', kind: 'nexia', driver: null },
+  { brand: 'BYD', model: 'Chazor', plate: '01 T 769 MC', color: 'Белый', hex: '#F5F6F8', kind: 'chazor', driver: 10 },
 ];
 const VAN = 1;   // Bongo 3 — он и везёт оборудование на мероприятие
 // Здания кампуса — у каждого вывеска и клавиша-дубль
@@ -2012,7 +2013,7 @@ function select(i) {
 
 /* ============== Карточка машины и реестр строками ============== */
 function plateHTML(p, lg) { const [r, ...rest] = p.split(' '); return `<span class="plate${lg ? ' plate--lg' : ''}" aria-label="Госномер ${p}"><b>${r}</b><span>${rest.join(' ')}</span><i>UZ</i></span>`; }
-const ownerOf = (c) => c.owner == null ? null : EMPLOYEES[c.owner].join(' ');
+const driverOf = (c) => c.driver == null ? null : EMPLOYEES[c.driver].join(' ');
 function renderPanel() {
   panel.classList.toggle('is-empty', state.sel == null);
   if (state.sel == null) {
@@ -2020,14 +2021,14 @@ function renderPanel() {
       <h3>${summary().fleet.cars ? 'Выберите машину в гараже' : 'В гараже пока нет машин'}</h3>${summary().fleet.cars ? '<p>или в списке ниже · в сцене <kbd>←</kbd> <kbd>→</kbd></p>' : ''}</div>`;
     return;
   }
-  const c = CARS[state.sel], owner = ownerOf(c);
+  const c = CARS[state.sel], driver = driverOf(c);
   panel.innerHTML = `<div class="p-head"><span class="p-photo"><svg class="i"><use href="#i-car"/></svg></span>
       <div><h2 class="p-name" id="panelTitle">${c.brand} ${c.model}</h2><p class="p-role">Машина · гараж ARGO</p>
       <div class="p-plate">${plateHTML(c.plate, true)}</div></div>
       <button type="button" class="p-close" data-close aria-label="Закрыть карточку">×</button></div>
     <div class="p-body"><dl>
       <div class="kv"><dt>Цвет</dt><dd><span class="sw" style="background:${c.hex}"></span>${c.color}</dd></div>
-      <div class="kv"><dt>Владелец</dt><dd${owner ? '' : ' class="q"'}>${owner ?? 'не указан'}</dd></div>
+      <div class="kv"><dt>Водитель</dt><dd${driver ? '' : ' class="q"'}>${driver ?? 'не назначен'}</dd></div>
       <div class="kv"><dt>Файлы</dt><dd class="q">нет</dd></div></dl></div>
     <div class="p-foot"><button type="button" class="btn btn--ink" data-stub="Карточка">Открыть карточку</button>
       <button type="button" class="btn btn--secondary" data-stub="Экспорт"><svg class="i"><use href="#i-sheet"/></svg>Экспорт</button></div>`;
@@ -2038,7 +2039,7 @@ panel.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) s
 const carList = $('carList');
 carList.innerHTML = CARS.map((c, i) => `<button type="button" class="car-row" role="option" data-car="${i}" aria-selected="false">
     ${plateHTML(c.plate)}<span class="c-name"><b>${c.brand} ${c.model}</b><small><span class="sw" style="background:${c.hex}"></span>${c.color}</small></span>
-    <span class="c-col"><span class="sw" style="background:${c.hex}"></span>${c.color}</span><span class="c-drv${ownerOf(c) ? ' is-set' : ''}">${ownerOf(c) ?? 'не указан'}</span><span class="c-files">нет</span></button>`).join('')
+    <span class="c-col"><span class="sw" style="background:${c.hex}"></span>${c.color}</span><span class="c-drv${driverOf(c) ? ' is-set' : ''}">${driverOf(c) ?? 'не назначен'}</span><span class="c-files">нет</span></button>`).join('')
   + '<p class="g-none" id="carNone" hidden>Ничего не найдено</p>';
 // Строка = выбор в 3D; наведение/фокус строки = подсветка машины в сцене
 carList.addEventListener('click', (e) => { const r = e.target.closest('[data-car]'); if (r) select(+r.dataset.car); });
