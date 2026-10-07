@@ -3,10 +3,13 @@
 // получают два мира на общих кэшах.
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
+import { CSS2DRenderer, type CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import type { CameraPose, WorldStore } from '../worldStore'
 import type { WorldData } from '../data/types'
 import { createLimit, fit, framePoints, placeCamera, pullIn, readPose, restorePose } from './camera'
+import { createHudLayout } from './hudLayout'
+import { bindPointer, collectPicks } from './pointer'
+import { createSelection, type Ring } from './selection'
 import { buildCampus } from './zones/campus'
 import type { WorldLook } from '../settings'
 import { createStyle, disposeStyle, restyle, type WorldStyle } from './style'
@@ -29,6 +32,16 @@ export type WorldCtx = {
   geo: Map<string, THREE.BufferGeometry>
   // id → корневая группа объекта
   roots: Map<string, THREE.Group>
+  // id → якорь подписи (здание — WorldSiteId, фигурка — whoLabelId); элементы уходят в стор
+  labels: Map<string, CSS2DObject>
+  // id здания → кольцо наведения и выбора на земле
+  rings: Map<string, Ring>
+  // Меши зданий для raycast
+  picks: THREE.Object3D[]
+  // Ключ подписи фигурки под указателем: её чип показан всегда
+  near: string | null
+  // Попросить кадр. Неподвижный мир рисуется только по требованию; в живом кадры идут сами
+  invalidate: () => void
   framePts: THREE.Vector3[]
   limit: THREE.Box3
   // Человек крутил камеру сам: ресайз больше не возвращает рабочий ракурс
@@ -44,6 +57,8 @@ export type WorldDeps = {
   // Машины и люди кампуса; без данных кампус стоит пустым
   data?: WorldData
   pose?: CameraPose | null
+  // Клик по объекту сцены (id здания): переход в раздел делает оболочка
+  onActivate?: (id: string) => void
   onFirstFrame?: () => void
   onContextLost?: () => void
 }
@@ -75,6 +90,8 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
   const renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   const canvas = renderer.domElement
+  // Картинка мира скринридеру не читается: её объекты продублированы вывесками и клавишами
+  canvas.setAttribute('aria-hidden', 'true')
   container.appendChild(canvas)
   const css2d = new CSS2DRenderer()
   css2d.domElement.className = 'w-labels'
@@ -108,6 +125,11 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     wheel: new THREE.CylinderGeometry(1, 1, 1, 16),
     geo: new Map(),
     roots: new Map(),
+    labels: new Map(),
+    rings: new Map(),
+    picks: [],
+    near: null,
+    invalidate: () => {},
     framePts: [],
     limit: createLimit(),
     userMoved: false,
@@ -116,33 +138,54 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
 
   const tmp = new THREE.Vector3()
   let seenFrame = false
-  const render = () => {
+  const render = (now: number) => {
     pullIn(ctx.limit, controls.target, camera.position, tmp)   // сдвиг камеры не уводит цель за пределы сцены
+    selection.tick(now)
     renderer.render(scene, camera)
     css2d.render(scene, camera)
+    hud.layout(now)
     if (!seenFrame) { seenFrame = true; deps.onFirstFrame?.() }
   }
   let raf = 0
   const requestRender = () => {
-    if (!raf) raf = requestAnimationFrame(() => { raf = 0; render() })
+    if (!raf) raf = requestAnimationFrame((now) => { raf = 0; render(now) })
   }
+
+  let disposed = false
+  ctx.invalidate = () => { if (deps.reducedMotion && !disposed) requestRender() }
+  const selection = createSelection(ctx, deps.store, deps.reducedMotion)
+  const hud = createHudLayout(ctx, deps.store, deps.reducedMotion)
+  const unbindPointer = bindPointer(ctx, deps)
 
   const resize = new ResizeObserver(() => {
     if (!fit(ctx)) return
-    deps.store.setState({ hudCompact: container.clientWidth < HUD_COMPACT_WIDTH })
-    if (!ctx.userMoved) placeCamera(ctx)
-    if (deps.reducedMotion) requestRender()
+    const compact = container.clientWidth < HUD_COMPACT_WIDTH
+    deps.store.setState({ hudCompact: compact })
+    if (!ctx.userMoved) placeCamera(ctx, compact)
+    hud.dirty()   // он же просит кадр неподвижному миру
   })
 
   const onContextLost = () => deps.onContextLost?.()
 
-  let disposed = false
+  // Подписи и кольца живут вместе с наполнением сцены. Элементы подписей снимаем сами:
+  // событие removed доходит только до снятого узла, а не до его CSS2DObject в глубине.
+  const clearFill = () => {
+    ctx.labels.forEach((o) => o.element.remove())
+    ctx.labels.clear()
+    ctx.rings.clear()
+    ctx.picks.length = 0
+    ctx.near = null
+  }
+
   const dispose = () => {
     if (disposed) return
     disposed = true
     renderer.setAnimationLoop(null)
     if (raf) cancelAnimationFrame(raf)
     resize.disconnect()
+    unbindPointer()
+    selection.dispose()
+    hud.dispose()
     // Раньше forceContextLoss: собственный снос — не потеря контекста, запасной вид не нужен
     canvas.removeEventListener('webglcontextlost', onContextLost)
     controls.dispose()
@@ -154,6 +197,7 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     ctx.wheel.dispose()
     disposeStyle(style)
     ctx.roots.clear()
+    clearFill()
     ctx.framePts.length = 0
     deps.store.setState({ hover: null, pick: null, labels: new Map() })
     renderer.dispose()
@@ -165,8 +209,13 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
 
   // Наполнение сцены — одно место и на первый кадр, и на смену облика
   const build = () => {
-    scene.add(buildCampus(ctx, deps.data ?? { cars: [], people: [] }))
+    scene.add(buildCampus(ctx, deps.data ?? { cars: [], people: [], sites: null }))
     ctx.framePts = framePoints(ctx)
+    collectPicks(ctx)
+    // Карта — новым объектом: оболочка рисует в элементы порталом и следит за сменой
+    deps.store.setState({ labels: new Map([...ctx.labels].map(([id, o]) => [id, o.element])) })
+    selection.rebuilt()
+    hud.dirty()
   }
 
   // Палитра меняет не только цвета, но и состав мешей: kit() сливает объёмы по
@@ -187,18 +236,18 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     ctx.geo.forEach((g) => g.dispose())
     ctx.geo.clear()
     ctx.roots.clear()
+    clearFill()
     restyle(style, tokens, next)
     background.set(style.P.ground)
     fog.color.set(style.P.ground)
     build()
-    if (deps.reducedMotion) requestRender()
   }
 
   try {
     build()
     // Синхронно, не дожидаясь ResizeObserver: первому кадру нужен верный аспект
     fit(ctx)
-    placeCamera(ctx)
+    placeCamera(ctx, container.clientWidth < HUD_COMPACT_WIDTH)
     if (deps.pose) restorePose(ctx, deps.pose)
 
     canvas.addEventListener('webglcontextlost', onContextLost)
@@ -208,9 +257,9 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
       controls.addEventListener('change', requestRender)
       requestRender()
     } else {
-      renderer.setAnimationLoop(() => {
+      renderer.setAnimationLoop((now) => {
         controls.update()
-        render()
+        render(now)
       })
     }
   } catch (error) {

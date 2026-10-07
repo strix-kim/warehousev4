@@ -1,0 +1,129 @@
+/* HUD мира — направление «Знаки B2» (облик — макет voxel-world-s51.html). Тёмное —
+   только вывески зданий (предметы мира); обвязка (плашка дня, клавиши) — светлая,
+   язык продукта. Префикс w- у всего, включая состояния на якорях движка: is-away,
+   is-hover, is-selected, is-near и w-sign--sm пишет движок (контракт — worldStore.ts).
+   Компактный режим — .w-stage.is-sm (сцена уже 920 px). */
+
+/* Роли HUD, зависящие от палитры мира, и то, чего нет в 01-tokens.css: тень вывески
+   лёгкая (вывески едут каждый кадр), --ease-in — кривая ухода. Белая схема: вывеска —
+   тёмный предмет мира. */
+.w-stage {
+  --shadow-sign: 0 2px 6px rgba(15,17,21,.14); --shadow-sign-up: 0 8px 16px rgba(15,17,21,.2);
+  --ease-in: cubic-bezier(.4,0,1,1);
+  --sign-bg: var(--night); --sign-ink: var(--on-night); --sign-cell: var(--night-3); --sign-leg: var(--night-3);
+  --key-line: var(--ctl); --key-rim: var(--ctl); --key-on: var(--night); --key-on-line: var(--night);
+  --who-bg: var(--card); --who-ink: var(--ink-2); --who-ink-2: var(--muted); --who-line: var(--line);
+}
+/* «Ночь»: тёмная вывеска теряется на тёмной земле — роли инвертированы: светлая
+   плашка, чёрная ячейка; чип имени, наоборот, уходит в тёмное, чтобы остаться самым
+   тихим уровнем. Обвязка белая в обеих палитрах. */
+.w-stage.is-dark {
+  --sign-bg: var(--on-night); --sign-ink: var(--ink); --sign-cell: var(--night); --sign-leg: var(--on-night-2);
+  --key-on: var(--night-3); --key-on-line: var(--on-night-2);
+  --who-bg: var(--night-3); --who-ink: var(--on-night); --who-ink-2: var(--on-night-2); --who-line: var(--night-line);
+}
+/* Кольцо фокуса ложится на тёмную землю — светлое. Только у HUD: запасные виды
+   (.w-stage__state) в «Ночи» остаются светлыми. */
+.w-stage.is-dark :is(.w-labels, .w-dock) { --focus: var(--on-night); }
+
+.w-plaque { position: relative; border: 1px solid var(--line); border-radius: var(--r-lg); color: var(--ink); background: var(--card); box-shadow: var(--shadow-card); }
+/* Ячейка счётчика: число и единица под ним на отдельной подложке */
+.w-cell { align-self: stretch; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 48px; padding: 0 9px; border-radius: var(--r-sm); background: var(--sign-cell); transition: background-color .16s var(--ease-out); }
+.w-cell__num { font: 800 30px/30px var(--f-display); letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--on-night); }
+.w-cell__unit { font: 500 13px/14px var(--f-text); white-space: nowrap; color: var(--on-night-2); }
+.w-flag { position: relative; flex: none; width: 16px; height: 26px; }
+.w-flag::before { content: ""; position: absolute; left: 0; top: 0; width: 3px; height: 100%; border-radius: 2px; background: var(--ink); }
+.w-flag::after { content: ""; position: absolute; left: 4px; top: 1px; width: 12px; height: 10px; border-radius: 1px 3px 3px 1px; background: var(--red); }
+
+/* Вывеска на ножке. Сам .w-sign — точка-якорь 0×0: её каждый кадр ставит
+   CSS2DRenderer. Плашка висит над якорем; --shift и --lift (px) пишет движок: сдвиг
+   вбок и подъём, чтобы не лечь на соседей. Ножка остаётся в якоре и удлиняется на
+   --lift. Движение плашки — через translate, наведение — через transform: так
+   переход наведения не «догоняет» покадровый сдвиг. */
+.w-sign { width: 0; height: 0; --leg: 12px; --shift: 0px; --lift: 0px; transition: opacity .2s var(--ease-out); }
+/* Не поместилась — гаснет и выходит из tab-порядка; текстовый путь остаётся за клавишами */
+.w-sign.is-away { opacity: 0; visibility: hidden; transition: opacity .15s var(--ease-in), visibility 0s .15s; }
+/* Ножка заходит под плашку на 6 px — при подъёме на наведении щели нет */
+.w-sign__leg { position: absolute; left: -1.5px; bottom: 0; width: 3px; height: calc(var(--leg) + var(--lift) + 6px); border-radius: 2px; background: var(--sign-leg); transition: background-color .16s var(--ease-out); }
+.w-sign__leg::after { content: ""; position: absolute; left: -2px; bottom: -3.5px; width: 7px; height: 7px; border-radius: 50%; background: inherit; }
+/* pointer-events: слой .w-labels мышь пропускает, плашка — ловит */
+.w-sign__board { position: absolute; z-index: 1; left: 0; bottom: var(--leg); translate: calc(-50% + var(--shift)) calc(var(--lift) * -1); width: max-content; height: 60px; display: flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px; border: 0; border-radius: var(--r-md); color: var(--sign-ink); background: var(--sign-bg); box-shadow: var(--shadow-sign); text-align: left; pointer-events: auto; -webkit-tap-highlight-color: transparent; transition: transform .16s var(--ease-out), box-shadow .16s var(--ease-out); }
+/* Без ячейки (числа нет) левое поле — как правое */
+.w-sign__board > .w-sign__name:first-child { margin-left: 8px; }
+.w-sign__name { font: 700 16px/20px var(--f-display); white-space: nowrap; }
+/* Наведение и фокус: плашка приподнята на 3 px, тень глубже */
+.w-sign__board:hover, .w-sign.is-hover .w-sign__board { transform: translateY(-3px); box-shadow: var(--shadow-sign-up); }
+/* Выбор: ячейка красная, ножка и шляпка красные, кольцо 2 px вокруг плашки */
+.w-sign.is-selected .w-cell { background: var(--red-act); }
+.w-sign.is-selected .w-cell__num, .w-sign.is-selected .w-cell__unit { color: var(--card); }
+.w-sign.is-selected .w-sign__leg { background: var(--red); }
+.w-sign.is-selected .w-sign__board::after { content: ""; position: absolute; inset: -4px; border: 2px solid var(--red); border-radius: calc(var(--r-md) + 4px); pointer-events: none; }
+/* Компактная: имя + одно число, 44 px — она же ступень «тесно» на десктопе */
+.w-sign--sm { --leg: 10px; }
+.w-sign--sm .w-sign__board { height: 44px; gap: 7px; padding: 5px 10px 5px 5px; }
+.w-sign--sm .w-sign__board > .w-sign__name:first-child { margin-left: 5px; }
+.w-sign--sm .w-cell { min-width: 28px; padding: 0 6px; }
+.w-sign--sm .w-cell__num { font-size: 20px; line-height: 22px; }
+.w-sign--sm .w-cell__unit { display: none; }
+.w-sign--sm .w-sign__name { font-size: 14px; line-height: 18px; }
+
+/* Чип имени над фигуркой — самый лёгкий уровень: без ножки и ячейки, мышь не ловит.
+   Фамилия — только у фигурки под указателем (is-near). Лёг бы на вывеску, обвязку
+   или соседа — гаснет. */
+.w-who { padding: 1px 7px 2px; border: 1px solid var(--who-line); border-radius: var(--r-sm); background: var(--who-bg); color: var(--who-ink); font: 600 13px/16px var(--f-text); white-space: nowrap; pointer-events: none; transition: opacity .2s var(--ease-out); }
+.w-who i { display: none; font-style: normal; font-weight: 500; color: var(--who-ink-2); }
+.w-who.is-near i { display: inline; }
+.w-who.is-away { opacity: 0; transition: opacity .15s var(--ease-in); }
+
+/* Плашка дня — слева сверху, ширина по содержимому */
+.w-day { position: absolute; left: 16px; top: 16px; height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 16px; }
+.w-day__date { font: 700 16px/20px var(--f-display); white-space: nowrap; }
+.w-stage.is-sm .w-day { left: 8px; top: 8px; gap: 8px; padding: 0 16px 0 14px; }
+.w-stage.is-sm .w-day .w-flag { height: 24px; }
+.w-stage.is-sm .w-day__date { font: 600 14px/18px var(--f-text); }
+
+/* Клавиши-дубли — клавиатурный и текстовый путь к каждому зданию. Тем же характером,
+   что кнопки на земле: скруглённая плита с толщиной (кромка снизу) и контуром.
+   Наведение — приподнимается, нажатие и «выбрано» — вдавлена в кромку. Ширина ряда:
+   три клавиши по 144 px, как в макете (там четыре в 600 px). */
+.w-dock { position: absolute; left: 16px; bottom: 16px; width: min(448px, calc(100% - 32px)); display: flex; gap: 8px; }
+.w-key { flex: 1; min-width: 0; height: 56px; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 0 10px; border: 1.5px solid var(--key-line); border-radius: 20px; box-shadow: 0 3px 0 var(--key-rim), var(--shadow-card); font: 700 15px/20px var(--f-display); white-space: nowrap; -webkit-tap-highlight-color: transparent;
+  transition: background-color .16s var(--ease-out), border-color .16s var(--ease-out), color .16s var(--ease-out), transform .14s var(--ease-out), box-shadow .14s var(--ease-out);
+  --ico-top: var(--soft); --ico-front: var(--muted); --ico-side: var(--ink); --ico-hole: var(--card); --ico-flag: var(--red); }
+.w-key:hover, .w-key.is-hover { background: var(--hover); --ico-hole: var(--hover); transform: translateY(-2px); box-shadow: 0 5px 0 var(--key-rim), var(--shadow-card); }
+.w-key:active { background: var(--select); --ico-hole: var(--select); }
+.w-key:active, .w-key[aria-pressed="true"], .w-key[aria-pressed="true"]:hover { transform: translateY(2px); box-shadow: 0 1px 0 var(--key-rim), var(--shadow-card); }
+/* Выбранная клавиша: тёмная плашка, белый текст, красная точка */
+.w-key[aria-pressed="true"], .w-key[aria-pressed="true"]:hover { color: var(--card); background: var(--key-on); border-color: var(--key-on-line);
+  --ico-top: var(--card); --ico-front: var(--on-night-2); --ico-side: var(--ctl); --ico-hole: var(--key-on); --ico-flag: var(--red-night); }
+.w-key[aria-pressed="true"]::after { content: ""; position: absolute; right: 11px; top: 11px; width: 8px; height: 8px; border-radius: 50%; background: var(--red-night); }
+/* Компактные: цели 56×56, значок и подпись под ним, ряд справа */
+.w-stage.is-sm .w-dock { left: auto; right: 8px; bottom: 8px; width: auto; }
+.w-stage.is-sm .w-key { flex: none; width: 56px; flex-direction: column; gap: 1px; padding: 0; font: 600 13px/14px var(--f-text); }
+.w-stage.is-sm .w-key[aria-pressed="true"]::after { right: 6px; top: 6px; width: 6px; height: 6px; }
+
+/* Значки-объекты, поле 28×28. <i> — объём в изометрии: сам элемент — фасад,
+   ::before — крыша (светлее), ::after — боковая грань (темнее); глубина --d.
+   <b> — плоская деталь. */
+.w-ico { position: relative; flex: none; width: 28px; height: 28px; }
+.w-ico i, .w-ico b { position: absolute; }
+.w-ico i { --d: 5px; left: var(--l); bottom: var(--b, 2px); width: var(--bw); height: var(--bh); background: var(--ico-front); }
+.w-ico i::before { content: ""; position: absolute; left: 0; bottom: 100%; width: 100%; height: var(--d); background: var(--ico-top); transform: skewX(-45deg); transform-origin: 0 100%; }
+.w-ico i::after { content: ""; position: absolute; left: 100%; bottom: 0; width: var(--d); height: 100%; background: var(--ico-side); transform: skewY(-45deg); transform-origin: 0 100%; }
+.w-ico--office i { --l: 3px; --bw: 15px; --bh: 13px; }
+.w-ico--office b { left: 12px; bottom: 18px; width: 2px; height: 10px; border-radius: 1px; background: var(--ico-side); }
+.w-ico--office b::after { content: ""; position: absolute; left: 2px; top: 0; width: 7px; height: 5px; border-radius: 0 2px 2px 0; background: var(--ico-flag); }
+.w-ico--store i:nth-child(1) { --l: 9px; --bw: 13px; --bh: 8px; }
+.w-ico--store i:nth-child(2) { --l: 1px; --bw: 8px; --bh: 18px; }
+.w-ico--garage i { --l: 1px; --bw: 21px; --bh: 13px; }
+.w-ico--garage b { left: 3px; bottom: 2px; width: 5px; height: 8px; border-radius: 1px 1px 0 0; background: var(--ico-hole); box-shadow: 6px 0 0 var(--ico-hole), 12px 0 0 var(--ico-hole); }
+
+/* Живая область для скринридера: в потоке её нет, но в дереве доступности она есть.
+   Общего утилитарного класса «визуально скрыто» в проекте нет — этот локальный. */
+.w-live { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* Reduced-motion: без сдвигов, только цвет и тень. !important — иначе пришлось бы
+   повторить каждый селектор состояния с его специфичностью. */
+@media (prefers-reduced-motion: reduce) {
+  .w-sign__board, .w-key { transform: none !important; }
+}

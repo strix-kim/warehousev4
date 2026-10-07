@@ -1,8 +1,7 @@
 // Камера: рабочий ракурс под окно, пределы цели, поза между пересозданиями мира.
 import * as THREE from 'three'
-import type { CameraPose } from '../worldStore'
+import { WORLD_SITES, type CameraPose } from '../worldStore'
 import type { WorldCtx } from './createWorld'
-import { CAMPUS_HALF, ROAD_Z } from './ground'
 import { INK_WIDTH } from './style'
 
 // Камера по виду: направление и пределы зума. Цель и дистанцию считает viewPose
@@ -24,22 +23,20 @@ export function pullIn(limit: THREE.Box3, t: THREE.Vector3, p: THREE.Vector3, tm
 
 const corners = (b: THREE.Box3) => Array.from({ length: 8 }, (_, i) => new THREE.Vector3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z))
 
-// Здания кампуса: по ним строится рабочий ракурс
-const SITES = ['office', 'warehouse', 'garage'] as const
-
 // Рамка интереса — точки, которые обязаны попасть в кадр: углы габаритов каждого
-// здания (не общий бокс — его пустые углы над землёй съедают кадр) + точка над
-// крышей под вывеску + край сетки на дороге. Машины в проёмах и на площадке — дети
-// гаража и входят в его габарит; фургон и фигурки рамку не двигают.
+// здания (не общий бокс — его пустые углы над землёй съедают кадр). Место под вывески
+// добавляет placeCamera: оно задано в пикселях, а не в метрах. Край сетки на дороге
+// (в макете там выезд и карточка события) в рамку вернётся вместе с «Сегодня»: пока
+// там пустая земля, он только мельчит кампус.
+// Машины в проёмах и на площадке — дети гаража и входят в его габарит; фургон и фигурки
+// рамку не двигают.
 export function framePoints(ctx: WorldCtx) {
   const pts: THREE.Vector3[] = []
-  for (const id of SITES) {
+  for (const id of WORLD_SITES) {
     const root = ctx.roots.get(id)
     if (!root) continue
-    const b = new THREE.Box3().setFromObject(root), c = b.getCenter(new THREE.Vector3())
-    pts.push(...corners(b), c.setY(b.max.y + 3.5))
+    pts.push(...corners(new THREE.Box3().setFromObject(root)))
   }
-  pts.push(new THREE.Vector3(CAMPUS_HALF + 1, 0, ROAD_Z + 1.25), new THREE.Vector3(CAMPUS_HALF - 0.8, 3.5, ROAD_Z))
   return pts
 }
 
@@ -48,7 +45,7 @@ export function framePoints(ctx: WorldCtx) {
 // Для точки (rel = точка − цель) в осях камеры: глубина = dist − rel·dir, нужно
 // |rel·right| ≤ tanH·глубина и |rel·up| ≤ tanV·глубина.
 // Цель дважды сдвигаем к центру проекции — иначе перспектива оставляет пустую полосу с края.
-// Чистая функция без сцены: сверяется скриптом против макета.
+// Чистая функция без сцены. От макета отличается одним: как цель возвращается в пределы.
 export function viewPose(pts: THREE.Vector3[], direction: readonly [number, number, number], fov: number, aspect: number, limit: THREE.Box3) {
   const dir = new THREE.Vector3(...direction).normalize()
   const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), dir).normalize()
@@ -75,6 +72,16 @@ export function viewPose(pts: THREE.Vector3[], direction: readonly [number, numb
   }
   dist *= 1.05
   const p = t.clone().addScaledVector(dir, dist)
+  // Центр проекции рамки лежит под землёй (кампус — на 4,6 м), а пределы цели начинаются
+  // с y = 0. Макет возвращал цель в пределы сдвигом цели И камеры — кадр уезжал вниз на
+  // 0,2 полукадра: сверху пусто, конец дороги срезан. Здесь цель скользит к пределу вдоль
+  // луча взгляда, камера стоит: картинка та же, меняется только дистанция до цели.
+  const y = THREE.MathUtils.clamp(t.y, limit.min.y, limit.max.y)
+  if (y !== t.y && dir.y > 1e-3) {
+    const slide = (y - t.y) / dir.y
+    t.addScaledVector(dir, slide)
+    dist -= slide
+  }
   pullIn(limit, t, p)   // поза вида = поза покоя: кадр после расстановки ничего не двигает
   return { t, p, dist }
 }
@@ -91,14 +98,38 @@ export function fit(ctx: WorldCtx) {
   return true
 }
 
-export function placeCamera(ctx: WorldCtx) {
+// Место над якорем вывески, px: плашка + ножка + поле от края сцены, в полном и
+// компактном виде. Пара к высотам .w-sign__board и --leg в world-hud.css и к LEGS,
+// HUD_EDGE раскладки.
+const SIGN_ROOM = { full: 60 + 12 + 8, compact: 44 + 10 + 8 }
+
+// Макет держал под вывеску 3,5 м над крышей: у дальнего здания это меньше высоты плашки,
+// и спасал только рыхлый кадр. Здесь запас — в пикселях: рамка включает точку над
+// каждым якорем на высоте вывески, пересчитанной в метры при найденной позе. Поза и
+// пересчёт зависят друг от друга — два уточнения сходятся с запасом.
+export function placeCamera(ctx: WorldCtx, compact: boolean) {
   const c = CAM.campus, { camera, controls } = ctx
-  const v = viewPose(ctx.framePts, c.dir, camera.fov, camera.aspect, ctx.limit)
-  controls.target.copy(v.t)
-  camera.position.copy(v.p)
-  controls.minDistance = c.min
-  controls.maxDistance = Math.max(c.max, v.dist * 1.3)
-  controls.update()
+  const room = compact ? SIGN_ROOM.compact : SIGN_ROOM.full
+  const anchors = WORLD_SITES.flatMap((id) => { const o = ctx.labels.get(id); return o ? [o.getWorldPosition(new THREE.Vector3())] : [] })
+  const tops = anchors.map((a) => a.clone())
+  const at = new THREE.Vector3(), above = new THREE.Vector3()
+  let v = viewPose([...ctx.framePts, ...tops], c.dir, camera.fov, camera.aspect, ctx.limit)
+  for (let pass = 0; pass < 3; pass++) {
+    controls.target.copy(v.t)
+    camera.position.copy(v.p)
+    controls.minDistance = c.min
+    controls.maxDistance = Math.max(c.max, v.dist * 1.3)
+    controls.update()
+    if (pass === 2) break
+    camera.updateMatrixWorld()
+    const half = ctx.container.clientHeight / 2
+    anchors.forEach((a, i) => {
+      // Сколько пикселей экрана в одном метре высоты у этого якоря
+      const perMeter = (above.copy(a).setY(a.y + 1).project(camera).y - at.copy(a).project(camera).y) * half
+      if (perMeter > 0) tops[i]!.setY(a.y + room / perMeter)
+    })
+    v = viewPose([...ctx.framePts, ...tops], c.dir, camera.fov, camera.aspect, ctx.limit)
+  }
 }
 
 export function readPose(ctx: WorldCtx): CameraPose {

@@ -16,7 +16,10 @@
 .w-stage.is-dark .w-stage__loading { color: var(--on-night-2); background: var(--night); }
 .w-scene { position: absolute; inset: 0; }
 .w-scene canvas { display: block; touch-action: none; }
-/* Слой CSS2DRenderer: размер ему пишет движок, display его детям — сам рендерер */
+/* Над целью движок ставит контейнеру is-pick */
+.w-scene.is-pick canvas { cursor: pointer; }
+/* Слой CSS2DRenderer: размер ему пишет движок, display его детям — сам рендерер.
+   Мышь слой пропускает к сцене; ловит её только плашка вывески (world-hud.css). */
 .w-labels { position: absolute; inset: 0; pointer-events: none; }
 
 .w-stage__state { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; margin: 0; padding: 24px; background: var(--bg); }

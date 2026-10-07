@@ -1,5 +1,6 @@
 // Примитивы формы «Галька + контур»: скруглённый объём, контур по рёбрам и силуэт.
 import * as THREE from 'three'
+import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js'
@@ -81,6 +82,19 @@ function hull(ctx: WorldCtx, o: THREE.Mesh) {
   const hm = new THREE.Mesh(o.geometry, ctx.style.hull)
   hm.userData.hull = true
   o.add(hm)
+}
+
+// Подпись CSS2D: якорь — нижний центр элемента. Элемент пустой — содержимое рисует
+// оболочка порталом (контракт в worldStore.ts), место плашки над якорем ставит hudLayout.
+export function label(ctx: WorldCtx, parent: THREE.Object3D, id: string, cls: string, x: number, y: number, z: number) {
+  const el = document.createElement('div')
+  el.className = cls
+  const o = new CSS2DObject(el)
+  o.position.set(x, y, z)
+  o.center.set(0.5, 1)
+  parent.add(o)
+  ctx.labels.set(id, o)
+  return o
 }
 
 // Отдельный куб: размеры w×h×d, (x, z) — центр, y0 — низ

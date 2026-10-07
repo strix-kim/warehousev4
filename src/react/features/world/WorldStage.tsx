@@ -1,14 +1,21 @@
 import { MonitorOff } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import type { WorldData } from './data/types'
+import { DayCap } from './hud/DayCap'
+import { Dock } from './hud/Dock'
+import { NameChip } from './hud/NameChip'
+import { Sign } from './hud/Sign'
 import { loadWorld } from './loadWorld'
 import type { WorldLook } from './settings'
 import { hasWebGL2, prefersReducedMotion } from './support'
-import { createWorldStore, type CameraPose } from './worldStore'
+import { createWorldStore, useWorldState, WORLD_SITES, type CameraPose, type WorldSiteId } from './worldStore'
 import './world.css'
+import './hud/world-hud.css'
 
 // unsupported — WebGL2 нет; failed — чанк не приехал или мир не собрался;
 // lost — браузер отобрал контекст у живого мира
@@ -22,6 +29,9 @@ type Status = 'loading' | 'ready' | 'unsupported' | 'failed' | 'lost'
 const hot = import.meta.hot
 if (hot) hot.dispose((data) => { data.swapping = true })
 
+// Раздел продукта за каждым зданием
+const SITE_ROUTES: Record<WorldSiteId, string> = { office: '/lists', warehouse: '/equipment', garage: '/vehicles' }
+
 type Props = {
   // Облик мира: палитра и тон контура. Смена на живом мире — без перезагрузки
   look: WorldLook
@@ -31,8 +41,14 @@ type Props = {
 
 export function WorldStage({ look, onFirstFrame }: Props) {
   const { tr } = useLanguage()
+  const navigate = useNavigate()
   const slotRef = useRef<HTMLDivElement>(null)
   const [store] = useState(createWorldStore)
+  // Те же данные, что получил движок (одна ссылка из loadWorld): HUD берёт из них
+  // числа вывесок и имена. null — данных нет, вывески стоят без чисел.
+  const [data, setData] = useState<WorldData | null>(null)
+  const hover = useWorldState(store, (state) => state.hover)
+  const hudCompact = useWorldState(store, (state) => state.hudCompact)
   const [status, setStatus] = useState<Status>(() => (hasWebGL2() ? 'loading' : 'unsupported'))
   const onFirstFrameRef = useRef(onFirstFrame)
   useEffect(() => { onFirstFrameRef.current = onFirstFrame }, [onFirstFrame])
@@ -41,6 +57,19 @@ export function WorldStage({ look, onFirstFrame }: Props) {
   // стартовое значение читается из ref. Живому миру смену передаёт эффект ниже.
   const lookRef = useRef<WorldLook>({ palette, ink })
   const worldRef = useRef<{ setStyle: (look: WorldLook) => void; dispose: () => void } | null>(null)
+
+  const names: Record<WorldSiteId, string> = { office: tr('Офис', 'Ofis'), warehouse: tr('Склад', 'Ombor'), garage: tr('Гараж', 'Garaj') }
+  // Выбор и переход — один путь для вывески, клавиши и клика по зданию в сцене.
+  // Движок к этому моменту pick уже поставил: повторная запись того же id стор не будит.
+  const activate = (id: string) => {
+    if (!WORLD_SITES.includes(id as WorldSiteId)) return
+    store.setState({ pick: id })
+    navigate(SITE_ROUTES[id as WorldSiteId])
+  }
+  // Движку колбэк уходит через ref: navigate и язык меняются между рендерами, а мир
+  // из-за них пересоздаваться не должен
+  const activateRef = useRef(activate)
+  useEffect(() => { activateRef.current = activate })
 
   useEffect(() => {
     const slot = slotRef.current
@@ -60,6 +89,7 @@ export function WorldStage({ look, onFirstFrame }: Props) {
           look: lookRef.current,
           reducedMotion: prefersReducedMotion(),
           pose: (hot?.data.pose as CameraPose | undefined) ?? null,
+          onActivate: (id) => activateRef.current(id),
           onFirstFrame: () => {
             setStatus('ready')
             onFirstFrameRef.current?.(Math.round(performance.now() - startedAt))
@@ -72,6 +102,7 @@ export function WorldStage({ look, onFirstFrame }: Props) {
         dispose = world.dispose
         getPose = world.getPose
         worldRef.current = world
+        setData(engine.data)
       } catch (error) {
         reportAppError(error, { scope: 'loader', route: window.location.pathname, detail: { batch: 'world-create' } })
         setStatus('failed')
@@ -106,8 +137,22 @@ export function WorldStage({ look, onFirstFrame }: Props) {
   }, [palette, ink])
 
   return (
-    <div className={`w-stage${palette === 'night' ? ' is-dark' : ''}`}>
-      <div className="w-scene" ref={slotRef} aria-hidden="true" />
+    <div className={`w-stage${palette === 'night' ? ' is-dark' : ''}${hudCompact ? ' is-sm' : ''}`}>
+      {/* Без aria-hidden: внутри слота живут вывески — настоящие кнопки с именем */}
+      <div className="w-scene" ref={slotRef} />
+      {/* Вывески и чипы — порталами в якоря движка; якорей нет (мир не собран или снесён) — пусто */}
+      {WORLD_SITES.map((id) => (
+        <Sign key={id} store={store} id={id} name={names[id]} count={data?.sites?.[id] ?? null} onActivate={activate} />
+      ))}
+      {data?.people.map((person) => <NameChip key={person.id} store={store} person={person} />)}
+      {status === 'ready' && (
+        <>
+          <DayCap />
+          <Dock store={store} names={names} onActivate={activate} />
+        </>
+      )}
+      {/* Скринридеру: имя здания под указателем или в фокусе клавиши */}
+      <p className="w-live" aria-live="polite">{hover !== null && WORLD_SITES.includes(hover as WorldSiteId) ? names[hover as WorldSiteId] : ''}</p>
       {status === 'loading' && <p className="w-stage__state w-stage__loading" role="status">{tr('Загружаем мир…', 'Dunyo yuklanmoqda…')}</p>}
       {status === 'unsupported' && (
         <div className="w-stage__state">

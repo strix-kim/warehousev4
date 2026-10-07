@@ -44,6 +44,12 @@ export function formatEventDate(date: Date, locale: string) {
   return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' }).format(date)
 }
 
+// День и месяц без года («7 октября», «7-oktabr») — тем же списком месяцев.
+export function formatDayMonth(date: Date, locale: string) {
+  if (locale.toLowerCase().startsWith('uz')) return `${date.getDate()}-${uzbekMonths[date.getMonth()]}`
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long' }).format(date)
+}
+
 // Заголовок месяца в календаре — тот же список месяцев, без числа.
 export function formatMonthTitle(date: Date, locale: string) {
   if (locale.toLowerCase().startsWith('uz')) return `${uzbekMonths[date.getMonth()]} ${date.getFullYear()}`

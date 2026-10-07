@@ -3,6 +3,7 @@
 // закончиться плитками, а не перезагрузкой. Отказ оставляет след здесь, запасной
 // вид рисует вызывающий.
 import { reportAppError } from '../../lib/reportAppError'
+import type { WorldData } from './data/types'
 import type { World, WorldDeps } from './engine/createWorld'
 
 // Данные мира до живого адаптера (useWorldData) — макетные и только в dev: фикстуры
@@ -12,9 +13,14 @@ export function loadWorld() {
   return Promise.all([
     import('./engine/createWorld'),
     import.meta.env.DEV ? import('./data/fixtures.dev') : null,
-  ]).then(([engine, fixtures]) => ({
-    createWorld: (container: HTMLElement, deps: WorldDeps): World => engine.createWorld(container, { data: fixtures?.FIXTURES, ...deps }),
-  }), (error: unknown) => {
+  ]).then(([engine, fixtures]) => {
+    // Одна ссылка и движку, и HUD: числа на вывесках и машины в сцене — из одного объекта
+    const data: WorldData | null = fixtures?.FIXTURES ?? null
+    return {
+      data,
+      createWorld: (container: HTMLElement, deps: WorldDeps): World => engine.createWorld(container, { data: data ?? undefined, ...deps }),
+    }
+  }, (error: unknown) => {
     reportAppError(error, { scope: 'chunk', route: window.location.pathname, detail: { chunk: 'world' } })
     throw error
   })

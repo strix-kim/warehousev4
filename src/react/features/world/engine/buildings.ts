@@ -11,6 +11,7 @@ import { kit } from './primitives'
 import { mat, own } from './style'
 
 // Здание: группа с собственным материалом корпуса (его подсвечивает наведение).
+// userData: top — высота под вывеску, ring — [x, z, радиус] кольца выбора на земле.
 function building(ctx: WorldCtx, id: string, x: number, z: number) {
   const { P } = ctx.style
   const g = new THREE.Group()
@@ -43,6 +44,7 @@ export function buildOffice(ctx: WorldCtx) {
   tree(ctx, k, -7.8, 5.6, 1.1)
   k.into(g)
   g.userData.top = 7.6
+  g.userData.ring = [X, Z + 0.5, Math.hypot(12, 10) / 2 + 1.2]
   return g
 }
 
@@ -69,6 +71,7 @@ export function buildWarehouse(ctx: WorldCtx) {
   crate(ctx, k, -4.2, 0.9, 5.9)
   k.into(g)
   g.userData.top = 9.4
+  g.userData.ring = [X, Z + 0.5, Math.hypot(17, 11) / 2 + 1]
   return g
 }
 
@@ -100,5 +103,6 @@ export function buildGarage(ctx: WorldCtx, cars: readonly WorldCar[]) {
     g.add(v)
   })
   g.userData.top = 7
+  g.userData.ring = [X, Z + 1, Math.hypot(12, 9) / 2 + 1]
   return g
 }

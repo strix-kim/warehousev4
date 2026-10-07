@@ -21,4 +21,5 @@ const EMPLOYEES: ReadonlyArray<readonly [firstName: string, lastName: string]> =
 export const FIXTURES: WorldData = {
   cars: CARS.map(([brand, model, plate, color], i) => ({ id: `fixture-car-${i}`, brand, model, plate, color })),
   people: EMPLOYEES.map(([firstName, lastName], i) => ({ id: `fixture-person-${i}`, firstName, lastName })),
+  sites: { office: 6, warehouse: 1471, garage: 6 },
 }

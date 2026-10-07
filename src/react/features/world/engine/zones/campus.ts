@@ -1,4 +1,5 @@
-// Кампус: земля, дороги, три здания, машины у гаража и фигурки сотрудников.
+// Кампус: земля, дороги, три здания с вывесками и кольцами выбора, машины у гаража
+// и фигурки сотрудников с чипами имён.
 // Пока статично: движение (фургон, бригада, прохожие) придёт своим модулем.
 import * as THREE from 'three'
 import { carKind } from '../../data/carKinds'
@@ -8,7 +9,9 @@ import { makeCar } from '../cars'
 import type { WorldCtx } from '../createWorld'
 import { CAMPUS_HALF, POS, ROAD_Z, ground, roads } from '../ground'
 import { makePerson } from '../people'
-import { kit } from '../primitives'
+import { kit, label } from '../primitives'
+import { makeRing } from '../selection'
+import { WORLD_SITES, whoLabelId } from '../../worldStore'
 
 // Мест у гаража без фургона: три проёма и два на площадке
 const PARKED = 5
@@ -49,6 +52,15 @@ export function buildCampus(ctx: WorldCtx, data: WorldData) {
   const vanAt = cars.findIndex((car) => carKind(car.brand, car.model) === 'bongo')
   const van = vanAt >= 0 ? cars.splice(vanAt, 1)[0] : cars[PARKED]
   g.add(buildOffice(ctx), buildWarehouse(ctx), buildGarage(ctx, cars.slice(0, PARKED)))
+  for (const id of WORLD_SITES) {
+    const root = ctx.roots.get(id)
+    if (!root) continue
+    // Вывеска: якорь — чуть выше крыши, на нём шляпка ножки
+    label(ctx, root, id, 'w-sign', 0, (root.userData.top as number) + 0.5, 0)
+    // Кольцо лежит в группе кампуса, а не в здании
+    const [x, z, r] = root.userData.ring as [number, number, number]
+    ctx.rings.set(id, makeRing(ctx, g, r, x, z))
+  }
   if (van) {
     const [GX, GZ] = POS.garage, v = makeCar(ctx, van, true)
     v.position.set(GX + bayX(2), 0, GZ + 6.9)
@@ -59,7 +71,10 @@ export function buildCampus(ctx: WorldCtx, data: WorldData) {
   const spots = peopleSpots()
   data.people.slice(0, spots.length).forEach((person, i) => {
     const [x, z, rot, c, withCase] = spots[i]!
-    makePerson(ctx, g, x, z, rot, cloth[c % cloth.length]!, withCase).userData.id = person.id
+    const figure = makePerson(ctx, g, x, z, rot, cloth[c % cloth.length]!, withCase)
+    figure.userData.id = person.id
+    // Чип имени: фигурки — не объекты навигации, скринридеру их не читаем
+    label(ctx, figure, whoLabelId(person.id), 'w-who', 0, 2.5, 0).element.setAttribute('aria-hidden', 'true')
   })
   return g
 }
