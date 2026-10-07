@@ -1,6 +1,6 @@
 # План: воксельный мир в продукте (`src/react/features/world`) — `planner`, с51
 
-Источник облика — макет `docs/project/design/voxel-world-s50.html` (4542 строки: CSS 11–878, DOM 881–1024, скрипт 1026–4540). Раскладка зон — целевая с51 (одна карта, три зоны вдоль дороги, приглушённые соседи, надписи на земле, ограда, «плюсы»); файл `voxel-world-s51.html` не читался — он в работе. Мост Supabase жив с с51 (планировщик его не трогал: всё про базу в плане — по коду и миграциям).
+Источник облика — макет `docs/project/design/voxel-world-s51.html` (принят прорабом в с51: одна карта, три зоны вдоль дороги, приглушённые соседи, кнопки на земле, ограда, «плюсы»). План писался по с50 (`git show 19c71e5:docs/project/design/voxel-world-s50.html`), Ш1–Ш2 портированы с него; имена функций макета в таблице модулей — по с50, в с51 часть переписана (`makeGate`, `viewPose`, `garageShell`). Мост Supabase жив с с51 (планировщик его не трогал: всё про базу в плане — по коду и миграциям).
 
 ## Решения
 
@@ -199,7 +199,7 @@ src/react/features/world/
 
 ## Файлы
 
-- Макет: `docs/project/design/voxel-world-s50.html`
+- Макет: `docs/project/design/voxel-world-s51.html`
 - Бриф: `docs/project/design/voxel-brief.md`
 - Шпаргалка: `docs/system/libs/three.md`
 - Роутер и прогрев: `src/react/app/App.tsx` (`App`, `AppShell`, `moduleTimer`)
