@@ -20,7 +20,7 @@ export function safeFileName(value: string, fallback = 'equipment-list') {
   return value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').slice(0, 80) || fallback
 }
 
-export type ExportFileKind = 'equipment' | 'equipmentApproval' | 'staff' | 'vehicles'
+export type ExportFileKind = 'equipment' | 'equipmentApproval' | 'staff' | 'vehicles' | 'expenses'
 
 // Тип документа в имени — на языке самого документа: узбекский — латиницей,
 // русский — кириллицей. Рабочий список и список на согласование обязаны
@@ -31,6 +31,7 @@ const KIND_LABELS: Record<ExportFileKind, { ru: string; uz: string; fallback: st
   equipmentApproval: { ru: 'Список_оборудования_на_согласование', uz: 'Uskunalar_royxati_kelishuvga', fallback: 'equipment-list' },
   staff: { ru: 'Список_сотрудников', uz: 'Xodimlar_royxati', fallback: 'event' },
   vehicles: { ru: 'Список_автомобилей', uz: 'Avtomobillar_royxati', fallback: 'event' },
+  expenses: { ru: 'Производственные_расходы', uz: 'Ishlab_chiqarish_xarajatlari', fallback: 'expenses' },
 }
 
 // Единая схема имени всех выгрузок: ARGOMEDIA_<Тип>_<Название>_<Дата>.xlsx.

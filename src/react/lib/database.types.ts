@@ -380,6 +380,51 @@ export type Database = {
         }
         Relationships: []
       }
+      // ПРАВКА РУКАМИ: таблица заведена миграцией 20261007163328 (с51), типы
+      // дописаны вслед за ней — генератор с прода не перезапускался. spent_on
+      // обязателен на вставке: default в базе нет намеренно (current_date там
+      // UTC), дату шлёт клиент.
+      expenses: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          spent_by: string | null
+          spent_on: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          name: string
+          spent_by?: string | null
+          spent_on: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          spent_by?: string | null
+          spent_on?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_spent_by_fkey"
+            columns: ["spent_by"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       // Правка руками (с20): hall_plans + halls, миграция 20260824022708;
       // hall_assignments + plan_positions вместо hall_positions — миграция
       // 20260824031553. Генератор типов не запускался — при перегенерации блоки
@@ -848,6 +893,17 @@ export type Database = {
       // для функции без параметров.
       home_summary: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      // ПРАВКА РУКАМИ: функция заведена миграцией 20261007163328 (с51), типы
+      // дописаны вслед за ней. p_spent_by необязателен (default null — без
+      // фильтра «Кто потратил»).
+      expenses_period: {
+        Args: {
+          p_from: string
+          p_to: string
+          p_spent_by?: string | null
+        }
         Returns: Json
       }
       // ПРАВКА РУКАМИ: функция заведена миграцией 20260823074238, типы дописаны

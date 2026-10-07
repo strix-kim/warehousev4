@@ -3,6 +3,10 @@
 // Новое дописывается только В ХВОСТ (и в fonts, и в cellXfs): вставка в середину
 // молча перекрасила бы уже выпущенные документы. Хвост cellXfs: 20 — абзац-
 // заголовок документа «на мероприятие» (полужирный 11, перенос, по левому краю).
+// 21–23 — деньги журнала расходов: сумма в обычной строке, в чередующейся и в
+// «Итого». Это единственные стили с числовым форматом: numFmtId="3" — встроенный
+// «#,##0», своего <numFmts> он не требует, а разделитель разрядов Excel берёт из
+// языка системы (в русской — пробел, как в образце «102 000»).
 export const workbookStyles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <fonts count="8">
@@ -30,7 +34,7 @@ export const workbookStyles = `<?xml version="1.0" encoding="UTF-8" standalone="
     <border><left/><right/><top style="medium"><color rgb="FFEF1236"/></top><bottom/><diagonal/></border>
   </borders>
   <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-  <cellXfs count="21">
+  <cellXfs count="24">
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
     <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
     <xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>
@@ -52,6 +56,9 @@ export const workbookStyles = `<?xml version="1.0" encoding="UTF-8" standalone="
     <xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center" wrapText="1" indent="1"/></xf>
     <xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1" indent="1"/></xf>
+    <xf numFmtId="3" fontId="0" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" indent="1"/></xf>
+    <xf numFmtId="3" fontId="0" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" indent="1"/></xf>
+    <xf numFmtId="3" fontId="4" fillId="7" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" indent="1"/></xf>
   </cellXfs>
   <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`

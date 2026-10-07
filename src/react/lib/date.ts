@@ -81,3 +81,32 @@ export function monthRange(offset: number) {
   const to = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)
   return { from: toDateValue(from), to: toDateValue(to) }
 }
+
+// Месяц строкой YYYY-MM — в таком виде он лежит в адресе журнала расходов
+// (?m=2026-10). Разбор строгий: мусор из адреса обязан читаться как «месяц не
+// задан», а не как 13-й месяц, который Date молча перенёс бы в следующий год.
+// Год — четыре цифры без ведущего нуля: годы 0–99 конструктор Date относит к 1900-м.
+function parseMonthValue(value: string) {
+  const match = /^([1-9]\d{3})-(0[1-9]|1[0-2])$/.exec(value)
+  return match ? { year: Number(match[1]), month: Number(match[2]) } : null
+}
+
+export function toMonthValue(date: Date) {
+  return toDateValue(date).slice(0, 7)
+}
+
+// Границы месяца, обе включительно — как их ждёт expenses_period. null — строка
+// не месяц. День 0 следующего месяца — последний день нужного (високосный
+// февраль и декабрь Date берёт на себя, как и в monthRange выше).
+export function monthBounds(month: string) {
+  const parsed = parseMonthValue(month)
+  if (!parsed) return null
+  return { from: `${month}-01`, to: toDateValue(new Date(parsed.year, parsed.month, 0)) }
+}
+
+// Соседний месяц (delta = ±1). Не месяц на входе — возвращается как есть:
+// вызывающий уже проверил строку через monthBounds.
+export function shiftMonthValue(month: string, delta: number) {
+  const parsed = parseMonthValue(month)
+  return parsed ? toMonthValue(new Date(parsed.year, parsed.month - 1 + delta, 1)) : month
+}

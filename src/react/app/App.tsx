@@ -1,4 +1,4 @@
-import { ArrowUpRight, Boxes, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Presentation, RadioTower, Users, Warehouse, X } from 'lucide-react'
+import { ArrowUpRight, Boxes, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Presentation, RadioTower, Receipt, Users, Warehouse, X } from 'lucide-react'
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, m, type Transition } from 'motion/react'
 import { Link, matchPath, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
@@ -30,6 +30,7 @@ const loadHallPlanPage = () => import('../features/halls/HallPlanPage').then((mo
 const loadHallTvPage = () => import('../features/halls/HallTvPage').then((module) => ({ default: module.HallTvPage }))
 const loadHomePage = () => import('../features/home/HomePage').then((module) => ({ default: module.HomePage }))
 const loadDelayCalculatorPage = () => import('../features/delay/DelayCalculatorPage').then((module) => ({ default: module.DelayCalculatorPage }))
+const loadExpensesPage = () => import('../features/expenses/ExpensesPage').then((module) => ({ default: module.ExpensesPage }))
 
 const LoginPage = lazyWithReload(loadLoginPage)
 const EquipmentPage = lazyWithReload(loadEquipmentPage)
@@ -45,13 +46,14 @@ const HallPlanPage = lazyWithReload(loadHallPlanPage)
 const HallTvPage = lazyWithReload(loadHallTvPage)
 const HomePage = lazyWithReload(loadHomePage)
 const DelayCalculatorPage = lazyWithReload(loadDelayCalculatorPage)
+const ExpensesPage = lazyWithReload(loadExpensesPage)
 
 // Пункты нижней панели телефона — m-обёртка над NavLink ради whileTap: сжатие
 // должно ловиться по всей площади вкладки, а не только по значку.
 const MotionNavLink = m.create(NavLink)
 
 // Пять вкладок телефона (макет с31): четыре раздела и «Ещё». Сотрудники,
-// Автомобили и Задержки на ≤820 живут в листе «Ещё», и на их адресах
+// Автомобили, Задержки и Расходы на ≤820 живут в листе «Ещё», и на их адресах
 // подсвечивается именно «Ещё».
 type PhoneTab = 'home' | 'equipment' | 'lists' | 'halls' | 'more'
 
@@ -143,6 +145,7 @@ export function App() {
         <Route path="/halls" element={<RouteBoundary><HallPlansPage /></RouteBoundary>} />
         <Route path="/halls/:planId" element={<RouteBoundary><HallPlanPage /></RouteBoundary>} />
         <Route path="/delay" element={<RouteBoundary><DelayCalculatorPage /></RouteBoundary>} />
+        <Route path="/expenses" element={<RouteBoundary><ExpensesPage /></RouteBoundary>} />
       </Route>
       {/* ТВ-режим — вне AppShell: на экране в зале не нужны ни сайдбар, ни
           отступы приложения. Гейт сессии у маршрута свой, как у шелла. */}
@@ -231,6 +234,7 @@ function AppShell() {
         loadHallPlansPage(),
         loadHallPlanPage(),
         loadDelayCalculatorPage(),
+        loadExpensesPage(),
       ])
     }, 0)
     // Прогрев выдач всех шести разделов, а не только двух старых (решение прораба,
@@ -375,6 +379,8 @@ function AppShell() {
           {/* В сайдбаре — «Задержки ITC», как в макете: полное «Задержка излучателей»
               ломалось на две строки. Полное имя — в заголовке страницы и в листе «Ещё». */}
           <NavLink className="sidebar__nav-extra" to="/delay"><RadioTower size={19} /><span>{tr('Задержки ITC', 'ITC kechikishlari')}</span></NavLink>
+          {/* Счётчика нет: home_summary расходы не считает, а журнал у каждого свой. */}
+          <NavLink className="sidebar__nav-extra" to="/expenses"><Receipt size={19} /><span>{tr('Расходы', 'Xarajatlar')}</span></NavLink>
           {/* Пятый слот нижней панели, на десктопе скрыт: язык, аккаунт, быстрый
               переход в новый список и три раздела сверх пяти живут в сайдбаре,
               которого на телефоне нет. Горит и на адресах этих разделов. */}
@@ -471,6 +477,7 @@ function MobileMoreSheet({ email, onSignOut, onClose }: { email: string; onSignO
         <NavLink to="/employees" onClick={onClose}><span><Users size={19} /></span>{tr('Сотрудники', 'Xodimlar')}</NavLink>
         <NavLink to="/vehicles" onClick={onClose}><span><CarFront size={19} /></span>{tr('Автомобили', 'Avtomobillar')}</NavLink>
         <NavLink to="/delay" onClick={onClose}><span><RadioTower size={19} /></span>{tr('Задержка излучателей', 'Nurlatgichlar kechikishi')}</NavLink>
+        <NavLink to="/expenses" onClick={onClose}><span><Receipt size={19} /></span>{tr('Производственные расходы', 'Ishlab chiqarish xarajatlari')}</NavLink>
       </nav>
       <div className="sheet__row">
         <span>{tr('Язык интерфейса', 'Interfeys tili')}</span>
