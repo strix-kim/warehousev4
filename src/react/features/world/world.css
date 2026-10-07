@@ -1,0 +1,23 @@
+/* Мир. Feature-CSS в проекте не изолирован, поэтому у всех селекторов префикс w-:
+   в макете они голые (.stage, .scene, .labels) и пересеклись бы с продуктом. */
+
+/* Dev-стенд /world: сцена занимает всё, что осталось под шапкой. 96px — поля
+   .app-content; деление на --app-zoom — gotchas §16. */
+.w-page { display: flex; flex-direction: column; height: calc(100dvh / var(--app-zoom) - 96px); min-height: 420px; }
+.w-page .page-header { flex: none; }
+.w-page__facts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; color: var(--muted); font: 500 13px/1.5 var(--f-text); }
+
+.w-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-lg); }
+.w-scene { position: absolute; inset: 0; }
+.w-scene canvas { display: block; touch-action: none; }
+/* Слой CSS2DRenderer: размер ему пишет движок, display его детям — сам рендерер */
+.w-labels { position: absolute; inset: 0; pointer-events: none; }
+
+.w-stage__state { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; margin: 0; padding: 24px; background: var(--bg); }
+.w-stage__state > * { width: min(100%, 460px); }
+.w-stage__loading { color: var(--muted); font: 500 14px/1.5 var(--f-text); text-align: center; }
+
+@media (max-width: 820px) {
+  .w-page { height: auto; min-height: 0; }
+  .w-stage { flex: none; height: 60svh; min-height: 300px; }
+}

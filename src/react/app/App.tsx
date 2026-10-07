@@ -47,6 +47,12 @@ const HallTvPage = lazyWithReload(loadHallTvPage)
 const HomePage = lazyWithReload(loadHomePage)
 const DelayCalculatorPage = lazyWithReload(loadDelayCalculatorPage)
 const ExpensesPage = lazyWithReload(loadExpensesPage)
+// Мир — dev-стенд до шага выкатки (план world-s51, решение 5): в прод-сборке
+// тернарий сворачивается в null, и ни маршрута, ни чанка three в ней нет.
+// В общий прогрев moduleTimer не входит намеренно — он тяжёлый.
+const WorldPage = import.meta.env.DEV
+  ? lazyWithReload(() => import('../features/world/WorldPage').then((module) => ({ default: module.WorldPage })))
+  : null
 
 // Пункты нижней панели телефона — m-обёртка над NavLink ради whileTap: сжатие
 // должно ловиться по всей площади вкладки, а не только по значку.
@@ -146,6 +152,7 @@ export function App() {
         <Route path="/halls/:planId" element={<RouteBoundary><HallPlanPage /></RouteBoundary>} />
         <Route path="/delay" element={<RouteBoundary><DelayCalculatorPage /></RouteBoundary>} />
         <Route path="/expenses" element={<RouteBoundary><ExpensesPage /></RouteBoundary>} />
+        {WorldPage && <Route path="/world" element={<RouteBoundary><WorldPage /></RouteBoundary>} />}
       </Route>
       {/* ТВ-режим — вне AppShell: на экране в зале не нужны ни сайдбар, ни
           отступы приложения. Гейт сессии у маршрута свой, как у шелла. */}

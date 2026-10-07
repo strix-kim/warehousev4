@@ -39,6 +39,10 @@ export default defineConfig(({ command, mode }) => {
             if (/[\\/]node_modules[\\/](react-router|react-router-dom)[\\/]/.test(id)) return 'router'
             if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react-vendor'
             if (/[\\/]node_modules[\\/]@supabase[\\/]/.test(id)) return 'supabase'
+            // three с аддонами — своим чанком: правка мира не должна сбрасывать ~700 кБ
+            // из кэша. Он заведомо выше порога 250 и ниже не режется — предупреждение
+            // о размере принято (решение прораба с51), порог не поднимаем
+            if (/[\\/]node_modules[\\/]three[\\/]/.test(id)) return 'three'
             return
           },
         },

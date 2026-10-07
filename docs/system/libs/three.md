@@ -1,8 +1,54 @@
 # three.js — шпаргалка (r186, npm `three@0.186.1`)
 
 Сверено с docs threejs.org (Context7 `/websites/threejs`) и исходниками r186 на jsdelivr.
-Первое применение — макет `docs/project/design/voxel-s47.html` (с47). В продукт
-по брифу пойдёт `react-three-fiber` + `drei` — для них будет своя шпаргалка.
+Первое применение — макет `docs/project/design/voxel-s47.html` (с47). В продукте —
+тот же чистый `three`, без `react-three-fiber` и `drei` (решение прораба с51,
+`docs/project/plans/world-s51.md`): код — `src/react/features/world/`.
+
+## Подключение в продукте (npm)
+`three@0.186.1` в `dependencies`, `@types/three@0.186.0` в dev — точные версии.
+```ts
+import * as THREE from 'three'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'   // расширение .js обязательно
+```
+- **`import … from 'three'` — только внутри `features/world/engine/`.** Всё остальное
+  (`WorldStage`, `support.ts`, `worldStore.ts`, будущие `hud/*`, `settings.ts`) three не
+  импортирует даже типами: иначе он утекает из ленивого чанка во входной.
+- Вход в чанк один — `loadWorld()` (`import('./engine/createWorld')`). В сборке это два
+  чанка: `three` (ветка в `manualChunks`, ~580 кБ min / ~145 кБ gzip с аддонами Ш1) и
+  `createWorld` (свой код движка). Предупреждение Vite о размере `three` принято, порог
+  250 не поднимаем.
+- Маршрут `/world` — только под `import.meta.env.DEV`; в прод-сборке чанка `three` нет.
+
+## Конвенции продукта
+- **`WorldCtx` вместо глобалей.** На уровне модулей движка нет ни одного THREE-объекта
+  (геометрий, материалов, векторов-времянок, кэшей): в макете это `W`, `roots`, `MATS`,
+  `GEO`, `P`, `BOX` — в продукте поля `WorldCtx` одного экземпляра (`ctx.style`, `ctx.geo`,
+  `ctx.roots`, `ctx.box`…). Причина — StrictMode и HMR: два мира на общих кэшах. Функции
+  движка первым аргументом берут `ctx`: `kit(ctx)`, `buildOffice(ctx)`, `fit(ctx)`.
+- **`createWorld(container, deps)` → `{ store, getPose, dispose }`.** React монтирует его
+  в эффекте `WorldStage`; `loadWorld()` асинхронный, поэтому в эффекте флаг отмены —
+  иначе при двойном mount StrictMode второй мир встаёт в слот рядом с первым.
+- **`dispose()` — по списку, целиком:** `setAnimationLoop(null)` и `cancelAnimationFrame`;
+  `ResizeObserver.disconnect()`; снять свои слушатели (`webglcontextlost` — ДО
+  `forceContextLoss`, иначе собственный снос читается как потеря контекста; указатель,
+  клавиатура, `document.fonts` — когда появятся); `controls.dispose()`; обход сцены —
+  `geometry`, `material`, `material.map`; кэши ctx (`geo`, `style.mats/flats`, `ink`,
+  `hull`, `box`, `wheel`); `renderer.dispose()` + `renderer.forceContextLoss()`; удалить
+  `canvas` и слой CSS2D из DOM. Без `forceContextLoss` контекст живёт до сборки мусора,
+  а браузер держит их ~16. Новый ресурс движка = новая строка в `dispose`.
+- **Форма одна — «Галька + контур»** (`softline` макета): `SHAPE_CFG`, ветки `toy` и
+  параметр `edge` у `kit()` не перенесены. Сигнатура `k(m, w, h, d, x, y0, z, rx?, rr?)` —
+  на один аргумент короче макетной; `k.post` и `k.door` макета = обычный `k`.
+- **Откаты:** нет WebGL2 (`hasWebGL2()` до загрузки чанка), чанк не приехал, мир не
+  собрался, `webglcontextlost` — заглушка в `WorldStage`, без падения страницы.
+  `prefers-reduced-motion` — мир остаётся, но неподвижный: без инерции, цикла кадров нет,
+  кадр рисуется по событию `change` у `OrbitControls` и по ресайзу.
+- **HMR:** правка модуля движка доходит до `WorldStage` (граница Fast Refresh) и
+  пересоздаёт мир; поза камеры переезжает через `import.meta.hot.data` только при замене
+  модуля (флаг ставит `hot.dispose`), обычный уход со страницы позу не хранит.
+- **`noUncheckedIndexedAccess`:** доступ к компоненте по номеру оси — `getComponent` /
+  `setComponent`, а не `v[ax]` по массиву-тройке.
 
 ## Подключение без сборки (макеты)
 ```html
