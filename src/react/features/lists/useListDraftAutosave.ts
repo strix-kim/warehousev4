@@ -3,14 +3,21 @@ import { clearListDraft, saveListDraft, type ListDraft, type ListDraftItem } fro
 
 // «Пустой» черновик не хранится и стирает уже записанный: иначе один заход на
 // /lists/new без единого действия подсовывал бы плашку «черновик восстановлен».
-// Дата в проверку не входит — у неё дефолт есть всегда. Реквизиты сравнивать не
-// с чем: подставленных значений у полей больше нет, нетронутое поле просто пусто.
+// Мероприятие считается работой, только если в него что-то ВНЕСЛИ: у нового —
+// набранный реквизит (дата не в счёт, у неё дефолт есть всегда), у существующего
+// — правка реквизитов. Просто выбранное мероприятие — не работа: с ним редактор
+// открывает ссылка /lists/new?project=…, и один такой заход черновика не заводит.
+function isProjectUntouched(project: ListDraft['project']) {
+  if (!project) return true
+  if (project.id) return !project.edited
+  return !project.name.trim() && !project.clientName.trim() && !project.venue
+}
+
 function isDraftEmpty(draft: ListDraft) {
   return draft.items.length === 0
     && !draft.description.trim()
     && !draft.name.trim()
-    && !draft.clientName.trim()
-    && !draft.venue.trim()
+    && isProjectUntouched(draft.project)
 }
 
 // Автосейв черновика: пауза 1 с после последнего изменения.
@@ -28,21 +35,19 @@ function isDraftEmpty(draft: ListDraft) {
 //
 // restoredRef — флаг «восстановление закончилось»: читается в момент срабатывания
 // таймера, поэтому передаётся ссылкой.
-export function useListDraftAutosave({ listId, restoredRef, isDirty, name, clientName, venue, description, eventDate, items }: {
+export function useListDraftAutosave({ listId, restoredRef, isDirty, name, description, project, items }: {
   listId: string | undefined
   restoredRef: { current: boolean }
   isDirty: boolean
   name: string
-  clientName: string
-  venue: string
   description: string
-  eventDate: string
+  project: ListDraft['project']
   items: ListDraftItem[]
 }) {
   useEffect(() => {
     if (!restoredRef.current) return
     const timer = window.setTimeout(() => {
-      const draft: ListDraft = { name, clientName, venue, description, eventDate, items }
+      const draft: ListDraft = { name, description, project, items }
       // У открытого списка «пусто» ничего не значит: пустым он быть не может,
       // а вот совпадение с базой значит «сохранять нечего».
       const shouldStore = listId ? isDirty : !isDraftEmpty(draft)
@@ -50,5 +55,5 @@ export function useListDraftAutosave({ listId, restoredRef, isDirty, name, clien
       else clearListDraft(listId)
     }, 1000)
     return () => window.clearTimeout(timer)
-  }, [clientName, description, eventDate, isDirty, items, listId, name, restoredRef, venue])
+  }, [description, isDirty, items, listId, name, project, restoredRef])
 }

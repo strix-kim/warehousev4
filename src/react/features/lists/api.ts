@@ -2,10 +2,12 @@ import { supabase } from '../../lib/supabase'
 import { cachedQuery, invalidateCachePrefix, primeCachedQuery, readCachedQuery, readCachedQueryMeta } from '../../lib/persistentCache'
 import type { Json, Tables } from '../../lib/database.types'
 import { MOBILE_MEDIA_QUERY } from '../../lib/breakpoints'
-import { escapeLikePattern, quoteFilterValue } from '../../lib/postgrest'
 import { reportAppError } from '../../lib/reportAppError'
 import { fetchEquipmentByIds } from '../equipment/api'
 import type { Equipment } from '../equipment/types'
+import { projectErrorText } from '../projects/api'
+import { invalidateProjectCounters, invalidateProjectsCache } from '../projects/cacheKeys'
+import type { ProjectBrief, VenueBrief } from '../projects/types'
 import { LIST_DRAFT_TTL_MS, listCompositionCacheKey, listDraftCacheKey } from './cacheKeys'
 import type { ExportListRow } from './xlsxExport'
 
@@ -19,56 +21,30 @@ export type EquipmentListItem = Pick<Equipment, 'brand' | 'model' | 'type' | 'su
 // Разъедется со схемой — упадёт компиляция нормализации ниже.
 type EquipmentListRow = Pick<
   Tables<'equipment_lists'>,
-  'id' | 'name' | 'description' | 'client_name' | 'venue' | 'type' | 'list_mode'
-  | 'equipment_ids' | 'equipment_items' | 'created_at' | 'is_archived'
-  | 'reservation_start' | 'reservation_end'
+  'id' | 'name' | 'description' | 'type' | 'list_mode'
+  | 'equipment_ids' | 'equipment_items' | 'created_at' | 'is_archived' | 'project_id'
 >
 
-// Набор колонок старой схемы: реквизитов заказчика в ней ещё нет.
-type LegacyEquipmentListRow = Pick<
-  Tables<'equipment_lists'>,
-  'id' | 'name' | 'description' | 'type' | 'list_mode' | 'equipment_ids'
-  | 'equipment_items' | 'created_at' | 'is_archived'
->
+// Строка списка вместе с мероприятием — так её отдают и одиночная выборка
+// (embed), и RPC реестра. Реквизиты (название, заказчик, период, площадка) живут
+// ТОЛЬКО в мероприятии: своих у списка нет, project === null — черновой набор.
+type EquipmentListRowWithProject = EquipmentListRow & { project: ProjectBrief | null }
 
 // Доменный список: строка базы, где текстовый list_mode под CHECK и jsonb-колонка
 // состава сужены до наших типов.
 export type EquipmentList = Omit<
-  EquipmentListRow,
+  EquipmentListRowWithProject,
   'list_mode' | 'equipment_items'
 > & {
   list_mode: 'specific' | 'abstract'
   equipment_items: EquipmentListItem[] | null
 }
 
-const listColumns = 'id,name,description,client_name,venue,type,list_mode,equipment_ids,equipment_items,created_at,is_archived,reservation_start,reservation_end'
+const listColumns = 'id,name,description,type,list_mode,equipment_ids,equipment_items,created_at,is_archived,project_id'
 
-const legacyListColumns = 'id,name,description,type,list_mode,equipment_ids,equipment_items,created_at,is_archived'
-
-// Коды, которые означают ровно одно: в базе НЕТ того, что мы просим, — таблицы
-// (PGRST205, 42P01) или колонки (PGRST204, 42703). Только они разрешают повтор
-// запроса в старой схеме. Сетевой сбой, 401 и отказ RLS сюда не попадают: раньше
-// они уводили в legacy-ветку, где статус жёстко проставлялся черновиком, и этот
-// вымысел кэшировался на 10 минут.
-const missingSchemaCodes = new Set(['PGRST205', '42P01', 'PGRST204', '42703'])
-
-function isMissingSchemaError(error: unknown) {
-  if (!error || typeof error !== 'object') return false
-  const code = (error as { code?: unknown }).code
-  return typeof code === 'string' && missingSchemaCodes.has(code)
-}
-
-// Единственная ветка фолбэка на старую схему: сначала запрос в современной схеме,
-// и только код «нет колонки/таблицы» разрешает второй заход. Ошибка второго захода
-// уходит наружу как есть.
-async function withLegacySchemaFallback<Result>(run: (schema: 'modern' | 'legacy') => Promise<Result>): Promise<Result> {
-  try {
-    return await run('modern')
-  } catch (error) {
-    if (!isMissingSchemaError(error)) throw error
-    return run('legacy')
-  }
-}
+// Мероприятие встроенным ресурсом — те же поля и те же имена, что кладёт в строку
+// RPC fetch_equipment_lists_page: карточка реестра и редактор читают одну форму.
+const listSelect = `${listColumns},project:projects(id,name,client_name,date_from,date_to,venue:venues(id,name,city,country))`
 
 export const LISTS_PAGE_SIZE = 12
 export const MOBILE_LISTS_PAGE_SIZE = 6
@@ -92,25 +68,35 @@ function toEquipmentListItems(value: Json): EquipmentListItem[] | null {
   return Array.isArray(value) ? (value as EquipmentListItem[]) : null
 }
 
-function normalizeList(row: EquipmentListRow): EquipmentList {
+// Поля перечислены явно, а не через spread: RPC реестра отдаёт в строке ещё и
+// updated_at, а эта же строка кладётся в кэш детали (prefetchSavedListDetails) —
+// форма обязана совпасть с одиночной выборкой до ключа.
+function normalizeList(row: EquipmentListRowWithProject): EquipmentList {
   return {
-    ...row,
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    type: row.type,
     list_mode: toListMode(row.list_mode),
+    equipment_ids: row.equipment_ids,
     equipment_items: toEquipmentListItems(row.equipment_items),
+    created_at: row.created_at,
+    is_archived: row.is_archived,
+    project_id: row.project_id,
+    project: row.project ?? null,
   }
 }
 
-// Старая схема без реквизитов и дат: недостающие поля добираем теми же
-// значениями, что подставлял фолбэк раньше.
-function normalizeLegacyList(row: LegacyEquipmentListRow): EquipmentList {
+// Ответ fetch_equipment_lists_page — jsonb {rows, total}. Конверт проверяем, а не
+// приводим: разъедется RPC с клиентом — реестр покажет отказ загрузки, а не
+// «списков нет». Форму самой строки задаёт функция (миграция 20261007185009).
+function toListsPage(value: Json): EquipmentListsPage {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('fetch_equipment_lists_page: ответ не объект')
+  const { rows, total } = value
+  if (!Array.isArray(rows) || typeof total !== 'number') throw new Error('fetch_equipment_lists_page: нет rows или total')
   return {
-    ...row,
-    list_mode: toListMode(row.list_mode),
-    equipment_items: toEquipmentListItems(row.equipment_items),
-    client_name: null,
-    venue: null,
-    reservation_start: null,
-    reservation_end: null,
+    rows: (rows as unknown as EquipmentListRowWithProject[]).map((item) => normalizeList(item)),
+    total,
   }
 }
 
@@ -150,9 +136,10 @@ function normalizeListsQuery({ page = 1, search = '', periodFrom = '', periodTo 
 
 // Ключ остаётся под префиксом `equipment-lists:` — его целиком сбрасывает любая
 // запись (создание, правка, удаление, смена этапа), и страницы обязаны уехать
-// вместе с ней.
+// вместе с ней. v2 — форма строки сменилась (реквизиты переехали в project), а
+// записи прошлой формы лежат в localStorage у всех, кто открывал реестр.
 function equipmentListsCacheKey(query: NormalizedListsQuery) {
-  return `equipment-lists:page:${JSON.stringify(query)}`
+  return `equipment-lists:page:v2:${JSON.stringify(query)}`
 }
 
 export function readCachedEquipmentLists(query: Omit<EquipmentListsQuery, 'bypassCache'> = {}) {
@@ -169,64 +156,28 @@ export async function fetchEquipmentLists(query: EquipmentListsQuery = {}): Prom
   const client = supabase
   const normalized = normalizeListsQuery(query)
   const { page, search, periodFrom, periodTo, pageSize } = normalized
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
-  const namePattern = search ? `%${escapeLikePattern(search)}%` : ''
-  // Тот же шаблон, но закавыченный: внутри `.or(...)` сырое значение с запятой
-  // или скобкой разобралось бы как границы условий.
-  const searchExpression = namePattern
-    ? ['name', 'client_name', 'venue'].map((column) => `${column}.ilike.${quoteFilterValue(namePattern)}`).join(',')
-    : ''
 
-  return cachedQuery(equipmentListsCacheKey(normalized), 10 * 60 * 1000, () => withLegacySchemaFallback(async (schema) => {
-    if (schema === 'legacy') {
-      // В старой схеме нет ни client_name/venue, ни reservation_start: поиск
-      // остаётся по одному названию, а период здесь пуст всегда — дата
-      // мероприятия там NULL, а NULL не попадает ни в один период, то же
-      // правило, что и в современной ветке. Отдать вместо этого невыбранную
-      // выборку было бы ложью: человек спросил месяц.
-      if (periodFrom || periodTo) return { rows: [], total: 0 }
-      let legacyQuery = client
-        .from('equipment_lists')
-        .select(legacyListColumns, { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
-        .range(from, to)
-      if (namePattern) legacyQuery = legacyQuery.ilike('name', namePattern)
-      const { data, error, count } = await legacyQuery
-      if (error) throw error
-      return {
-        rows: (data ?? []).map((item) => normalizeLegacyList(item)),
-        total: count ?? 0,
-      }
-    }
-
-    // Сортировка created_at desc, id desc: created_at не уникален (импорт кладёт
-    // пачку одной секундой), и без второго ключа строка могла попасть на две
-    // соседние страницы сразу либо не попасть ни на одну.
-    let listsQuery = client
-      .from('equipment_lists')
-      .select(listColumns, { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false })
-      .range(from, to)
-    if (searchExpression) listsQuery = listsQuery.or(searchExpression)
-    // Период меряется по дате НАЧАЛА мероприятия: список без даты (колонка
-    // nullable) в любой период не попадает — сравнение с NULL ложно, и это
-    // честнее, чем показывать «этот месяц» вперемешку с недатированными.
-    if (periodFrom) listsQuery = listsQuery.gte('reservation_start', periodFrom)
-    if (periodTo) listsQuery = listsQuery.lte('reservation_start', periodTo)
-    const { data, error, count } = await listsQuery
+  // Реестр считает RPC, а не embed: поиск идёт по имени списка, имени
+  // мероприятия, заказчику и площадке — полям трёх таблиц, а PostgREST не строит
+  // `or` поперёк родителя и встроенного ресурса. Экранирование шаблона, порядок
+  // (created_at desc, id desc) и счётчик выборки — внутри функции. Период
+  // меряется по дате НАЧАЛА мероприятия: список без мероприятия или без даты в
+  // любой период не попадает.
+  return cachedQuery(equipmentListsCacheKey(normalized), 10 * 60 * 1000, async () => {
+    const { data, error } = await client.rpc('fetch_equipment_lists_page', {
+      p_search: search,
+      p_from: periodFrom || null,
+      p_to: periodTo || null,
+      p_limit: pageSize,
+      p_offset: (page - 1) * pageSize,
+    })
     if (error) throw error
-    return {
-      rows: (data ?? []).map((item) => normalizeList(item)),
-      total: count ?? 0,
-    }
-  }), { bypass: query.bypassCache ?? false })
+    return toListsPage(data)
+  }, { bypass: query.bypassCache ?? false })
 }
 
 function equipmentListCacheKey(listId: string) {
-  return `equipment-lists:detail:${listId}`
+  return `equipment-lists:detail:v2:${listId}`
 }
 
 export function readCachedEquipmentList(listId: string) {
@@ -236,25 +187,15 @@ export function readCachedEquipmentList(listId: string) {
 export async function fetchEquipmentList(listId: string, { bypassCache = false } = {}) {
   if (!supabase) throw new Error('Supabase не настроен')
   const client = supabase
-  return cachedQuery(equipmentListCacheKey(listId), 10 * 60 * 1000, () => withLegacySchemaFallback(async (schema) => {
-    if (schema === 'legacy') {
-      const { data, error } = await client
-        .from('equipment_lists')
-        .select(legacyListColumns)
-        .eq('id', listId)
-        .single()
-      if (error) throw error
-      return normalizeLegacyList(data)
-    }
-
+  return cachedQuery(equipmentListCacheKey(listId), 10 * 60 * 1000, async () => {
     const { data, error } = await client
       .from('equipment_lists')
-      .select(listColumns)
+      .select(listSelect)
       .eq('id', listId)
       .single()
     if (error) throw error
     return normalizeList(data)
-  }), { bypass: bypassCache })
+  }, { bypass: bypassCache })
 }
 
 // Состав сохранённого списка — строки для деталей и для Excel. Ключ кэша
@@ -337,8 +278,8 @@ export function buildSavedListComposition(list: EquipmentList, { bypassCache = f
 }
 
 // Прогрев карточки списка стоит РОВНО один запрос — состав. Деталь списка мы уже
-// держим в руках: строка из equipment-lists:recent собрана тем же селектом, что и
-// одиночная выборка, поэтому кладём её в кэш детали напрямую. История и дефицит
+// держим в руках: строка реестра нормализована в ту же форму, что и одиночная
+// выборка (normalizeList), поэтому кладём её в кэш детали напрямую. История и дефицит
 // грузятся при открытии деталей: reservation_shortages — полная агрегация склада,
 // звать её вслепую на шесть карточек нечем оправдать.
 export function prefetchSavedListDetails(list: EquipmentList) {
@@ -355,12 +296,30 @@ export type ListDraftItem = {
   serialIds: string[]
 }
 
-export type ListDraft = {
+// Мероприятие в форме редактора списка. null на месте всего объекта — список
+// без мероприятия (черновой набор).
+export type ListProjectDraft = {
+  // null — новое мероприятие: его создаст RPC тем же сохранением, что и список.
+  id: string | null
   name: string
   clientName: string
-  venue: string
+  // Даты — строки YYYY-MM-DD, как их отдаёт AppDatePicker; пустая строка — «не
+  // указана». dateTo пусто при заданном dateFrom — один день.
+  dateFrom: string
+  dateTo: string
+  // Место целиком, а не id: подпись площадки нужна полосе реквизитов и шапке
+  // документа, а справочник мест редактор сам не держит.
+  venue: VenueBrief | null
+  // Реквизиты СУЩЕСТВУЮЩЕГО мероприятия правили в этом редакторе. Только тогда
+  // они уезжают в базу: мероприятие общее, и сохранение списка, в котором их не
+  // трогали, не должно затирать чужую правку снимком суточной давности.
+  edited: boolean
+}
+
+export type ListDraft = {
+  name: string
   description: string
-  eventDate: string
+  project: ListProjectDraft | null
   items: ListDraftItem[]
 }
 
@@ -394,51 +353,106 @@ export function clearListDraft(listId?: string) {
 export type EquipmentListDocumentInput = {
   name: string
   description: string
-  clientName: string
-  venue: string
   listMode: 'specific' | 'abstract'
-  reservationStart: string | null
-  reservationEnd: string | null
   equipmentItems: EquipmentListItem[]
+  // Привязка к мероприятию — ровно семантика RPC (миграция 20261007185009):
+  //   оба null             → список без мероприятия;
+  //   project без id       → мероприятие создаётся тем же сохранением;
+  //   id и project         → реквизиты существующего ПЕРЕПИСЫВАЮТСЯ целиком;
+  //   только id            → привязка как есть, мероприятие не трогается.
+  projectId: string | null
+  project: Pick<ListProjectDraft, 'name' | 'clientName' | 'dateFrom' | 'dateTo' | 'venue'> | null
 }
 
-export async function createEquipmentList(input: EquipmentListDocumentInput) {
+export type SavedEquipmentList = { listId: string; projectId: string | null }
+
+// Пять полей мероприятия, как их читает RPC: пишутся все, отсутствующий ключ
+// стал бы NULL. Края не режем — это делает триггер normalize_project_fields, он
+// же превращает пустого заказчика в NULL.
+function projectPayload(project: NonNullable<EquipmentListDocumentInput['project']>): Json {
+  return {
+    name: project.name,
+    client_name: project.clientName,
+    venue_id: project.venue?.id ?? null,
+    date_from: project.dateFrom || null,
+    date_to: project.dateTo || null,
+  }
+}
+
+function toSavedList(value: Json): SavedEquipmentList {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('save_project_equipment_list: ответ не объект')
+  const { list_id: listId, project_id: projectId } = value
+  if (typeof listId !== 'string') throw new Error('save_project_equipment_list: нет list_id')
+  return { listId, projectId: typeof projectId === 'string' ? projectId : null }
+}
+
+// Сброс после записи списка. Мероприятие создано или его реквизиты переписаны —
+// уезжает всё, что их показывает (реестр мероприятий и кэш списков одним
+// вызовом). Иначе менялась только привязка: кэш списков и счётчики мероприятий.
+function invalidateAfterSave(input: EquipmentListDocumentInput) {
+  if (input.project) {
+    invalidateProjectsCache()
+    return
+  }
+  invalidateCachePrefix('equipment-lists:')
+  invalidateProjectCounters()
+}
+
+export async function createEquipmentList(input: EquipmentListDocumentInput): Promise<SavedEquipmentList> {
   if (!supabase) throw new Error('Supabase не настроен')
 
-  const { data, error } = await supabase.rpc('create_equipment_list_document', {
+  const { data, error } = await supabase.rpc('create_project_equipment_list', {
+    p_project_id: input.projectId,
+    p_project: input.project ? projectPayload(input.project) : null,
     p_name: input.name.trim(),
     p_description: input.description.trim(),
-    p_client_name: input.clientName.trim(),
-    p_venue: input.venue.trim(),
     p_list_mode: input.listMode,
-    p_reservation_start: input.reservationStart,
-    p_reservation_end: input.reservationEnd,
     p_items: input.equipmentItems,
   })
 
   if (error) throw error
-  invalidateCachePrefix('equipment-lists:')
-  return data as string
+  invalidateAfterSave(input)
+  return toSavedList(data)
 }
 
-export async function updateEquipmentList(listId: string, input: EquipmentListDocumentInput) {
+export async function updateEquipmentList(listId: string, input: EquipmentListDocumentInput): Promise<SavedEquipmentList> {
   if (!supabase) throw new Error('Supabase не настроен')
 
-  const { data, error } = await supabase.rpc('update_equipment_list_document', {
+  const { data, error } = await supabase.rpc('update_project_equipment_list', {
     p_list_id: listId,
+    p_project_id: input.projectId,
+    p_project: input.project ? projectPayload(input.project) : null,
     p_name: input.name.trim(),
     p_description: input.description.trim(),
-    p_client_name: input.clientName.trim(),
-    p_venue: input.venue.trim(),
     p_list_mode: input.listMode,
-    p_reservation_start: input.reservationStart,
-    p_reservation_end: input.reservationEnd,
     p_items: input.equipmentItems,
   })
 
   if (error) throw error
-  invalidateCachePrefix('equipment-lists:')
-  return data as string
+  invalidateAfterSave(input)
+  return toSavedList(data)
+}
+
+// Отказ сохранения словами. Свои, списочные, причины остаются одной общей фразой,
+// как и раньше; отказы МЕРОПРИЯТИЯ разбираются именем ограничения — у них есть
+// что исправить в полях. Признак «это про мероприятие» — имя таблицы projects в
+// сообщении базы: под теми же кодами приходят и нарушения самого списка.
+export function listSaveErrorText(error: unknown, tr: (ru: string, uz: string) => string): string {
+  const candidate = (typeof error === 'object' && error !== null ? error : {}) as { code?: unknown; message?: unknown }
+  const code = typeof candidate.code === 'string' ? candidate.code : ''
+  const message = typeof candidate.message === 'string' ? candidate.message : ''
+
+  // Выбранное мероприятие удалили, пока редактор был открыт: внешний ключ списка
+  // (вставка или правка) либо явный отказ RPC при правке реквизитов. Тот же ключ
+  // projectErrorText читает как «нельзя удалить мероприятие со списками» —
+  // поэтому разбираем его раньше.
+  if ((code === '23503' && message.includes('equipment_lists_project_id_fkey')) || message.includes('Project not found')) {
+    return tr('Выбранного мероприятия больше нет или его нельзя править. Выберите другое или сохраните список без мероприятия.', 'Tanlangan tadbir endi yo‘q yoki uni tahrirlab bo‘lmaydi. Boshqasini tanlang yoki ro‘yxatni tadbirsiz saqlang.')
+  }
+  if (['23505', '23514', '23503', '42501'].includes(code) && message.includes('projects')) {
+    return projectErrorText(error, tr)
+  }
+  return tr('Не удалось сохранить список. Файл всё ещё можно скачать.', 'Ro‘yxatni saqlab bo‘lmadi. Faylni baribir yuklab olish mumkin.')
 }
 
 // Отказ RLS на удалении: политика не возвращает ошибку — строка просто не попадает
@@ -459,5 +473,7 @@ export async function deleteEquipmentList(listId: string) {
   if (error) throw error
   if (!data) throw new Error(LIST_DELETE_FORBIDDEN)
   invalidateCachePrefix('equipment-lists:')
+  // Список мог стоять на мероприятии — его счётчик списков стал меньше.
+  invalidateProjectCounters()
   return data.id as string
 }

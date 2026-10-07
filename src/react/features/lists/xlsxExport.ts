@@ -18,6 +18,9 @@ export type ExportListInput = {
   venue: string
   description: string
   eventDate: string | null
+  // Окончание периода мероприятия. Пусто или равно началу — один день, и строка
+  // даты в документе та же, что была до периодов.
+  eventDateTo?: string | null
   rows: ExportListRow[]
   locale: 'ru-RU' | 'uz-UZ'
   language: 'ru' | 'uz'
@@ -37,9 +40,13 @@ type SheetTexts = ReturnType<typeof sheetTexts>
 type MetadataRow = [label: string, value: string, key: 'project' | 'client' | 'venue' | 'date' | 'description' | 'generated']
 
 function formatEventDate(input: ExportListInput) {
-  return input.eventDate
-    ? new Intl.DateTimeFormat(input.locale).format(new Date(`${input.eventDate}T12:00:00`))
-    : '—'
+  if (!input.eventDate) return '—'
+  const format = (value: string) => new Intl.DateTimeFormat(input.locale).format(new Date(`${value}T12:00:00`))
+  // Многодневное мероприятие — «12.10.2026 — 14.10.2026»; та же строка идёт в
+  // правый нижний колонтитул.
+  return input.eventDateTo && input.eventDateTo !== input.eventDate
+    ? `${format(input.eventDate)} — ${format(input.eventDateTo)}`
+    : format(input.eventDate)
 }
 
 // Пустые реквизиты в документ не выводятся вовсе. Раньше на их месте стояли

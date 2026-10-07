@@ -1,29 +1,71 @@
 import { formatTime, parseDateValue } from '../../lib/date'
 import type { Equipment } from '../equipment/types'
-import type { EquipmentList, EquipmentListItem } from './api'
+import type { ProjectBrief } from '../projects/types'
+import type { EquipmentList, EquipmentListItem, ListProjectDraft } from './api'
 import { groupKey, type CatalogGroup } from './catalogGroups'
 import { selectionLabel, type SelectedGroup, type SelectionLabel } from './listSelection'
 import type { ExportListRow } from './xlsxExport'
 
+// Мероприятие из базы → форма редактора. Одна функция на все входы (строка
+// списка, пикер, ссылка ?project=): разъедься они, одно и то же мероприятие
+// давало бы разные снимки, и «есть несохранённые правки» загоралось бы само.
+export function projectDraftFrom(project: ProjectBrief): ListProjectDraft {
+  return {
+    id: project.id,
+    name: project.name,
+    clientName: project.client_name ?? '',
+    dateFrom: project.date_from ?? '',
+    dateTo: project.date_to ?? '',
+    venue: project.venue,
+    edited: false,
+  }
+}
+
 // Снимок документа одной строкой — по нему считается «есть несохранённые
 // правки». Серийники сортируются, порядок ключей фиксирован: иначе одна и та же
 // правка давала бы разные строки, и предупреждение загоралось бы на ровном месте.
+// У мероприятия в снимок идут только id и реквизиты: флаг edited и подпись места
+// — служебные, документ от них не меняется.
 export function serializeDocument(input: {
   name: string
-  clientName: string
-  venue: string
   description: string
-  eventDate: string
+  project: ListProjectDraft | null
   items: { key: string; count: number; serialIds: string[] }[]
 }) {
   return JSON.stringify({
     name: input.name.trim(),
-    clientName: input.clientName.trim(),
-    venue: input.venue.trim(),
     description: input.description.trim(),
-    eventDate: input.eventDate,
+    project: input.project && {
+      id: input.project.id,
+      name: input.project.name.trim(),
+      clientName: input.project.clientName.trim(),
+      dateFrom: input.project.dateFrom,
+      dateTo: input.project.dateTo,
+      venueId: input.project.venue?.id ?? null,
+    },
     items: input.items.map(({ key, count, serialIds }) => ({ key, count, serialIds: [...serialIds].sort() })),
   })
+}
+
+// Шапка документа (Excel) из мероприятия. Одна на редактор и на реестр — раньше
+// каждый собирал её сам из колонок списка.
+//   name      — название мероприятия; подпись списка добавляется через « · »,
+//               только когда отличается от него («Форум · Свет»): у мероприятия
+//               бывает несколько списков, и их файлы должны различаться. У списка
+//               без мероприятия — его собственное название.
+//   venue     — название места без города: ровно то, что раньше набирали руками.
+//   eventDate — начало периода, eventDateTo — окончание (null — один день).
+export function documentHeader({ listName, project }: { listName: string; project: ListProjectDraft | null }) {
+  const label = listName.trim()
+  const projectName = project?.name.trim() ?? ''
+  const sameName = label.toLocaleLowerCase('ru') === projectName.toLocaleLowerCase('ru')
+  return {
+    name: projectName ? (label && !sameName ? `${projectName} · ${label}` : projectName) : label,
+    clientName: project?.clientName.trim() ?? '',
+    venue: project?.venue?.name ?? '',
+    eventDate: project?.dateFrom || null,
+    eventDateTo: project?.dateTo || null,
+  }
 }
 
 export type ResolvedSelection = { item: SelectedGroup; group: CatalogGroup | null; label: SelectionLabel }[]
@@ -97,18 +139,22 @@ export function buildExportRows(resolved: ResolvedSelection): ExportListRow[] {
   }))
 }
 
-// Имя собирается в момент действия и только если поле пустое: дата мероприятия
-// отвечает на «что искать в реестре», время — на «который из сегодняшних».
+// Имя списка собирается в момент действия и только если поле пустое. Есть
+// мероприятие — список зовётся как оно: это и есть его подпись по умолчанию.
+// Нет — дата отвечает на «что искать в реестре», время — на «который из
+// сегодняшних»; своей даты у списка без мероприятия нет, поэтому сегодняшняя.
 // Само поле не трогаем — пустое поле законно, и подставлять в него нечего.
-export function resolveListName({ name, eventDate, locale, tr }: {
+export function resolveListName({ name, project, locale, tr }: {
   name: string
-  eventDate: string
+  project: ListProjectDraft | null
   locale: string
   tr: (ru: string, uz: string) => string
 }) {
   const trimmed = name.trim()
   if (trimmed) return trimmed
-  const date = new Intl.DateTimeFormat(locale).format(parseDateValue(eventDate) ?? new Date())
+  const projectName = project?.name.trim()
+  if (projectName) return projectName
+  const date = new Intl.DateTimeFormat(locale).format(parseDateValue(project?.dateFrom ?? '') ?? new Date())
   const time = formatTime(Date.now(), locale)
   return tr(`Список ${date} · ${time}`, `Ro‘yxat ${date} · ${time}`)
 }

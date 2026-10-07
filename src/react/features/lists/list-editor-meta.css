@@ -1,0 +1,11 @@
+/* Панель реквизитов редактора списка: поле «Мероприятие» и его реквизиты (с54,
+   ListEditorMeta.tsx). Сетка панели и полоса — в styles/05-editor.css и
+   06-responsive-editor.css; файл едет ленивым чанком ПОСЛЕ них, поэтому здесь
+   только собственные селекторы — чужое правило, переопределённое отсюда,
+   перебило бы медиазапросы глобальных файлов (тот же довод, что в
+   export-choice.css). */
+
+/* На всю ширину сетки при любом числе колонок: -1 — последняя явная линия. */
+.quick-list-meta__full { grid-column: 1 / -1; }
+.quick-list-meta__shared-note { margin: 0; padding: 10px 12px; border-radius: var(--r-sm); color: var(--muted); background: var(--sunk); font-size: 13px; line-height: 1.45; }
+.quick-list-meta__retry { padding: 0; border: 0; color: inherit; background: none; font: inherit; text-decoration: underline; }

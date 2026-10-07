@@ -41,10 +41,12 @@ import {
   readListDraft,
   readListDraftMeta,
   type EquipmentList,
+  type ListProjectDraft,
   type SavedListComposition,
 } from './api'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import { documentHeader, projectDraftFrom } from './listDocument'
 import { downloadEquipmentListXlsx } from './xlsxExport'
 
 type Tr = (ru: string, uz: string) => string
@@ -107,6 +109,24 @@ function formatCardDate(start: string | null, end: string | null, locale: string
   if (start !== end) return formatEventRange(start, end, locale, tr)
   const parsed = parseDateValue(start)
   return parsed ? formatEventDate(parsed, locale) : formatDate(start, locale, tr)
+}
+
+// Период мероприятия парой дат для двух форматтеров выше. Открытый конец — один
+// день: у мероприятия date_to пуст, а форматтеры сравнивают начало с концом.
+function periodOf(project: Pick<ListProjectDraft, 'dateFrom' | 'dateTo'> | null): [string | null, string | null] {
+  const start = project?.dateFrom || null
+  return [start, project?.dateTo || start]
+}
+
+// Вторая строка карточки: чем человек узнаёт работу. Название мероприятия стоит
+// первым, только когда список назван иначе («Свет» на «Форуме»), — иначе оно
+// повторяло бы заголовок карточки. Пустая строка — мероприятие есть, но сказать
+// о нём нечего: чем её заменить, решает место показа.
+function projectSummary(listName: string, project: ListProjectDraft | null, tr: Tr) {
+  if (!project) return tr('Без мероприятия', 'Tadbirsiz')
+  const projectName = project.name.trim()
+  const differs = projectName.toLocaleLowerCase('ru') !== listName.trim().toLocaleLowerCase('ru')
+  return [differs ? projectName : '', project.clientName.trim(), project.venue?.name].filter(Boolean).join(' · ')
 }
 
 export function ListsPage() {
@@ -265,11 +285,8 @@ export function ListsPage() {
     try {
       const composition = await buildSavedListComposition(list)
       downloadEquipmentListXlsx({
-        name: list.name,
-        clientName: list.client_name ?? '',
-        venue: list.venue ?? '',
+        ...documentHeader({ listName: list.name, project: list.project ? projectDraftFrom(list.project) : null }),
         description: list.description ?? '',
-        eventDate: list.reservation_start,
         locale,
         language,
         documentMode,
@@ -334,8 +351,8 @@ export function ListsPage() {
               <article className="list-card list-card--draft">
                 <div className="list-card__top">
                   <div className="list-card__identity">
-                    <p className="list-card__date">{formatCardDate(draft.value.eventDate, draft.value.eventDate, locale, tr)}</p>
-                    <p className="list-card__client">{[draft.value.clientName, draft.value.venue].filter(Boolean).join(' · ') || tr('Заказчик не указан', 'Buyurtmachi ko‘rsatilmagan')}</p>
+                    <p className="list-card__date">{formatCardDate(...periodOf(draft.value.project), locale, tr)}</p>
+                    <p className="list-card__client">{projectSummary(draft.value.name, draft.value.project, tr) || tr('Заказчик не указан', 'Buyurtmachi ko‘rsatilmagan')}</p>
                   </div>
                   {/* Бейдж, а не подпись мелким шрифтом: карточка во всём остальном
                       неотличима от сохранённых, и «этого нет в системе» человек
@@ -343,7 +360,7 @@ export function ListsPage() {
                   <span className="list-card__draft-badge">{tr('Не сохранён', 'Saqlanmagan')}</span>
                 </div>
                 <div>
-                  <h3>{draft.value.name.trim() || tr('Новый список', 'Yangi ro‘yxat')}</h3>
+                  <h3>{draft.value.name.trim() || draft.value.project?.name.trim() || tr('Новый список', 'Yangi ro‘yxat')}</h3>
                   {draft.value.description && <p className="list-card__description">{draft.value.description}</p>}
                 </div>
                 <div className="list-card__meta">
@@ -367,6 +384,7 @@ export function ListsPage() {
                   // created_at в схеме nullable; поведение прежнее: пустое значение даёт эпоху
                   const createdAt = new Intl.DateTimeFormat(locale).format(new Date(list.created_at ?? 0))
                   const isEmpty = listSize(list) === 0
+                  const project = list.project ? projectDraftFrom(list.project) : null
                   return (
                     <article
                       className="list-card"
@@ -378,8 +396,8 @@ export function ListsPage() {
                         <div className="list-card__identity">
                           {/* Дата мероприятия и заказчик — то, чем человек помнит работу.
                               Название у всех дефолтное, поэтому оно ниже и мельче. */}
-                          <p className="list-card__date">{formatCardDate(list.reservation_start, list.reservation_end, locale, tr)}</p>
-                          <p className="list-card__client">{[list.client_name, list.venue].filter(Boolean).join(' · ') || tr('Заказчик не указан', 'Buyurtmachi ko‘rsatilmagan')}</p>
+                          <p className="list-card__date">{formatCardDate(...periodOf(project), locale, tr)}</p>
+                          <p className="list-card__client">{projectSummary(list.name, project, tr) || tr('Заказчик не указан', 'Buyurtmachi ko‘rsatilmagan')}</p>
                         </div>
                       </div>
                       <div>
@@ -468,7 +486,8 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState<DrawerErrorCode>('')
-  const contacts = [list.client_name, list.venue].filter(Boolean).join(' · ')
+  const project = list.project ? projectDraftFrom(list.project) : null
+  const contacts = projectSummary(list.name, project, tr)
 
   async function loadDetails() {
     const cached = readCachedSavedListComposition(list.id)
@@ -511,10 +530,11 @@ function ReservationDrawer({ list, onClose, onChanged }: { list: EquipmentList; 
           <div className="reservation-summary">
             <CalendarRange size={19} />
             <div>
-              <strong>{formatEventRange(list.reservation_start, list.reservation_end, locale, tr)}</strong>
+              <strong>{formatEventRange(...periodOf(project), locale, tr)}</strong>
               <span>{list.list_mode === 'specific' ? tr('С серийными номерами', 'Seriya raqamlari bilan') : tr('Только модели', 'Faqat modellar')} · {listSize(list)} {tr('единиц', 'birlik')}</span>
-              {/* Реквизиты показываем только заполненные: у старых списков их нет, и пустая
-                  строка-заглушка сообщала бы о них больше, чем их отсутствие */}
+              {/* Реквизиты — мероприятия, и показываем только заполненные: пустая
+                  строка-заглушка сообщала бы о них больше, чем их отсутствие.
+                  У списка без мероприятия строка говорит об этом прямо. */}
               {contacts && <span className="reservation-summary__meta">{contacts}</span>}
               {list.description && <span className="reservation-summary__meta">{list.description}</span>}
             </div>

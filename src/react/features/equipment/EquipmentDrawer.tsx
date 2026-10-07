@@ -509,7 +509,7 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
                               ? tr('Уже в этом списке', 'Bu ro‘yxatda allaqachon bor')
                               : appendBusyId === target.id
                                 ? tr('Добавляем…', 'Qo‘shilmoqda…')
-                                : eventDateLabel(target.reservation_start, locale) ?? tr('Дата не указана', 'Sana ko‘rsatilmagan')}</small>
+                                : eventDateLabel(target.date_from, locale) ?? tr('Дата не указана', 'Sana ko‘rsatilmagan')}</small>
                           </span>
                         </button>
                       </li>
@@ -535,7 +535,7 @@ export function EquipmentDrawer({ item, onClose, onRefreshed, onUpdated, instant
                     <span>
                       {/* «× 3» — со второй штуки: одна подразумевается самим фактом строки. */}
                       <strong>{list.name}{list.count !== null && list.count > 1 ? ` × ${list.count}` : ''}</strong>
-                      <small>{eventDateLabel(list.reservation_start, locale) ?? tr('Дата не указана', 'Sana ko‘rsatilmagan')}</small>
+                      <small>{eventDateLabel(list.date_from, locale) ?? tr('Дата не указана', 'Sana ko‘rsatilmagan')}</small>
                     </span>
                   </Link>
                 </li>

@@ -30,14 +30,16 @@ function splitPlate(plate: string) {
   return match ? { region: match[1], rest: match[2] } : null
 }
 
-// Дата мероприятия списка числами. Полдень в разборе — чтобы Ташкент (UTC+5) не
+// Дата начала мероприятия списка числами. Полдень в разборе — чтобы Ташкент (UTC+5) не
 // увёл календарный день на сутки назад.
 function formatListDate(value: string | null, locale: string) {
   return value ? new Intl.DateTimeFormat(locale).format(new Date(`${value}T12:00:00`)) : null
 }
 
 function listSubtitle(list: EquipmentList, tr: Tr) {
-  return [list.client_name, list.venue].filter(Boolean).join(' · ') || tr('Заказчик не указан', 'Buyurtmachi ko‘rsatilmagan')
+  // Реквизиты — у мероприятия списка; у списка без него их нет вовсе.
+  if (!list.project) return tr('Без мероприятия', 'Tadbirsiz')
+  return [list.project.client_name, list.project.venue?.name].filter(Boolean).join(' · ') || tr('Заказчик не указан', 'Buyurtmachi ko‘rsatilmagan')
 }
 
 // Сколько сроков истекло и сколько истекает скоро. Порог — только expiryState:
@@ -210,7 +212,7 @@ export function HomePage() {
             {recent.slice(0, RECENT_LISTS).map((list) => (
               <Link key={list.id} to={`/lists/${list.id}/edit`}>
                 <span className="recent__name"><b>{list.name}</b><small>{listSubtitle(list, tr)}</small></span>
-                <small className="recent__date">{formatListDate(list.reservation_start, locale) ?? tr('без даты', 'sanasiz')}</small>
+                <small className="recent__date">{formatListDate(list.project?.date_from ?? null, locale) ?? tr('без даты', 'sanasiz')}</small>
                 <span className="count count--soft" title={tr('Позиций в списке', 'Ro‘yxatdagi birliklar')}>{number(listSize(list))}</span>
               </Link>
             ))}
@@ -352,7 +354,7 @@ export function HomePage() {
           {recent.slice(0, PHONE_RECENT_LISTS).map((list) => (
             <Link className="p-row" key={list.id} to={`/lists/${list.id}/edit`}>
               <span className="thumb"><ClipboardList size={18} /></span>
-              <span className="p-row__body"><b>{list.name}</b><small>{[formatListDate(list.reservation_start, locale), list.venue ?? list.client_name].filter(Boolean).join(' · ') || tr('Заказчик не указан', 'Buyurtmachi ko‘rsatilmagan')}</small></span>
+              <span className="p-row__body"><b>{list.name}</b><small>{[formatListDate(list.project?.date_from ?? null, locale), list.project?.venue?.name ?? list.project?.client_name].filter(Boolean).join(' · ') || listSubtitle(list, tr)}</small></span>
               <span className="count count--soft">{number(listSize(list))}</span>
             </Link>
           ))}

@@ -17,7 +17,8 @@ export type AppendResult = { status: 'added' | 'already'; count: number | null }
 
 // Ключ под префиксом equipment-lists:, как у unitUsage: список целей зависит от
 // состава списков и сбрасывается их создание/правкой/удалением автоматически.
-const APPEND_TARGETS_CACHE_KEY = 'equipment-lists:append-targets'
+// v2 — форма значения сменилась вместе с UnitListUsage (дата из мероприятия).
+const APPEND_TARGETS_CACHE_KEY = 'equipment-lists:append-targets:v2'
 
 // Свежие списки первыми: кнопкой пользуются, когда собирают текущее
 // мероприятие, а не архивный документ полугодовой давности.
@@ -33,12 +34,12 @@ export async function fetchAppendTargets(): Promise<AppendTarget[]> {
   return cachedQuery(APPEND_TARGETS_CACHE_KEY, 10 * 60 * 1000, async () => {
     const { data, error } = await client
       .from('equipment_lists')
-      .select('id,name,reservation_start')
+      .select('id,name,project:projects(date_from)')
       .eq('is_archived', false)
       .order('created_at', { ascending: false })
       .limit(TARGETS_LIMIT)
     if (error) throw error
-    return (data ?? []).map((row) => ({ id: row.id, name: row.name, reservation_start: row.reservation_start }))
+    return (data ?? []).map((row) => ({ id: row.id, name: row.name, date_from: row.project?.date_from ?? null }))
   })
 }
 

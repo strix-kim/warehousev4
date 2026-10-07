@@ -11,26 +11,30 @@ import { cachedQuery, readCachedQuery } from '../../lib/persistentCache'
 // строку списка сюда тянуть нельзя — потребовался бы тип из lists/api.
 // count — сколько штук этой единицы стоит в списке; null у серийной позиции,
 // там всегда одна и число было бы шумом.
+// date_from — дата начала МЕРОПРИЯТИЯ списка (projects.date_from); null и у
+// списка без мероприятия, и у мероприятия без даты.
 export type UnitListUsage = {
   id: string
   name: string
-  reservation_start: string | null
+  date_from: string | null
   count: number | null
 }
 
 // Ключ живёт под префиксом equipment-lists:, а не equipment: — значение зависит
 // от состава списков, а не от строки склада. Создание, правка и удаление списка
-// уже сбрасывают этот префикс целиком, поэтому своей инвалидации не нужно.
-const unitUsageCacheKey = (equipmentId: string) => `equipment-lists:unit:${equipmentId}`
+// уже сбрасывают этот префикс целиком, поэтому своей инвалидации не нужно; его же
+// сбрасывает правка мероприятия (projects/cacheKeys) — отсюда читается его дата.
+// v2 — форма значения сменилась (reservation_start → date_from).
+const unitUsageCacheKey = (equipmentId: string) => `equipment-lists:unit:v2:${equipmentId}`
 
 function sortByEventDate(rows: UnitListUsage[]) {
   // Ближайшее мероприятие первым; недатированные — в конец, они ничего не говорят
   // о том, когда единица понадобится.
   return rows.sort((a, b) => {
-    if (a.reservation_start === b.reservation_start) return a.name.localeCompare(b.name)
-    if (!a.reservation_start) return 1
-    if (!b.reservation_start) return -1
-    return a.reservation_start.localeCompare(b.reservation_start)
+    if (a.date_from === b.date_from) return a.name.localeCompare(b.name)
+    if (!a.date_from) return 1
+    if (!b.date_from) return -1
+    return a.date_from.localeCompare(b.date_from)
   })
 }
 
@@ -60,7 +64,9 @@ export async function fetchUnitLists(equipmentId: string): Promise<UnitListUsage
   if (!equipmentId) return []
 
   return cachedQuery(unitUsageCacheKey(equipmentId), 10 * 60 * 1000, async () => {
-    const columns = 'id,name,reservation_start'
+    // Дата — у мероприятия: своей у списка нет. Embed по единственному внешнему
+    // ключу equipment_lists.project_id; у списка без мероприятия project === null.
+    const columns = 'id,name,project:projects(date_from)'
     const [serialized, quantity] = await Promise.all([
       client.from('equipment_lists').select(columns).contains('equipment_ids', [equipmentId]),
       // JSON.stringify обязателен, и это не украшение. postgrest-js смотрит на тип
@@ -79,13 +85,13 @@ export async function fetchUnitLists(equipmentId: string): Promise<UnitListUsage
     // ветка идёт второй и перекрывает запись серийной своим count.
     const byId = new Map<string, UnitListUsage>()
     for (const row of serialized.data ?? []) {
-      byId.set(row.id, { id: row.id, name: row.name, reservation_start: row.reservation_start, count: null })
+      byId.set(row.id, { id: row.id, name: row.name, date_from: row.project?.date_from ?? null, count: null })
     }
     for (const row of quantity.data ?? []) {
       const items = (row.equipment_items ?? []) as { equipment_id?: string | null; count?: number }[]
       const item = items.find((entry) => entry.equipment_id === equipmentId)
       const count = typeof item?.count === 'number' && item.count > 0 ? item.count : null
-      byId.set(row.id, { id: row.id, name: row.name, reservation_start: row.reservation_start, count })
+      byId.set(row.id, { id: row.id, name: row.name, date_from: row.project?.date_from ?? null, count })
     }
     return sortByEventDate([...byId.values()])
   })

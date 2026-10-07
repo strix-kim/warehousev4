@@ -1,16 +1,19 @@
 import { Save } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ErrorState } from '../../components/ErrorState'
-import { todayDateValue } from '../../lib/date'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import { fetchProject } from '../projects/api'
 import {
   clearListDraft,
   createEquipmentList,
+  listSaveErrorText,
   readListDraft,
   updateEquipmentList,
+  type EquipmentList,
+  type ListProjectDraft,
 } from './api'
 import { buildCatalogGroups, type CatalogGroup } from './catalogGroups'
 import { CatalogPanel, CatalogPreviewDrawer } from './ListEditorCatalog'
@@ -20,7 +23,7 @@ import { ListEditorHeader, type EditorStatusDot } from './ListEditorHeader'
 import { KitPanel } from './ListEditorKit'
 import { ListExportSheet } from './ListExportSheet'
 import { ListStickyBar } from './ListStickyBar'
-import { ListEditorMeta, type ListMetaField, type RequisiteField } from './ListEditorMeta'
+import { ListEditorMeta, type ListMetaField, type ListProjectFields, type RequisiteField } from './ListEditorMeta'
 import { useEditorChrome } from './useEditorChrome'
 import { useEditorCatalog } from './useEditorCatalog'
 import { useMobilePanels } from './useMobilePanels'
@@ -33,7 +36,7 @@ import {
   toggleSerialPickerIn,
   type SelectedGroup,
 } from './listSelection'
-import { buildExportRows, buildListItems, resolveListName, resolveSelection, selectionFromList, serializeDocument } from './listDocument'
+import { buildExportRows, buildListItems, documentHeader, projectDraftFrom, resolveListName, resolveSelection, selectionFromList, serializeDocument } from './listDocument'
 import { useCountUp } from '../../lib/useCountUp'
 import { useListDraftAutosave } from './useListDraftAutosave'
 import { useListDraftRestore } from './useListDraftRestore'
@@ -44,9 +47,19 @@ import { downloadEquipmentListXlsx } from './xlsxExport'
 // 06-responsive-editor.css и export-choice.css; правится руками синхронно.
 const EDITOR_PHONE_MEDIA_QUERY = '(max-width: 700px)'
 
+// Мероприятие сохранённого списка в форме редактора; null — список без него.
+function projectOfList(list: EquipmentList): ListProjectDraft | null {
+  return list.project ? projectDraftFrom(list.project) : null
+}
+
 export function ListEditorPage() {
   const navigate = useNavigate()
   const { listId } = useParams<{ listId: string }>()
+  // /lists/new?project=ID — новый список сразу на мероприятии (кнопка «Новый
+  // список» на странице мероприятия). Адрес только читаем: после сохранения
+  // редактор уходит на /lists/:id/edit заменой записи, и параметр уходит с ней.
+  const [searchParams] = useSearchParams()
+  const linkedProjectId = listId ? null : searchParams.get('project')
   const { tr, language, locale } = useLanguage()
   // Реквизиты стартуют пустыми: подставленный текст пользователь принимал за свой
   // и увозил в документ и в базу.
@@ -58,10 +71,12 @@ export function ListEditorPage() {
   // бы поднять хук выше каталога, куда он не встанет.
   const restoredDraft = useState(() => listId ? null : readListDraft())[0]
   const [name, setName] = useState<string>(() => restoredDraft?.name ?? '')
-  const [clientName, setClientName] = useState<string>(() => restoredDraft?.clientName ?? '')
-  const [venue, setVenue] = useState<string>(() => restoredDraft?.venue ?? '')
   const [description, setDescription] = useState(() => restoredDraft?.description ?? '')
-  const [eventDate, setEventDate] = useState(() => restoredDraft?.eventDate ?? todayDateValue())
+  // Мероприятие списка вместе с реквизитами; null — список без мероприятия.
+  const [project, setProject] = useState<ListProjectDraft | null>(() => restoredDraft?.project ?? null)
+  // Мероприятие из ссылки, как оно пришло из базы: к нему возвращает «Начать
+  // заново». null — ссылки не было, оно ещё в пути или не нашлось.
+  const [linkedProject, setLinkedProject] = useState<ListProjectDraft | null>(null)
   const [selected, setSelected] = useState<SelectedGroup[]>([])
   const [isSaving, setIsSaving] = useState(false)
   // Режим экспорта, а не флаг: «Готовим…» должна гореть на нажатой кнопке, а не на обеих.
@@ -119,12 +134,38 @@ export function ListEditorPage() {
   useEffect(() => {
     if (!listToEdit || hydratedMetaRef.current === listToEdit.id) return
     setName(listToEdit.name)
-    setClientName(listToEdit.client_name ?? '')
-    setVenue(listToEdit.venue ?? '')
     setDescription(listToEdit.description ?? '')
-    setEventDate(listToEdit.reservation_start ?? todayDateValue())
+    setProject(projectOfList(listToEdit))
     hydratedMetaRef.current = listToEdit.id
   }, [listToEdit])
+
+  // Мероприятие из ссылки читается прямо по id, мимо реестра: ссылка обязана
+  // работать и без загруженного списка мероприятий. Оно важнее восстановленного
+  // черновика — человек только что нажал «Новый список» на странице мероприятия;
+  // состав из черновика при этом остаётся, о нём скажет плашка.
+  useEffect(() => {
+    if (!linkedProjectId) return
+    let isCurrent = true
+    fetchProject(linkedProjectId)
+      .then((found) => {
+        if (!isCurrent) return
+        if (!found) {
+          setSaveError(tr('Мероприятие из ссылки не найдено — список откроется без него.', 'Havoladagi tadbir topilmadi — ro‘yxat usiz ochiladi.'))
+          return
+        }
+        const linked = projectDraftFrom(found)
+        setLinkedProject(linked)
+        setProject(linked)
+      })
+      .catch((error: unknown) => {
+        if (!isCurrent) return
+        reportAppError(error, { scope: 'loader', route: '/lists/new', detail: { source: 'linked-project' } })
+        setSaveError(tr('Не удалось открыть мероприятие из ссылки — выберите его в реквизитах.', 'Havoladagi tadbirni ochib bo‘lmadi — uni rekvizitlarda tanlang.'))
+      })
+    return () => { isCurrent = false }
+    // tr в зависимости не идёт намеренно: смена языка не повод перечитывать
+    // мероприятие и затирать уже начатую правку реквизитов.
+  }, [linkedProjectId])
 
   const groups = useMemo(() => buildCatalogGroups(equipment), [equipment])
 
@@ -141,10 +182,8 @@ export function ListEditorPage() {
     // пользователь начал печатать, пока ехал каталог.
     savedSnapshotRef.current = serializeDocument({
       name: listToEdit.name,
-      clientName: listToEdit.client_name ?? '',
-      venue: listToEdit.venue ?? '',
       description: listToEdit.description ?? '',
-      eventDate: listToEdit.reservation_start ?? todayDateValue(),
+      project: projectOfList(listToEdit),
       items: restoredItems,
     })
     hydratedSelectionRef.current = listToEdit.id
@@ -152,13 +191,11 @@ export function ListEditorPage() {
   }, [equipment, groups, groupsByKey, listToEdit])
 
   // Шапка документа из черновика открытого списка. Отдельным колбэком, чтобы не
-  // тащить в хук шесть сеттеров формы.
+  // тащить в хук сеттеры формы.
   const applyDocument = useCallback((draft: ListDraft) => {
     setName(draft.name)
-    setClientName(draft.clientName)
-    setVenue(draft.venue)
     setDescription(draft.description)
-    setEventDate(draft.eventDate)
+    setProject(draft.project)
   }, [])
 
   const { draftNotice, setDraftNotice, draftRestoredRef } = useListDraftRestore({
@@ -174,9 +211,9 @@ export function ListEditorPage() {
   // Расхождение с последним сохранённым состоянием. Считается ДО автосейва: он
   // же по нему и решает, писать черновик открытого списка или стирать.
   const isDirty = savedSnapshotRef.current !== ''
-    && savedSnapshotRef.current !== serializeDocument({ name, clientName, venue, description, eventDate, items: draftItems })
+    && savedSnapshotRef.current !== serializeDocument({ name, description, project, items: draftItems })
 
-  useListDraftAutosave({ listId, restoredRef: draftRestoredRef, isDirty, name, clientName, venue, description, eventDate, items: draftItems })
+  useListDraftAutosave({ listId, restoredRef: draftRestoredRef, isDirty, name, description, project, items: draftItems })
 
   // Закрытие вкладки всё равно спрашивает подтверждение: черновик переживает
   // уход, но человек об этом не знает, а «правки пропали» дороже лишнего диалога.
@@ -215,10 +252,8 @@ export function ListEditorPage() {
 
     if (listId && listToEdit) {
       setName(listToEdit.name)
-      setClientName(listToEdit.client_name ?? '')
-      setVenue(listToEdit.venue ?? '')
       setDescription(listToEdit.description ?? '')
-      setEventDate(listToEdit.reservation_start ?? todayDateValue())
+      setProject(projectOfList(listToEdit))
       hydratedSelectionRef.current = ''
       setHydratedListId(null)
       return
@@ -226,10 +261,10 @@ export function ListEditorPage() {
 
     setSelected([])
     setName('')
-    setClientName('')
-    setVenue('')
     setDescription('')
-    setEventDate(todayDateValue())
+    // Новый список, открытый со страницы мероприятия, остаётся на нём: «заново»
+    // отбрасывает набранное, а не то, откуда человек пришёл.
+    setProject(linkedProject)
   }
 
   function clearRequisiteError(field: RequisiteField) {
@@ -241,16 +276,27 @@ export function ListEditorPage() {
     })
   }
 
-  // Правка реквизита снимает с поля подсветку «обязательно для согласования»:
-  // пользователь уже отвечает на подсказку, держать её дальше незачем.
   function changeMeta(field: ListMetaField, value: string) {
-    switch (field) {
-      case 'name': setName(value); clearRequisiteError(field); break
-      case 'clientName': setClientName(value); clearRequisiteError(field); break
-      case 'venue': setVenue(value); clearRequisiteError(field); break
-      case 'description': setDescription(value); break
-      case 'eventDate': setEventDate(value); break
-    }
+    if (field === 'name') setName(value)
+    else setDescription(value)
+  }
+
+  // Смена мероприятия целиком: выбрали другое, новое или «без мероприятия».
+  // Подсветка согласования снимается вся — она была про прежний выбор.
+  function pickProject(next: ListProjectDraft | null) {
+    setProject(next)
+    setRequisiteErrors(new Set())
+  }
+
+  // Правка реквизита снимает с поля подсветку «обязательно для согласования»:
+  // пользователь уже отвечает на подсказку, держать её дальше незачем. У
+  // существующего мероприятия правка взводит edited — только с ним реквизиты
+  // уедут в базу при сохранении (см. persistList).
+  function changeProject(fields: ListProjectFields) {
+    setProject((current) => current && { ...current, ...fields, edited: current.edited || current.id !== null })
+    if ('name' in fields) clearRequisiteError('projectName')
+    if ('clientName' in fields) clearRequisiteError('clientName')
+    if ('venue' in fields) clearRequisiteError('venue')
   }
 
   const selectedCount = selected.reduce((sum, item) => sum + item.count, 0)
@@ -305,30 +351,45 @@ export function ListEditorPage() {
     const items = buildListItems(resolvedSelection)
     const listMode: 'specific' | 'abstract' = items.every((item) => item.tracking_mode !== 'planned') ? 'specific' : 'abstract'
     const input = {
-      name: resolveListName({ name, eventDate, locale, tr }),
+      name: resolveListName({ name, project, locale, tr }),
       description,
-      clientName: clientName.trim(),
-      venue: venue.trim(),
       listMode,
-      reservationStart: eventDate || null,
-      reservationEnd: eventDate || null,
       equipmentItems: items,
+      projectId: project?.id ?? null,
+      // Реквизиты уезжают только у нового мероприятия и у существующего, которое
+      // правили здесь. Иначе — одна привязка по id: мероприятие общее, и
+      // сохранение списка не должно переписывать его снимком из этого редактора.
+      project: project && (project.id === null || project.edited) ? project : null,
     }
-    const id = listId ? await updateEquipmentList(listId, input) : await createEquipmentList(input)
+    const saved = listId ? await updateEquipmentList(listId, input) : await createEquipmentList(input)
     // Имя возвращаем разрешённым: снимок «сохранено» должен совпасть с тем, что
     // приедет из базы гидратацией, иначе список сразу окажется «изменённым».
-    return { id, name: input.name }
+    return { id: saved.listId, projectId: saved.projectId, name: input.name }
   }
 
   async function saveList() {
     if (!canSubmit) return
+    // Мероприятие без названия база не примет (projects_name_check). Говорим об
+    // этом до запроса и показываем поле: общий отказ сохранения не объяснил бы,
+    // что править.
+    if (project && !project.name.trim()) {
+      setRequisiteErrors(new Set<RequisiteField>(['projectName']))
+      setSaveError(tr('Укажите название мероприятия или выберите «Без мероприятия».', 'Tadbir nomini kiriting yoki «Tadbirsiz»ni tanlang.'))
+      setSuccessMessage('')
+      revealRequisite('projectName')
+      return
+    }
     const isCreating = !listId
     setIsSaving(true)
     setSaveError('')
     setSuccessMessage('')
     try {
       const saved = await persistList()
-      savedSnapshotRef.current = serializeDocument({ name: saved.name, clientName, venue, description, eventDate, items: draftItems })
+      // Мероприятие после записи: у нового появился id, правки реквизитов
+      // существующего уехали в базу — флаг edited своё отработал.
+      const savedProject = project && { ...project, id: saved.projectId, edited: false }
+      setProject(savedProject)
+      savedSnapshotRef.current = serializeDocument({ name: saved.name, description, project: savedProject, items: draftItems })
       // Пустое поле после записи показывает то имя, что уехало в базу: иначе у
       // открытого списка (гидратация для него уже отработала) поле и h1 остались
       // бы пустыми, а «есть несохранённые правки» — взведённым до перезагрузки.
@@ -345,10 +406,31 @@ export function ListEditorPage() {
       }
     } catch (saveError: unknown) {
       reportAppError(saveError, { scope: 'loader', route: listId ? '/lists/:id/edit' : '/lists/new', detail: { source: 'save-list' } })
-      setSaveError(tr('Не удалось сохранить список. Файл всё ещё можно скачать.', 'Ro‘yxatni saqlab bo‘lmadi. Faylni baribir yuklab olish mumkin.'))
+      setSaveError(listSaveErrorText(saveError, tr))
     } finally {
       setIsSaving(false)
     }
+  }
+
+  // Реквизиты документа на согласование — все три у мероприятия. Без мероприятия
+  // пусты все: взять их неоткуда.
+  const requisiteFields: [RequisiteField, string][] = [
+    ['projectName', project?.name ?? ''],
+    ['clientName', project?.clientName ?? ''],
+    ['venue', project?.venue?.name ?? ''],
+  ]
+
+  // Раскрыть панель реквизитов и привести к полю. Поля свёрнутой панели
+  // появляются в DOM только после раскрытия, поэтому прокрутка и фокус —
+  // следующим кадром. preventScroll обязателен: обычный фокус прыгает к полю
+  // мгновенно и обрывает плавную прокрутку к панели. У площадки и у списка без
+  // мероприятия поля с таким id нет — остаётся прокрутка к панели.
+  function revealRequisite(field: RequisiteField) {
+    setMetaOpen(true)
+    window.requestAnimationFrame(() => {
+      metaRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      document.getElementById(`quick-list-${field}`)?.focus({ preventScroll: true })
+    })
   }
 
   function exportList(documentMode: 'working' | 'approval') {
@@ -357,23 +439,21 @@ export function ListEditorPage() {
     // заказчику под грифом «УТВЕРЖДАЮ», и пустых строк в нём быть не должно.
     // «Рабочий Excel» и «Сохранить» не требуют ни одного заполненного поля.
     if (documentMode === 'approval') {
-      const fields: [RequisiteField, string][] = [['name', name], ['clientName', clientName], ['venue', venue]]
-      const missing = fields.filter(([, value]) => !value.trim()).map(([field]) => field)
-      if (missing.length > 0) {
+      const missing = requisiteFields.filter(([, value]) => !value.trim()).map(([field]) => field)
+      const firstMissing = missing[0]
+      if (firstMissing) {
         setRequisiteErrors(new Set(missing))
-        setSaveError(tr(
-          'Для документа на согласование заполните название, заказчика и площадку.',
-          'Kelishuv hujjati uchun nom, buyurtmachi va maydonni to‘ldiring.',
-        ))
+        setSaveError(project
+          ? tr(
+            'Для документа на согласование заполните название мероприятия, заказчика и площадку.',
+            'Kelishuv hujjati uchun tadbir nomi, buyurtmachi va maydonni to‘ldiring.',
+          )
+          : tr(
+            'Для документа на согласование выберите или создайте мероприятие: название, заказчик и площадка берутся из него.',
+            'Kelishuv hujjati uchun tadbirni tanlang yoki yarating: nom, buyurtmachi va maydon undan olinadi.',
+          ))
         setSuccessMessage('')
-        setMetaOpen(true)
-        // Поля свёрнутой панели появляются в DOM только после раскрытия, поэтому
-        // прокрутка и фокус — следующим кадром. preventScroll обязателен: обычный
-        // фокус прыгает к полю мгновенно и обрывает плавную прокрутку к панели.
-        window.requestAnimationFrame(() => {
-          metaRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-          document.getElementById(`quick-list-${missing[0]}`)?.focus({ preventScroll: true })
-        })
+        revealRequisite(firstMissing)
         return
       }
     }
@@ -383,11 +463,8 @@ export function ListEditorPage() {
     setSuccessMessage('')
     try {
       downloadEquipmentListXlsx({
-        name: resolveListName({ name, eventDate, locale, tr }),
-        clientName: clientName.trim(),
-        venue: venue.trim(),
+        ...documentHeader({ listName: resolveListName({ name, project, locale, tr }), project }),
         description: description.trim(),
-        eventDate: eventDate || null,
         locale,
         language,
         documentMode,
@@ -416,7 +493,7 @@ export function ListEditorPage() {
     onApproval: () => exportList('approval'),
     disabled: !canSubmit || isBusy,
     exporting: isExporting,
-    requisitesFilled: [name, clientName, venue].filter((value) => value.trim()).length,
+    requisitesFilled: requisiteFields.filter(([, value]) => value.trim()).length,
   }
 
   // Строка состояния занимает место eyebrow и имеет фиксированную высоту: результат
@@ -441,7 +518,7 @@ export function ListEditorPage() {
   return (
     <>
       <ListEditorHeader
-        title={name.trim() || tr('Новый список', 'Yangi ro‘yxat')}
+        title={name.trim() || project?.name.trim() || tr('Новый список', 'Yangi ro‘yxat')}
         statusTone={statusTone}
         statusDot={statusDot}
         statusBody={statusBody}
@@ -455,11 +532,13 @@ export function ListEditorPage() {
 
       <ListEditorMeta
         panelRef={metaRef}
-        values={{ name, clientName, venue, description, eventDate }}
+        values={{ name, description, project }}
         requisiteErrors={requisiteErrors}
         open={metaOpen}
         onToggle={() => setMetaOpen((current) => !current)}
         onChange={changeMeta}
+        onProjectPick={pickProject}
+        onProjectChange={changeProject}
       />
 
       <div className="mobile-editor-tabs" role="tablist" aria-label={tr('Раздел редактора', 'Tahrirchi bo‘limi')}>
