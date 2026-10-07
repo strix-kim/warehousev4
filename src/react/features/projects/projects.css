@@ -1,0 +1,58 @@
+/* Мероприятия (с54): реестр, страница мероприятия и дровер реквизитов.
+   Импортируется страницами модуля и встаёт в каскад ПОСЛЕ styles.css. Реестр —
+   общие .list-grid/.list-card, шапка страницы — общая .editor-header, реквизиты —
+   общая .detail-list; здесь только отличия и ряды блоков страницы. */
+
+/* Карточка реестра: действие одно, поэтому кнопка во всю ширину; три счётчика
+   в подвале переносятся, а не сжимаются до обрезки. */
+.project-card__actions { grid-template-columns: 1fr; }
+.project-card__meta { flex-wrap: wrap; justify-content: flex-start; gap: 4px 14px; }
+
+/* Дровер реквизитов. */
+.project-drawer__note { margin: 0 0 16px; padding: 10px 12px; border-radius: var(--r-sm); color: var(--muted); background: var(--sunk); font-size: 13px; line-height: 1.45; }
+
+/* Страница мероприятия. Панели идут столбцом; отступ между ними свой — общая
+   .data-panel его не задаёт, на реестрах она одна. */
+.project-error { display: flex; align-items: center; gap: 7px; margin: 0 0 14px; }
+.project-facts-panel .detail-list.project-facts { margin: 0; border: 0; border-radius: 0; }
+.project-facts > div { min-height: 0; }
+/* Описание набирают абзацами — переносы строк сохраняем; длинное слово без
+   пробелов не должно дать горизонтальной прокрутки на телефоне. */
+.project-facts__text { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.project-section { margin-top: 16px; }
+.project-section__head { min-height: 64px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.project-section__head h2 { margin: 0; font-size: 18px; }
+.project-section__count { min-width: 24px; padding: 2px 8px; border-radius: 999px; color: var(--muted); background: var(--hover); font-size: 12px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.project-section__head .button { min-height: 40px; margin-left: auto; text-decoration: none; }
+/* Пустое состояние внутри блока — ниже, чем на целый экран: блоков три. */
+.project-section .empty-state { min-height: 180px; }
+.project-section .empty-state .button { text-decoration: none; }
+
+.project-rows { margin: 0; padding: 0; list-style: none; }
+.project-rows > li + li { border-top: 1px solid var(--line); }
+.project-row { min-height: 56px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 16px; color: var(--ink); font-size: 14px; font-weight: 600; text-decoration: none; }
+.project-row:hover { background: var(--hover); }
+.project-row:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.project-row > svg { color: var(--faint); }
+.project-row__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-row small { color: var(--faint); font-size: 12px; font-weight: 500; white-space: nowrap; }
+
+/* Болванка страницы: шапка реквизитов и два блока. */
+.project-skeleton { display: grid; gap: 12px; padding: 16px; }
+.project-skeleton span { height: 72px; border-radius: var(--r-md); background: linear-gradient(90deg, var(--sunk) 25%, var(--card) 50%, var(--sunk) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+
+@media (max-width: 820px) {
+  /* Ряд действий шапки — отдельной строкой: на ≤700 сетка .editor-header
+     становится 44px 1fr, и третий ребёнок падал бы в колонку 44px (тот же
+     приём, что у .editor-header--hall в halls.css). */
+  .editor-header--project .editor-header__actions { grid-column: 1 / -1; flex-wrap: wrap; justify-content: flex-start; }
+  .project-facts-panel .detail-list.project-facts { grid-template-columns: 1fr; }
+  /* Подпись уходит под название, шеврон остаётся справа на обе строки. */
+  .project-row { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 2px; }
+  .project-row > svg:first-child { grid-row: 1 / span 2; }
+  .project-row > svg:last-child { grid-row: 1 / span 2; grid-column: 3; }
+  .project-row__name { grid-column: 2; white-space: normal; overflow-wrap: anywhere; }
+  .project-row small { grid-column: 2; white-space: normal; }
+  .project-section__head .button { flex: 1 0 100%; margin-left: 0; }
+}

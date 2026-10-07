@@ -1,4 +1,4 @@
-import { ArrowUpRight, Boxes, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Presentation, RadioTower, Receipt, Users, Warehouse, X } from 'lucide-react'
+import { ArrowUpRight, Boxes, CalendarRange, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Presentation, RadioTower, Receipt, Users, Warehouse, X } from 'lucide-react'
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, m, type Transition } from 'motion/react'
 import { Link, matchPath, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
@@ -28,6 +28,8 @@ const loadVehicleFormPage = () => import('../features/vehicles/VehicleFormPage')
 const loadHallPlansPage = () => import('../features/halls/HallPlansPage').then((module) => ({ default: module.HallPlansPage }))
 const loadHallPlanPage = () => import('../features/halls/HallPlanPage').then((module) => ({ default: module.HallPlanPage }))
 const loadHallTvPage = () => import('../features/halls/HallTvPage').then((module) => ({ default: module.HallTvPage }))
+const loadProjectsPage = () => import('../features/projects/ProjectsPage').then((module) => ({ default: module.ProjectsPage }))
+const loadProjectPage = () => import('../features/projects/ProjectPage').then((module) => ({ default: module.ProjectPage }))
 const loadHomePage = () => import('../features/home/HomePage').then((module) => ({ default: module.HomePage }))
 const loadDelayCalculatorPage = () => import('../features/delay/DelayCalculatorPage').then((module) => ({ default: module.DelayCalculatorPage }))
 const loadExpensesPage = () => import('../features/expenses/ExpensesPage').then((module) => ({ default: module.ExpensesPage }))
@@ -44,6 +46,8 @@ const VehicleFormPage = lazyWithReload(loadVehicleFormPage)
 const HallPlansPage = lazyWithReload(loadHallPlansPage)
 const HallPlanPage = lazyWithReload(loadHallPlanPage)
 const HallTvPage = lazyWithReload(loadHallTvPage)
+const ProjectsPage = lazyWithReload(loadProjectsPage)
+const ProjectPage = lazyWithReload(loadProjectPage)
 const HomePage = lazyWithReload(loadHomePage)
 const DelayCalculatorPage = lazyWithReload(loadDelayCalculatorPage)
 const ExpensesPage = lazyWithReload(loadExpensesPage)
@@ -58,9 +62,9 @@ const WorldPage = import.meta.env.DEV
 // должно ловиться по всей площади вкладки, а не только по значку.
 const MotionNavLink = m.create(NavLink)
 
-// Пять вкладок телефона (макет с31): четыре раздела и «Ещё». Сотрудники,
-// Автомобили, Задержки и Расходы на ≤820 живут в листе «Ещё», и на их адресах
-// подсвечивается именно «Ещё».
+// Пять вкладок телефона (макет с31): четыре раздела и «Ещё». Мероприятия,
+// Сотрудники, Автомобили, Задержки и Расходы на ≤820 живут в листе «Ещё», и на
+// их адресах подсвечивается именно «Ещё».
 type PhoneTab = 'home' | 'equipment' | 'lists' | 'halls' | 'more'
 
 function isUnder(pathname: string, base: string) {
@@ -148,6 +152,8 @@ export function App() {
         <Route path="/vehicles" element={<RouteBoundary><VehiclesPage /></RouteBoundary>} />
         <Route path="/vehicles/new" element={<RouteBoundary><VehicleFormPage /></RouteBoundary>} />
         <Route path="/vehicles/:vehicleId/edit" element={<RouteBoundary><VehicleFormPage /></RouteBoundary>} />
+        <Route path="/projects" element={<RouteBoundary><ProjectsPage /></RouteBoundary>} />
+        <Route path="/projects/:projectId" element={<RouteBoundary><ProjectPage /></RouteBoundary>} />
         <Route path="/halls" element={<RouteBoundary><HallPlansPage /></RouteBoundary>} />
         <Route path="/halls/:planId" element={<RouteBoundary><HallPlanPage /></RouteBoundary>} />
         <Route path="/delay" element={<RouteBoundary><DelayCalculatorPage /></RouteBoundary>} />
@@ -240,6 +246,8 @@ function AppShell() {
         loadVehicleFormPage(),
         loadHallPlansPage(),
         loadHallPlanPage(),
+        loadProjectsPage(),
+        loadProjectPage(),
         loadDelayCalculatorPage(),
         loadExpensesPage(),
       ])
@@ -257,10 +265,13 @@ function AppShell() {
         import('../features/employees/api'),
         import('../features/vehicles/api'),
         import('../features/halls/api'),
-      ]).then(([equipmentApi, listsApi, employeesApi, vehiclesApi, hallsApi]) => Promise.allSettled([
+        import('../features/projects/api'),
+      ]).then(([equipmentApi, listsApi, employeesApi, vehiclesApi, hallsApi, projectsApi]) => Promise.allSettled([
         employeesApi.fetchEmployeeList(),
         vehiclesApi.fetchVehicles(),
         hallsApi.fetchHallPlans(),
+        // Реестр мероприятий — числа и реквизиты, без состава: лёгкий и на диск годится.
+        projectsApi.fetchProjects(),
         // Таксономия переехала сюда из тяжёлой пачки ниже: она весит пару
         // килобайт, живёт сутки и лежит на диске — греть её стоит везде, а вот
         // тащить ради неё полный каталог (см. ниже) не стоит нигде.
@@ -378,7 +389,10 @@ function AppShell() {
           {/* Сотрудники, Автомобили и Задержки на телефоне в нижнюю панель не
               входят: там ровно пять вкладок (Главная, Техника, Списки, Залы, Ещё),
               шестая ужала бы подписи до слипания. На ≤820 эти ссылки прячутся
-              (sidebar__nav-extra), а сами разделы живут в листе «Ещё». */}
+              (sidebar__nav-extra), а сами разделы живут в листе «Ещё».
+              Мероприятия — первыми в группе: к ним привязаны и люди, и залы.
+              Счётчика нет: home_summary мероприятия не считает. */}
+          <NavLink className="sidebar__nav-extra" to="/projects"><CalendarRange size={19} /><span>{tr('Мероприятия', 'Tadbirlar')}</span></NavLink>
           <NavLink className="sidebar__nav-extra" to="/employees"><Users size={19} /><span>{tr('Сотрудники', 'Xodimlar')}</span>{navCount(navSummary?.employees.count)}</NavLink>
           <NavLink className="sidebar__nav-extra" to="/vehicles"><CarFront size={19} /><span>{tr('Автомобили', 'Avtomobillar')}</span>{navCount(navSummary?.vehicles.count)}</NavLink>
           <MotionNavLink to="/halls" className={tabClass} whileTap={tabPress}>{tabIndicator('halls')}<Presentation size={19} /><span>{tr('Залы', 'Zallar')}</span></MotionNavLink>
@@ -481,6 +495,7 @@ function MobileMoreSheet({ email, onSignOut, onClose }: { email: string; onSignO
       {/* Разделы, которым нет слота в нижней панели (см. sidebar__nav-extra).
           Значки серые: красный остаётся за «Новым списком». */}
       <nav className="sheet__nav" aria-label={tr('Другие разделы', 'Boshqa bo‘limlar')}>
+        <NavLink to="/projects" onClick={onClose}><span><CalendarRange size={19} /></span>{tr('Мероприятия', 'Tadbirlar')}</NavLink>
         <NavLink to="/employees" onClick={onClose}><span><Users size={19} /></span>{tr('Сотрудники', 'Xodimlar')}</NavLink>
         <NavLink to="/vehicles" onClick={onClose}><span><CarFront size={19} /></span>{tr('Автомобили', 'Avtomobillar')}</NavLink>
         <NavLink to="/delay" onClick={onClose}><span><RadioTower size={19} /></span>{tr('Задержка излучателей', 'Nurlatgichlar kechikishi')}</NavLink>

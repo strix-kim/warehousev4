@@ -1,0 +1,16 @@
+/* Поле «Площадка» (с54, components/VenueField.tsx). Импортируется компонентом и
+   встаёт в каскад после styles.css, как unsaved-prompt.css. Сам выбор — общий
+   .app-select внутри .field; свои здесь только вложенная форма нового места и
+   кнопка «Повторить» в подсказке. */
+
+.venue-field__new { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--sunk); }
+.venue-field__new .field { margin: 0; }
+.venue-field__new .form-error { display: flex; align-items: center; gap: 7px; margin: 0; }
+.venue-field__place { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.venue-field__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.venue-field__actions .button { flex: 1 1 140px; min-width: 0; }
+.venue-field__retry { padding: 0; border: 0; color: inherit; background: none; font: inherit; text-decoration: underline; }
+
+@media (max-width: 520px) {
+  .venue-field__place { grid-template-columns: 1fr; }
+}
