@@ -61,6 +61,7 @@ export type Database = {
           clearance_expires_at: string | null
           created_at: string
           created_by: string | null
+          department: string
           document_photo_id: string | null
           first_name: string
           id: string
@@ -84,6 +85,7 @@ export type Database = {
           clearance_expires_at?: string | null
           created_at?: string
           created_by?: string | null
+          department?: string
           document_photo_id?: string | null
           first_name: string
           id?: string
@@ -107,6 +109,7 @@ export type Database = {
           clearance_expires_at?: string | null
           created_at?: string
           created_by?: string | null
+          department?: string
           document_photo_id?: string | null
           first_name?: string
           id?: string
@@ -200,6 +203,7 @@ export type Database = {
           metadata: Json | null
           mount_point_id: string | null
           name: string
+          project_id: string | null
           reservation_end: string | null
           reservation_start: string | null
           type: string
@@ -220,6 +224,7 @@ export type Database = {
           metadata?: Json | null
           mount_point_id?: string | null
           name: string
+          project_id?: string | null
           reservation_end?: string | null
           reservation_start?: string | null
           type: string
@@ -240,6 +245,7 @@ export type Database = {
           metadata?: Json | null
           mount_point_id?: string | null
           name?: string
+          project_id?: string | null
           reservation_end?: string | null
           reservation_start?: string | null
           type?: string
@@ -259,6 +265,13 @@ export type Database = {
             columns: ["mount_point_id"]
             isOneToOne: false
             referencedRelation: "mount_points"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_lists_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -501,6 +514,7 @@ export type Database = {
           event_to: string | null
           id: string
           name: string
+          project_id: string | null
           updated_at: string
         }
         Insert: {
@@ -510,6 +524,7 @@ export type Database = {
           event_to?: string | null
           id?: string
           name: string
+          project_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -519,9 +534,18 @@ export type Database = {
           event_to?: string | null
           id?: string
           name?: string
+          project_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hall_plans_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       halls: {
         Row: {
@@ -681,6 +705,96 @@ export type Database = {
           role?: string
         }
         Relationships: []
+      }
+      // ПРАВКА РУКАМИ: таблица заведена миграцией 20261007184926 (с54), типы дописаны
+      // вслед за ней — генератор с прода не перезапускался.
+      project_staff: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          id: string
+          project_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          id?: string
+          project_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_staff_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_staff_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      // ПРАВКА РУКАМИ: таблица заведена миграцией 20261007184926 (с54), типы дописаны
+      // вслед за ней — генератор с прода не перезапускался.
+      projects: {
+        Row: {
+          client_name: string | null
+          created_at: string
+          created_by: string | null
+          date_from: string | null
+          date_to: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          venue_id: string | null
+        }
+        Insert: {
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_from?: string | null
+          date_to?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          venue_id?: string | null
+        }
+        Update: {
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_from?: string | null
+          date_to?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          venue_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reports: {
         Row: {
@@ -848,11 +962,80 @@ export type Database = {
         }
         Relationships: []
       }
+      // ПРАВКА РУКАМИ: таблица заведена миграцией 20261007184903 (с54), типы дописаны
+      // вслед за ней — генератор с прода не перезапускался.
+      venues: {
+        Row: {
+          city: string
+          country: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          city: string
+          country: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          city?: string
+          country?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      // ПРАВКА РУКАМИ: функции заведены миграцией 20261007185009 (с54), типы
+      // дописаны вслед за ней. p_project_id и p_project принимают null — так
+      // выбирается ветка (см. комментарий к save_project_equipment_list).
+      create_project_equipment_list: {
+        Args: {
+          p_description: string
+          p_items: Json
+          p_list_mode: string
+          p_name: string
+          p_project: Json | null
+          p_project_id: string | null
+        }
+        Returns: Json
+      }
+      update_project_equipment_list: {
+        Args: {
+          p_description: string
+          p_items: Json
+          p_list_id: string
+          p_list_mode: string
+          p_name: string
+          p_project: Json | null
+          p_project_id: string | null
+        }
+        Returns: Json
+      }
+      // p_search пустой — без поиска; p_from/p_to null — без периода.
+      fetch_equipment_lists_page: {
+        Args: {
+          p_from: string | null
+          p_limit: number
+          p_offset: number
+          p_search: string
+          p_to: string | null
+        }
+        Returns: Json
+      }
       // ПРАВКА РУКАМИ: функция заведена миграцией 20260823083606 (с16), типы
       // дописаны вслед за ней. Серийник и количество опциональны — дефолты
       // задаёт сама функция (null и 1).
