@@ -16,7 +16,7 @@ function building(ctx: WorldCtx, id: string, x: number, z: number) {
   const { P } = ctx.style
   const g = new THREE.Group()
   g.position.set(x, 0, z)
-  const body = own(P.wall)
+  const body = own(ctx.style, P.wall)
   g.userData = { id, mats: [body] }
   ctx.roots.set(id, g)
   // roofMass — крыша-объём: в палитрах, где она цвета стены, это тот же материал корпуса (один меш)

@@ -7,7 +7,9 @@ import { fetchEmployeeList, readCachedEmployeeList } from '../../employees/api'
 import { fetchHomeSummary, readCachedHomeSummary } from '../../home/api'
 import { fetchEquipmentLists, preferredListsPageSize, readCachedEquipmentLists } from '../../lists/api'
 import { fetchVehicles, readCachedVehicles } from '../../vehicles/api'
-import type { WorldData } from './types'
+import type { WorldArchivePlace, WorldData, WorldVenue } from './types'
+
+type Mock = { venues: WorldVenue[]; archive: WorldArchivePlace[] }
 
 // null — ни один источник ещё не ответил и в кэше пусто: кампус стоит без машин,
 // фигурок и чисел. Ссылка меняется только вместе с ответом источника.
@@ -23,6 +25,18 @@ export function useWorldData(): WorldData | null {
   const [lists, setLists] = useState(cachedLists)
   // Машины и люди — наполнение сцены, и приходят одним обновлением (см. ниже)
   const [crowd, setCrowd] = useState({ vehicles: cachedVehicles, employees: cachedEmployees })
+  // Площадки и архив: источника в базе нет (Ш9), в проде оба поля null — зон на карте
+  // нет. В dev их даёт макет; ?mock=off выключает (кадр = кампус, как в проде).
+  const [mock, setMock] = useState<Mock | null>(null)
+  useEffect(() => {
+    // Ветка целиком срезается из прод-сборки вместе с чанком фикстур
+    if (!import.meta.env.DEV || new URLSearchParams(window.location.search).get('mock') === 'off') return
+    let isCurrent = true
+    void import('./fixtures.dev').then((module) => {
+      if (isCurrent) setMock({ venues: module.FIXTURE_VENUES, archive: module.FIXTURE_ARCHIVE })
+    })
+    return () => { isCurrent = false }
+  }, [])
 
   useEffect(() => {
     let isCurrent = true
@@ -54,8 +68,11 @@ export function useWorldData(): WorldData | null {
 
   return useMemo(() => {
     const { vehicles, employees } = crowd
-    if (!summary && !lists && !vehicles && !employees) return null
+    if (!summary && !lists && !vehicles && !employees && !mock) return null
     return {
+      venues: mock?.venues ?? null,
+      archive: mock?.archive ?? null,
+      mock: mock !== null,
       cars: (vehicles ?? []).map((row) => ({ id: row.id, brand: row.brand, model: row.model, color: row.color, plate: row.plate_number })),
       people: (employees ?? []).map((row) => ({ id: row.id, firstName: row.first_name, lastName: row.last_name })),
       sites: {
@@ -64,5 +81,5 @@ export function useWorldData(): WorldData | null {
         garage: summary?.vehicles.count ?? null,
       },
     }
-  }, [crowd, lists, summary])
+  }, [crowd, lists, mock, summary])
 }

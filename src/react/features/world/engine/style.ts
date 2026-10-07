@@ -3,6 +3,7 @@
 import * as THREE from 'three'
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
 import type { WorldInk, WorldLook, WorldPalette } from '../settings'
+import type { WorldZone } from '../worldStore'
 import type { Tokens } from './tokens'
 
 export const mix = (a: string, b: string, k: number) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString()
@@ -60,8 +61,33 @@ export type Roles = Record<
   THREE.MeshLambertMaterial
 >
 
+// Материалы одной зоны карты. Кэш у каждой зоны свой — это и есть «зона в ключе
+// кэша»: одинаковый цвет в кампусе и на «Площадках» — два материала, и приглушить
+// соседа можно, не трогая активную зону. map — общее карты (дорога и кнопки в
+// промежутках): не приглушается никогда.
+export type ZoneKey = WorldZone | 'map'
+const ZONE_KEYS: readonly ZoneKey[] = ['campus', 'venues', 'archive', 'map']
+// Неактивная зона уведена к цвету земли на ZONE_FADE, контур — целиком
+const ZONE_FADE = 0.7
+
+type Dim = { value: number }
+type ZoneLook = {
+  mats: Map<string, THREE.MeshLambertMaterial>
+  flats: Map<string, THREE.MeshBasicMaterial>
+  roles: Roles
+  ink: LineMaterial
+  hull: THREE.MeshBasicMaterial
+  // Uniform-ы приглушения: заливка и контур. Пишет setZoneDim, читают шейдеры зоны
+  dim: Dim
+  dimInk: Dim
+}
+
 export type WorldStyle = {
   P: Palette
+  looks: Record<ZoneKey, ZoneLook>
+  // Зона, чьи материалы сейчас отдают mat / flat / roles / ink / hull: её ставит
+  // switchZone на время сборки зоны (zones/layout.ts). Поля ниже — ссылки в looks[zone].
+  zone: ZoneKey
   // Кэши материалов по цвету: один материал на роль — условие слияния в kit()
   mats: Map<string, THREE.MeshLambertMaterial>
   flats: Map<string, THREE.MeshBasicMaterial>
@@ -72,9 +98,30 @@ export type WorldStyle = {
   hullPx: { value: THREE.Vector2 }
 }
 
+// Приглушение — в шейдере, а не пересборкой: после тумана цвет фрагмента уходит к
+// цвету тумана (он же цвет земли) на uZoneDim. Туман в сцене включён всегда
+// (createWorld), так что USE_FOG и fogColor есть у каждого материала.
+type Shader = { uniforms: Record<string, unknown>; fragmentShader: string }
+function injectDim(shader: Shader, level: Dim) {
+  shader.uniforms.uZoneDim = level
+  shader.fragmentShader = 'uniform float uZoneDim;\n' + shader.fragmentShader.replace('#include <fog_fragment>',
+    `#include <fog_fragment>
+    #ifdef USE_FOG
+      gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, uZoneDim );
+    #endif`)
+}
+
+// Свой материал вне кэша (сетка земли, корпус здания) приглушается вместе с зоной
+// сборки. ink — как контур: уходит целиком.
+export function dimmed<M extends THREE.Material>(style: WorldStyle, m: M, ink = false): M {
+  const look = style.looks[style.zone], level = ink ? look.dimInk : look.dim
+  m.onBeforeCompile = (shader) => injectDim(shader, level)
+  return m
+}
+
 export function mat(style: WorldStyle, color: string) {
   let m = style.mats.get(color)
-  if (!m) style.mats.set(color, m = new THREE.MeshLambertMaterial({ color }))
+  if (!m) style.mats.set(color, m = dimmed(style, new THREE.MeshLambertMaterial({ color })))
   return m
 }
 
@@ -82,7 +129,7 @@ export function mat(style: WorldStyle, color: string) {
 export function flat(style: WorldStyle, color: string) {
   let m = style.flats.get(color)
   if (!m) {
-    m = new THREE.MeshBasicMaterial({ color })
+    m = dimmed(style, new THREE.MeshBasicMaterial({ color }))
     m.userData.ground = true
     style.flats.set(color, m)
   }
@@ -90,12 +137,12 @@ export function flat(style: WorldStyle, color: string) {
 }
 
 // Свой материал корпуса, мимо кэша: его будет подсвечивать наведение
-export const own = (color: string) => new THREE.MeshLambertMaterial({ color })
+export const own = (style: WorldStyle, color: string) => dimmed(style, new THREE.MeshLambertMaterial({ color }))
 
 // Контур-силуэт: тот же меш задними гранями, раздвинутый по нормали на постоянную
 // толщину в пикселях экрана. Скруглённым объёмам с гладкими нормалями это даёт
 // сплошную линию по силуэту.
-function hullMaterial(color: string, hullPx: WorldStyle['hullPx']) {
+function hullMaterial(color: string, hullPx: WorldStyle['hullPx'], level: Dim) {
   const m = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide })
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uHullPx = hullPx
@@ -103,29 +150,58 @@ function hullMaterial(color: string, hullPx: WorldStyle['hullPx']) {
       `#include <project_vertex>
       vec4 hullN = projectionMatrix * vec4( normalize( normalMatrix * normal ), 0.0 );
       gl_Position.xy += normalize( hullN.xy + vec2( 1e-6 ) ) * uHullPx * gl_Position.w;`)
+    injectDim(shader, level)
   }
   return m
+}
+
+// Переключить зону сборки: дальше mat / flat / roles / ink / hull — её материалы.
+// Материал, созданный позже сборки, получит зону, выставленную последней, — поэтому
+// zones/layout.ts после сборки всегда возвращает 'map'.
+export function switchZone(style: WorldStyle, zone: ZoneKey) {
+  const look = style.looks[zone]
+  style.zone = zone
+  style.mats = look.mats
+  style.flats = look.flats
+  style.roles = look.roles
+  style.ink = look.ink
+  style.hull = look.hull
+}
+
+// Уровень приглушения зоны: 0 — яркая, 1 — приглушена
+export function setZoneDim(style: WorldStyle, zone: WorldZone, level: number) {
+  const look = style.looks[zone]
+  look.dim.value = level * ZONE_FADE
+  look.dimInk.value = level
 }
 
 // Собрать облик из палитры и ступени контура. Кэши на входе пусты.
 function applyLook(style: WorldStyle, T: Tokens, look: WorldLook) {
   const P = style.P = PALETTES[look.palette](T)
   const ink = P.ink[INK_STEP[look.ink]]
-  // Рёбра — LineSegments2: обычная линия в WebGL всегда 1 px и без сглаживания.
-  // Разрешение LineMaterial ставит сам LineSegments2 перед кадром.
-  style.ink = new LineMaterial({ color: ink, linewidth: INK_WIDTH, fog: true })
-  style.hull = hullMaterial(ink, style.hullPx)
-  // Графит мира — только --night-3: чистый --night слишком тяжёлый, он остаётся за HTML-хромом (и за палитрой «Ночь»)
-  const glass = mat(style, P.glass)
-  style.roles = {
-    glass, band: glass, dark: mat(style, P.dark), white: mat(style, P.wall2), red: mat(style, P.accent), steel: mat(style, P.steel),
-    leaf: mat(style, P.leaf), roof: mat(style, P.roof), canopy: mat(style, P.canopy), door: mat(style, P.door),
-    sign: mat(style, P.sign), signMark: mat(style, P.signMark), carGlass: mat(style, P.carGlass), tire: mat(style, P.tire), lamp: mat(style, P.lamp),
+  for (const zone of ZONE_KEYS) {
+    // Уровни переживают смену облика: объекты uniform-ов остаются теми же
+    const prev = style.looks[zone] as ZoneLook | undefined
+    const dim = prev?.dim ?? { value: 0 }, dimInk = prev?.dimInk ?? { value: 0 }
+    const zoneLook = style.looks[zone] = { mats: new Map(), flats: new Map(), dim, dimInk } as ZoneLook
+    switchZone(style, zone)
+    // Рёбра — LineSegments2: обычная линия в WebGL всегда 1 px и без сглаживания.
+    // Разрешение LineMaterial ставит сам LineSegments2 перед кадром.
+    zoneLook.ink = style.ink = dimmed(style, new LineMaterial({ color: ink, linewidth: INK_WIDTH, fog: true }), true)
+    zoneLook.hull = style.hull = hullMaterial(ink, style.hullPx, dimInk)
+    // Графит мира — только --night-3: чистый --night слишком тяжёлый, он остаётся за HTML-хромом (и за палитрой «Ночь»)
+    const glass = mat(style, P.glass)
+    zoneLook.roles = style.roles = {
+      glass, band: glass, dark: mat(style, P.dark), white: mat(style, P.wall2), red: mat(style, P.accent), steel: mat(style, P.steel),
+      leaf: mat(style, P.leaf), roof: mat(style, P.roof), canopy: mat(style, P.canopy), door: mat(style, P.door),
+      sign: mat(style, P.sign), signMark: mat(style, P.signMark), carGlass: mat(style, P.carGlass), tire: mat(style, P.tire), lamp: mat(style, P.lamp),
+    }
   }
+  switchZone(style, 'map')
 }
 
 export function createStyle(T: Tokens, look: WorldLook): WorldStyle {
-  const style = { mats: new Map(), flats: new Map(), hullPx: { value: new THREE.Vector2(0.002, 0.002) } } as unknown as WorldStyle
+  const style = { looks: {}, hullPx: { value: new THREE.Vector2(0.002, 0.002) } } as unknown as WorldStyle
   applyLook(style, T, look)
   return style
 }
@@ -139,10 +215,12 @@ export function restyle(style: WorldStyle, T: Tokens, look: WorldLook) {
 }
 
 export function disposeStyle(style: WorldStyle) {
-  for (const cache of [style.mats, style.flats]) {
-    cache.forEach((m) => m.dispose())
-    cache.clear()
+  for (const look of Object.values(style.looks)) {
+    for (const cache of [look.mats, look.flats]) {
+      cache.forEach((m) => m.dispose())
+      cache.clear()
+    }
+    look.ink.dispose()
+    look.hull.dispose()
   }
-  style.ink.dispose()
-  style.hull.dispose()
 }

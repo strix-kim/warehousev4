@@ -4,13 +4,15 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CSS2DRenderer, type CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
-import type { CameraPose, WorldStore } from '../worldStore'
+import { isAddId, WORLD_ZONES, type CameraPose, type WorldStore, type WorldTexts, type WorldZone } from '../worldStore'
 import type { WorldData } from '../data/types'
-import { createLimit, fit, framePoints, placeCamera, pullIn, readPose, restorePose } from './camera'
+import { createLimit, fit, framePoints, limitTo, placeCamera, pullIn, readPose, restorePose, startFlight, tickFlight, type Flight } from './camera'
+import { still, type Glide } from './ease'
+import type { Gate } from './groundLabel'
 import { createHudLayout } from './hudLayout'
 import { bindPointer, collectPicks } from './pointer'
-import { createSelection, type Ring } from './selection'
-import { buildCampus } from './zones/campus'
+import { createSelection, type Fence, type Plus, type Ring } from './selection'
+import { buildMap, retextGates, tickZones, zoneLabels } from './zones/layout'
 import type { WorldLook } from '../settings'
 import { createStyle, disposeStyle, restyle, type WorldStyle } from './style'
 import { readTokens } from './tokens'
@@ -36,8 +38,36 @@ export type WorldCtx = {
   labels: Map<string, CSS2DObject>
   // id здания → кольцо наведения и выбора на земле
   rings: Map<string, Ring>
-  // Меши зданий для raycast
+  // lotPartId('lot', venueId) → ограда участка; id → «плюс» пустого места (selection.ts)
+  fences: Map<string, Fence>
+  pluses: Map<string, Plus>
+  // id → кнопка зоны на земле (groundLabel.ts)
+  gates: Map<string, Gate>
+  // Цели указателя: меши с userData.root = id. Пополняют pickable / hitPlane (pointer.ts)
   picks: THREE.Object3D[]
+  // Покадровая работа зон (жизнь, рост зданий): строитель зоны кладёт сюда функцию при
+  // сборке, кадр зовёт её перед рендером; список живёт до пересборки сцены. Нужен новый
+  // кадр в неподвижном мире — ctx.invalidate().
+  ticks: Array<(now: number) => void>
+  // Зона под камерой; построенные зоны (в порядке ряда) и их группы
+  zone: WorldZone
+  zones: WorldZone[]
+  zoneRoots: Map<WorldZone, THREE.Group>
+  // Зона, под которую показаны кнопки на земле: в переезде — прежняя
+  zoneShown: WorldZone
+  // Уровень приглушения каждой зоны: 0 — яркая, 1 — приглушена
+  zoneDim: Record<WorldZone, Glide>
+  // Переезд камеры между зонами; пока он идёт, указатель ничего не активирует
+  flight: Flight | null
+  // Кнопка на земле под нажатым указателем
+  press: string | null
+  // Последнее попадание указателя в цель: точка в осях мира и момент (performance.now)
+  hit: { point: THREE.Vector3; at: number } | null
+  // Активация объекта: клик в сцене; кнопка зоны — переезд, остальное — выбор и оболочка
+  activate: (id: string) => void
+  // Неподвижный мир (prefers-reduced-motion): анимации встают в конечное состояние сразу
+  reduced: boolean
+  tmpColor: THREE.Color
   // Ключ подписи фигурки под указателем: её чип показан всегда
   near: string | null
   // Попросить кадр. Неподвижный мир рисуется только по требованию; в живом кадры идут сами
@@ -58,8 +88,14 @@ export type WorldDeps = {
   // Дальше данные приходят через setData.
   data?: WorldData | null
   pose?: CameraPose | null
-  // Клик по объекту сцены (id здания): переход в раздел делает оболочка
+  // Надписи кнопок на земле на момент сборки; дальше — setTexts
+  texts: WorldTexts
+  // Зона из адреса на момент сборки; дальше — goZone
+  zone?: WorldZone
+  // Клик по объекту сцены (id здания, участка, места, «плюса»): что с ним делать, решает оболочка
   onActivate?: (id: string) => void
+  // Нажата кнопка зоны на земле: оболочка пишет зону в адрес и зовёт goZone
+  onZone?: (zone: WorldZone) => void
   onFirstFrame?: () => void
   onContextLost?: () => void
 }
@@ -69,8 +105,13 @@ export type World = {
   getPose: () => CameraPose
   // Смена облика без перезагрузки: сцена пересобирается, камера остаётся на месте
   setStyle: (look: WorldLook) => void
-  // Новые данные: сцена пересобирается, только если изменились машины или люди
+  // Новые данные: сцена пересобирается, только если изменились машины, люди или зоны
   setData: (data: WorldData | null) => void
+  // Новые надписи на земле (смена языка, чисел): перерисовка без пересборки
+  setTexts: (texts: WorldTexts) => void
+  // Камера переезжает к зоне (неподвижный мир — мгновенно). Зоны без данных нет на
+  // карте — камера остаётся на кампусе, а просьбу мир помнит до появления данных.
+  goZone: (zone: WorldZone) => void
   dispose: () => void
 }
 
@@ -86,12 +127,14 @@ function release(root: THREE.Object3D) {
   })
 }
 
-const NO_DATA: WorldData = { cars: [], people: [], sites: { office: null, warehouse: null, garage: null } }
+const NO_DATA: WorldData = { cars: [], people: [], venues: null, archive: null, mock: false, sites: { office: null, warehouse: null, garage: null } }
 
-// Наполнение сцены зависит только от машин и людей (числа вывесок рисует оболочка),
-// причём от порядка тоже: место у гаража и на кампусе — по номеру в списке
+// Наполнение сцены зависит от машин, людей, площадок и архива (числа вывесок рисует
+// оболочка), причём от порядка тоже: место у гаража и на кампусе — по номеру в списке.
+// Площадки и архив сверяются ссылкой: адаптер отдаёт тот же массив, пока источник не ответил заново.
 function sameFill(a: WorldData, b: WorldData) {
-  return a.cars.length === b.cars.length && a.people.length === b.people.length
+  return a.venues === b.venues && a.archive === b.archive
+    && a.cars.length === b.cars.length && a.people.length === b.people.length
     && a.cars.every((car, i) => {
       const other = b.cars[i]!
       return car.id === other.id && car.brand === other.brand && car.model === other.model && car.color === other.color && car.plate === other.plate
@@ -146,7 +189,22 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     roots: new Map(),
     labels: new Map(),
     rings: new Map(),
+    fences: new Map(),
+    pluses: new Map(),
+    gates: new Map(),
     picks: [],
+    ticks: [],
+    zone: 'campus',
+    zones: ['campus'],
+    zoneRoots: new Map(),
+    zoneShown: 'campus',
+    zoneDim: { campus: still(0), venues: still(1), archive: still(1) },
+    flight: null,
+    press: null,
+    hit: null,
+    activate: () => {},
+    reduced: deps.reducedMotion,
+    tmpColor: new THREE.Color(),
     near: null,
     invalidate: () => {},
     framePts: [],
@@ -158,7 +216,12 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
   const tmp = new THREE.Vector3()
   let seenFrame = false
   const render = (now: number) => {
-    pullIn(ctx.limit, controls.target, camera.position, tmp)   // сдвиг камеры не уводит цель за пределы сцены
+    if (ctx.flight) {
+      // Переезд: камерой правит анимация, OrbitControls выключены
+      if (tickFlight(ctx, ctx.flight, now)) land()
+    } else pullIn(ctx.limit, controls.target, camera.position, tmp)   // сдвиг камеры не уводит цель за пределы сцены
+    tickZones(ctx, now, deps.store.getState().hover)
+    for (const tick of ctx.ticks) tick(now)
     selection.tick(now)
     renderer.render(scene, camera)
     css2d.render(scene, camera)
@@ -176,13 +239,73 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
   const hud = createHudLayout(ctx, deps.store, deps.reducedMotion)
   const unbindPointer = bindPointer(ctx, deps)
 
+  const isCompact = () => container.clientWidth < HUD_COMPACT_WIDTH
   const resize = new ResizeObserver(() => {
     if (!fit(ctx)) return
-    const compact = container.clientWidth < HUD_COMPACT_WIDTH
+    const compact = isCompact()
     deps.store.setState({ hudCompact: compact })
-    if (!ctx.userMoved) placeCamera(ctx, compact)
+    if (ctx.flight) land()   // цель переезда посчитана под прежнее окно
+    else if (!ctx.userMoved) placeCamera(ctx, compact)
     hud.dirty()   // он же просит кадр неподвижному миру
   })
+
+  // Камера встала на зону: позу покоя считаем заново (окно могло смениться), кнопки на
+  // земле — под новую зону, нажатая гаснет
+  function land() {
+    ctx.flight = null
+    controls.enabled = true
+    ctx.zoneShown = ctx.zone
+    for (const gate of ctx.gates.values()) gate.lit = false
+    ctx.userMoved = false
+    placeCamera(ctx, isCompact())
+    deps.store.setState({ flying: false })
+    hud.dirty()
+  }
+
+  // Зона из адреса (последняя просьба оболочки) и зона под камерой: расходятся, пока у
+  // запрошенной нет данных
+  let wanted: WorldZone = deps.zone ?? 'campus'
+  // Сменить зону под камерой. fly — переезд по карте; иначе камера встаёт сразу
+  // (неподвижный мир, сборка мира, пропавшая зона).
+  const enterZone = (to: WorldZone, fly: boolean) => {
+    const from = ctx.zone
+    if (ctx.flight) land()
+    ctx.zone = to
+    limitTo(ctx.limit, to)
+    zoneLabels(ctx)
+    deps.store.setState({ zone: to, hover: null, pick: null, flying: fly })
+    if (fly) startFlight(ctx, from, isCompact(), performance.now())
+    else {
+      ctx.zoneShown = to
+      // Без переезда приглушение не перетекает, а встаёт
+      for (const zone of WORLD_ZONES) ctx.zoneDim[zone] = still(zone === to ? 0 : 1)
+      ctx.userMoved = false
+      if (placed) placeCamera(ctx, isCompact())
+    }
+    hud.dirty()
+  }
+  const goZone = (zone: WorldZone) => {
+    if (disposed) return
+    wanted = zone
+    const to = ctx.zones.includes(zone) ? zone : 'campus'
+    if (to !== ctx.zone) enterZone(to, !deps.reducedMotion && seenFrame)
+  }
+
+  // Клик по кнопке зоны: она загорается и держит свет до посадки; зону меняет адрес
+  // (оболочка зовёт goZone). Переезд не начался — короткая вспышка.
+  ctx.activate = (id) => {
+    const gate = ctx.gates.get(id)
+    if (!gate) {
+      // «Плюс» — действие, а не выбор
+      if (!isAddId(id)) deps.store.setState({ pick: id })
+      deps.onActivate?.(id)
+      return
+    }
+    gate.lit = true
+    ctx.invalidate()
+    deps.onZone?.(gate.to)
+    window.setTimeout(() => { if (!ctx.flight && gate.lit) { gate.lit = false; ctx.invalidate() } }, 260)
+  }
 
   const onContextLost = () => deps.onContextLost?.()
 
@@ -192,7 +315,14 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     ctx.labels.forEach((o) => o.element.remove())
     ctx.labels.clear()
     ctx.rings.clear()
+    ctx.fences.clear()
+    ctx.pluses.clear()
+    ctx.gates.clear()
+    ctx.zoneRoots.clear()
     ctx.picks.length = 0
+    ctx.ticks.length = 0
+    ctx.press = null
+    ctx.hit = null
     ctx.near = null
   }
 
@@ -218,7 +348,7 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     ctx.roots.clear()
     clearFill()
     ctx.framePts.length = 0
-    deps.store.setState({ hover: null, pick: null, labels: new Map() })
+    deps.store.setState({ hover: null, pick: null, flying: false, labels: new Map() })
     renderer.dispose()
     // Без этого контекст живёт до сборки мусора, а браузер держит их около шестнадцати
     renderer.forceContextLoss()
@@ -228,12 +358,26 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
 
   // Наполнение сцены — одно место и на первый кадр, и на смену облика или данных
   let data = deps.data ?? NO_DATA
+  let texts = deps.texts
+  // Камера уже расставлена под окно (после первого fit): до этого аспекта нет
+  let placed = false
   const build = () => {
-    scene.add(buildCampus(ctx, data))
+    const before = ctx.zones
+    scene.add(buildMap(ctx, data, texts))
     ctx.framePts = framePoints(ctx)
     collectPicks(ctx)
-    // Карта — новым объектом: оболочка рисует в элементы порталом и следит за сменой
-    deps.store.setState({ labels: new Map([...ctx.labels].map(([id, o]) => [id, o.element])) })
+    const same = before.length === ctx.zones.length && before.every((zone, i) => zone === ctx.zones[i])
+    // Карта — новым объектом: оболочка рисует в элементы порталом и следит за сменой.
+    // Состав зон — тем же массивом, пока не изменился.
+    deps.store.setState({ labels: new Map([...ctx.labels].map(([id, o]) => [id, o.element])), zones: same ? deps.store.getState().zones : [...ctx.zones] })
+    // Зона из адреса могла появиться (данные пришли) или пропасть: камера встаёт без переезда
+    const to = ctx.zones.includes(wanted) ? wanted : 'campus'
+    if (to !== ctx.zone) enterZone(to, false)
+    else {
+      zoneLabels(ctx)
+      // У кампуса появились или пропали соседи — в рамку вошли или вышли их кнопки
+      if (!same && placed && !ctx.userMoved) placeCamera(ctx, isCompact())
+    }
     selection.rebuilt()
     hud.dirty()
   }
@@ -242,6 +386,8 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
   // возвращает selection.rebuilt() внутри build(). change — что меняется между сносом
   // и сборкой (облик); данным менять нечего, они уже лежат в data.
   const refill = (change?: () => void) => {
+    // Переезд целился в сцену, которой сейчас не станет
+    if (ctx.flight) land()
     // Всё, кроме света: что именно лежит в сцене, этот код не знает и знать не должен
     for (const o of [...scene.children]) {
       if ((o as THREE.Light).isLight) continue
@@ -283,11 +429,19 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     if (!sameFill(prev, data)) refill()
   }
 
+  const setTexts = (next: WorldTexts) => {
+    if (disposed) return
+    texts = next
+    retextGates(ctx, next)
+  }
+
   try {
     build()
     // Синхронно, не дожидаясь ResizeObserver: первому кадру нужен верный аспект
     fit(ctx)
-    placeCamera(ctx, container.clientWidth < HUD_COMPACT_WIDTH)
+    placed = true
+    limitTo(ctx.limit, ctx.zone)
+    placeCamera(ctx, isCompact())
     if (deps.pose) restorePose(ctx, deps.pose)
 
     canvas.addEventListener('webglcontextlost', onContextLost)
@@ -298,7 +452,7 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
       requestRender()
     } else {
       renderer.setAnimationLoop((now) => {
-        controls.update()
+        if (!ctx.flight) controls.update()
         render(now)
       })
     }
@@ -307,5 +461,5 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     throw error
   }
 
-  return { store: deps.store, getPose: () => readPose(ctx), setStyle, setData, dispose }
+  return { store: deps.store, getPose: () => readPose(ctx), setStyle, setData, setTexts, goZone, dispose }
 }

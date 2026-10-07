@@ -7,6 +7,8 @@
       при повороте камеры.
    3. Чипы имён — ниже всех: не двигаются, а гаснут, если легли бы на обвязку, вывеску
       или уже показанный чип. В компактном режиме скрыты все, кроме чипа под указателем.
+   4. Свободные подписи (ни w-sign, ни w-who — «плюс» пустого места) раскладка не трогает.
+   Подписи приглушённых зон сняты со слоя камеры (zones/layout.ts) — их как нет.
    Скрытая вывеска не теряет объект: у каждого здания есть клавиша.
    Движок пишет только классы и переменные якоря (контракт — worldStore.ts), детей не трогает. */
 import * as THREE from 'three'
@@ -81,7 +83,8 @@ export function createHudLayout(ctx: WorldCtx, store: WorldStore, reduced: boole
     stale = false
     chrome = stage ? [...stage.querySelectorAll<HTMLElement>('[data-w-chrome]')].map(boxIn).filter((b) => b.w && b.h) : []
     const old = new Map(items.map((s) => [s.o, s]))
-    items = [...ctx.labels].map(([id, o]) => {
+    const laid = [...ctx.labels].filter(([, o]) => o.element.classList.contains('w-sign') || o.element.classList.contains('w-who'))
+    items = laid.map(([id, o]) => {
       const el = o.element, chip = el.classList.contains('w-who')
       // Новая подпись рождается скрытой и проявляется, когда раскладка нашла ей место
       const s: Item = old.get(o) ?? { id, o, el, chip, size: null, hidden: false, level: chip ? 1 : 2, fresh: true, x: 0, y: 0, z: 0, ok: false, tight: false, shift: 0, lift: 0, px: '', near: false, dx: 0 }
@@ -141,7 +144,8 @@ export function createHudLayout(ctx: WorldCtx, store: WorldStore, reduced: boole
     for (const s of items) {
       at.setFromMatrixPosition(s.o.matrixWorld).project(ctx.camera)
       s.x = (at.x + 1) / 2 * w; s.y = (1 - at.y) / 2 * h; s.z = at.z
-      const seen = s.o.visible && Math.abs(s.z) <= 1
+      // Слой: подпись приглушённой зоны рендерер прячет сам — ждать её размера не нужно
+      const seen = s.o.visible && s.o.layers.test(ctx.camera.layers) && Math.abs(s.z) <= 1
       s.ok = !!s.size && seen
       if (seen && !s.size) {
         stale = true

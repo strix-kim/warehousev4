@@ -1,22 +1,13 @@
-// Наведение и выбор: кольцо на земле у здания и классы подписи. Корпус и рёбра не
-// меняются. Источник — стор: hover и pick пишут и движок (указатель), и оболочка
-// (наведение и фокус на вывеске и клавише) — отзыв один, откуда бы значение ни пришло.
+// Наведение и выбор: кольцо на земле у здания, ограда участка, «плюс» пустого места и
+// классы подписи. Корпус и рёбра не меняются. Источник — стор: hover и pick пишут и
+// движок (указатель), и оболочка (наведение и фокус на вывеске и клавише) — отзыв один,
+// откуда бы значение ни пришло.
 import * as THREE from 'three'
-import type { WorldStore } from '../worldStore'
+import { lotPartId, parseLotId, type WorldStore } from '../worldStore'
 import type { WorldCtx } from './createWorld'
-
-// cubic-bezier(.2,.8,.2,1) = --ease-out: x(s) решаем делением пополам
-const bz = (s: number, a: number, b: number) => 3 * a * s * (1 - s) ** 2 + 3 * b * s * s * (1 - s) + s ** 3
-function easeOut(t: number) {
-  let lo = 0, hi = 1, s = t
-  for (let i = 0; i < 18; i++) { s = (lo + hi) / 2; if (bz(s, 0.2, 0.2) < t) lo = s; else hi = s }
-  return bz(s, 0.8, 1)
-}
-
-// Значение, плавно идущее к цели по --ease-out
-type Glide = { val: number; from: number; to: number; t0: number; dur: number }
-const still = (val = 0): Glide => ({ val, from: val, to: val, t0: 0, dur: 0 })
-const glide = (v: Glide, to: number, dur: number, now: number) => { if (v.to !== to) Object.assign(v, { from: v.val, to, t0: now, dur }) }
+import { easeOut, glide, glideStep, still, type Glide } from './ease'
+import { hitPlane } from './pointer'
+import { label } from './primitives'
 
 type Flat = THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
 
@@ -69,6 +60,62 @@ function settleRing(ring: Ring) {
 // Пульс: 0,8 → 1,08 за 45 % времени, затем → 1
 const pulse = (k: number) => k < 0.45 ? 0.8 + 0.28 * easeOut(k / 0.45) : 1.08 - 0.08 * easeOut((k - 0.45) / 0.55)
 
+/* Ограда участка — вместо кольца: по периметру надела лежат блоки высотой 0. Наведение
+   на любую часть участка поднимает их серой кромкой, выбор — красный забор с зубцами
+   волной от ближнего к клику угла (ctx.hit), снятие — разом; неподвижный мир — сразу.
+   Надел — прямоугольник в осях parent (группа участка): hw — полуширина, z0…z1 —
+   задний и передний край, curb — ширина бордюра, gate — калитка в переднем бордюре.
+   ЗАГОТОВКА захода 1 Ш5: состояние ведётся, блоков нет. Рисует кодер В (заход 2) по
+   макету voxel-world-s51.html: FENCE_ITEMS, makeFence, tickFences. */
+export type FencePlot = { hw: number; z0: number; z1: number; curb: number; gate: readonly [number, number] }
+export type Fence = {
+  parent: THREE.Object3D
+  plot: FencePlot
+  hovOn: boolean; selOn: boolean
+  h: Glide
+  // Начало волны выбора или схлопывания
+  sT0: number
+}
+
+// Ключ в ctx.fences — lotPartId('lot', venueId): по нему ограду находит выбор любой
+// части участка. Кладёт вызывающий (zones/venues.ts): ctx.fences.set(key, makeFence(…)).
+export function makeFence(ctx: WorldCtx, parent: THREE.Object3D, plot: FencePlot): Fence {
+  void ctx
+  return { parent, plot, hovOn: false, selOn: false, h: still(), sT0: -1e9 }
+}
+
+// Кадр одной ограды; зовётся из tick ниже, перед рендером
+function tickFence(ctx: WorldCtx, fence: Fence, now: number, reduced: boolean) {
+  glide(fence.h, fence.hovOn && !fence.selOn ? 1 : 0, 150, now)
+  glideStep(fence.h, now, reduced)
+  void ctx
+}
+
+/* «Плюс» — пустое место, которое можно заполнить: пунктир из плиток по контуру будущего
+   основания и невидимая цель клика w × d с центром в (x, z) в осях parent. Сам «плюс» —
+   кнопка HUD в якоре (класс w-plus, свободная подпись; hud/Plus.tsx): она же дубль для
+   клавиатуры. Наведение — класс is-hover на якоре (ставит paint ниже) и hovOn здесь.
+   ЗАГОТОВКА захода 1 Ш5: цель и якорь есть, пунктира нет. Рисует кодер В (заход 2) по
+   макету: dashRect, buildSlot. Сам кладёт себя в ctx.pluses и ctx.roots. */
+export type Plus = { root: THREE.Group; hovOn: boolean }
+
+export function makePlus(ctx: WorldCtx, parent: THREE.Object3D, id: string, x: number, z: number, w: number, d: number): Plus {
+  const root = new THREE.Group()
+  root.position.set(x, 0, z)
+  parent.add(root)
+  hitPlane(ctx, root, w, d, 0, 0, id, 0.08)
+  label(ctx, root, id, 'w-plus', 0, 0.3, 0).center.set(0.5, 0.5)
+  const plus: Plus = { root, hovOn: false }
+  ctx.roots.set(id, root)
+  ctx.pluses.set(id, plus)
+  return plus
+}
+
+// Кадр одного «плюса»; зовётся из tick ниже
+function tickPlus(ctx: WorldCtx, plus: Plus, now: number, reduced: boolean) {
+  void ctx; void plus; void now; void reduced
+}
+
 export type Selection = {
   // Кадр колец; зовётся перед рендером сцены
   tick: (now: number) => void
@@ -90,6 +137,16 @@ export function createSelection(ctx: WorldCtx, store: WorldStore, reduced: boole
     const el = ctx.labels.get(id)?.element
     el?.classList.toggle('is-hover', hot)
     el?.classList.toggle('is-selected', sel)
+    const plus = ctx.pluses.get(id)
+    if (plus) plus.hovOn = hot
+    // Ограда — одна на участок: отвечает наведению и выбору любой его части
+    const lot = parseLotId(id)
+    const fence = lot && ctx.fences.get(lotPartId('lot', lot.venueId))
+    if (lot && fence) {
+      const on = (v: string | null) => parseLotId(v)?.venueId === lot.venueId
+      fence.hovOn = on(hover)
+      if (fence.selOn !== on(pick)) { fence.selOn = !fence.selOn; fence.sT0 = performance.now() }
+    }
   }
 
   const unsubscribe = store.subscribe(() => {
@@ -102,7 +159,7 @@ export function createSelection(ctx: WorldCtx, store: WorldStore, reduced: boole
     ctx.invalidate()
   })
 
-  const step = (v: Glide, now: number) => (v.val = v.from + (v.to - v.from) * easeOut(reduced || !v.dur ? 1 : Math.min(1, Math.max(0, (now - v.t0) / v.dur))))
+  const step = (v: Glide, now: number) => glideStep(v, now, reduced)
   // Доля пути анимации длиной dur от момента sT0; в неподвижном мире — сразу конец
   const span = (ring: Ring, now: number, dur: number) => reduced ? 1 : Math.min(1, Math.max(0, (now - ring.sT0) / dur))
 
@@ -130,6 +187,8 @@ export function createSelection(ctx: WorldCtx, store: WorldStore, reduced: boole
         r.fill.visible = f > 0.001
         r.fill.scale.setScalar(Math.max(f, 0.001))
       }
+      for (const f of ctx.fences.values()) tickFence(ctx, f, now, reduced)
+      for (const p of ctx.pluses.values()) tickPlus(ctx, p, now, reduced)
     },
     rebuilt() {
       if (hover) paint(hover)
@@ -137,6 +196,10 @@ export function createSelection(ctx: WorldCtx, store: WorldStore, reduced: boole
         paint(pick)
         const ring = ctx.rings.get(pick)
         if (ring) settleRing(ring)
+        // Ограда выбранного участка — тоже сразу в покое, без повторной волны
+        const lot = parseLotId(pick)
+        const fence = lot && ctx.fences.get(lotPartId('lot', lot.venueId))
+        if (fence) fence.sT0 = -1e9
       }
     },
     dispose: unsubscribe,

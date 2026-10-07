@@ -2,7 +2,7 @@
 import * as THREE from 'three'
 import type { WorldCtx } from './createWorld'
 import type { Kit } from './primitives'
-import { flat } from './style'
+import { dimmed, flat } from './style'
 
 export const CAMPUS_HALF = 28   // край сетки кампуса
 export const ROAD_Z = 25.25     // ось главной дороги вдоль фронта кампуса
@@ -24,6 +24,7 @@ export function ground(ctx: WorldCtx, parent: THREE.Object3D, size: number) {
   grid.material.transparent = true
   grid.material.opacity = P.gridA
   grid.material.depthWrite = false
+  dimmed(ctx.style, grid.material)
   grid.position.y = 0.06
   parent.add(grid)
 }

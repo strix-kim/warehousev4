@@ -1,20 +1,25 @@
 import { MonitorOff } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import { useWorldData } from './data/useWorldData'
+import { ArchivePanel } from './hud/ArchivePanel'
 import { DayCap } from './hud/DayCap'
 import { Dock } from './hud/Dock'
 import { NameChip } from './hud/NameChip'
+import { Plus } from './hud/Plus'
+import { ruPlural } from './hud/plural'
 import { Sign } from './hud/Sign'
+import { VenuePanel } from './hud/VenuePanel'
+import { ZoneSwitch } from './hud/ZoneSwitch'
 import type { World } from './engine/createWorld'
 import { loadWorld } from './loadWorld'
 import type { WorldLook } from './settings'
 import { hasWebGL2, prefersReducedMotion } from './support'
-import { createWorldStore, useWorldState, WORLD_SITES, type CameraPose, type WorldSiteId } from './worldStore'
+import { createWorldStore, isAddId, isWorldZone, useWorldState, WORLD_SITES, type CameraPose, type WorldSiteId, type WorldTexts, type WorldZone } from './worldStore'
 import './world.css'
 import './hud/world-hud.css'
 
@@ -30,6 +35,12 @@ type Status = 'loading' | 'ready' | 'unsupported' | 'failed' | 'lost'
 const hot = import.meta.hot
 if (hot) hot.dispose((data) => { data.swapping = true })
 
+// Зоны, у которых нет источника в базе: в dev их наполняет макет (fixtures.dev.ts)
+const MOCK_ZONES: readonly WorldZone[] = ['venues', 'archive']
+const NO_ZONES: readonly WorldZone[] = []
+// Сколько держится сообщение стенда
+const NOTE_MS = 2400
+
 // Раздел продукта за каждым зданием
 const SITE_ROUTES: Record<WorldSiteId, string> = { office: '/lists', warehouse: '/equipment', garage: '/vehicles' }
 
@@ -41,14 +52,30 @@ type Props = {
 }
 
 export function WorldStage({ look, onFirstFrame }: Props) {
-  const { tr } = useLanguage()
+  const { tr, locale } = useLanguage()
   const navigate = useNavigate()
+  // Зона живёт в адресе (?zone=): хозяин — адрес, мир только догоняет. Незнакомое
+  // значение — кампус; зона без данных — тоже кампус (решает движок), адрес не трогаем:
+  // данные могут ещё прийти.
+  const [params, setParams] = useSearchParams()
+  const zoneParam = params.get('zone')
+  const wantedZone: WorldZone = isWorldZone(zoneParam) ? zoneParam : 'campus'
   const slotRef = useRef<HTMLDivElement>(null)
   const [store] = useState(createWorldStore)
   // Одна ссылка и движку, и HUD: машины в сцене, числа вывесок и имена — из одного
   // объекта. null — данных нет, вывески стоят без чисел.
   const data = useWorldData()
   const hover = useWorldState(store, (state) => state.hover)
+  const zone = useWorldState(store, (state) => state.zone)
+  const zones = useWorldState(store, (state) => state.zones)
+  const labels = useWorldState(store, (state) => state.labels)
+  // Сообщение стенда: «плюс» в макете ничего не добавляет
+  const [note, setNote] = useState<string | null>(null)
+  useEffect(() => {
+    if (note === null) return
+    const timer = window.setTimeout(() => setNote(null), NOTE_MS)
+    return () => window.clearTimeout(timer)
+  }, [note])
   const hudCompact = useWorldState(store, (state) => state.hudCompact)
   const [status, setStatus] = useState<Status>(() => (hasWebGL2() ? 'loading' : 'unsupported'))
   const onFirstFrameRef = useRef(onFirstFrame)
@@ -59,12 +86,44 @@ export function WorldStage({ look, onFirstFrame }: Props) {
   const lookRef = useRef<WorldLook>({ palette, ink })
   // То же с данными: к моменту сборки мира они могли прийти, а могли и нет
   const dataRef = useRef(data)
-  const worldRef = useRef<Pick<World, 'setStyle' | 'setData' | 'dispose'> | null>(null)
+  const worldRef = useRef<Pick<World, 'setStyle' | 'setData' | 'setTexts' | 'goZone' | 'dispose'> | null>(null)
+  const wantedRef = useRef(wantedZone)
 
   const names: Record<WorldSiteId, string> = { office: tr('Офис', 'Ofis'), warehouse: tr('Склад', 'Ombor'), garage: tr('Гараж', 'Garaj') }
+  // Имена зон и подстрочники с числами: их же движок рисует на кнопках на земле.
+  // Числа нет (источник не ответил) — подстрочника нет.
+  const listCount = data?.sites.office ?? null, venueCount = data?.venues?.length ?? null, placeCount = data?.archive?.length ?? null
+  const texts = useMemo<WorldTexts>(() => {
+    const count = (n: number | null, ru: [string, string, string], uz: string) => n === null ? '' : `${n.toLocaleString(locale)} ${tr(ruPlural(n, ...ru), uz)}`
+    return {
+      zones: {
+        campus: { name: tr('Кампус', 'Kampus'), sub: count(listCount, ['список', 'списка', 'списков'], 'ro‘yxat') },
+        venues: { name: tr('Площадки', 'Maydonlar'), sub: count(venueCount, ['место', 'места', 'мест'], 'joy') },
+        archive: { name: tr('Где работали', 'Qayerda ishlaganmiz'), sub: count(placeCount, ['место', 'места', 'мест'], 'joy') },
+      },
+    }
+  }, [tr, locale, listCount, venueCount, placeCount])
+  const textsRef = useRef(texts)
+  // Зона — в адрес через replace: переезды по карте историю не плодят, «назад» уводит
+  // со страницы мира, а не по зонам (gotchas §7)
+  const goZone = (next: WorldZone) => {
+    setParams((prev) => {
+      const query = new URLSearchParams(prev)
+      if (next === 'campus') query.delete('zone')
+      else query.set('zone', next)
+      return query
+    }, { replace: true })
+  }
+  const goZoneRef = useRef(goZone)
+  useEffect(() => { goZoneRef.current = goZone })
   // Выбор и переход — один путь для вывески, клавиши и клика по зданию в сцене.
   // Движок к этому моменту pick уже поставил: повторная запись того же id стор не будит.
+  // Участки и места — выбор без перехода: их показывают панели зон по pick из стора.
   const activate = (id: string) => {
+    if (isAddId(id)) {
+      setNote(tr('Макет: добавление появится вместе с живыми площадками', 'Maket: qo‘shish jonli maydonlar bilan birga paydo bo‘ladi'))
+      return
+    }
     if (!WORLD_SITES.includes(id as WorldSiteId)) return
     store.setState({ pick: id })
     navigate(SITE_ROUTES[id as WorldSiteId])
@@ -93,7 +152,10 @@ export function WorldStage({ look, onFirstFrame }: Props) {
           data: dataRef.current,
           reducedMotion: prefersReducedMotion(),
           pose: (hot?.data.pose as CameraPose | undefined) ?? null,
+          texts: textsRef.current,
+          zone: wantedRef.current,
           onActivate: (id) => activateRef.current(id),
+          onZone: (next) => goZoneRef.current(next),
           onFirstFrame: () => {
             setStatus('ready')
             onFirstFrameRef.current?.(Math.round(performance.now() - startedAt))
@@ -152,6 +214,16 @@ export function WorldStage({ look, onFirstFrame }: Props) {
     }
   }, [data])
 
+  useEffect(() => {
+    textsRef.current = texts
+    worldRef.current?.setTexts(texts)
+  }, [texts])
+
+  useEffect(() => {
+    wantedRef.current = wantedZone
+    worldRef.current?.goZone(wantedZone)
+  }, [wantedZone])
+
   return (
     <div className={`w-stage${palette === 'night' ? ' is-dark' : ''}${hudCompact ? ' is-sm' : ''}`}>
       {/* Без aria-hidden: внутри слота живут вывески — настоящие кнопки с именем */}
@@ -161,10 +233,18 @@ export function WorldStage({ look, onFirstFrame }: Props) {
         <Sign key={id} store={store} id={id} name={names[id]} count={data?.sites[id] ?? null} onActivate={activate} />
       ))}
       {data?.people.map((person) => <NameChip key={person.id} store={store} person={person} />)}
+      {[...labels.keys()].filter(isAddId).map((id) => <Plus key={id} store={store} id={id} onActivate={activate} />)}
+      {/* HUD зоны живёт, пока камера стоит на ней; якоря чужих зон движок прячет сам */}
+      {zone === 'venues' && data?.venues && <VenuePanel store={store} venues={data.venues} />}
+      {zone === 'archive' && data?.archive && <ArchivePanel store={store} places={data.archive} />}
       {status === 'ready' && (
         <>
           <DayCap />
-          <Dock store={store} names={names} onActivate={activate} />
+          {/* Один кампус (зон нет) — переключать нечего */}
+          {zones.length > 1 && <ZoneSwitch store={store} texts={texts} mockZones={data?.mock ? MOCK_ZONES : NO_ZONES} onGo={goZone} />}
+          {/* Клавиши — дубли зданий кампуса */}
+          {zone === 'campus' && <Dock store={store} names={names} onActivate={activate} />}
+          {note !== null && <p className="w-toast" role="status">{note}</p>}
         </>
       )}
       {/* Скринридеру: имя здания под указателем или в фокусе клавиши */}

@@ -71,14 +71,14 @@ function crease(out: number[], w: number, h: number, d: number, r: number, p?: T
 
 // Линии контура одним объектом: пары точек → толстые отрезки.
 // userData.hull — как у силуэта: в raycast не идёт
-function inkLines(ctx: WorldCtx, pts: number[]) {
+export function inkLines(ctx: WorldCtx, pts: number[]) {
   const o = new LineSegments2(new LineSegmentsGeometry().setPositions(pts), ctx.style.ink)
   o.userData.hull = true
   return o
 }
 
 // Силуэт «чернилами»: тем же объёмом, задними гранями
-function hull(ctx: WorldCtx, o: THREE.Mesh) {
+export function hull(ctx: WorldCtx, o: THREE.Mesh) {
   const hm = new THREE.Mesh(o.geometry, ctx.style.hull)
   hm.userData.hull = true
   o.add(hm)

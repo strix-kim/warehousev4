@@ -1,15 +1,9 @@
 import { createPortal } from 'react-dom'
 import { useLanguage } from '../../../lib/i18n'
 import { useWorldState, type WorldSiteId, type WorldStore } from '../worldStore'
+import { ruPlural } from './plural'
 
 type Tr = (ru: string, uz: string) => string
-
-// Склонение для русского — то же правило, что у ruPlural на главной (HomePage.tsx):
-// там хелпер локальный и не экспортируется. В узбекском счётное слово не склоняется.
-function ruPlural(count: number, one: string, few: string, many: string) {
-  const rule = new Intl.PluralRules('ru').select(count)
-  return rule === 'one' ? one : rule === 'few' ? few : many
-}
 
 // Единица под числом. Склад — слово плитки главной («штук» / «dona»)
 function unitWord(id: WorldSiteId, count: number, tr: Tr) {

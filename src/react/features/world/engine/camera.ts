@@ -1,19 +1,39 @@
-// Камера: рабочий ракурс под окно, пределы цели, поза между пересозданиями мира.
+// Камера: рабочий ракурс под окно, пределы цели, переезд между зонами, поза между
+// пересозданиями мира.
 import * as THREE from 'three'
-import { WORLD_SITES, type CameraPose } from '../worldStore'
+import { WORLD_SITES, WORLD_ZONES, type CameraPose, type WorldZone } from '../worldStore'
 import type { WorldCtx } from './createWorld'
 import { INK_WIDTH } from './style'
+import { zoneFrame, zoneOffset } from './zones/layout'
 
-// Камера по виду: направление и пределы зума. Цель и дистанцию считает viewPose
+// Направление — углом от вертикали (polar) и поворотом от фронтальной оси +z к +x
+// (azimuth), в градусах
+const sph = (polar: number, az: number): [number, number, number] => {
+  const p = THREE.MathUtils.degToRad(polar), a = THREE.MathUtils.degToRad(az)
+  return [Math.sin(p) * Math.sin(a), Math.cos(p), Math.sin(p) * Math.cos(a)]
+}
+
+// Телефон: цель тапа — участок или квартал, ракурс круче, чтобы ромб цели вмещал 44 px
+const PHONE_WIDTH = 640
+// Камера по зоне: направление и пределы зума. Цель и дистанцию считает viewPose
 // по «рамке интереса» под текущий аспект.
-const CAM = {
-  campus: { dir: [0.6, 0.5, 0.64], min: 14, max: 120 },
-} as const
+const CAM: Record<WorldZone, { dir: (phone: boolean) => [number, number, number]; min: number; max: number }> = {
+  campus: { dir: () => [0.6, 0.5, 0.64], min: 14, max: 120 },
+  venues: { dir: (phone) => phone ? sph(40, 43) : [0.6, 0.5, 0.64], min: 14, max: 120 },
+  archive: { dir: (phone) => sph(phone ? 36 : 52, 43), min: 14, max: 140 },
+}
 
 // Пределы цели камеры. Держит их кадр (сдвиг мышью), и в них же обязана лежать цель
-// рабочего ракурса — иначе первый кадр после расстановки дёргает камеру.
+// рабочего ракурса — иначе первый кадр после расстановки дёргает камеру. Пределы стоят
+// вокруг зоны под камерой: их двигает limitTo.
+const LIMIT = { min: [-30, 0, -30], max: [30, 14, 30] } as const
 export function createLimit() {
-  return new THREE.Box3(new THREE.Vector3(-30, 0, -30), new THREE.Vector3(30, 14, 30))
+  return new THREE.Box3(new THREE.Vector3(...LIMIT.min), new THREE.Vector3(...LIMIT.max))
+}
+export function limitTo(limit: THREE.Box3, zone: WorldZone) {
+  const off = zoneOffset(zone, new THREE.Vector3())
+  limit.min.set(...LIMIT.min).add(off)
+  limit.max.set(...LIMIT.max).add(off)
 }
 
 export function pullIn(limit: THREE.Box3, t: THREE.Vector3, p: THREE.Vector3, tmp = new THREE.Vector3()) {
@@ -103,17 +123,25 @@ export function fit(ctx: WorldCtx) {
 // HUD_EDGE раскладки.
 const SIGN_ROOM = { full: 60 + 12 + 8, compact: 44 + 10 + 8 }
 
+// Высота переключателя зон с полем, px — пара к .w-zones в world-hud.css
+const ZONES_ROOM = 56
+
 // Макет держал под вывеску 3,5 м над крышей: у дальнего здания это меньше высоты плашки,
 // и спасал только рыхлый кадр. Здесь запас — в пикселях: рамка включает точку над
 // каждым якорем на высоте вывески, пересчитанной в метры при найденной позе. Поза и
 // пересчёт зависят друг от друга — два уточнения сходятся с запасом.
+// Кадр — зоны под камерой (ctx.zone): её рамка и кнопки соседей. Вывески на ножках
+// есть только у кампуса; «Площадки» и «Где работали» кладут место под подписи в свою
+// рамку сами (userData.frame).
 export function placeCamera(ctx: WorldCtx, compact: boolean) {
-  const c = CAM.campus, { camera, controls } = ctx
-  const room = compact ? SIGN_ROOM.compact : SIGN_ROOM.full
-  const anchors = WORLD_SITES.flatMap((id) => { const o = ctx.labels.get(id); return o ? [o.getWorldPosition(new THREE.Vector3())] : [] })
+  const c = CAM[ctx.zone], { camera, controls } = ctx
+  // С соседями сверху встаёт переключатель зон: вывеске дальнего здания нужно место под ним
+  const room = (compact ? SIGN_ROOM.compact : SIGN_ROOM.full) + (ctx.zones.length > 1 ? ZONES_ROOM : 0)
+  const dir = c.dir(ctx.container.clientWidth <= PHONE_WIDTH), pts = zoneFrame(ctx)
+  const anchors = ctx.zone !== 'campus' ? [] : WORLD_SITES.flatMap((id) => { const o = ctx.labels.get(id); return o ? [o.getWorldPosition(new THREE.Vector3())] : [] })
   const tops = anchors.map((a) => a.clone())
   const at = new THREE.Vector3(), above = new THREE.Vector3()
-  let v = viewPose([...ctx.framePts, ...tops], c.dir, camera.fov, camera.aspect, ctx.limit)
+  let v = viewPose([...pts, ...tops], dir, camera.fov, camera.aspect, ctx.limit)
   for (let pass = 0; pass < 3; pass++) {
     controls.target.copy(v.t)
     camera.position.copy(v.p)
@@ -128,8 +156,36 @@ export function placeCamera(ctx: WorldCtx, compact: boolean) {
       const perMeter = (above.copy(a).setY(a.y + 1).project(camera).y - at.copy(a).project(camera).y) * half
       if (perMeter > 0) tops[i]!.setY(a.y + room / perMeter)
     })
-    v = viewPose([...ctx.framePts, ...tops], c.dir, camera.fov, camera.aspect, ctx.limit)
+    v = viewPose([...pts, ...tops], dir, camera.fov, camera.aspect, ctx.limit)
   }
+}
+
+// Переезд камеры по карте к рабочему ракурсу зоны под камерой (ctx.zone уже новая):
+// 700 мс к соседу, 900 мс через зону — вдвое дальше, но не вдвое дольше. На время
+// переезда OrbitControls выключены, камерой правит tickFlight. Поза цели считается тем
+// же placeCamera — камера на миг встаёт в неё и возвращается на место.
+export type Flight = { t0: number; dur: number; p0: THREE.Vector3; t0v: THREE.Vector3; p1: THREE.Vector3; t1: THREE.Vector3 }
+
+export function startFlight(ctx: WorldCtx, from: WorldZone, compact: boolean, now: number) {
+  const { camera, controls } = ctx
+  const p0 = camera.position.clone(), t0v = controls.target.clone()
+  placeCamera(ctx, compact)
+  const p1 = camera.position.clone(), t1 = controls.target.clone()
+  camera.position.copy(p0)
+  controls.target.copy(t0v)
+  camera.lookAt(t0v)
+  controls.enabled = false
+  const far = Math.abs(WORLD_ZONES.indexOf(from) - WORLD_ZONES.indexOf(ctx.zone)) > 1
+  ctx.flight = { t0: now, dur: far ? 900 : 700, p0, t0v, p1, t1 }
+}
+
+// Кадр переезда; true — приехали (позу покоя и управление возвращает вызывающий)
+export function tickFlight(ctx: WorldCtx, flight: Flight, now: number) {
+  const k = Math.min(1, Math.max(0, (now - flight.t0) / flight.dur)), s = k * k * (3 - 2 * k)
+  ctx.camera.position.lerpVectors(flight.p0, flight.p1, s)
+  ctx.controls.target.lerpVectors(flight.t0v, flight.t1, s)
+  ctx.camera.lookAt(ctx.controls.target)
+  return k >= 1
 }
 
 export function readPose(ctx: WorldCtx): CameraPose {
