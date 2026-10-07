@@ -93,6 +93,8 @@ default `'N/A'` · `count` integer default 1 · `availability` text default `'av
 `updated_at` · `created_by` uuid → **`auth.users(id)` без `on delete`** ·
 `is_archived` · `equipment_items` jsonb default `'[]'` · `list_mode` varchar default
 `'specific'` · `reservation_start`, `reservation_end` date · `client_name`, `venue` text.
+С с54 — девятнадцатая колонка `project_id` → `projects on delete restrict` (§16); четыре реквизита
+выше стали **донорами**: новый код их не читает и не пишет, снос — шаг 9 `plans/event-s53.md`.
 
 Ограничения: `list_mode in ('specific','abstract')`; `reservation_dates_check` — обе
 даты пусты либо `start <= end`.
@@ -627,3 +629,38 @@ technician/operator/other) → `hall_assignments` (ячейка: позиция 
 - Проверено в с51 живым REST под `rls-test@`: чтение, правка и удаление чужой строки по id —
   0 строк; подмена автора — 42501. Не проверено: первый кадр из кэша после смены аккаунта
   в одном браузере (ключ кэша несёт id пользователя).
+
+## 16. Мероприятие, состав, места (с54)
+
+Миграции `20261007184724` … `20261007191934`; план и 11 решений прораба — `plans/event-s53.md`.
+Не выводится из кода:
+
+- **`projects`, а не `events`:** имя занято наследием Vue (на `events` ссылаются `mount_points`,
+  `reports`, `equipment_lists.event_id`), TS-тип `Event` конфликтует с DOM. В интерфейсе — «Мероприятие».
+- **Реквизиты живут в `projects`** (название, заказчик, `venue_id`, `date_from`/`date_to`;
+  `date_to null` = один день). Список и план залов держат только ссылку `project_id`:
+  у списка `on delete restrict` (мероприятие со списками не удалить, 23503), у плана — `set null`.
+  `equipment_lists.project_id` nullable навсегда: список без мероприятия — черновой набор.
+  Свои название и даты у `hall_plans` остаются и с мероприятием не синхронизируются.
+- **Изоляции между сотрудниками нет по замыслу:** читает любой участник, пишут и удаляют
+  technician/manager/admin; вставка требует `created_by = auth.uid()`. Следствие: участник без
+  рабочей роли привязывает список к мероприятию, но не правит реквизиты (отказ 42501 из RPC).
+- **Запись списка — одно тело** `private.save_project_equipment_list`, наружу обёртки
+  `create_project_equipment_list` / `update_project_equipment_list`. `p_project` (объект из пяти
+  полей) пишется целиком: отсутствующий ключ = null. Клиент шлёт его, только если реквизиты правили
+  в этом редакторе (`ListProjectDraft.edited`), иначе снимок из кэша затёр бы чужую правку.
+- **Реестр списков — RPC `fetch_equipment_lists_page`,** не embed: поиск идёт по полям трёх таблиц.
+  Период меряется по `projects.date_from`; список без мероприятия или даты в период не попадает.
+- **`venues` — одна таблица на площадку работы и будущий отель** (`lodging-s49.md`); роль выводится
+  из ссылок. Город и страна — данные, не тексты интерфейса: `Toshkent` был бы другим местом по
+  `venues_identity_key`.
+- **`employees.department`** (`'staff' | 'hired'`, CHECK) — единственное отличие наёмного. `home_summary()`
+  и мир считают только штат; пикеры показывают всех.
+- **Состав — прямой DML по `project_staff`** под RLS и `project_staff_member_key`; пачечная вставка
+  обязана идти с `defaultToNull: false` (иначе `created_by: null` и отказ политики). Состав с
+  паспортами на диск не кэшируется.
+- **Бэкфилл пропускает тестовые списки по имени** (`ТЕСТ*с10*`, `SCOUT-с54-*`): их удаление в проде
+  к выкатке не прошло.
+- Проверено в с54 живым REST под `rls-test@` и блоками с откатом: гранты, подмена автора, все
+  именованные отказы, не-staff, гонка двух созданий. Не проверено: удаление от имени не-staff,
+  `set null` плана при удалении мероприятия.
