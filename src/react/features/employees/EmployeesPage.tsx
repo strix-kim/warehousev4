@@ -1,11 +1,11 @@
-import { BriefcaseBusiness, FileSpreadsheet, Plus, Search, X } from 'lucide-react'
+import { BriefcaseBusiness, Plus, Search, Users, X } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchEmployeeList, fetchEmployeePhotos, fetchEmployeesByIds, getSignedUrls, pickDocumentPhoto, readCachedEmployeeList, readCachedEmployeeListMeta, readCachedEmployeePhotos, type EmployeePhotoRef } from './api'
 import { EmployeeDrawer } from './EmployeeDrawer'
-import { EmployeeEventExportDrawer } from './EmployeeEventExportDrawer'
 import { downloadEmployeeEventXlsx, loadEventPhotos } from './eventExport'
+import { RosterToEventDrawer } from './RosterToEventDrawer'
 import { employeeDepartmentLabel, employeeFullName, hiredMarkLabel, isHiredEmployee, type EmployeeDepartment, type EmployeeListItem } from './types'
 import { AppSelect } from '../../components/AppSelect'
 import { DataAge } from '../../components/DataAge'
@@ -60,10 +60,10 @@ export function EmployeesPage() {
   const [position, setPosition] = useState('')
   // Отдел — третий клиентский фильтр того же рода; пустая строка — «Все».
   const [department, setDepartment] = useState<EmployeeDepartment | ''>('')
-  // Состав будущего документа — черновик действия, а не состояние экрана:
+  // Отмеченные для состава мероприятия — черновик действия, а не состояние экрана:
   // ни в адресе, ни в хранилище его нет, уход со страницы сбрасывает выбор.
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [isExportOpen, setIsExportOpen] = useState(false)
+  const [isRosterOpen, setIsRosterOpen] = useState(false)
   // Фото сотрудников: карта нужна не только миниатюрам — сводка «без фото»
   // в экспорте считается по ней же, тем же pickDocumentPhoto.
   const [photos, setPhotos] = useState<Map<string, EmployeePhotoRef[]>>(() => readCachedEmployeePhotos() ?? new Map())
@@ -259,7 +259,8 @@ export function EmployeesPage() {
   // человек уже закрыл дровер, и загрузка «сама собой» его бы озадачила.
   // Паспорт, ПИНФЛ и дата рождения в реестре не лежат — за ними идём отдельным
   // запросом по выбранным id, ровно в момент сборки файла и без кэша.
-  async function exportEventList(meta: EventDocumentMeta, options: { onProgress: (done: number, total: number) => void; signal: AbortSignal }) {
+  // Состав к этому моменту уже записан дровером; реквизиты — из мероприятия.
+  async function exportEventList(meta: EventDocumentMeta, options: { includeAddress: boolean; onProgress: (done: number, total: number) => void; signal: AbortSignal }) {
     const refs = chosen
       .map((employee) => ({ employeeId: employee.id, photo: pickDocumentPhoto(employee, photos.get(employee.id)) }))
       .filter((item): item is { employeeId: string; photo: EmployeePhotoRef } => Boolean(item.photo))
@@ -270,7 +271,7 @@ export function EmployeesPage() {
       fetchEmployeesByIds(chosen.map((employee) => employee.id)),
       loadEventPhotos(refs, options),
     ])
-    if (!options.signal.aborted) downloadEmployeeEventXlsx({ employees: full, meta, photos: loaded })
+    if (!options.signal.aborted) downloadEmployeeEventXlsx({ employees: full, meta, photos: loaded, includeAddress: options.includeAddress })
     return { failed }
   }
 
@@ -286,7 +287,7 @@ export function EmployeesPage() {
             {isFiltered
               ? tr(`Найдено: ${visible.length.toLocaleString(locale)} из ${employees.length.toLocaleString(locale)}`, `Topildi: ${employees.length.toLocaleString(locale)} tadan ${visible.length.toLocaleString(locale)} tasi`)
               : `${tr('Сотрудников', 'Xodimlar')}: ${employees.length.toLocaleString(locale)}`}
-            {' · '}{tr('выберите галками для списка на пропуск', 'ruxsatnoma ro‘yxati uchun belgilang')}
+            {' · '}{tr('выберите галками для состава на мероприятие', 'tadbir tarkibi uchun belgilang')}
           </p>
         </div>
         <button className="button button--primary" onClick={() => navigate('/employees/new')}>
@@ -454,8 +455,8 @@ export function EmployeesPage() {
         <div className="bulk-bar">
           <span>{tr('Выбрано', 'Tanlangan')}: <strong>{selected.size.toLocaleString(locale)}</strong></span>
           <button className="button button--secondary" onClick={() => setSelected(new Set())}>{tr('Снять выбор', 'Tanlovni bekor qilish')}</button>
-          <button className="button button--primary" onClick={() => setIsExportOpen(true)}>
-            <FileSpreadsheet size={17} /> {tr('Список на мероприятие', 'Tadbir uchun ro‘yxat')}
+          <button className="button button--primary" onClick={() => setIsRosterOpen(true)}>
+            <Users size={17} /> {tr('Состав на мероприятие', 'Tadbir tarkibi')}
           </button>
         </div>
       )}
@@ -464,7 +465,7 @@ export function EmployeesPage() {
         {openCard && <EmployeeDrawer key="profile" employee={openCard} photoUrl={openCardPhotoUrl} onClose={closeEmployee} onDocumentPhotoChange={(fileId) => applyDocumentPhoto(openCard.id, fileId)} />}
       </AnimatePresence>
       <AnimatePresence>
-        {isExportOpen && <EmployeeEventExportDrawer key="export" employees={chosen} photos={photos} photosKnown={photosKnown} onClose={() => setIsExportOpen(false)} onExport={exportEventList} />}
+        {isRosterOpen && <RosterToEventDrawer key="roster" employees={chosen} photos={photos} photosKnown={photosKnown} onClose={() => setIsRosterOpen(false)} onSaved={(projectId) => navigate(`/projects/${projectId}`)} onExport={exportEventList} />}
       </AnimatePresence>
     </>
   )

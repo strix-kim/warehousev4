@@ -88,24 +88,31 @@ export async function loadEventPhotos(
   return { photos, failed }
 }
 
-// Колонки листа в «символах» Excel. Ширина H участвует в расчёте якоря картинки,
-// поэтому она здесь константой, а не числом в строке cols.
-const PHOTO_COLUMN_WIDTH = 20
-// Индекс колонки H в нумерации DrawingML (A = 0).
-const PHOTO_COLUMN_INDEX = 7
-// Ширина и выравнивание одной парой на колонку: ФИО и должность текстом слева,
-// остальное по центру.
-const COLUMN_LAYOUT: Array<{ width: number; align: EventSheetColumn['align'] }> = [
-  { width: 5, align: 'center' },                    // A №
-  { width: 30, align: 'left' },                     // B ФИО
-  { width: 13, align: 'center' },                   // C дата рождения
-  { width: 22, align: 'centerWrap' },               // D место рождения
-  { width: 26, align: 'centerWrap' },               // E место жительства
-  { width: 16, align: 'centerWrap' },               // F паспорт
-  { width: 17, align: 'center' },                   // G ПИНФЛ
-  { width: PHOTO_COLUMN_WIDTH, align: 'center' },   // H фото
-  { width: 22, align: 'left' },                     // I должность
+// Графы листа. Ключ — имя графы: по нему берётся и заголовок (sheetTexts), и
+// значение ячейки (cellValue), а номер колонки считается от состава граф.
+type StaffColumnKey = 'number' | 'fullName' | 'birthDate' | 'birthPlace' | 'residence' | 'passport' | 'pinfl' | 'photo' | 'position'
+
+// Ширина в «символах» Excel и выравнивание одной парой на графу: ФИО и должность
+// текстом слева, остальное по центру. Ширины участвуют в расчёте якоря картинки.
+const COLUMN_LAYOUT: Array<{ key: StaffColumnKey; width: number; align: EventSheetColumn['align'] }> = [
+  { key: 'number', width: 5, align: 'center' },
+  { key: 'fullName', width: 30, align: 'left' },
+  { key: 'birthDate', width: 13, align: 'center' },
+  { key: 'birthPlace', width: 22, align: 'centerWrap' },
+  { key: 'residence', width: 26, align: 'centerWrap' },
+  { key: 'passport', width: 16, align: 'centerWrap' },
+  { key: 'pinfl', width: 17, align: 'center' },
+  { key: 'photo', width: 20, align: 'center' },
+  { key: 'position', width: 22, align: 'left' },
 ]
+
+// «Место жительства» — графа по выбору (решение прораба с53, п. 8): без неё лист
+// совпадает с образцом принимающей стороны, восемь граф. Всё, что зависит от
+// номера колонки (якорь фото, область печати), считается от ЭТОГО списка, а не
+// от букв: без адреса фото стоит в G, с адресом — в H.
+function staffColumns(includeAddress: boolean) {
+  return includeAddress ? COLUMN_LAYOUT : COLUMN_LAYOUT.filter((column) => column.key !== 'residence')
+}
 
 // Ровная сетка под фото: высота одна на все строки данных, иначе якорь каждой
 // картинки пришлось бы считать по накопленной высоте предыдущих.
@@ -113,7 +120,7 @@ const DATA_ROW_HEIGHT_PT = 128
 // Рамка под портрет внутри ячейки — с полями до её границ.
 const PHOTO_BOX = { widthPx: 120, heightPx: 160 }
 
-// Шапка таблицы — 30 пунктов: девять широких колонок, заголовки в две строки.
+// Шапка таблицы — 30 пунктов: восемь-девять широких колонок, заголовки в две строки.
 const HEADER_HEIGHT_PT = 30
 
 function sheetTexts(language: 'ru' | 'uz') {
@@ -147,38 +154,45 @@ export type EmployeeEventSheet = {
   printTitles: string
 }
 
-export function buildEmployeeEventSheet(rows: Employee[], meta: EventDocumentMeta, photos: Map<string, EventPhoto>): EmployeeEventSheet {
+// Значение ячейки по имени графы. Пустое поле — прочерк (см. DASH).
+function cellValue(key: StaffColumnKey, employee: Employee, index: number, hasPhoto: boolean): EventSheetCell {
+  switch (key) {
+    case 'number': return index + 1
+    case 'fullName': return employeeFullName(employee)
+    case 'birthDate': return employee.birth_date ? formatDocumentDate(employee.birth_date) : DASH
+    case 'birthPlace': return employee.birth_place || DASH
+    case 'residence': return employee.residence_address || DASH
+    case 'passport': return passportText(employee)
+    case 'pinfl': return employee.pinfl || DASH
+    // Ячейка под фото остаётся текстовой и при наличии снимка: она даёт рамку и
+    // заливку, а сама картинка лежит слоем поверх листа, а не «в» ячейке.
+    case 'photo': return hasPhoto ? '' : DASH
+    case 'position': return employee.position || DASH
+  }
+}
+
+export function buildEmployeeEventSheet(rows: Employee[], meta: EventDocumentMeta, photos: Map<string, EventPhoto>, includeAddress: boolean): EmployeeEventSheet {
   const t = sheetTexts(meta.language)
-  const headers = [t.number, t.fullName, t.birthDate, t.birthPlace, t.residence, t.passport, t.pinfl, t.photo, t.position]
-  const columns: EventSheetColumn[] = COLUMN_LAYOUT.map((column, index) => ({ ...column, header: headers[index] ?? '' }))
+  const layout = staffColumns(includeAddress)
+  const columns: EventSheetColumn[] = layout.map((column) => ({ width: column.width, align: column.align, header: t[column.key] }))
+  // Индекс колонки фото в нумерации DrawingML (A = 0).
+  const photoColumnIndex = layout.findIndex((column) => column.key === 'photo')
   const anchors: string[] = []
   const images: Uint8Array[] = []
 
-  // Размеры ячейки H в EMU — по ним картинка центрируется офсетами якоря.
-  const cellWidthEmu = columnWidthToPx(PHOTO_COLUMN_WIDTH) * EMU_PER_PX
+  // Размеры ячейки фото в EMU — по ним картинка центрируется офсетами якоря.
+  const cellWidthEmu = columnWidthToPx(layout[photoColumnIndex]?.width ?? 0) * EMU_PER_PX
   const cellHeightEmu = rowHeightToEmu(DATA_ROW_HEIGHT_PT)
-  // Абсолютные координаты угла ячейки H для a:xfrm: слева — сумма ширин колонок
-  // A–G, сверху — служебные строки 1–5 и шапка. Ширины и высоты фиксированы
+  // Абсолютные координаты угла ячейки фото для a:xfrm: слева — сумма ширин колонок
+  // до неё, сверху — служебные строки 1–5 и шапка. Ширины и высоты фиксированы
   // константами, поэтому раскладка считается без обхода листа.
-  const cellLeftEmu = COLUMN_LAYOUT.slice(0, PHOTO_COLUMN_INDEX)
+  const cellLeftEmu = layout.slice(0, photoColumnIndex)
     .reduce((sum, column) => sum + columnWidthToPx(column.width), 0) * EMU_PER_PX
   const topRowsPt = TOP_ROW_HEIGHTS_PT.reduce((sum, pt) => sum + pt, 0) + HEADER_HEIGHT_PT
 
   const sheetRows: EventSheetCell[][] = rows.map((employee, index) => {
     const photo = photos.get(employee.id)
-    const row: EventSheetCell[] = [
-      index + 1,
-      employeeFullName(employee),
-      employee.birth_date ? formatDocumentDate(employee.birth_date) : DASH,
-      employee.birth_place || DASH,
-      employee.residence_address || DASH,
-      passportText(employee),
-      employee.pinfl || DASH,
-      // Ячейка под фото остаётся текстовой и при наличии снимка: она даёт рамку и
-      // заливку, а сама картинка лежит слоем поверх листа, а не «в» ячейке.
-      photo ? '' : DASH,
-      employee.position || DASH,
-    ]
+    const row = layout.map((column) => cellValue(column.key, employee, index, Boolean(photo)))
 
     if (photo) {
       // Потолок масштаба 1 задаётся боксом: снимок мельче рамки становится боксом
@@ -195,7 +209,7 @@ export function buildEmployeeEventSheet(rows: Employee[], meta: EventDocumentMet
         id: images.length + 1,
         name: `photo-${images.length}`,
         descr: employeeFullName(employee),
-        col: PHOTO_COLUMN_INDEX,
+        col: photoColumnIndex,
         row: DATA_START_ROW + index - 1,
         colOffEmu,
         rowOffEmu,
@@ -238,13 +252,15 @@ function byName(a: Employee, b: Employee) {
   return a.last_name.localeCompare(b.last_name, 'ru') || a.first_name.localeCompare(b.first_name, 'ru')
 }
 
-export function downloadEmployeeEventXlsx({ employees, meta, photos }: {
+export function downloadEmployeeEventXlsx({ employees, meta, photos, includeAddress = false }: {
   employees: Employee[]
   meta: EventDocumentMeta
   photos: Map<string, EventPhoto>
+  // Графа «Место жительства» — по выбору при выгрузке (решение прораба с53, п. 8).
+  includeAddress?: boolean
 }) {
   const sorted = [...employees].sort(byName)
-  const sheet = buildEmployeeEventSheet(sorted, meta, photos)
+  const sheet = buildEmployeeEventSheet(sorted, meta, photos, includeAddress)
   const blob = buildWorkbookPackage({
     sheetName: docText(meta.language, 'Сотрудники', 'Ходимлар'),
     title: eventDocumentTitle('staff', meta),
