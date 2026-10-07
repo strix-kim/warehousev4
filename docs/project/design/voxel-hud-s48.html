@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HUD мира ARGO — три направления · с48</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&subset=cyrillic,latin&display=swap">
+<style>
+/* Страница сравнения шага 3 design-game-ui: три направления HUD целыми экранами.
+   Сами направления — voxel-hud-s48-a/b/c.html, сюда они встают через ?frame=d|p. */
+:root{
+  --f-display:"Manrope","Inter",system-ui,sans-serif;
+  --f-text:"Inter",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --bg:#EEF0F3; --card:#FFFFFF; --sunk:#F5F6F8; --ink:#16181D; --muted:#5F6470;
+  --line:#DDE0E5; --ctl:#858A95; --night:#0F1115; --red-act:#C8201B; --focus:#16181D;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:24px 32px 64px;background:var(--bg);color:var(--ink);font:500 14px/1.45 var(--f-text)}
+h1{margin:0 0 4px;font:800 24px/1.15 var(--f-display);letter-spacing:-.03em}
+h2{margin:40px 0 12px;font:700 16px/1.2 var(--f-display);letter-spacing:-.02em}
+p{margin:0;max-width:880px;color:var(--muted)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:16px -32px 16px;padding:10px 32px;background:var(--bg);border-bottom:1px solid var(--line)}
+.seg{display:inline-flex;gap:2px;padding:2px;border-radius:12px;background:var(--card);border:1px solid var(--line)}
+.seg button{min-height:40px;padding:0 16px;border:0;border-radius:10px;background:transparent;font:600 14px/1 var(--f-text);color:var(--muted);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--night);color:#fff}
+.bar kbd{font:600 12px/1 var(--f-mono);padding:3px 6px;border:1px solid var(--ctl);border-radius:6px;background:var(--card);color:var(--ink)}
+.bar a{color:var(--ink);font-weight:600}
+.idea{flex:1 1 320px;color:var(--ink)}
+/* Десктоп: три iframe лежат друг на друге, виден один — смена клавишей без сдвига кадра. */
+.desk{position:relative;width:1376px;height:687px;border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--card)}
+.desk iframe{position:absolute;inset:0;width:1376px;height:687px;border:0;visibility:hidden}
+.desk iframe.is-on{visibility:visible}
+.scroll{overflow-x:auto;padding-bottom:8px}
+.phones{display:flex;gap:32px;width:max-content}
+.phones figure{margin:0}
+.phones figcaption{margin-bottom:8px;font:600 13px/1.2 var(--f-mono);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.phones iframe{display:block;width:390px;height:560px;border:1px solid var(--line);border-radius:18px;background:var(--card)}
+</style>
+</head>
+<body>
+<h1>HUD мира — три направления</h1>
+<p>Один и тот же кадр кампуса, одни и те же числа и зоны; меняется только язык: таблички, плашка дня, карточка события, кнопки-дубли. Офис — покой, склад — наведение, гараж — выбран. Выбираем направление целиком, детали докрутим на шаге 4.</p>
+
+<div class="bar">
+  <div class="seg" role="group" aria-label="Направление">
+    <button type="button" data-d="a" aria-pressed="true">A · Чертёж</button>
+    <button type="button" data-d="b" aria-pressed="false">B · Знаки</button>
+    <button type="button" data-d="c" aria-pressed="false">C · Бирки</button>
+  </div>
+  <span class="idea" id="idea"></span>
+  <span><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> — переключить · <a id="solo" href="voxel-hud-s48-a.html" target="_blank" rel="noopener">открыть отдельно</a></span>
+</div>
+
+<h2>Десктоп · сцена 1376 × 687</h2>
+<div class="scroll">
+  <div class="desk" id="desk">
+    <iframe class="is-on" data-d="a" src="voxel-hud-s48-a.html?frame=d" title="A · Чертёж, десктоп"></iframe>
+    <iframe data-d="b" src="voxel-hud-s48-b.html?frame=d" title="B · Знаки, десктоп"></iframe>
+    <iframe data-d="c" src="voxel-hud-s48-c.html?frame=d" title="C · Бирки, десктоп"></iframe>
+  </div>
+</div>
+
+<h2>Телефон · 390 × 560 над нижней панелью — все три рядом</h2>
+<div class="scroll">
+  <div class="phones">
+    <figure><figcaption>A · Чертёж</figcaption><iframe src="voxel-hud-s48-a.html?frame=p" title="A · Чертёж, телефон"></iframe></figure>
+    <figure><figcaption>B · Знаки</figcaption><iframe src="voxel-hud-s48-b.html?frame=p" title="B · Знаки, телефон"></iframe></figure>
+    <figure><figcaption>C · Бирки</figcaption><iframe src="voxel-hud-s48-c.html?frame=p" title="C · Бирки, телефон"></iframe></figure>
+  </div>
+</div>
+
+<script>
+const IDEAS = {
+  a: 'Чертёж — HUD как размерные выноски схемы: число крупно на полке, без коробок.',
+  b: 'Знаки — HUD как предметы мира: тёмные вывески на ножке, событие — дорожный указатель.',
+  c: 'Бирки — HUD как складская бумага: бирки на шнурке, событие — накладная на выезд.',
+};
+const pick = (d) => {
+  document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.d === d)));
+  document.querySelectorAll('#desk iframe').forEach((f) => f.classList.toggle('is-on', f.dataset.d === d));
+  document.getElementById('idea').textContent = IDEAS[d];
+  document.getElementById('solo').href = `voxel-hud-s48-${d}.html`;
+};
+document.querySelector('.seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) pick(b.dataset.d); });
+addEventListener('keydown', (e) => { const d = { 1: 'a', 2: 'b', 3: 'c' }[e.key]; if (d) pick(d); });
+pick('a');
+</script>
+</body>
+</html>

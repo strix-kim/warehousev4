@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HUD воксельного мира — направление A «Чертёж»</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&subset=cyrillic,latin&display=swap">
+<script>
+/* Единственный JS страницы: ?frame=d | ?frame=p оставляет одну рамку без полей — для iframe страницы сравнения. */
+(function () {
+  var f = new URLSearchParams(location.search).get('frame');
+  if (f === 'd' || f === 'p') document.documentElement.classList.add('only-' + f);
+})();
+</script>
+<style>
+/* =========================================================
+   0. Токены — дословно блок :root из src/react/styles/01-tokens.css.
+   ========================================================= */
+:root {
+  color-scheme: light;
+  font-family: var(--f-text);
+  color: var(--ink);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --f-display: "Manrope","Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-text: "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono: "JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --bg: #EEF0F3;
+  --grid: rgba(22,24,29,.055);
+  --card: #FFFFFF;
+  --sunk: #F5F6F8;
+  --hover: #F0F2F5;
+  --select: #E9ECF1;
+  --ink: #16181D;
+  --ink-2: #2A2E36;
+  --muted: #5F6470;
+  --faint: #676C77;
+  /* Только декор, не текст: на белом ниже 4,5:1. */
+  --soft: #8A8F9A;
+  --line: #DDE0E5;
+  --line-2: #E8EAEE;
+  --ctl: #858A95;
+  --red: #E52D27;
+  /* Заливка под белым текстом — --red-act, не --red: белый на --red 4,4:1, здесь 5,7:1. */
+  --red-act: #C8201B;
+  --red-press: #AE1B16;
+  --red-tint: #FCEAE9;
+  --night: #0F1115;
+  --night-2: #1A1D23;
+  --night-3: #262A31;
+  --night-line: #2C3038;
+  --on-night: #E8EAEE;
+  --on-night-2: #9CA1AC;
+  --red-night: #FF5A52;
+  --bad-night: #FF8095;
+  --neutral-night: #D5D8DE;
+  --warn-night: #F2B544;
+  --ok: #1B7A45;
+  --ok-bg: #E3F3EA;
+  --ok-dot: #2A9D5C;
+  --warn: #8A5A00;
+  --warn-bg: #FBF0D5;
+  --warn-dot: #B7800A;
+  --bad: #B0203F;
+  --bad-bg: #FBE6EA;
+  --bad-dot: #B0203F;
+  --focus: #16181D;
+  --r-xl: 22px;
+  --r-lg: 18px;
+  --r-md: 12px;
+  --r-sm: 8px;
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+  --shadow-pop: 0 18px 48px rgba(15,17,21,.16), 0 2px 6px rgba(15,17,21,.06);
+  --shadow-drawer: -24px 0 60px rgba(15,17,21,.18);
+  --shadow-card: 0 12px 32px rgba(15, 17, 21, 0.07);
+  --app-zoom: 1;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px; background: var(--bg); }
+button { font: inherit; cursor: pointer; }
+:focus-visible, .is-focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* =========================================================
+   1. Страница: две рамки, подписи. ?frame=… — одна рамка в углу.
+   ========================================================= */
+.page-title { margin: 0 0 4px; font: 800 22px/28px var(--f-display); letter-spacing: -.02em; }
+.page-note { margin: 0 0 20px; font: 500 14px/20px var(--f-text); color: var(--muted); }
+.frame-cap { margin: 0 0 8px; font: 600 13px/16px var(--f-mono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.frame { position: relative; overflow: hidden; border-radius: var(--r-lg); }
+.frame-d { width: 1376px; height: 687px; margin-bottom: 32px; background: var(--bg) url("voxel-hud-s48-bg-1440.png") 0 0 / 1376px 687px no-repeat; }
+.frame-p { width: 390px; height: 560px; background: #EEF0F3 url("voxel-hud-s48-bg-390.png") 0 60px / 390px auto no-repeat; }
+.only-d body, .only-p body { padding: 0; }
+.only-d .page-title, .only-d .page-note, .only-d .frame-cap, .only-d .frame-p,
+.only-p .page-title, .only-p .page-note, .only-p .frame-cap, .only-p .frame-d { display: none; }
+.only-d .frame-d { margin: 0; }
+
+/* =========================================================
+   2. Общие приёмы «чертежа».
+   ========================================================= */
+/* Подпись ячейки / раздела: моно-капс. */
+.cap { display: block; font: 600 13px/16px var(--f-mono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+/* Ореол цветом листа: текст без коробки читается поверх сетки. */
+.halo { text-shadow: 1px 0 0 var(--bg), -1px 0 0 var(--bg), 0 1px 0 var(--bg), 0 -1px 0 var(--bg), 0 0 3px var(--bg), 0 0 3px var(--bg); }
+/* Статус «идёт»: цвет + точка, не только цветом. */
+.status { display: inline-flex; align-items: center; gap: 6px; font: 600 14px/18px var(--f-text); color: var(--ok); white-space: nowrap; }
+.status::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ok-dot); }
+.status--cap { font: 600 13px/16px var(--f-mono); letter-spacing: .04em; text-transform: uppercase; }
+
+/* =========================================================
+   3. Выноски (SVG поверх кадра): якорь → вверх → излом 45° → полка.
+   Полка таблички — её нижняя граница, линия SVG приходит ровно в угол.
+   ========================================================= */
+.leads { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.lead-line { fill: none; stroke: var(--ink); stroke-width: 1; }
+.lead-dot { fill: var(--ink); }
+.lead-ring { fill: none; stroke: var(--red); stroke-width: 1; opacity: 0; }
+.lead-arrow { fill: var(--ink); opacity: 0; }
+/* наведение: линия 2 px, точка сменяется засечкой-стрелкой */
+.lead.is-hover .lead-line { stroke-width: 2; }
+.lead.is-hover .lead-arrow { opacity: 1; }
+.lead.is-hover .lead-dot { opacity: 0; }
+/* выбор: красная точка-мишень на якоре */
+.lead.is-sel .lead-dot { fill: var(--red); }
+.lead.is-sel .lead-ring { opacity: 1; }
+/* живое наведение на табличку в покое */
+.frame:has(.tag--office:hover) .lead--office .lead-line,
+.frame:has(.tag--garage:hover) .lead--garage .lead-line { stroke-width: 2; }
+.frame:has(.tag--office:hover) .lead--office .lead-arrow { opacity: 1; }
+.frame:has(.tag--office:hover) .lead--office .lead-dot { opacity: 0; }
+
+/* =========================================================
+   4. T — табличка без коробки: подпись раздела, крупное число, полка.
+   Десктоп: 16 подпись + 2 + 36 строка числа + 1 + 1 полка = 56.
+   ========================================================= */
+.tag {
+  position: absolute; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start;
+  height: 56px; min-width: 48px; max-width: 200px; padding: 0 0 1px 6px;
+  border: 0; border-bottom: 1px solid var(--ink); border-radius: 0; background: none;
+  color: var(--ink); text-align: left; white-space: nowrap;
+}
+.tag-row { display: flex; align-items: flex-end; gap: 8px; height: 36px; margin-top: 2px; }
+.tag-num { position: relative; font: 800 32px/36px var(--f-display); letter-spacing: -.02em; word-spacing: -.06em; }
+.tag-sub { padding-bottom: 2px; font: 500 13px/16px var(--f-mono); color: var(--ink-2); }
+/* наведение: полка 2 px */
+.tag.is-hover, .tag:hover { box-shadow: 0 1px 0 var(--ink); }
+/* выбор: число красное (текст — --red-act ради 4,5:1), под числом размерная линия с засечками */
+.tag.is-sel .tag-num { color: var(--red-act); }
+.tag.is-sel .tag-num::before { content: ""; position: absolute; left: -2px; right: -2px; bottom: -2px; height: 2px; background: var(--red); }
+.tag.is-sel .tag-num::after { content: ""; position: absolute; left: -2px; right: -2px; bottom: -5px; height: 8px; border-left: 2px solid var(--red); border-right: 2px solid var(--red); }
+/* полка уходит влево от излома (объект у правого края) */
+.tag--left { align-items: flex-end; padding: 0 5px 1px 0; text-align: right; }
+
+/* десктоп: левый нижний угол таблички = точка излома выноски */
+.frame-d .tag--garage    { left: 354px;  top: 82px; }
+.frame-d .tag--office    { left: 716px;  top: 52px; }
+.frame-d .tag--warehouse { left: 1064px; top: 20px; }
+
+/* телефон: имя + одно число, 16 + 26 + 1 + 1 = 44 */
+.frame-p .tag { height: 44px; max-width: 120px; padding-left: 5px; }
+.frame-p .tag--left { padding-left: 0; }
+.frame-p .tag-row { height: 26px; margin-top: 0; }
+.frame-p .tag-num { font-size: 22px; line-height: 26px; }
+.frame-p .tag--garage    { left: 82px;  top: 140px; }
+.frame-p .tag--office    { left: 210px; top: 140px; }
+.frame-p .tag--warehouse { right: 75px; top: 88px; }
+
+/* =========================================================
+   5. C — «штамп» листа: рамка и ячейки через вертикальные линии.
+   ========================================================= */
+.stamp { position: absolute; left: 16px; top: 16px; display: flex; width: 360px; height: 56px; border: 1px solid var(--ink); background: var(--card); }
+.stamp-cell { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 0 12px; }
+.stamp-cell + .stamp-cell { border-left: 1px solid var(--ink); }
+.stamp-cell--grow { flex: 1; }
+.stamp-val { font: 700 16px/22px var(--f-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.frame-p .stamp { top: 8px; width: 358px; height: 48px; }
+.frame-p .stamp-cell { padding: 0 10px; }
+.frame-p .stamp-val { font-size: 15px; }
+
+/* =========================================================
+   6. Карточка события — «основная надпись» чертежа.
+   Высота: 2 рамка + 60 + (1+68) + (1+50) + (1+48) = 231.
+   Линия между первой и второй строкой (y 501,5) продолжается выноской к указателю.
+   ========================================================= */
+.tb { position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; width: 360px; border: 1px solid var(--ink); background: var(--card); }
+.tb-row { display: flex; }
+.tb-row + .tb-row { border-top: 1px solid var(--ink); }
+.tb-row--title { height: 60px; }
+.tb-row--venue { height: 69px; }
+.tb-row--items { height: 51px; }
+.tb-row--act   { height: 49px; }
+.tb-cell { position: relative; flex: 1; min-width: 0; padding: 8px 12px; }
+.tb-cell + .tb-cell { border-left: 1px solid var(--ink); }
+.tb-cell--status { flex: 0 0 118px; }
+.tb-title { font: 800 22px/28px var(--f-display); letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-val { font: 500 14px/18px var(--f-text); color: var(--ink); }
+/* флажок события: древко + красное полотнище, геометрией */
+.flag { position: absolute; right: 12px; top: 10px; width: 11px; height: 14px; border-left: 1px solid var(--ink); }
+.flag::before { content: ""; position: absolute; left: 0; top: 0; width: 10px; height: 7px; background: var(--red); }
+/* действие — залитая ячейка */
+.tb-open { flex: 1; display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 12px; border: 0; border-radius: 0; background: var(--ink); color: var(--card); font: 700 15px/20px var(--f-display); text-align: left; }
+.tb-open:hover { background: var(--ink-2); }
+.tb-open-mark { font: 600 14px/20px var(--f-mono); }
+
+/* телефон: у выезда компактная метка события, 2 + 8 + 16 + 18 = 44 */
+.evtag { position: absolute; right: 194px; top: 299px; display: flex; flex-direction: column; align-items: flex-start; height: 44px; max-width: 160px; padding: 4px 8px; border: 1px solid var(--ink); border-radius: 0; background: var(--card); color: var(--ink); text-align: left; }
+.evtag-name { max-width: 100%; font: 700 14px/18px var(--f-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* =========================================================
+   7. A — линейка-шкала: ячейки в одной рамке, деления сверху.
+   Десктоп: 16 подпись + 2 + 6 деления + 56 ячейки = 80; ячейка 150×56.
+   ========================================================= */
+.rule { position: absolute; left: 16px; bottom: 16px; width: 600px; height: 80px; }
+.rule-ticks { height: 6px; margin-top: 2px; background: repeating-linear-gradient(90deg, var(--ink) 0 1px, transparent 1px 10px); }
+.rule-cells { display: flex; height: 56px; }
+.rule-cell {
+  position: relative; display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
+  width: 150px; height: 56px; padding: 0 12px;
+  border: 1px solid var(--ink); border-right-width: 0; border-radius: 0;
+  background: var(--card); color: var(--ink); text-align: left;
+}
+.rule-cell:last-child { border-right-width: 1px; }
+.rule-cell:hover { background: var(--hover); }
+.rule-cell.is-focus, .rule-cell:focus-visible { z-index: 1; }
+.rule-no { font: 600 13px/16px var(--f-mono); letter-spacing: .04em; color: var(--muted); }
+.rule-name { font: 700 17px/22px var(--f-display); }
+/* выбранный объект — ячейка залита */
+.rule-cell.is-active, .rule-cell.is-active:hover { background: var(--ink); color: var(--card); }
+.rule-cell.is-active .rule-no { color: var(--on-night-2); }
+
+/* телефон: 6 деления + 2 + 56 = 64; четыре цели 56×56, зазор 8 */
+.frame-p .rule { left: auto; right: 16px; width: 248px; height: 64px; }
+.frame-p .rule-ticks { margin: 0 0 2px; background: repeating-linear-gradient(90deg, var(--ink) 0 1px, transparent 1px 8px); }
+.frame-p .rule-cells { gap: 8px; }
+.frame-p .rule-cell { width: 56px; padding: 0; align-items: center; border-right-width: 1px; text-align: center; }
+.frame-p .rule-name { font-size: 13px; line-height: 16px; }
+
+/* Анимации: только hover-переход и только если движение не отключено. */
+@media (prefers-reduced-motion: no-preference) {
+  .lead-line { transition: stroke-width .12s var(--ease-out); }
+  .rule-cell, .tb-open { transition: background-color .12s var(--ease-out); }
+}
+</style>
+</head>
+<body>
+
+<h1 class="page-title">Направление A — «Чертёж»</h1>
+<p class="page-note">HUD как размерные выноски на листе: число — главное, коробок нет. Офис — покой, склад — наведение, гараж — выбран; фокус клавиатуры — на «Офис» в линейке.</p>
+
+<!-- ======================= ДЕСКТОП 1376×687 ======================= -->
+<p class="frame-cap">Десктоп · 1376×687</p>
+<div class="frame frame-d">
+  <svg class="leads" viewBox="0 0 1376 687" aria-hidden="true">
+    <g class="lead lead--garage is-sel">
+      <path class="lead-line" d="M346.5 149.5 V145.5 L354.5 137.5"/>
+      <circle class="lead-ring" cx="346.5" cy="149.5" r="8"/>
+      <circle class="lead-dot" cx="346.5" cy="149.5" r="4"/>
+    </g>
+    <g class="lead lead--office">
+      <path class="lead-line" d="M700.5 147.5 V123.5 L716.5 107.5"/>
+      <circle class="lead-dot" cx="700.5" cy="147.5" r="3"/>
+      <path class="lead-arrow" d="M700.5 148 L696.5 139 H704.5 Z"/>
+    </g>
+    <g class="lead lead--warehouse is-hover">
+      <path class="lead-line" d="M1052.5 102.5 V87.5 L1064.5 75.5"/>
+      <circle class="lead-dot" cx="1052.5" cy="102.5" r="3"/>
+      <path class="lead-arrow" d="M1052.5 103 L1048.5 94 H1056.5 Z"/>
+    </g>
+    <g class="lead lead--event">
+      <path class="lead-line" d="M763.5 550.5 L812.5 501.5 H1000"/>
+      <circle class="lead-dot" cx="763.5" cy="550.5" r="3"/>
+    </g>
+  </svg>
+
+  <!-- C: штамп листа -->
+  <div class="stamp">
+    <div class="stamp-cell stamp-cell--grow">
+      <span class="cap">Дата</span>
+      <span class="stamp-val">Сегодня, 7 октября</span>
+    </div>
+    <div class="stamp-cell">
+      <span class="cap">На день</span>
+      <span class="stamp-val">1 мероприятие</span>
+    </div>
+  </div>
+
+  <!-- T: таблички-выноски -->
+  <button type="button" class="tag tag--garage halo is-sel" aria-pressed="true">
+    <span class="cap">Гараж · Машины</span>
+    <span class="tag-row"><span class="tag-num">6</span><span class="tag-sub">машин<br>1 в пути</span></span>
+  </button>
+  <button type="button" class="tag tag--office halo">
+    <span class="cap">Офис · Списки</span>
+    <span class="tag-row"><span class="tag-num">6</span><span class="tag-sub">списков</span></span>
+  </button>
+  <button type="button" class="tag tag--warehouse halo is-hover">
+    <span class="cap">Склад · Оборудование</span>
+    <span class="tag-row"><span class="tag-num">1&nbsp;867</span><span class="tag-sub">единиц<br>86 на выезде</span></span>
+  </button>
+
+  <!-- Карточка события: основная надпись -->
+  <section class="tb" aria-label="Мероприятие">
+    <div class="tb-row tb-row--title">
+      <div class="tb-cell">
+        <span class="cap">Мероприятие</span>
+        <div class="tb-title">Bionorica Workshop</div>
+        <span class="flag" aria-hidden="true"></span>
+      </div>
+    </div>
+    <div class="tb-row tb-row--venue">
+      <div class="tb-cell">
+        <span class="cap">Площадка</span>
+        <div class="tb-val">Hyatt Regency Tashkent · Grand Ballroom A+B</div>
+      </div>
+      <div class="tb-cell tb-cell--status">
+        <span class="cap">Статус</span>
+        <span class="status">идёт</span>
+      </div>
+    </div>
+    <div class="tb-row tb-row--items">
+      <div class="tb-cell">
+        <span class="cap">Состав</span>
+        <div class="tb-val">32 позиции · залы Jupiter &amp; Uranus</div>
+      </div>
+    </div>
+    <div class="tb-row tb-row--act">
+      <button type="button" class="tb-open">Открыть список<span class="tb-open-mark" aria-hidden="true">→</span></button>
+    </div>
+  </section>
+
+  <!-- A: линейка-шкала -->
+  <nav class="rule" aria-label="Перейти к объекту">
+    <span class="cap halo">Перейти</span>
+    <div class="rule-ticks" aria-hidden="true"></div>
+    <div class="rule-cells">
+      <button type="button" class="rule-cell is-focus"><span class="rule-no">01</span><span class="rule-name">Офис</span></button>
+      <button type="button" class="rule-cell"><span class="rule-no">02</span><span class="rule-name">Склад</span></button>
+      <button type="button" class="rule-cell is-active" aria-pressed="true"><span class="rule-no">03</span><span class="rule-name">Гараж</span></button>
+      <button type="button" class="rule-cell"><span class="rule-no">04</span><span class="rule-name">Списком</span></button>
+    </div>
+  </nav>
+</div>
+
+<!-- ======================= ТЕЛЕФОН 390×560 ======================= -->
+<p class="frame-cap">Телефон · 390×560</p>
+<div class="frame frame-p">
+  <svg class="leads" viewBox="0 0 390 560" aria-hidden="true">
+    <g class="lead lead--garage is-sel">
+      <path class="lead-line" d="M70.5 206.5 V195.5 L82.5 183.5"/>
+      <circle class="lead-ring" cx="70.5" cy="206.5" r="7"/>
+      <circle class="lead-dot" cx="70.5" cy="206.5" r="3.5"/>
+    </g>
+    <g class="lead lead--office">
+      <path class="lead-line" d="M198.5 206.5 V195.5 L210.5 183.5"/>
+      <circle class="lead-dot" cx="198.5" cy="206.5" r="3"/>
+      <path class="lead-arrow" d="M198.5 207 L195 199 H202 Z"/>
+    </g>
+    <g class="lead lead--warehouse is-hover">
+      <path class="lead-line" d="M326.5 189.5 V143.5 L314.5 131.5"/>
+      <circle class="lead-dot" cx="326.5" cy="189.5" r="3"/>
+      <path class="lead-arrow" d="M326.5 190 L323 182 H330 Z"/>
+    </g>
+    <g class="lead lead--event">
+      <path class="lead-line" d="M216.5 332.5 L204.5 320.5 H196"/>
+      <circle class="lead-dot" cx="216.5" cy="332.5" r="3"/>
+    </g>
+  </svg>
+
+  <!-- C: свёрнута, итог события в одну строку -->
+  <div class="stamp">
+    <div class="stamp-cell"><span class="cap">Сегодня</span></div>
+    <div class="stamp-cell stamp-cell--grow"><span class="stamp-val">Bionorica Workshop</span></div>
+    <div class="stamp-cell"><span class="status">идёт</span></div>
+  </div>
+
+  <!-- T: имя + одно число -->
+  <button type="button" class="tag tag--garage halo is-sel" aria-pressed="true" aria-label="Гараж: 6 машин">
+    <span class="cap">Гараж</span>
+    <span class="tag-row"><span class="tag-num">6</span></span>
+  </button>
+  <button type="button" class="tag tag--office halo" aria-label="Офис: 6 списков">
+    <span class="cap">Офис</span>
+    <span class="tag-row"><span class="tag-num">6</span></span>
+  </button>
+  <button type="button" class="tag tag--left tag--warehouse halo is-hover" aria-label="Склад: 1 867 единиц">
+    <span class="cap">Склад</span>
+    <span class="tag-row"><span class="tag-num">1&nbsp;867</span></span>
+  </button>
+
+  <!-- метка события у выезда -->
+  <button type="button" class="evtag" aria-label="Bionorica Workshop, идёт">
+    <span class="status status--cap">идёт</span>
+    <span class="evtag-name">Bionorica Workshop</span>
+  </button>
+
+  <!-- A: четыре цели 56×56 -->
+  <nav class="rule" aria-label="Перейти к объекту">
+    <div class="rule-ticks" aria-hidden="true"></div>
+    <div class="rule-cells">
+      <button type="button" class="rule-cell is-focus"><span class="rule-no">01</span><span class="rule-name">Офис</span></button>
+      <button type="button" class="rule-cell"><span class="rule-no">02</span><span class="rule-name">Склад</span></button>
+      <button type="button" class="rule-cell is-active" aria-pressed="true"><span class="rule-no">03</span><span class="rule-name">Гараж</span></button>
+      <button type="button" class="rule-cell"><span class="rule-no">04</span><span class="rule-name">Список</span></button>
+    </div>
+  </nav>
+</div>
+
+</body>
+</html>

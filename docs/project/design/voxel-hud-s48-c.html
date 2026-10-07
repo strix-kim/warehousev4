@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HUD воксельного мира — направление C «Бирки»</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&subset=cyrillic,latin&display=swap">
+<script>
+/* Единственный JS страницы: ?frame=d | ?frame=p оставляет одну рамку без заголовков
+   и отступов — так её вставляет в iframe страница сравнения направлений. */
+(function () {
+  var f = new URLSearchParams(location.search).get('frame');
+  if (f === 'd' || f === 'p') document.documentElement.setAttribute('data-frame', f);
+})();
+</script>
+<style>
+/* =========================================================
+   0. Токены — дословно из src/react/styles/01-tokens.css.
+   ========================================================= */
+:root{
+  color-scheme: light;
+  --f-display: "Manrope","Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-text: "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono: "JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --bg: #EEF0F3;
+  --grid: rgba(22,24,29,.055);
+  --card: #FFFFFF;
+  --sunk: #F5F6F8;
+  --hover: #F0F2F5;
+  --select: #E9ECF1;
+  --ink: #16181D;
+  --ink-2: #2A2E36;
+  --muted: #5F6470;
+  --faint: #676C77;
+  /* Только декор, не текст: на белом ниже 4,5:1. */
+  --soft: #8A8F9A;
+  --line: #DDE0E5;
+  --line-2: #E8EAEE;
+  --ctl: #858A95;
+  --red: #E52D27;
+  /* Заливка под белым текстом — --red-act, не --red: белый на --red 4,4:1, здесь 5,7:1. */
+  --red-act: #C8201B;
+  --red-press: #AE1B16;
+  --red-tint: #FCEAE9;
+  --night: #0F1115;
+  --night-2: #1A1D23;
+  --night-3: #262A31;
+  --night-line: #2C3038;
+  --on-night: #E8EAEE;
+  --on-night-2: #9CA1AC;
+  --red-night: #FF5A52;
+  --bad-night: #FF8095;
+  --neutral-night: #D5D8DE;
+  --warn-night: #F2B544;
+  --ok: #1B7A45;
+  --ok-bg: #E3F3EA;
+  --ok-dot: #2A9D5C;
+  --warn: #8A5A00;
+  --warn-bg: #FBF0D5;
+  --warn-dot: #B7800A;
+  --bad: #B0203F;
+  --bad-bg: #FBE6EA;
+  --bad-dot: #B0203F;
+  --focus: #16181D;
+  --r-xl: 22px;
+  --r-lg: 18px;
+  --r-md: 12px;
+  --r-sm: 8px;
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+  --shadow-pop: 0 18px 48px rgba(15,17,21,.16), 0 2px 6px rgba(15,17,21,.06);
+  --shadow-drawer: -24px 0 60px rgba(15,17,21,.18);
+  --shadow-card: 0 12px 32px rgba(15, 17, 21, 0.07);
+
+  /* --- Свои токены направления C «Бирки» ---
+     «Бумажная» тень: волосок по нижней кромке + мягкое пятно. Силуэт бирки режется
+     clip-path / mask, а они срезают box-shadow, поэтому у той же тени есть форма для
+     filter на обёртке (-f) и углублённая форма для наведения (-f-up). */
+  --shadow-tag: 0 1px 0 var(--line), 0 6px 14px rgba(15,17,21,.08);
+  --shadow-tag-f: drop-shadow(0 1px 0 var(--line)) drop-shadow(0 6px 14px rgba(15,17,21,.08));
+  --shadow-tag-f-up: drop-shadow(0 1px 0 var(--line)) drop-shadow(0 12px 20px rgba(15,17,21,.16));
+  --t-hang: 160ms var(--ease-out);
+}
+
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;padding:24px;font-family:var(--f-text);color:var(--ink);background:var(--bg);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* =========================================================
+   1. Страница и две рамки (каркас общий для трёх направлений)
+   ========================================================= */
+.page-head{margin:0 0 20px}
+.page-head h1{margin:0 0 4px;font:800 22px/1.2 var(--f-display);letter-spacing:-.02em}
+.page-head p{margin:0;font-size:14px;line-height:1.45;color:var(--muted);max-width:760px}
+.shot{margin:0 0 28px}
+.shot-cap{margin:0 0 8px;font:600 13px/16px var(--f-mono);text-transform:uppercase;color:var(--muted)}
+
+.frame-d{position:relative;overflow:hidden;width:1376px;height:687px;border-radius:18px;
+  background:url(voxel-hud-s48-bg-1440.png) 0 0 / 1376px 687px no-repeat}
+.frame-p{position:relative;overflow:hidden;width:390px;height:560px;
+  background:var(--bg) url(voxel-hud-s48-bg-390.png) 0 60px / 390px auto no-repeat}
+
+/* Режим одной рамки: без заголовков и отступов, рамка в левом верхнем углу. */
+[data-frame] body{padding:0}
+[data-frame] .page-head,[data-frame] .shot-cap{display:none}
+[data-frame] .shot{margin:0}
+[data-frame="d"] .shot-p,[data-frame="p"] .shot-d{display:none}
+
+/* =========================================================
+   2. Подвес — общий приём: предмет висит на шнурке.
+   .hang — точка нулевого размера в центре люверса (--x/--y в координатах рамки).
+   От неё шнурок длиной --len под углом --ang идёт к якорю объекта (--dx/--dy).
+   Сам предмет поворачивается ВОКРУГ люверса, поэтому люверс и узел не съезжают
+   при любом наклоне.
+   ========================================================= */
+.hang{position:absolute;left:var(--x);top:var(--y);width:0;height:0}
+.hang-string{position:absolute;left:0;top:-.5px;width:var(--len);height:1px;background:var(--ink);
+  transform-origin:0 50%;transform:rotate(var(--ang));pointer-events:none;
+  transition:transform var(--t-hang),width var(--t-hang)}
+.hang-knot{position:absolute;left:-2px;top:-2px;width:4px;height:4px;border-radius:50%;background:var(--ink);
+  pointer-events:none;transition:transform var(--t-hang)}
+.hang-pin{position:absolute;left:var(--dx);top:var(--dy);width:6px;height:6px;margin:-3px 0 0 -3px;
+  border-radius:50%;background:var(--ink);pointer-events:none}
+.hang-lift{position:absolute;filter:var(--shadow-tag-f);
+  transition:transform var(--t-hang),filter var(--t-hang)}
+
+/* =========================================================
+   3. Бирка (T): срезанные левые углы, люверс, красная полоса, число крупно.
+   Геометрия задаётся переменными, телефонный размер — модификатор .tag--p.
+   ========================================================= */
+.tag{--h:56px;--ex:16px;--ey:28px;--cut:14px;--zone:28px;--stripe:4px}
+.tag .hang-lift{left:calc(-1 * var(--ex));top:calc(-1 * var(--ey));width:var(--w);height:var(--h)}
+.tag-body{position:absolute;left:0;top:0;width:100%;height:100%;margin:0;border:0;
+  padding:5px 8px 7px calc(var(--zone) + var(--stripe) + 8px);
+  display:grid;grid-template-rows:28px 16px;text-align:left;white-space:nowrap;
+  background:var(--card);
+  clip-path:polygon(var(--cut) 0,100% 0,100% 100%,var(--cut) 100%,0 calc(100% - var(--cut)),0 var(--cut));
+  transform-origin:var(--ex) var(--ey);transform:rotate(var(--tilt));
+  transition:transform var(--t-hang)}
+/* Красная полоса — декор, отделяет зону люверса от текста. */
+.tag-body::before{content:"";position:absolute;left:var(--zone);top:0;bottom:0;width:var(--stripe);background:var(--red)}
+/* Люверс: кольцо --ctl, в отверстии виден «фон мира». */
+.tag-body::after{content:"";position:absolute;left:calc(var(--ex) - 6px);top:calc(var(--ey) - 6px);
+  width:12px;height:12px;border-radius:50%;border:2px solid var(--ctl);background:var(--bg)}
+/* clip-path срезал бы внешнюю обводку фокуса — у бирки она внутренняя. */
+.tag-body:focus-visible{outline-offset:-4px}
+
+.tag-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.tag-num{font:800 28px/28px var(--f-display);letter-spacing:-.02em;color:var(--ink)}
+.tag-name{margin-top:3px;font:600 13px/16px var(--f-mono);text-transform:uppercase;color:var(--muted)}
+.tag-sub{font:500 13px/16px var(--f-text);color:var(--ink-2)}
+
+/* Наведение: бирка выравнивается, приподнимается на 3 px, тень глубже.
+   Шнурок дотягивается до приподнятого узла (--len-h/--ang-h посчитаны заранее). */
+.tag:hover .hang-lift,.tag.is-hover .hang-lift{transform:translateY(-3px);filter:var(--shadow-tag-f-up)}
+.tag:hover .tag-body,.tag.is-hover .tag-body{transform:rotate(0deg)}
+.tag:hover .hang-string,.tag.is-hover .hang-string{width:var(--len-h);transform:translateY(-3px) rotate(var(--ang-h))}
+.tag:hover .hang-knot,.tag.is-hover .hang-knot{transform:translateY(-3px)}
+
+/* Выбор: имя раздела — красный штамп в двойной рамке, шнурок и узел красные. */
+.tag.is-selected .hang-string,.tag.is-selected .hang-knot,.tag.is-selected .hang-pin{background:var(--red)}
+.tag.is-selected .tag-name{padding:0 5px;color:var(--card);background:var(--red-act);
+  box-shadow:0 0 0 1px var(--card),0 0 0 2px var(--red-act)}
+
+/* Телефонная бирка ≤ 120×44: имя + одно число, в два ряда. */
+.tag--p{--h:44px;--ex:11px;--ey:22px;--cut:11px;--zone:20px;--stripe:3px}
+.tag--p .tag-body{padding:4px 8px 4px calc(var(--zone) + var(--stripe) + 7px);grid-template-rows:16px 20px;justify-items:start}
+.tag--p .tag-body::after{left:calc(var(--ex) - 5px);top:calc(var(--ey) - 5px);width:10px;height:10px}
+.tag--p .tag-name{margin-top:0}
+.tag--p .tag-num{font:800 18px/20px var(--f-display)}
+.tag--p.is-selected .tag-name{padding:0 4px}
+
+/* Метка события у выезда (телефон, ≤ 160×44): та же бирка без полосы — название и статус. */
+.tag--event{--zone:16px;--stripe:0px}
+.tag--event .tag-body{padding:5px 6px 5px 24px;grid-template-rows:18px 16px}
+.tag--event .tag-title{font:600 13px/18px var(--f-text);color:var(--ink)}
+
+/* Статус: цвет + точка + слово — не только цветом. */
+.status{display:inline-flex;align-items:center;gap:6px;font:600 13px/16px var(--f-text);color:var(--ok)}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok-dot)}
+
+/* =========================================================
+   4. Отрывной талон дня (C). Линия отрыва на --tear от левого края:
+   пунктир + два полукруглых выреза сверху и снизу (маска; цвета в маске —
+   это альфа, а не краска). Тень — фильтром на обёртке, маска её срезает.
+   ========================================================= */
+.talon-wrap{position:absolute;filter:var(--shadow-tag-f)}
+.talon{--tear:224px;--th:56px;position:relative;display:flex;align-items:center;margin:0;padding:0;border:0;text-align:left;
+  width:360px;height:var(--th);border-radius:var(--r-sm);background:var(--card);
+  -webkit-mask:radial-gradient(circle 6px at var(--tear) 50%,transparent 5.5px,#000 6px) 0 calc(var(--th) / 2) / 100% var(--th) repeat-y;
+          mask:radial-gradient(circle 6px at var(--tear) 50%,transparent 5.5px,#000 6px) 0 calc(var(--th) / 2) / 100% var(--th) repeat-y}
+.talon::before{content:"";position:absolute;left:var(--tear);top:9px;bottom:9px;border-left:1px dashed var(--ctl)}
+.talon-main{flex:0 0 var(--tear);padding:0 12px 0 16px;white-space:nowrap}
+.talon-stub{flex:1;display:flex;align-items:center;gap:8px;padding:0 10px 0 14px;white-space:nowrap}
+.talon-over{display:block;font:600 13px/16px var(--f-mono);text-transform:uppercase;color:var(--muted)}
+.talon-date{display:block;font:700 18px/22px var(--f-display);letter-spacing:-.01em;color:var(--ink)}
+.talon-count{font:800 28px/28px var(--f-display);letter-spacing:-.02em;color:var(--ink)}
+.talon-unit{font:500 13px/16px var(--f-text);color:var(--muted)}
+
+/* Телефон: талон свёрнут в одну строку 358×48, он же кнопка раскрытия. */
+.talon--p{--tear:270px;--th:48px;width:358px}
+.talon--p .talon-main{display:flex;align-items:baseline;gap:8px;padding:0 10px 0 14px}
+.talon--p .talon-over{display:inline}
+.talon--p .talon-date{display:inline;font:700 15px/20px var(--f-display)}
+.talon--p .talon-stub{justify-content:space-between;padding:0 14px 0 12px}
+/* Шеврон «раскрыть» — геометрия, не иконка. */
+.chev{width:8px;height:8px;margin-top:-4px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:rotate(45deg)}
+
+/* =========================================================
+   5. Накладная на выезд (карточка события). Лист 352×228 висит на шнурке
+   от указателя выезда, наклон +1° вокруг люверса. Низ с кнопкой — отрывной:
+   пунктир и полукруглые вырезы на 60 px от нижней кромки.
+   ========================================================= */
+.slip{--w:352px}
+.slip .hang-lift{left:-16px;top:-14px;width:var(--w);height:228px}
+.slip-sheet{position:absolute;left:0;top:0;width:100%;height:100%;
+  display:flex;flex-direction:column;overflow:hidden;border-radius:var(--r-sm);background:var(--card);
+  transform-origin:16px 14px;transform:rotate(1deg);
+  -webkit-mask:radial-gradient(circle 6px at 50% calc(100% - 60px),transparent 5.5px,#000 6px) calc(var(--w) / 2) 0 / var(--w) 100% repeat-x;
+          mask:radial-gradient(circle 6px at 50% calc(100% - 60px),transparent 5.5px,#000 6px) calc(var(--w) / 2) 0 / var(--w) 100% repeat-x}
+.slip-head{flex:0 0 28px;display:flex;align-items:center;justify-content:space-between;padding:0 14px 0 32px;
+  font:600 13px/16px var(--f-mono);text-transform:uppercase;white-space:nowrap;color:var(--on-night);background:var(--night)}
+.slip-head::before{content:"";position:absolute;left:10px;top:8px;width:12px;height:12px;border-radius:50%;
+  border:2px solid var(--ctl);background:var(--bg)}
+.slip-no{color:var(--on-night-2)}
+.slip-body{flex:1;padding:8px 14px 0}
+.slip-title{margin:0 0 4px;font:800 20px/24px var(--f-display);letter-spacing:-.02em;color:var(--ink)}
+/* Графы бланка: подпись моно слева, значение справа, между графами пунктир. */
+.slip-fields{margin:0}
+.slip-field{display:grid;grid-template-columns:72px 1fr;padding:5px 0;border-top:1px dashed var(--line)}
+.slip-field:first-child{border-top:0}
+.slip-field dt{font:600 13px/17px var(--f-mono);text-transform:uppercase;color:var(--muted)}
+.slip-field dd{margin:0;font:600 13px/17px var(--f-text);color:var(--ink)}
+.slip-field dd.is-one-line{white-space:nowrap}
+.slip-field .status{line-height:17px}
+.slip-tear{flex:0 0 1px;margin:0 12px;border-top:1px dashed var(--ctl)}
+.slip-foot{flex:0 0 59px;padding:7px 14px 8px}
+.slip-btn{display:block;width:100%;height:44px;border:0;border-radius:var(--r-sm);
+  font:600 14px/44px var(--f-text);color:var(--card);background:var(--ink);transition:background var(--t-hang)}
+.slip-btn:hover{background:var(--ink-2)}
+
+/* =========================================================
+   6. Корешки папок (A): ярлыки на общей планке --ink, скруглён только верх.
+   Выбранный выше на 6 px и с красной полосой сверху.
+   ========================================================= */
+.spines{position:absolute;display:flex;align-items:flex-end;gap:8px;border-bottom:2px solid var(--ink)}
+.spines--d{left:16px;bottom:16px;width:600px;height:80px}
+.spines--p{right:16px;bottom:16px;width:248px;height:64px}
+.spine{flex:1 1 0;min-width:0;height:56px;margin:0;padding:0 14px;text-align:left;white-space:nowrap;
+  border:1px solid var(--line);border-bottom:0;border-radius:var(--r-md) var(--r-md) 0 0;background:var(--card);
+  transition:background var(--t-hang)}
+.spine:hover{background:var(--hover)}
+.spine-name{display:block;font:700 16px/20px var(--f-display);color:var(--ink)}
+.spine-sub{display:block;font:500 13px/16px var(--f-mono);color:var(--muted)}
+.spine.is-selected{height:62px;box-shadow:inset 0 4px 0 var(--red)}
+/* Показ клавиатурного фокуса на месте — та же обводка, что у :focus-visible. */
+.spine.is-focus{outline:2px solid var(--focus);outline-offset:2px}
+.spines--p .spine{flex:0 0 56px;padding:0;text-align:center;border-radius:var(--r-sm) var(--r-sm) 0 0}
+.spines--p .spine-name{font:700 13px/16px var(--f-display)}
+.spines--p .spine.is-selected{box-shadow:inset 0 3px 0 var(--red)}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{transition:none !important;animation:none !important}
+}
+</style>
+</head>
+<body>
+
+<header class="page-head">
+  <h1>Направление C — «Бирки»</h1>
+  <p>Складская бумага, повешенная на объекты мира: инвентарные бирки на шнурке, отрывной талон дня, накладная на выезд, корешки папок. Состояния показаны на месте: офис — покой, склад — наведение, гараж — выбран, «Списком» — клавиатурный фокус.</p>
+</header>
+
+<!-- ============================ Десктоп 1376×687 ============================ -->
+<section class="shot shot-d">
+  <p class="shot-cap">Десктоп · 1376×687</p>
+  <div class="frame-d">
+
+    <!-- C: отрывной талон дня, 360×56 -->
+    <div class="talon-wrap" style="left:16px;top:16px">
+      <div class="talon">
+        <div class="talon-main">
+          <span class="talon-over">Сегодня</span>
+          <span class="talon-date">7 октября</span>
+        </div>
+        <div class="talon-stub">
+          <span class="talon-count">1</span>
+          <span class="talon-unit">мероприятие</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- T: гараж — выбран. Якорь (346,150), люверс (404,100), бирка 164×56, наклон −2° -->
+    <div class="hang tag is-selected" style="--x:404px;--y:100px;--w:164px;--tilt:-2deg;--dx:-58px;--dy:50px;--len:76.6px;--ang:139.24deg;--len-h:78.6px;--ang-h:137.58deg">
+      <div class="hang-lift">
+        <button class="tag-body" type="button" aria-pressed="true">
+          <span class="tag-row"><span class="tag-num">6</span><span class="tag-name">Гараж</span></span>
+          <span class="tag-sub">машин · 1 в пути</span>
+        </button>
+      </div>
+      <span class="hang-string"></span><span class="hang-knot"></span><span class="hang-pin"></span>
+    </div>
+
+    <!-- T: офис — покой. Якорь (700,148), люверс (740,100), бирка 116×56, наклон +1,5° -->
+    <div class="hang tag" style="--x:740px;--y:100px;--w:116px;--tilt:1.5deg;--dx:-40px;--dy:48px;--len:62.5px;--ang:129.81deg;--len-h:64.8px;--ang-h:128.11deg">
+      <div class="hang-lift">
+        <button class="tag-body" type="button">
+          <span class="tag-row"><span class="tag-num">6</span><span class="tag-name">Офис</span></span>
+          <span class="tag-sub">списков</span>
+        </button>
+      </div>
+      <span class="hang-string"></span><span class="hang-knot"></span><span class="hang-pin"></span>
+    </div>
+
+    <!-- T: склад — наведение (0°, −3 px). Якорь (1052,103), люверс (1092,56), бирка 200×56, в покое −3° -->
+    <div class="hang tag is-hover" style="--x:1092px;--y:56px;--w:200px;--tilt:-3deg;--dx:-40px;--dy:47px;--len:61.7px;--ang:130.4deg;--len-h:64px;--ang-h:128.66deg">
+      <div class="hang-lift">
+        <button class="tag-body" type="button">
+          <span class="tag-row"><span class="tag-num">1 867</span><span class="tag-name">Склад</span></span>
+          <span class="tag-sub">единиц · 86 на выезде</span>
+        </button>
+      </div>
+      <span class="hang-string"></span><span class="hang-knot"></span><span class="hang-pin"></span>
+    </div>
+
+    <!-- Карточка события: накладная 352×228, люверс (1022,450), шнурок к указателю выезда (763,551) -->
+    <div class="hang slip" style="--x:1022px;--y:450px;--dx:-259px;--dy:101px;--len:278px;--ang:158.7deg">
+      <div class="hang-lift">
+        <article class="slip-sheet">
+          <div class="slip-head"><span>Накладная · выезд</span><span class="slip-no">№ 0710</span></div>
+          <div class="slip-body">
+            <h2 class="slip-title">Bionorica Workshop</h2>
+            <dl class="slip-fields">
+              <div class="slip-field"><dt>Площадка</dt><dd>Hyatt Regency Tashkent · Grand Ballroom A+B</dd></div>
+              <div class="slip-field"><dt>Статус</dt><dd><span class="status">идёт</span></dd></div>
+              <div class="slip-field"><dt>Состав</dt><dd class="is-one-line">32 позиции · залы Jupiter &amp; Uranus</dd></div>
+            </dl>
+          </div>
+          <div class="slip-tear"></div>
+          <div class="slip-foot"><button class="slip-btn" type="button">Открыть список</button></div>
+        </article>
+      </div>
+      <span class="hang-string"></span><span class="hang-knot"></span><span class="hang-pin"></span>
+    </div>
+
+    <!-- A: корешки папок, группа 600×80, цели 144×56 (выбранный 62), зазор 8 -->
+    <nav class="spines spines--d" aria-label="Разделы">
+      <button class="spine" type="button"><span class="spine-name">Офис</span><span class="spine-sub">6 списков</span></button>
+      <button class="spine" type="button"><span class="spine-name">Склад</span><span class="spine-sub">1 867 единиц</span></button>
+      <button class="spine is-selected" type="button" aria-pressed="true"><span class="spine-name">Гараж</span><span class="spine-sub">6 машин</span></button>
+      <button class="spine is-focus" type="button"><span class="spine-name">Списком</span><span class="spine-sub">весь список</span></button>
+    </nav>
+
+  </div>
+</section>
+
+<!-- ============================ Телефон 390×560 ============================ -->
+<section class="shot shot-p">
+  <p class="shot-cap">Телефон · 390×560</p>
+  <div class="frame-p">
+
+    <!-- C: талон свёрнут, 358×48, в одну строку итог события -->
+    <div class="talon-wrap" style="left:16px;top:8px">
+      <button class="talon talon--p" type="button" aria-expanded="false">
+        <span class="talon-main">
+          <span class="talon-over">Сегодня</span>
+          <span class="talon-date">Bionorica Workshop</span>
+        </span>
+        <span class="talon-stub">
+          <span class="status">идёт</span>
+          <span class="chev" aria-hidden="true"></span>
+        </span>
+      </button>
+    </div>
+
+    <!-- T: гараж — выбран. Якорь (70,207), люверс (86,160), бирка 88×44, −2° -->
+    <div class="hang tag tag--p is-selected" style="--x:86px;--y:160px;--w:88px;--tilt:-2deg;--dx:-16px;--dy:47px;--len:49.6px;--ang:108.8deg;--len-h:52.5px;--ang-h:107.74deg">
+      <div class="hang-lift">
+        <button class="tag-body" type="button" aria-pressed="true">
+          <span class="tag-name">Гараж</span>
+          <span class="tag-num">6</span>
+        </button>
+      </div>
+      <span class="hang-string"></span><span class="hang-knot"></span><span class="hang-pin"></span>
+    </div>
+
+    <!-- T: офис — покой. Якорь (198,207), люверс (208,152), бирка 72×44, +1,5° -->
+    <div class="hang tag tag--p" style="--x:208px;--y:152px;--w:72px;--tilt:1.5deg;--dx:-10px;--dy:55px;--len:55.9px;--ang:100.3deg;--len-h:58.9px;--ang-h:99.78deg">
+      <div class="hang-lift">
+        <button class="tag-body" type="button">
+          <span class="tag-name">Офис</span>
+          <span class="tag-num">6</span>
+        </button>
+      </div>
+      <span class="hang-string"></span><span class="hang-knot"></span><span class="hang-pin"></span>
+    </div>
+
+    <!-- T: склад — наведение. Якорь (326,190) у правого края: бирка 88×44 сдвинута влево
+         (правая кромка 372, safe 18), люверс (295,140), шнурок уходит вправо-вниз к якорю -->
+    <div class="hang tag tag--p is-hover" style="--x:295px;--y:140px;--w:88px;--tilt:-3deg;--dx:31px;--dy:50px;--len:58.8px;--ang:58.2deg;--len-h:61.4px;--ang-h:59.68deg">
+      <div class="hang-lift">
+        <button class="tag-body" type="button">
+          <span class="tag-name">Склад</span>
+          <span class="tag-num">1 867</span>
+        </button>
+      </div>
+      <span class="hang-string"></span><span class="hang-knot"></span><span class="hang-pin"></span>
+    </div>
+
+    <!-- Метка события у выезда: 160×44, якорь (216,333), люверс (224,303), +1° -->
+    <div class="hang tag tag--p tag--event" style="--x:224px;--y:303px;--w:160px;--tilt:1deg;--dx:-8px;--dy:30px;--len:31px;--ang:104.93deg;--len-h:34px;--ang-h:103.63deg">
+      <div class="hang-lift">
+        <button class="tag-body" type="button">
+          <span class="tag-title">Bionorica Workshop</span>
+          <span class="status">идёт</span>
+        </button>
+      </div>
+      <span class="hang-string"></span><span class="hang-knot"></span><span class="hang-pin"></span>
+    </div>
+
+    <!-- A: 248×64, четыре цели 56×56 (выбранная 62), зазор 8; левый нижний угол пуст -->
+    <nav class="spines spines--p" aria-label="Разделы">
+      <button class="spine" type="button"><span class="spine-name">Офис</span><span class="spine-sub">6</span></button>
+      <button class="spine" type="button"><span class="spine-name">Склад</span><span class="spine-sub">1 867</span></button>
+      <button class="spine is-selected" type="button" aria-pressed="true"><span class="spine-name">Гараж</span><span class="spine-sub">6</span></button>
+      <button class="spine" type="button"><span class="spine-name">Список</span><span class="spine-sub">все</span></button>
+    </nav>
+
+  </div>
+</section>
+
+</body>
+</html>
