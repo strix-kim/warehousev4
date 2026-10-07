@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HUD воксельного мира — B2 «Тёмные вывески, светлая обвязка»</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&subset=cyrillic,latin&display=swap">
+<script>
+/* Единственный JS страницы: ?frame=d | ?frame=p оставляет одну рамку без подписей
+   и отступов — так страница сравнения вставляет направление в iframe. */
+(function () {
+  var f = new URLSearchParams(location.search).get('frame');
+  if (f === 'd' || f === 'p') document.documentElement.setAttribute('data-frame', f);
+})();
+</script>
+<style>
+/* =========================================================
+   0. Токены — дословно из src/react/styles/01-tokens.css.
+   ========================================================= */
+:root {
+  color-scheme: light;
+  font-family: var(--f-text);
+  color: var(--ink);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --f-display: "Manrope","Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-text: "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono: "JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --bg: #EEF0F3;
+  --grid: rgba(22,24,29,.055);
+  --card: #FFFFFF;
+  --sunk: #F5F6F8;
+  --hover: #F0F2F5;
+  --select: #E9ECF1;
+  --ink: #16181D;
+  --ink-2: #2A2E36;
+  --muted: #5F6470;
+  --faint: #676C77;
+  --soft: #8A8F9A;
+  --line: #DDE0E5;
+  --line-2: #E8EAEE;
+  --ctl: #858A95;
+  --red: #E52D27;
+  --red-act: #C8201B;
+  --red-press: #AE1B16;
+  --red-tint: #FCEAE9;
+  --night: #0F1115;
+  --night-2: #1A1D23;
+  --night-3: #262A31;
+  --night-line: #2C3038;
+  --on-night: #E8EAEE;
+  --on-night-2: #9CA1AC;
+  --red-night: #FF5A52;
+  --bad-night: #FF8095;
+  --neutral-night: #D5D8DE;
+  --warn-night: #F2B544;
+  --ok: #1B7A45;
+  --ok-bg: #E3F3EA;
+  --ok-dot: #2A9D5C;
+  --warn: #8A5A00;
+  --warn-bg: #FBF0D5;
+  --warn-dot: #B7800A;
+  --bad: #B0203F;
+  --bad-bg: #FBE6EA;
+  --bad-dot: #B0203F;
+  --focus: #16181D;
+  --r-xl: 22px;
+  --r-lg: 18px;
+  --r-md: 12px;
+  --r-sm: 8px;
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+  --shadow-pop: 0 18px 48px rgba(15,17,21,.16), 0 2px 6px rgba(15,17,21,.06);
+  --shadow-drawer: -24px 0 60px rgba(15,17,21,.18);
+  --shadow-card: 0 12px 32px rgba(15, 17, 21, 0.07);
+}
+
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; }
+button { margin: 0; border: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+/* Фокус: тёмная обводка — вся обвязка светлая. */
+:focus-visible, .is-focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* =========================================================
+   1. Страница и рамки (каркас общий для трёх направлений).
+   ========================================================= */
+.page { display: grid; justify-items: start; gap: 12px; padding: 24px; }
+.page__title { margin: 0; font: 800 20px/24px var(--f-display); letter-spacing: -.02em; }
+.page__cap { margin: 12px 0 0; color: var(--muted); font: 500 13px/16px var(--f-text); }
+.frame { position: relative; overflow: hidden; border-radius: var(--r-lg); }
+.frame-d { width: 1376px; height: 687px; background: var(--bg) url(voxel-hud-s48-bg-1440.png) 0 0 / 1376px 687px no-repeat; }
+.frame-p { width: 390px; height: 560px; background: var(--bg) url(voxel-hud-s48-bg-390.png) 0 60px / 390px auto no-repeat; }
+html[data-frame] .page { display: block; padding: 0; }
+html[data-frame] .page__title, html[data-frame] .page__cap { display: none; }
+html[data-frame="d"] .frame-p, html[data-frame="p"] .frame-d { display: none; }
+
+/* =========================================================
+   2. Материалы. B2: тёмное — только вывески зданий (предметы мира),
+   вся обвязка (C, клавиши, карточка, метка) — светлая, язык продукта.
+   Один контур: у светлых плашек линия 1 px, у вывесок линии нет.
+   ========================================================= */
+.plaque { position: relative; border-radius: var(--r-lg); color: var(--ink); background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-card); }
+/* Ячейка счётчика: число (и единица под ним) на отдельной подложке, с отступом от края плашки. */
+.cell { align-self: stretch; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 48px; padding: 0 9px; border-radius: var(--r-sm); background: var(--night-3); transition: background-color .16s var(--ease-out); }
+.cell__num { font: 800 30px/30px var(--f-display); letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--on-night); }
+.cell__unit { font: 500 13px/14px var(--f-text); white-space: nowrap; color: var(--on-night-2); }
+/* Статус «идёт»: точка + слово, не только цвет. */
+.live { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ok); white-space: nowrap; }
+.live::before { content: ''; width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--ok-dot); }
+.sep { padding: 0 5px; color: var(--soft); }
+/* Флажок-маркер: тёмный столбик, красное полотнище, всё со скруглением. */
+.flag { position: relative; flex: none; width: 16px; height: 26px; }
+.flag::before { content: ''; position: absolute; left: 0; top: 0; width: 3px; height: 100%; border-radius: 2px; background: var(--ink); }
+.flag::after { content: ''; position: absolute; left: 4px; top: 1px; width: 12px; height: 10px; border-radius: 1px 3px 3px 1px; background: var(--red); }
+
+/* =========================================================
+   3. T — вывеска на ножке. Точка .sign стоит в якоре (--x, --y),
+   плашка шириной --w висит над ней на ножке --leg; --shift сдвигает
+   плашку от центра, ножка остаётся в якоре.
+   ========================================================= */
+.sign { position: absolute; left: var(--x); top: var(--y); width: 0; height: 0; --leg: 12px; --h: 60px; --shift: 0px; }
+/* Ножка заходит под плашку на 6 px — при подъёме на наведении щели нет. */
+.sign__leg { position: absolute; left: -1.5px; bottom: 0; width: 3px; height: calc(var(--leg) + 6px); border-radius: 2px; background: var(--night-3); transition: background-color .16s var(--ease-out); }
+/* Шляпка на якоре. */
+.sign__leg::after { content: ''; position: absolute; left: -2px; bottom: -3.5px; width: 7px; height: 7px; border-radius: 50%; background: inherit; }
+.sign__board { position: absolute; z-index: 1; left: calc(var(--w) / -2 + var(--shift)); bottom: var(--leg); width: var(--w); height: var(--h); display: flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px; border-radius: var(--r-md); color: var(--on-night); background: var(--night); box-shadow: var(--shadow-card); transition: transform .16s var(--ease-out), box-shadow .16s var(--ease-out); }
+.sign__text { min-width: 0; display: grid; gap: 1px; }
+.sign__name { font: 700 16px/20px var(--f-display); white-space: nowrap; color: var(--on-night); }
+.sign__sub { font: 500 13px/16px var(--f-text); white-space: nowrap; color: var(--on-night-2); }
+/* Наведение: плашка приподнята на 3 px, тень глубже. */
+.sign__board:hover, .sign.is-hover .sign__board { transform: translateY(-3px); box-shadow: var(--shadow-pop); }
+/* Выбор: ячейка красная, ножка и шляпка красные, кольцо 2 px вокруг всей плашки. */
+.sign.is-selected .cell { background: var(--red-act); }
+.sign.is-selected .cell__num, .sign.is-selected .cell__unit { color: var(--card); }
+.sign.is-selected .sign__leg { background: var(--red); }
+.sign.is-selected .sign__board::after { content: ''; position: absolute; inset: -4px; border: 2px solid var(--red); border-radius: calc(var(--r-md) + 4px); pointer-events: none; }
+/* Телефон: имя + одно число. */
+.sign--sm { --leg: 10px; --h: 44px; }
+.sign--sm .sign__board { gap: 7px; padding: 5px 10px 5px 5px; }
+.sign--sm .cell { min-width: 28px; padding: 0 6px; }
+.sign--sm .cell__num { font-size: 20px; line-height: 22px; }
+.sign--sm .sign__name { font-size: 14px; line-height: 18px; }
+
+/* =========================================================
+   4. C — плашка дня: белая, счётчик — тёмная ячейка, как на вывесках.
+   ========================================================= */
+.day { position: absolute; left: 16px; top: 16px; width: 360px; height: 48px; display: flex; align-items: center; gap: 10px; padding: 5px 5px 5px 16px; }
+.day__date { flex: 1; min-width: 0; font: 700 16px/20px var(--f-display); white-space: nowrap; }
+.day__cell { flex-direction: row; align-items: baseline; gap: 6px; min-width: 0; padding: 0 10px; background: var(--night); }
+.day__cell .cell__num { font-size: 20px; line-height: 36px; color: var(--card); }
+.day__cell .cell__unit { line-height: 36px; }
+/* Телефон: свёрнута, итог события одной строкой. */
+.day--sm { left: 16px; top: 8px; width: 358px; height: 48px; gap: 8px; padding: 0 16px 0 14px; text-align: left; }
+.day--sm .flag { height: 24px; }
+.day__line { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0; font: 600 14px/18px var(--f-text); white-space: nowrap; }
+.day__chev { flex: none; width: 8px; height: 8px; margin: 0 2px 4px 0; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); border-radius: 1px; transform: rotate(45deg); }
+
+/* =========================================================
+   5. Карточка события — светлая, 340×200; «→ выезд» — тёмная пилюля.
+   ========================================================= */
+.route { position: absolute; right: 16px; bottom: 16px; width: 340px; height: 200px; display: flex; flex-direction: column; align-items: flex-start; padding: 13px 15px 15px; box-shadow: var(--shadow-pop); }
+/* Связь с указателем выезда (763, 551): стойка вверх от якоря, скруглённый угол,
+   плечо к карточке. Карточка начинается с x = 1020, y = 471. */
+.route__arm { position: absolute; left: -259px; top: 41px; width: 258px; height: 38px; border: solid var(--night-3); border-width: 3px 0 0 3px; border-top-left-radius: var(--r-lg); pointer-events: none; }
+.route__arm::after { content: ''; position: absolute; left: -5px; bottom: -3.5px; width: 7px; height: 7px; border-radius: 50%; background: var(--night-3); }
+.route__kicker { display: inline-flex; align-items: center; gap: 6px; height: 24px; margin-bottom: 8px; padding: 0 10px 0 9px; border-radius: var(--r-md); color: var(--on-night); background: var(--night); font: 600 13px/16px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
+.route__title { margin: 0 0 4px; font: 800 20px/24px var(--f-display); letter-spacing: -.02em; color: var(--ink); white-space: nowrap; }
+/* Площадка: две смысловые строки, вторая — вторичным цветом. */
+.route__venue { margin: 0 0 6px; font: 500 14px/18px var(--f-text); color: var(--ink); }
+.route__venue span { display: block; white-space: nowrap; }
+.route__venue span + span { color: var(--muted); }
+.route__status { margin: 0; display: flex; align-items: center; font: 500 13px/16px var(--f-text); color: var(--muted); white-space: nowrap; }
+.route__open { margin-top: auto; width: 100%; height: 44px; display: grid; place-items: center; border-radius: var(--r-md); color: var(--card); background: var(--ink); font: 700 15px/20px var(--f-display); transition: background-color .16s var(--ease-out); }
+.route__open:hover { background: var(--ink-2); }
+
+/* Телефон: у выезда — компактная метка события: белая, с тёмной пилюлей-стрелкой. */
+.tag { position: absolute; left: var(--x); top: var(--y); width: 0; height: 0; }
+.tag__leg { position: absolute; left: -1.5px; bottom: 0; width: 3px; height: 12px; border-radius: 2px; background: var(--night-3); }
+.tag__leg::after { content: ''; position: absolute; left: -2px; bottom: -3.5px; width: 7px; height: 7px; border-radius: 50%; background: inherit; }
+.tag__board { position: absolute; z-index: 1; left: -28px; bottom: 8px; width: 186px; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 8px; border-radius: var(--r-lg); }
+.tag__pill { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; color: var(--on-night); background: var(--night); font: 600 14px/14px var(--f-mono); }
+.tag__text { min-width: 0; display: grid; }
+.tag__name { font: 700 13px/16px var(--f-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+.tag__sub { display: flex; align-items: center; font: 500 13px/16px var(--f-text); white-space: nowrap; color: var(--muted); }
+.tag__sub .live::before { width: 7px; height: 7px; }
+.tag__sub .live { gap: 5px; }
+.tag__sub .sep { padding: 0 4px; }
+
+/* =========================================================
+   6. A — клавиши: четыре отдельные белые плашки, зазор 8.
+   ========================================================= */
+.keys { position: absolute; left: 16px; bottom: 16px; width: 600px; height: 80px; display: flex; align-items: flex-end; gap: 8px; }
+.key { flex: 1; height: 56px; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 0 10px; font: 700 15px/20px var(--f-display); transition: background-color .16s var(--ease-out);
+  --ico-top: var(--soft); --ico-front: var(--muted); --ico-side: var(--ink); --ico-hole: var(--card); --ico-flag: var(--red); }
+.key:hover { background: var(--hover); --ico-hole: var(--hover); }
+/* Выбранная клавиша: тёмная плашка, белый текст, красная точка. */
+.key.is-selected, .key.is-selected:hover { color: var(--card); background: var(--night); border-color: var(--night);
+  --ico-top: var(--card); --ico-front: var(--on-night-2); --ico-side: var(--ctl); --ico-hole: var(--night); --ico-flag: var(--red-night); }
+.key.is-selected::after { content: ''; position: absolute; right: 11px; top: 11px; width: 8px; height: 8px; border-radius: 50%; background: var(--red-night); }
+/* Телефон: цели 56×56, значок и подпись под ним. */
+.keys--sm { left: auto; right: 16px; width: 248px; height: 64px; }
+.keys--sm .key { flex: none; width: 56px; flex-direction: column; gap: 1px; padding: 0; font: 600 13px/14px var(--f-text); }
+.keys--sm .key.is-selected::after { right: 6px; top: 6px; width: 6px; height: 6px; }
+
+/* Значки-объекты, поле 28×28. <i> — объём в изометрии: сам элемент — фасад,
+   ::before — крыша (светлее), ::after — боковая грань (темнее); глубина --d.
+   <b> — плоская деталь. */
+.ico { position: relative; flex: none; width: 28px; height: 28px; }
+.ico i, .ico b { position: absolute; }
+.ico i { --d: 5px; left: var(--l); bottom: var(--b, 2px); width: var(--bw); height: var(--bh); background: var(--ico-front); }
+.ico i::before { content: ''; position: absolute; left: 0; bottom: 100%; width: 100%; height: var(--d); background: var(--ico-top); transform: skewX(-45deg); transform-origin: 0 100%; }
+.ico i::after { content: ''; position: absolute; left: 100%; bottom: 0; width: var(--d); height: 100%; background: var(--ico-side); transform: skewY(-45deg); transform-origin: 0 100%; }
+/* Офис: куб и красный флажок на крыше. */
+.ico--office i { --l: 3px; --bw: 15px; --bh: 13px; }
+.ico--office b { left: 12px; bottom: 18px; width: 2px; height: 10px; border-radius: 1px; background: var(--ico-side); }
+.ico--office b::after { content: ''; position: absolute; left: 2px; top: 0; width: 7px; height: 5px; border-radius: 0 2px 2px 0; background: var(--ico-flag); }
+/* Склад: длинный низкий блок и башня слева. */
+.ico--store i:nth-child(1) { --l: 9px; --bw: 13px; --bh: 8px; }
+.ico--store i:nth-child(2) { --l: 1px; --bw: 8px; --bh: 18px; }
+/* Гараж: блок с тремя воротами (ворота — цвет клавиши). */
+.ico--garage i { --l: 1px; --bw: 21px; --bh: 13px; }
+.ico--garage b { left: 3px; bottom: 2px; width: 5px; height: 8px; border-radius: 1px 1px 0 0; background: var(--ico-hole); box-shadow: 6px 0 0 var(--ico-hole), 12px 0 0 var(--ico-hole); }
+/* Списком: три строки с точками. */
+.ico--list b { left: 10px; width: 16px; height: 4px; border-radius: 2px; background: var(--ico-front); }
+.ico--list b::before { content: ''; position: absolute; left: -8px; top: 0; width: 4px; height: 4px; border-radius: 50%; background: var(--ico-side); }
+.ico--list b:nth-child(1) { top: 4px; }
+.ico--list b:nth-child(2) { top: 12px; }
+.ico--list b:nth-child(3) { top: 20px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<main class="page">
+  <h1 class="page__title">Направление B2 — «Знаки»: тёмные вывески, светлая обвязка</h1>
+  <p class="page__cap">Десктоп, 1376×687. Склад — наведение, гараж — выбран, клавиша «Офис» — клавиатурный фокус.</p>
+
+  <!-- ================= Десктоп ================= -->
+  <section class="frame frame-d" aria-label="Кампус, десктоп">
+    <!-- C: плашка дня -->
+    <div class="plaque day">
+      <span class="flag" aria-hidden="true"></span>
+      <span class="day__date">Сегодня, 7 октября</span>
+      <span class="cell day__cell"><b class="cell__num">1</b><span class="cell__unit">мероприятие</span></span>
+    </div>
+
+    <!-- T: вывески на ножке. Гараж — выбран, склад — наведение, офис — покой. -->
+    <div class="sign is-selected" style="--x:346px;--y:150px;--w:142px">
+      <span class="sign__leg"></span>
+      <button class="sign__board" type="button" aria-pressed="true">
+        <span class="cell"><b class="cell__num">6</b><span class="cell__unit">машин</span></span>
+        <span class="sign__text"><span class="sign__name">Гараж</span><span class="sign__sub">1 в пути</span></span>
+      </button>
+    </div>
+    <div class="sign" style="--x:700px;--y:148px;--w:144px">
+      <span class="sign__leg"></span>
+      <button class="sign__board" type="button">
+        <span class="cell"><b class="cell__num">6</b><span class="cell__unit">списков</span></span>
+        <span class="sign__text"><span class="sign__name">Офис</span></span>
+      </button>
+    </div>
+    <div class="sign is-hover" style="--x:1052px;--y:103px;--w:214px">
+      <span class="sign__leg"></span>
+      <button class="sign__board" type="button">
+        <span class="cell"><b class="cell__num">1&nbsp;867</b><span class="cell__unit">единиц</span></span>
+        <span class="sign__text"><span class="sign__name">Склад</span><span class="sign__sub">86 на выезде</span></span>
+      </button>
+    </div>
+
+    <!-- Карточка события: указатель направления, раскрыта -->
+    <article class="plaque route">
+      <span class="route__arm" aria-hidden="true"></span>
+      <span class="route__kicker"><span aria-hidden="true">→</span>Выезд</span>
+      <h2 class="route__title">Bionorica Workshop</h2>
+      <p class="route__venue"><span>Hyatt Regency Tashkent</span><span>Grand Ballroom A+B</span></p>
+      <p class="route__status"><span class="live">идёт</span><span class="sep">·</span>32 позиции<span class="sep">·</span>залы Jupiter &amp; Uranus</p>
+      <button class="route__open" type="button">Открыть список</button>
+    </article>
+
+    <!-- A: клавиши -->
+    <nav class="keys" aria-label="Разделы">
+      <button class="plaque key is-focus" type="button"><span class="ico ico--office" aria-hidden="true"><i></i><b></b></span><span class="key__name">Офис</span></button>
+      <button class="plaque key" type="button"><span class="ico ico--store" aria-hidden="true"><i></i><i></i></span><span class="key__name">Склад</span></button>
+      <button class="plaque key is-selected" type="button" aria-pressed="true"><span class="ico ico--garage" aria-hidden="true"><i></i><b></b></span><span class="key__name">Гараж</span></button>
+      <button class="plaque key" type="button"><span class="ico ico--list" aria-hidden="true"><b></b><b></b><b></b></span><span class="key__name">Списком</span></button>
+    </nav>
+  </section>
+
+  <p class="page__cap">Телефон, 390×560. Те же состояния.</p>
+
+  <!-- ================= Телефон ================= -->
+  <section class="frame frame-p" aria-label="Кампус, телефон">
+    <!-- C: свёрнута, итог события одной строкой -->
+    <button class="plaque day day--sm" type="button" aria-expanded="false">
+      <span class="flag" aria-hidden="true"></span>
+      <span class="day__line">Сегодня<span class="sep">·</span>Bionorica Workshop<span class="sep">·</span><span class="live">идёт</span></span>
+      <span class="day__chev" aria-hidden="true"></span>
+    </button>
+
+    <!-- T: имя + одно число -->
+    <div class="sign sign--sm is-selected" style="--x:70px;--y:207px;--w:92px">
+      <span class="sign__leg"></span>
+      <button class="sign__board" type="button" aria-pressed="true">
+        <span class="cell"><b class="cell__num">6</b></span>
+        <span class="sign__text"><span class="sign__name">Гараж</span></span>
+      </button>
+    </div>
+    <div class="sign sign--sm" style="--x:198px;--y:207px;--w:88px;--shift:-6px">
+      <span class="sign__leg"></span>
+      <button class="sign__board" type="button">
+        <span class="cell"><b class="cell__num">6</b></span>
+        <span class="sign__text"><span class="sign__name">Офис</span></span>
+      </button>
+    </div>
+    <!-- Склад у правого края: плашка сдвинута влево на 17 (правый край 374), ножка в якоре -->
+    <div class="sign sign--sm is-hover" style="--x:326px;--y:190px;--w:130px;--shift:-17px">
+      <span class="sign__leg"></span>
+      <button class="sign__board" type="button">
+        <span class="cell"><b class="cell__num">1&nbsp;867</b></span>
+        <span class="sign__text"><span class="sign__name">Склад</span></span>
+      </button>
+    </div>
+
+    <!-- Метка события у выезда -->
+    <div class="tag" style="--x:216px;--y:333px">
+      <span class="tag__leg"></span>
+      <button class="plaque tag__board" type="button">
+        <span class="tag__pill" aria-hidden="true">→</span>
+        <span class="tag__text"><span class="tag__name">Bionorica Workshop</span><span class="tag__sub"><span class="live">идёт</span><span class="sep">·</span>32 позиции</span></span>
+      </button>
+    </div>
+
+    <!-- A: четыре цели 56×56, значок и подпись -->
+    <nav class="keys keys--sm" aria-label="Разделы">
+      <button class="plaque key is-focus" type="button"><span class="ico ico--office" aria-hidden="true"><i></i><b></b></span><span class="key__name">Офис</span></button>
+      <button class="plaque key" type="button"><span class="ico ico--store" aria-hidden="true"><i></i><i></i></span><span class="key__name">Склад</span></button>
+      <button class="plaque key is-selected" type="button" aria-pressed="true"><span class="ico ico--garage" aria-hidden="true"><i></i><b></b></span><span class="key__name">Гараж</span></button>
+      <button class="plaque key" type="button"><span class="ico ico--list" aria-hidden="true"><b></b><b></b><b></b></span><span class="key__name">Список</span></button>
+    </nav>
+  </section>
+</main>
+</body>
+</html>

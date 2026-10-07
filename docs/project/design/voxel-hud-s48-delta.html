@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HUD мира ARGO — три направления · с48</title>
+<title>HUD мира ARGO — доработка «Знаков» · с48</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -43,48 +43,48 @@ p{margin:0;max-width:880px;color:var(--muted)}
 </style>
 </head>
 <body>
-<h1>HUD мира — три направления</h1>
-<p>Один и тот же кадр кампуса, одни и те же числа и зоны; меняется только язык: таблички, плашка дня, карточка события, кнопки-дубли. Офис — покой, склад — наведение, гараж — выбран. Выбираем направление целиком, детали докрутим на шаге 4.</p>
+<h1>HUD мира — доработка направления «Знаки»</h1>
+<p>Текущий вариант — первым. В обоих новых: скруглённые формы, один контур вместо двойного канта, крупнее число на вывеске, новые значки клавиш, компактная карточка события. Различаются они одним — сколько на экране чёрного.</p>
 
 <div class="bar">
   <div class="seg" role="group" aria-label="Направление">
-    <button type="button" data-d="a" aria-pressed="true">A · Чертёж</button>
-    <button type="button" data-d="b" aria-pressed="false">B · Знаки</button>
-    <button type="button" data-d="c" aria-pressed="false">C · Бирки</button>
+    <button type="button" data-d="a" aria-pressed="true">B · как было</button>
+    <button type="button" data-d="b" aria-pressed="false">B2 · тёмные вывески</button>
+    <button type="button" data-d="c" aria-pressed="false">B3 · светлые знаки</button>
   </div>
   <span class="idea" id="idea"></span>
-  <span><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> — переключить · <a id="solo" href="voxel-hud-s48-a.html" target="_blank" rel="noopener">открыть отдельно</a></span>
+  <span><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> — переключить · <a id="solo" href="voxel-hud-s48-b.html" target="_blank" rel="noopener">открыть отдельно</a></span>
 </div>
 
 <h2>Десктоп · сцена 1376 × 687</h2>
 <div class="scroll">
   <div class="desk" id="desk">
-    <iframe class="is-on" data-d="a" src="voxel-hud-s48-a.html?frame=d" title="A · Чертёж, десктоп"></iframe>
-    <iframe data-d="b" src="voxel-hud-s48-b.html?frame=d" title="B · Знаки, десктоп"></iframe>
-    <iframe data-d="c" src="voxel-hud-s48-c.html?frame=d" title="C · Бирки, десктоп"></iframe>
+    <iframe class="is-on" data-d="a" src="voxel-hud-s48-b.html?frame=d" title="B · как было, десктоп"></iframe>
+    <iframe data-d="b" src="voxel-hud-s48-b2.html?frame=d" title="B2 · тёмные вывески, десктоп"></iframe>
+    <iframe data-d="c" src="voxel-hud-s48-b3.html?frame=d" title="B3 · светлые знаки, десктоп"></iframe>
   </div>
 </div>
 
 <h2>Телефон · 390 × 560 над нижней панелью — все три рядом</h2>
 <div class="scroll">
   <div class="phones">
-    <figure><figcaption>A · Чертёж</figcaption><iframe src="voxel-hud-s48-a.html?frame=p" title="A · Чертёж, телефон"></iframe></figure>
-    <figure><figcaption>B · Знаки</figcaption><iframe src="voxel-hud-s48-b.html?frame=p" title="B · Знаки, телефон"></iframe></figure>
-    <figure><figcaption>C · Бирки</figcaption><iframe src="voxel-hud-s48-c.html?frame=p" title="C · Бирки, телефон"></iframe></figure>
+    <figure><figcaption>B · как было</figcaption><iframe src="voxel-hud-s48-b.html?frame=p" title="B · как было, телефон"></iframe></figure>
+    <figure><figcaption>B2 · тёмные вывески</figcaption><iframe src="voxel-hud-s48-b2.html?frame=p" title="B2 · тёмные вывески, телефон"></iframe></figure>
+    <figure><figcaption>B3 · светлые знаки</figcaption><iframe src="voxel-hud-s48-b3.html?frame=p" title="B3 · светлые знаки, телефон"></iframe></figure>
   </div>
 </div>
 
 <script>
 const IDEAS = {
-  a: 'Чертёж — HUD как размерные выноски схемы: число крупно на полке, без коробок.',
-  b: 'Знаки — HUD как предметы мира: тёмные вывески на ножке, событие — дорожный указатель.',
-  c: 'Бирки — HUD как складская бумага: бирки на шнурке, событие — накладная на выезд.',
+  a: 'Как было: все плашки тёмные, двойной кант, углы почти прямые.',
+  b: 'B2: тёмными остаются только вывески зданий; плашка дня, клавиши и карточка — светлые.',
+  c: 'B3: все плашки белые, тёмная только ячейка-счётчик — один знак на всех элементах.',
 };
 const pick = (d) => {
   document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.d === d)));
   document.querySelectorAll('#desk iframe').forEach((f) => f.classList.toggle('is-on', f.dataset.d === d));
   document.getElementById('idea').textContent = IDEAS[d];
-  document.getElementById('solo').href = `voxel-hud-s48-${d}.html`;
+  document.getElementById('solo').href = `voxel-hud-s48-${{ a: 'b', b: 'b2', c: 'b3' }[d]}.html`;
 };
 document.querySelector('.seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) pick(b.dataset.d); });
 addEventListener('keydown', (e) => { const d = { 1: 'a', 2: 'b', 3: 'c' }[e.key]; if (d) pick(d); });
