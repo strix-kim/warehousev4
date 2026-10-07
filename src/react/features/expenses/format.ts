@@ -2,10 +2,11 @@ import type { Language } from '../../lib/i18n'
 
 // Форматы журнала расходов — свои, не Intl: для `uz` он отдаёт то ISO-дату, то
 // разряды запятой в зависимости от движка, а сумму и дату человек сверяет
-// глазами с бумажным чеком. Парные ограничения в базе — expenses_amount_check
-// и expenses_name_check; здесь только подсказка и вид.
+// глазами с бумажным чеком. Парные ограничения в базе — expenses_amount_check,
+// expenses_name_check и expenses_comment_check; здесь только подсказка и вид.
 export const EXPENSE_AMOUNT_MAX = 1_000_000_000
 export const EXPENSE_NAME_MAX = 200
+export const EXPENSE_COMMENT_MAX = 500
 
 // Неразрывный пробел: «102 000» не должно рваться между разрядами ни в ячейке,
 // ни в плашке итога.

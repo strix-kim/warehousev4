@@ -222,7 +222,7 @@ export function ExpensesPage() {
       }
       await exportExpensesXlsx({
         monthLabel: formatMonthLabel(month, language),
-        rows: fresh.rows.map((row) => ({ name: row.name, spentOn: row.spent_on, amount: row.amount })),
+        rows: fresh.rows.map((row) => ({ name: row.name, spentOn: row.spent_on, amount: row.amount, comment: row.comment })),
         total: fresh.total,
       })
       setExportState('idle')
@@ -307,19 +307,21 @@ export function ExpensesPage() {
                   <col />
                   <col style={{ width: 150 }} />
                   <col style={{ width: 190 }} />
+                  <col style={{ width: '30%' }} />
                 </colgroup>
                 <thead>
                   <tr>
                     <th>{tr('Наименование расхода', 'Xarajat nomi')}</th>
                     <th>{tr('Дата', 'Sana')}</th>
-                    <th className="expenses-table__amount">{tr('Сумма', 'Summa')}</th>
+                    <th className="expenses-table__amount">{tr('Сумма, UZS', 'Summa, UZS')}</th>
+                    <th>{tr('Комментарий', 'Izoh')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {isLoading
                     ? Array.from({ length: 5 }, (_, index) => (
                         <tr key={index} className="skeleton-row">
-                          <td colSpan={3}><span /></td>
+                          <td colSpan={4}><span /></td>
                         </tr>
                       ))
                     : rows.map((row) => (
@@ -340,11 +342,15 @@ export function ExpensesPage() {
                               <span>
                                 <strong title={row.name}>{row.name}</strong>
                                 {row.spent_by && namesById.has(row.spent_by) && <small>{namesById.get(row.spent_by)}</small>}
+                                {/* Дубль графы для телефона: там колонки нет, и комментарий
+                                    идёт малой строкой под наименованием (expenses.css). */}
+                                {row.comment && <small className="expenses-table__note">{row.comment}</small>}
                               </span>
                             </div>
                           </td>
                           <td className="expenses-table__date">{formatDay(row.spent_on)}</td>
                           <td className="expenses-table__amount">{formatSum(row.amount)}</td>
+                          <td className="expenses-table__comment" title={row.comment ?? undefined}>{row.comment}</td>
                         </tr>
                       ))}
                 </tbody>
@@ -353,6 +359,7 @@ export function ExpensesPage() {
                     <tr>
                       <td colSpan={2}>{tr('Итого', 'Jami')}</td>
                       <td className="expenses-table__amount">{totalText}</td>
+                      <td />
                     </tr>
                   </tfoot>
                 )}

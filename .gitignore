@@ -44,3 +44,6 @@ outputs
 
 # Служебные файлы Supabase CLI (link, кэш версий)
 supabase/.temp/
+
+# Образцы заказчика с живыми паспортными данными: репозиторий публичный, в git не кладём
+docs/reference/*.docx

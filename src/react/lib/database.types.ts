@@ -383,10 +383,12 @@ export type Database = {
       // ПРАВКА РУКАМИ: таблица заведена миграцией 20261007163328 (с51), типы
       // дописаны вслед за ней — генератор с прода не перезапускался. spent_on
       // обязателен на вставке: default в базе нет намеренно (current_date там
-      // UTC), дату шлёт клиент.
+      // UTC), дату шлёт клиент. comment — миграция 20261007182355 (с52), так же
+      // руками: nullable, пустой строки в базе не бывает (expenses_comment_check).
       expenses: {
         Row: {
           amount: number
+          comment: string | null
           created_at: string
           created_by: string
           id: string
@@ -397,6 +399,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          comment?: string | null
           created_at?: string
           created_by?: string
           id?: string
@@ -407,6 +410,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          comment?: string | null
           created_at?: string
           created_by?: string
           id?: string

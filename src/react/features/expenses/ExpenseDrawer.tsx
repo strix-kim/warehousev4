@@ -2,7 +2,7 @@ import { CalendarDays, CircleAlert, Plus, Save, Trash2, X } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useLayoutEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import { createExpense, deleteExpense, EXPENSE_NOT_APPLIED, expenseErrorText, updateExpense } from './api'
-import { caretAfterDigits, EXPENSE_AMOUNT_MAX, EXPENSE_NAME_MAX, formatSum, groupDigits, isSumInRange, parseSum, sumDigits } from './format'
+import { caretAfterDigits, EXPENSE_AMOUNT_MAX, EXPENSE_COMMENT_MAX, EXPENSE_NAME_MAX, formatSum, groupDigits, isSumInRange, parseSum, sumDigits } from './format'
 import type { Expense, ExpenseInput } from './types'
 import { AppDatePicker } from '../../components/AppDatePicker'
 import { DrawerFrame } from '../../components/DrawerFrame'
@@ -27,6 +27,8 @@ type Draft = {
   amountDigits: string
   spentOn: string
   spentBy: string | null
+  // Как набрано; пустое и края приводит api при записи.
+  comment: string
 }
 
 // Один дровер на ввод и на правку (как HallPlanMetaDrawer): разъедься они,
@@ -59,6 +61,7 @@ export function ExpenseDrawer({ expense, defaultSpentBy, candidates, candidatesS
     // Default в базе нет намеренно (current_date там UTC) — дату шлёт клиент.
     spentOn: expense?.spent_on ?? todayDateValue(),
     spentBy: expense ? expense.spent_by : (defaultSpentBy || null),
+    comment: expense?.comment ?? '',
   }))
   const [draft, setDraft] = useState<Draft>(initialDraft)
   // 'saving' и 'deleting' после успеха НЕ снимаются: дровер закрывает страница,
@@ -95,8 +98,8 @@ export function ExpenseDrawer({ expense, defaultSpentBy, candidates, candidatesS
     setCaretTick((value) => value + 1)
   }
 
-  // Клиентские проверки — подсказка: границы держат expenses_name_check и
-  // expenses_amount_check, роль и владельца — политики. Кнопку они запирают
+  // Клиентские проверки — подсказка: границы держат expenses_name_check,
+  // expenses_amount_check и expenses_comment_check, роль и владельца — политики. Кнопку они запирают
   // только чтобы не слать заведомо мёртвый запрос.
   const amount = parseSum(draft.amountDigits)
   const nameEmpty = !draft.name.trim()
@@ -107,6 +110,7 @@ export function ExpenseDrawer({ expense, defaultSpentBy, candidates, candidatesS
     || draft.amountDigits !== initialDraft.amountDigits
     || draft.spentOn !== initialDraft.spentOn
     || draft.spentBy !== initialDraft.spentBy
+    || draft.comment !== initialDraft.comment
   const { requestClose, isPrompting, confirmClose, keepEditing } = useGuardedClose(isDirty && busy === 'idle', onClose)
   useModalLayer(requestClose)
 
@@ -119,7 +123,7 @@ export function ExpenseDrawer({ expense, defaultSpentBy, candidates, candidatesS
 
   async function save() {
     if (!canSave || !isSumInRange(amount)) return
-    const input: ExpenseInput = { name: draft.name, spentOn: draft.spentOn, amount, spentBy: draft.spentBy }
+    const input: ExpenseInput = { name: draft.name, spentOn: draft.spentOn, amount, spentBy: draft.spentBy, comment: draft.comment }
     setBusy('saving')
     setErrorText('')
     try {
@@ -217,7 +221,7 @@ export function ExpenseDrawer({ expense, defaultSpentBy, candidates, candidatesS
       </label>
 
       <label className="field">
-        <span>{tr('Сумма', 'Summa')} *</span>
+        <span>{tr('Сумма, UZS', 'Summa, UZS')} *</span>
         <div className="expenses-sum">
           <input
             ref={amountRef}
@@ -279,6 +283,18 @@ export function ExpenseDrawer({ expense, defaultSpentBy, candidates, candidatesS
             disabled={busy !== 'idle'}
           />
         )}
+
+      {/* Enter здесь — перенос строки, а не сохранение: поле многострочное. */}
+      <label className="field">
+        <span>{tr('Комментарий — необязательно', 'Izoh — ixtiyoriy')}</span>
+        <textarea
+          value={draft.comment}
+          maxLength={EXPENSE_COMMENT_MAX}
+          rows={3}
+          onChange={(event) => patch({ comment: event.target.value })}
+          placeholder={tr('Например, чек у бухгалтера', 'Masalan, chek buxgalterda')}
+        />
+      </label>
 
       {errorText && <p className="form-error" role="alert"><CircleAlert size={15} /> {errorText}</p>}
     </DrawerFrame>

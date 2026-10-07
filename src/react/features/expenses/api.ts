@@ -12,8 +12,12 @@ import type { Expense, ExpenseInput, ExpensesPeriod, ExpensesQuery, Tr } from '.
 const EXPENSES_CACHE_PREFIX = 'expenses:'
 const EXPENSES_CACHE_TTL = 10 * 60 * 1000
 
+// v2 — в строке снимка появился comment (с52). Первый кадр читает кэш без
+// разбора, и запись прошлой формы отдала бы строки без этого поля; смена формы =
+// смена ключа (gotchas §4). Старые записи выпадут по TTL, общий префикс сброса
+// прежний.
 function periodCacheKey({ from, to, spentBy }: ExpensesQuery) {
-  return `${EXPENSES_CACHE_PREFIX}period:${from}:${to}${spentBy ? `:${spentBy}` : ''}`
+  return `${EXPENSES_CACHE_PREFIX}period:v2:${from}:${to}${spentBy ? `:${spentBy}` : ''}`
 }
 
 type JsonObject = { [key: string]: Json | undefined }
@@ -49,6 +53,9 @@ function parseExpensesPeriod(data: Json): ExpensesPeriod {
       spent_on: asString(row.spent_on),
       amount: asNumber(row.amount),
       spent_by: typeof row.spent_by === 'string' ? row.spent_by : null,
+      // Ключа может не быть вовсе (функция прошлой версии) — это тот же «без
+      // комментария», а не битая строка: на деньги поле не влияет.
+      comment: typeof row.comment === 'string' ? row.comment : null,
       created_at: asString(row.created_at),
       updated_at: asString(row.updated_at),
     }
@@ -89,12 +96,16 @@ export function readCachedExpensesPeriodMeta(query: ExpensesQuery) {
 // Раскладка формы в строку таблицы — одна на вставку и на правку. Имя уходит
 // как введено: края обрезает триггер базы (normalize_hall_name), второй канон
 // на клиенте не заводим. created_by не шлём — его ставит default auth.uid().
+// С комментарием наоборот: триггера на него в базе нет, а пустую строку
+// expenses_comment_check отбивает, поэтому края режутся здесь и «ничего не
+// написано» уходит как null. На правке null шлётся явно — он стирает прежний текст.
 function expenseRow(fields: ExpenseInput) {
   return {
     name: fields.name,
     spent_on: fields.spentOn,
     amount: fields.amount,
     spent_by: fields.spentBy,
+    comment: fields.comment?.trim() || null,
   }
 }
 
@@ -140,7 +151,7 @@ export async function deleteExpense(id: string): Promise<void> {
 }
 
 // Перевод отказа базы в человеческую фразу. Разбираем ИМЕНЕМ ограничения, а не
-// одним кодом 23514: под ним два разных CHECK, и «сумма вне границ» в ответ на
+// одним кодом 23514: под ним три разных CHECK, и «сумма вне границ» в ответ на
 // пустое название было бы враньём.
 export function expenseErrorText(error: unknown, tr: Tr, action: 'save' | 'delete' = 'save'): string {
   const candidate = (typeof error === 'object' && error !== null ? error : {}) as { code?: unknown; message?: unknown }
@@ -152,6 +163,9 @@ export function expenseErrorText(error: unknown, tr: Tr, action: 'save' | 'delet
   }
   if (message.includes('expenses_name_check')) {
     return tr('Наименование не может быть пустым и длиннее 200 знаков.', 'Nom bo‘sh yoki 200 belgidan uzun bo‘lishi mumkin emas.')
+  }
+  if (message.includes('expenses_comment_check')) {
+    return tr('Комментарий не может быть длиннее 500 знаков.', 'Izoh 500 belgidan uzun bo‘lishi mumkin emas.')
   }
   if (message.includes('expenses_amount_check')) {
     return tr('Сумма — от 1 до 1 000 000 000 сум.', 'Summa — 1 dan 1 000 000 000 so‘mgacha.')

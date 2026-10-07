@@ -1,5 +1,5 @@
 /* Журнал «Производственные расходы» (с51): переключатель месяца, три колонки
-   образца с «Итого», плашка итога над нижней навигацией, поля дровера. Таблица —
+   образца и комментарий (с52) с «Итого», плашка итога над нижней навигацией, поля дровера. Таблица —
    модификатор общего реестра (.data-table--registry), свои только отличия.
    Импортируется страницей и встаёт в каскад ПОСЛЕ styles.css; где общий реестр
    на телефоне задаёт раскладку «галка · аватар · имя», правила ниже перебивают
@@ -12,6 +12,11 @@
 .data-table.expenses-table th.expenses-table__amount, .expenses-table td.expenses-table__amount { text-align: right; }
 .expenses-table td.expenses-table__date, .expenses-table td.expenses-table__amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .expenses-table tbody td.expenses-table__amount { color: var(--ink); font-weight: 600; }
+/* Комментарий — одной строкой с многоточием (полный текст в title и в дровере):
+   графа необязательная и не должна раздвигать строку журнала. На десктопе живёт
+   колонкой, дубль под наименованием спрятан; на телефоне наоборот. */
+.expenses-table td.expenses-table__comment { overflow: hidden; color: var(--muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.expenses-table .equipment-cell small.expenses-table__note { display: none; }
 .expenses-table tfoot td { height: 52px; border-top: 1px solid var(--line); border-bottom: 0; color: var(--ink); background: var(--sunk); font-weight: 700; }
 
 /* Плашка итога — по образцу .bulk-bar (05-registry): левый край считается от
@@ -56,6 +61,11 @@
   .data-table.data-table--registry.expenses-table tbody tr td:first-child { grid-row: 1; grid-column: 1; min-height: 0; }
   .data-table.data-table--registry.expenses-table tbody tr td:nth-child(2) { grid-row: 2; grid-column: 1; min-height: 0; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding-top: 3px; color: var(--muted); font-size: 13px; }
   .data-table.data-table--registry.expenses-table tbody tr td:nth-child(2)::after { content: none; }
+  /* Колонки комментария на телефоне нет: текст — под наименованием, не больше
+     двух строк (title здесь не навести, а пятьсот знаков строку бы раздули);
+     overflow-wrap — чтобы слово без пробелов не дало горизонтальной прокрутки. */
+  .data-table.data-table--registry.expenses-table tbody tr td.expenses-table__comment { display: none; }
+  .data-table.expenses-table .equipment-cell small.expenses-table__note { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; color: var(--muted); font-size: 13px; white-space: normal; overflow-wrap: anywhere; }
   .data-table.data-table--registry.expenses-table tbody tr td:nth-child(3) { grid-row: 1 / span 2; grid-column: 2; padding-bottom: 0; color: var(--ink); font-size: 16px; font-weight: 700; }
 
   /* Над нижней навигацией (64 px), тем же отступом, что .bulk-bar. */

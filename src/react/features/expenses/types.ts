@@ -2,7 +2,7 @@ import type { Tables } from '../../lib/database.types'
 
 // Строка журнала ровно в том виде, в каком её отдаёт RPC expenses_period:
 // created_by в ответ не входит — журнал и так только свой (owner-политика).
-export type Expense = Pick<Tables<'expenses'>, 'id' | 'name' | 'spent_on' | 'amount' | 'spent_by' | 'created_at' | 'updated_at'>
+export type Expense = Pick<Tables<'expenses'>, 'id' | 'name' | 'spent_on' | 'amount' | 'spent_by' | 'comment' | 'created_at' | 'updated_at'>
 
 // Журнал за период одним снимком. total и count считает база: сумма по
 // подгруженным строкам соврала бы при обрезке выборки, а под фильтром «Кто
@@ -26,6 +26,9 @@ export type ExpenseInput = {
   spentOn: string
   amount: number
   spentBy: string | null
+  // Необязательный. Что считать пустым, решает api (expenseRow): в базу уходит
+  // либо текст без краёв, либо null.
+  comment: string | null
 }
 
 export type Tr = (ru: string, uz: string) => string
