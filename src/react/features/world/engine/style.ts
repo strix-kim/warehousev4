@@ -2,9 +2,10 @@
 // (softline макета с50); остальные формы остались на стенде voxel-style-s48.
 import * as THREE from 'three'
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
+import type { WorldInk, WorldLook, WorldPalette } from '../settings'
 import type { Tokens } from './tokens'
 
-const mix = (a: string, b: string, k: number) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString()
+export const mix = (a: string, b: string, k: number) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString()
 
 // Палитра — одна таблица ролей на все материалы мира. Значения — токены и их смеси.
 //   ground земля (она же фон сцены и туман) · grid/gridA сетка и её непрозрачность · road дорога · mark осевая
@@ -31,6 +32,25 @@ function whitePalette(T: Tokens): Palette {
     cloth: [T.select, T.night3, T.line], skin: T.card, legs: T.night3,
   }
 }
+
+// Тёмный мир в тон сайдбару: окна и проёмы светятся, акцент — --red-night.
+// Контур в ночи ТЁМНЫЙ по серой стене: светлая линия по стене даёт контраст не выше 2,8
+// и, тускнея к --night-line, проходит через цвет самой стены (пропадает); тёмная держит
+// те же ступени контраста к заливке, что и в белой схеме. Силуэт к земле при этом
+// слабый — объём от земли отделяет заливка.
+function nightPalette(T: Tokens): Palette {
+  return {
+    ground: T.night, grid: T.nightLine, gridA: 1, road: T.night2, mark: mix(T.night3, T.onNight2, 0.5), floor: T.night2, pad: T.night2, yard: T.night3, paint: mix(T.night3, T.onNight2, 0.6),
+    wall: mix(T.night3, T.onNight, 0.3), wall2: mix(T.night3, T.onNight, 0.42), roof: T.night3, roofMass: mix(T.night3, T.onNight, 0.16), canopy: mix(T.night3, T.onNight, 0.42), door: T.onNight2, glass: T.onNight, carGlass: T.night2,
+    dark: mix(T.night3, T.onNight2, 0.5), sign: T.night, signMark: T.redNight, steel: T.onNight2, tire: T.nightLine, accent: T.redNight, lamp: T.warnBg, leaf: mix(T.ok, T.night3, 0.35),
+    edge: mix(T.nightLine, T.onNight2, 0.35), gate: T.onNight, ink: [T.night3, mix(T.night3, T.onNight2, 0.1), mix(T.night3, T.onNight2, 0.25)], ringSel: T.red, ringHover: T.onNight2,
+    cloth: [T.onNight2, mix(T.night3, T.onNight, 0.2), T.onNight], skin: T.onNight, legs: mix(T.night3, T.onNight2, 0.5),
+  }
+}
+
+const PALETTES: Record<WorldPalette, (T: Tokens) => Palette> = { white: whitePalette, night: nightPalette }
+// Ступень контура → место в роли ink палитры
+const INK_STEP: Record<WorldInk, 0 | 1 | 2> = { ink1: 0, ink2: 1, ink3: 2 }
 
 // Толщина контура в px экрана, одна на силуэт и на линии рёбер
 export const INK_WIDTH = 2
@@ -87,28 +107,35 @@ function hullMaterial(color: string, hullPx: WorldStyle['hullPx']) {
   return m
 }
 
-export function createStyle(T: Tokens): WorldStyle {
-  const P = whitePalette(T)
-  const hullPx = { value: new THREE.Vector2(0.002, 0.002) }
-  const ink = P.ink[0]
-  const style: WorldStyle = {
-    P, hullPx,
-    mats: new Map(),
-    flats: new Map(),
-    roles: {} as Roles,
-    // Рёбра — LineSegments2: обычная линия в WebGL всегда 1 px и без сглаживания.
-    // Разрешение LineMaterial ставит сам LineSegments2 перед кадром.
-    ink: new LineMaterial({ color: ink, linewidth: INK_WIDTH, fog: true }),
-    hull: hullMaterial(ink, hullPx),
-  }
-  // Графит мира — только --night-3: чистый --night слишком тяжёлый, он остаётся за HTML-хромом
+// Собрать облик из палитры и ступени контура. Кэши на входе пусты.
+function applyLook(style: WorldStyle, T: Tokens, look: WorldLook) {
+  const P = style.P = PALETTES[look.palette](T)
+  const ink = P.ink[INK_STEP[look.ink]]
+  // Рёбра — LineSegments2: обычная линия в WebGL всегда 1 px и без сглаживания.
+  // Разрешение LineMaterial ставит сам LineSegments2 перед кадром.
+  style.ink = new LineMaterial({ color: ink, linewidth: INK_WIDTH, fog: true })
+  style.hull = hullMaterial(ink, style.hullPx)
+  // Графит мира — только --night-3: чистый --night слишком тяжёлый, он остаётся за HTML-хромом (и за палитрой «Ночь»)
   const glass = mat(style, P.glass)
   style.roles = {
     glass, band: glass, dark: mat(style, P.dark), white: mat(style, P.wall2), red: mat(style, P.accent), steel: mat(style, P.steel),
     leaf: mat(style, P.leaf), roof: mat(style, P.roof), canopy: mat(style, P.canopy), door: mat(style, P.door),
     sign: mat(style, P.sign), signMark: mat(style, P.signMark), carGlass: mat(style, P.carGlass), tire: mat(style, P.tire), lamp: mat(style, P.lamp),
   }
+}
+
+export function createStyle(T: Tokens, look: WorldLook): WorldStyle {
+  const style = { mats: new Map(), flats: new Map(), hullPx: { value: new THREE.Vector2(0.002, 0.002) } } as unknown as WorldStyle
+  applyLook(style, T, look)
   return style
+}
+
+// Смена облика на живом мире. Объект style остаётся тем же (его держит ctx, а hullPx
+// пишет fit()), но ВСЕ материалы в нём новые: старые освобождены, и меши, собранные
+// на них, обязаны быть пересобраны — это делает setStyle в createWorld.
+export function restyle(style: WorldStyle, T: Tokens, look: WorldLook) {
+  disposeStyle(style)
+  applyLook(style, T, look)
 }
 
 export function disposeStyle(style: WorldStyle) {

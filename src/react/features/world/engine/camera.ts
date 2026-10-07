@@ -24,12 +24,18 @@ export function pullIn(limit: THREE.Box3, t: THREE.Vector3, p: THREE.Vector3, tm
 
 const corners = (b: THREE.Box3) => Array.from({ length: 8 }, (_, i) => new THREE.Vector3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z))
 
+// Здания кампуса: по ним строится рабочий ракурс
+const SITES = ['office', 'warehouse', 'garage'] as const
+
 // Рамка интереса — точки, которые обязаны попасть в кадр: углы габаритов каждого
-// объекта (не общий бокс — его пустые углы над землёй съедают кадр) + точка над
-// крышей под вывеску + край сетки на дороге.
+// здания (не общий бокс — его пустые углы над землёй съедают кадр) + точка над
+// крышей под вывеску + край сетки на дороге. Машины в проёмах и на площадке — дети
+// гаража и входят в его габарит; фургон и фигурки рамку не двигают.
 export function framePoints(ctx: WorldCtx) {
   const pts: THREE.Vector3[] = []
-  for (const root of ctx.roots.values()) {
+  for (const id of SITES) {
+    const root = ctx.roots.get(id)
+    if (!root) continue
     const b = new THREE.Box3().setFromObject(root), c = b.getCenter(new THREE.Vector3())
     pts.push(...corners(b), c.setY(b.max.y + 3.5))
   }

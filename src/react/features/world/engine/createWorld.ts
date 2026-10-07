@@ -5,11 +5,11 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
 import type { CameraPose, WorldStore } from '../worldStore'
-import { buildOffice } from './buildings'
+import type { WorldData } from '../data/types'
 import { createLimit, fit, framePoints, placeCamera, pullIn, readPose, restorePose } from './camera'
-import { CAMPUS_HALF, ground, roads } from './ground'
-import { kit } from './primitives'
-import { createStyle, disposeStyle, type WorldStyle } from './style'
+import { buildCampus } from './zones/campus'
+import type { WorldLook } from '../settings'
+import { createStyle, disposeStyle, restyle, type WorldStyle } from './style'
 import { readTokens } from './tokens'
 
 // Сцена уже — вывески и клавиши HUD переходят в компактный вид
@@ -37,8 +37,12 @@ export type WorldCtx = {
 
 export type WorldDeps = {
   store: WorldStore
+  // Стартовый облик: палитра и тон контура из настроек устройства
+  look: WorldLook
   // Неподвижный мир: без инерции камеры, кадр рисуется по требованию
   reducedMotion: boolean
+  // Машины и люди кампуса; без данных кампус стоит пустым
+  data?: WorldData
   pose?: CameraPose | null
   onFirstFrame?: () => void
   onContextLost?: () => void
@@ -47,21 +51,26 @@ export type WorldDeps = {
 export type World = {
   store: WorldStore
   getPose: () => CameraPose
+  // Смена облика без перезагрузки: сцена пересобирается, камера остаётся на месте
+  setStyle: (look: WorldLook) => void
   dispose: () => void
 }
 
-function buildCampus(ctx: WorldCtx) {
-  const g = new THREE.Group()
-  ground(ctx, g, CAMPUS_HALF * 2)
-  const k = kit(ctx)
-  roads(ctx, k)
-  k.into(g)
-  g.add(buildOffice(ctx))
-  return g
+// Освободить всё, что висит на узле: геометрии, материалы и их текстуры
+function release(root: THREE.Object3D) {
+  root.traverse((o) => {
+    const { geometry, material } = o as Partial<THREE.Mesh>
+    geometry?.dispose()
+    for (const m of Array.isArray(material) ? material : material ? [material] : []) {
+      (m as THREE.MeshBasicMaterial).map?.dispose()
+      m.dispose()
+    }
+  })
 }
 
 export function createWorld(container: HTMLElement, deps: WorldDeps): World {
-  const style = createStyle(readTokens())
+  const tokens = readTokens()
+  const style = createStyle(tokens, deps.look)
   // Бросает, если браузер не отдал контекст (лимит контекстов, блок-лист GPU), — ловит вызывающий
   const renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -72,10 +81,13 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
   container.appendChild(css2d.domElement)
 
   const scene = new THREE.Scene()
-  scene.background = new THREE.Color(style.P.ground)
+  // Фон и туман — в тон земле палитры; setStyle перекрашивает их на месте
+  const background = new THREE.Color(style.P.ground)
+  scene.background = background
   // Туман цвета земли включён всегда, но вынесен за горизонт: переезд камеры будет
   // двигать near/far. Включать и выключать его нельзя — смена fog пересобирает шейдеры.
-  scene.fog = new THREE.Fog(style.P.ground, 1e4, 1e4 + 1)
+  const fog = new THREE.Fog(style.P.ground, 1e4, 1e4 + 1)
+  scene.fog = fog
   // Свет: заливка + один направленный, теней нет — схема, а не «как в жизни»
   scene.add(new THREE.AmbientLight(0xffffff, 2))
   const sun = new THREE.DirectionalLight(0xffffff, 1.6)
@@ -134,14 +146,7 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     // Раньше forceContextLoss: собственный снос — не потеря контекста, запасной вид не нужен
     canvas.removeEventListener('webglcontextlost', onContextLost)
     controls.dispose()
-    scene.traverse((o) => {
-      const { geometry, material } = o as Partial<THREE.Mesh>
-      geometry?.dispose()
-      for (const m of Array.isArray(material) ? material : material ? [material] : []) {
-        (m as THREE.MeshBasicMaterial).map?.dispose()
-        m.dispose()
-      }
-    })
+    release(scene)
     scene.clear()
     ctx.geo.forEach((g) => g.dispose())
     ctx.geo.clear()
@@ -158,9 +163,39 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     css2d.domElement.remove()
   }
 
-  try {
-    scene.add(buildCampus(ctx))
+  // Наполнение сцены — одно место и на первый кадр, и на смену облика
+  const build = () => {
+    scene.add(buildCampus(ctx, deps.data ?? { cars: [], people: [] }))
     ctx.framePts = framePoints(ctx)
+  }
+
+  // Палитра меняет не только цвета, но и состав мешей: kit() сливает объёмы по
+  // материалу, а материал в кэше один на цвет. Роли, совпавшие цветом в белой схеме
+  // (стена, навес, вторая стена — все --card), в «Ночи» расходятся, и перекрасить
+  // слитый меш на месте нельзя. Поэтому, как restyle макета, наполнение сносится и
+  // собирается заново; renderer, свет, камера и её поза остаются.
+  let look = deps.look
+  const setStyle = (next: WorldLook) => {
+    if (disposed || (next.palette === look.palette && next.ink === look.ink)) return
+    look = next
+    // Всё, кроме света: что именно лежит в сцене, этот код не знает и знать не должен
+    for (const o of [...scene.children]) {
+      if ((o as THREE.Light).isLight) continue
+      release(o)   // общие ctx.box и ctx.wheel тоже: three зальёт их буферы заново при первом кадре
+      scene.remove(o)
+    }
+    ctx.geo.forEach((g) => g.dispose())
+    ctx.geo.clear()
+    ctx.roots.clear()
+    restyle(style, tokens, next)
+    background.set(style.P.ground)
+    fog.color.set(style.P.ground)
+    build()
+    if (deps.reducedMotion) requestRender()
+  }
+
+  try {
+    build()
     // Синхронно, не дожидаясь ResizeObserver: первому кадру нужен верный аспект
     fit(ctx)
     placeCamera(ctx)
@@ -183,5 +218,5 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     throw error
   }
 
-  return { store: deps.store, getPose: () => readPose(ctx), dispose }
+  return { store: deps.store, getPose: () => readPose(ctx), setStyle, dispose }
 }

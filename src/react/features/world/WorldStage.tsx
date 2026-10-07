@@ -5,6 +5,7 @@ import { ErrorState } from '../../components/ErrorState'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import { loadWorld } from './loadWorld'
+import type { WorldLook } from './settings'
 import { hasWebGL2, prefersReducedMotion } from './support'
 import { createWorldStore, type CameraPose } from './worldStore'
 import './world.css'
@@ -22,17 +23,24 @@ const hot = import.meta.hot
 if (hot) hot.dispose((data) => { data.swapping = true })
 
 type Props = {
+  // Облик мира: палитра и тон контура. Смена на живом мире — без перезагрузки
+  look: WorldLook
   // Миллисекунды от запроса чанка до первого кадра — цифра для dev-стенда
   onFirstFrame?: (ms: number) => void
 }
 
-export function WorldStage({ onFirstFrame }: Props) {
+export function WorldStage({ look, onFirstFrame }: Props) {
   const { tr } = useLanguage()
   const slotRef = useRef<HTMLDivElement>(null)
   const [store] = useState(createWorldStore)
   const [status, setStatus] = useState<Status>(() => (hasWebGL2() ? 'loading' : 'unsupported'))
   const onFirstFrameRef = useRef(onFirstFrame)
   useEffect(() => { onFirstFrameRef.current = onFirstFrame }, [onFirstFrame])
+  const { palette, ink } = look
+  // Мир собирается после загрузки чанка — к тому моменту облик мог смениться, поэтому
+  // стартовое значение читается из ref. Живому миру смену передаёт эффект ниже.
+  const lookRef = useRef<WorldLook>({ palette, ink })
+  const worldRef = useRef<{ setStyle: (look: WorldLook) => void; dispose: () => void } | null>(null)
 
   useEffect(() => {
     const slot = slotRef.current
@@ -49,6 +57,7 @@ export function WorldStage({ onFirstFrame }: Props) {
       try {
         const world = engine.createWorld(slot, {
           store,
+          look: lookRef.current,
           reducedMotion: prefersReducedMotion(),
           pose: (hot?.data.pose as CameraPose | undefined) ?? null,
           onFirstFrame: () => {
@@ -62,6 +71,7 @@ export function WorldStage({ onFirstFrame }: Props) {
         })
         dispose = world.dispose
         getPose = world.getPose
+        worldRef.current = world
       } catch (error) {
         reportAppError(error, { scope: 'loader', route: window.location.pathname, detail: { batch: 'world-create' } })
         setStatus('failed')
@@ -76,12 +86,27 @@ export function WorldStage({ onFirstFrame }: Props) {
     return () => {
       cancelled = true
       if (hot?.data.swapping && getPose) hot.data.pose = getPose()
+      worldRef.current = null
       dispose?.()
     }
   }, [store])
 
+  useEffect(() => {
+    lookRef.current = { palette, ink }
+    const world = worldRef.current
+    if (!world) return
+    try {
+      world.setStyle({ palette, ink })
+    } catch (error) {
+      // Пересборка упала на полпути — сцена в неизвестном состоянии, показываем запасной вид
+      reportAppError(error, { scope: 'loader', route: window.location.pathname, detail: { batch: 'world-restyle' } })
+      world.dispose()
+      setStatus('failed')
+    }
+  }, [palette, ink])
+
   return (
-    <div className="w-stage">
+    <div className={`w-stage${palette === 'night' ? ' is-dark' : ''}`}>
       <div className="w-scene" ref={slotRef} aria-hidden="true" />
       {status === 'loading' && <p className="w-stage__state w-stage__loading" role="status">{tr('Загружаем мир…', 'Dunyo yuklanmoqda…')}</p>}
       {status === 'unsupported' && (

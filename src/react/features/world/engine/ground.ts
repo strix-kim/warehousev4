@@ -1,4 +1,4 @@
-// Земля кампуса: плоскость, сетка, дороги, фонари, дерево.
+// Земля кампуса: плоскость, сетка, дороги, фонари, дерево, кейс.
 import * as THREE from 'three'
 import type { WorldCtx } from './createWorld'
 import type { Kit } from './primitives'
@@ -55,4 +55,9 @@ export function tree(ctx: WorldCtx, k: Kit, x: number, z: number, s = 1) {
   const crown = (w: number, h: number, d: number, cx: number, y0: number, cz: number) => k(leaf, w, h, d, cx, y0, cz, 0, 0.3 * Math.min(w, h, d))
   crown(2.6 * s, 2.2 * s, 2.6 * s, x, 1.6 * s, z)
   if (s > 1) crown(1.5, 1.2, 1.5, x + 0.2, 1.6 * s + 2.2 * s, z - 0.1)
+}
+
+// Кейс — один графитовый куб
+export function crate(ctx: WorldCtx, k: Kit, x: number, y0: number, z: number, s = 0.7) {
+  k(ctx.style.roles.dark, s, s, s, x, y0, z)
 }
