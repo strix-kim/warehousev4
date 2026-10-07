@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Мир из трёх квадратов — чертёж зон (с49)</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&subset=cyrillic,latin&display=swap">
+<style>
+/* =========================================================
+   0. Токены ARGO — блок :root из voxel-s47.html.
+   ========================================================= */
+:root{
+  color-scheme: light;
+  --bg:#EEF0F3; --grid:rgba(22,24,29,.055);
+  --card:#FFFFFF; --sunk:#F5F6F8; --hover:#F0F2F5; --select:#E9ECF1;
+  --ink:#16181D; --ink-2:#2A2E36; --muted:#5F6470; --faint:#676C77; --soft:#8A8F9A;
+  --line:#DDE0E5; --line-2:#E8EAEE; --ctl:#858A95;
+  --red:#E52D27; --red-act:#C8201B; --red-press:#AE1B16; --red-tint:#FCEAE9;
+  --night:#0F1115; --night-2:#1A1D23; --night-3:#262A31; --night-line:#2C3038;
+  --on-night:#E8EAEE; --on-night-2:#9CA1AC; --red-night:#FF5A52; --bad-night:#FF8095;
+  --ok:#1B7A45; --ok-bg:#E3F3EA; --ok-dot:#2A9D5C;
+  --warn:#8A5A00; --warn-bg:#FBF0D5; --warn-dot:#B7800A;
+  --bad:#B0203F; --bad-bg:#FBE6EA; --bad-dot:#B0203F;
+  --focus:#16181D;
+  --r-xl:22px; --r-lg:18px; --r-md:12px; --r-sm:8px;
+  --f-display:"Manrope","Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-text:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease-out:cubic-bezier(.2,.8,.2,1);
+  --shadow-pop:0 18px 48px rgba(15,17,21,.16),0 2px 6px rgba(15,17,21,.06);
+}
+*{box-sizing:border-box}
+html{background:var(--bg);color:var(--ink);font-family:var(--f-text);-webkit-font-smoothing:antialiased;font-synthesis:none}
+body{margin:0}
+button{margin:0;border:0;font:inherit;color:inherit;cursor:pointer;background:none}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* =========================================================
+   1. Страница-стенд (не HUD: обвязка самого чертежа).
+   ========================================================= */
+.page{max-width:1424px;margin:0 auto;padding:24px;display:grid;gap:14px}
+.page>*{min-width:0}
+.h1{margin:0;font:800 22px/28px var(--f-display);letter-spacing:-.02em}
+.h2{margin:22px 0 0;font:800 18px/24px var(--f-display);letter-spacing:-.02em}
+.txt{margin:0;max-width:980px;font:500 14px/21px var(--f-text);color:var(--ink-2)}
+.txt b{color:var(--ink)}
+.note{margin:0;max-width:1100px;font:500 13px/19px var(--f-text);color:var(--muted)}
+.list{margin:0;padding-left:20px;max-width:1040px;font:500 14px/21px var(--f-text);color:var(--ink-2);display:grid;gap:6px}
+.scroll{max-width:100%;overflow-x:auto}
+.row{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.col{display:grid;gap:8px;justify-items:start;min-width:0}
+.cap{margin:0;font:600 13px/16px var(--f-mono);color:var(--muted)}
+.tb{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tb__sep{width:1px;height:28px;background:var(--line);margin:0 4px}
+.tb__lbl{font:600 13px/16px var(--f-mono);color:var(--muted)}
+.tb button{height:44px;padding:0 14px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--card);font:600 14px/18px var(--f-text);white-space:nowrap}
+.tb button:hover{background:var(--hover)}
+.tb button[aria-pressed="true"]{background:var(--night);border-color:var(--night);color:var(--card)}
+.tb kbd{margin-right:7px;font:600 13px/16px var(--f-mono);opacity:.65}
+table.bud{border-collapse:collapse;max-width:1040px;font:500 13px/18px var(--f-text)}
+.bud th,.bud td{padding:6px 12px 6px 0;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+.bud th{font:600 13px/18px var(--f-mono);color:var(--muted);white-space:nowrap}
+.bud td:nth-child(2){font-family:var(--f-mono);white-space:nowrap}
+.yes{color:var(--ok);font-weight:700}.no{color:var(--bad);font-weight:700}
+.lg{display:flex;flex-wrap:wrap;gap:6px 18px;font:500 13px/18px var(--f-text);color:var(--muted)}
+.lg i{display:inline-block;width:14px;height:14px;margin-right:6px;vertical-align:-2px;border:1px solid var(--ink-2);border-radius:3px}
+.lg .i-v{background:var(--card)}.lg .i-h{background:var(--soft)}.lg .i-t{background:var(--night-3)}
+.lg .i-z{border:1.5px dashed var(--ink);background:rgba(22,24,29,.05)}.lg .i-s{background:var(--line);border:1.5px dashed var(--ctl)}
+html[data-solo] body{background:var(--bg)}
+html[data-solo] .page{display:block;padding:0;max-width:none}
+
+/* =========================================================
+   2. Рамка и сцена-чертёж.
+   ========================================================= */
+.frame{position:relative;flex:none;overflow:hidden;border-radius:var(--r-lg);background:var(--bg);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;
+  box-shadow:inset 0 0 0 1px var(--line);touch-action:pan-y}
+.frame.is-here{box-shadow:inset 0 0 0 3px var(--ink)}
+.scene{position:absolute;left:0;top:0;display:block}
+.scene *{vector-effect:non-scaling-stroke}
+.sq{fill:var(--card);stroke:var(--ctl);stroke-width:1.5}
+.grid{fill:none;stroke:var(--line-2);stroke-width:1}
+.zone{fill:none;stroke:var(--soft);stroke-width:1;stroke-dasharray:5 4}
+.zone--empty{fill:rgba(22,24,29,.03)}
+.zone--live{fill:var(--red-tint);stroke:var(--red);stroke-width:2;stroke-dasharray:none}
+.zone--unload{fill:rgba(22,24,29,.07);stroke:var(--ink-2);stroke-dasharray:3 3}
+.route{fill:none;stroke:var(--ink-2);stroke-width:2;stroke-dasharray:2 7;stroke-linecap:round}
+.gt{font-family:var(--f-display);font-weight:700;fill:var(--muted)}
+.blk polygon{stroke:var(--ink-2);stroke-width:1;stroke-linejoin:round}
+.f-t{fill:var(--card)}.f-l{fill:var(--line-2)}.f-r{fill:var(--line)}
+.blk--h .f-t{fill:var(--select)}.blk--h .f-l{fill:var(--ctl)}.blk--h .f-r{fill:var(--soft)}
+.blk--t .f-t{fill:var(--muted)}.blk--t .f-l{fill:var(--night-3)}.blk--t .f-r{fill:var(--night)}
+.blk.is-hover polygon{stroke:var(--ink);stroke-width:2.5}
+.arm{fill:none;stroke:var(--night-3);stroke-width:3}
+.arm-dot{fill:var(--night-3)}
+
+/* Плита-сосед: граница пунктиром, своя мелкая сетка, надпись лежит на поверхности.
+   Наведение/фокус: плита светлеет, граница сплошная, подъём 8 px над тенью-следом. */
+.slab{cursor:pointer;outline:none}
+.slab__base{fill:rgba(22,24,29,.13)}
+.slab__lift{transition:transform .18s var(--ease-out)}
+.slab__face{fill:var(--line);stroke:var(--ctl);stroke-width:1.5;stroke-dasharray:7 5;transition:fill .16s var(--ease-out)}
+.slab__grid{fill:none;stroke:var(--card);stroke-width:1;opacity:.75}
+.slab__name{font-family:var(--f-display);font-weight:800;letter-spacing:-.01em;fill:var(--ink)}
+.slab__num{font-family:var(--f-display);font-weight:800;fill:var(--ink)}
+.slab__unit{font-family:var(--f-text);font-weight:600;fill:var(--ink-2)}
+.slab__live{font-family:var(--f-text);font-weight:700;fill:var(--red-press)}
+.slab__edge{fill:var(--red)}
+.slab:hover .slab__lift,.slab.is-hover .slab__lift,.slab:focus-visible .slab__lift{transform:translateY(-8px)}
+.slab:hover .slab__face,.slab.is-hover .slab__face,.slab:focus-visible .slab__face{fill:var(--card);stroke:var(--ink);stroke-width:2;stroke-dasharray:none}
+.slab:hover .slab__grid,.slab.is-hover .slab__grid,.slab:focus-visible .slab__grid{stroke:var(--line-2);opacity:1}
+.slab:focus-visible .slab__face{stroke-width:3.5}
+
+/* Табличка-схема: якорь в точке, плашка над ней на ножке. */
+.tg{position:absolute;z-index:2;transform:translate(-50%,calc(-100% - var(--leg,12px)));padding:5px 9px;border:1px solid var(--ink);border-radius:var(--r-sm);background:var(--card);font:600 13px/16px var(--f-text);white-space:nowrap;pointer-events:none}
+.tg::after{content:'';position:absolute;left:calc(50% - .75px);top:100%;width:1.5px;height:var(--leg,12px);background:var(--ink)}
+.tg b{display:block;max-width:150px;overflow:hidden;text-overflow:ellipsis;font:700 14px/18px var(--f-display)}
+.tg span{display:block;font:500 13px/16px var(--f-text);color:var(--muted)}
+.tg--below{transform:translate(-50%,var(--leg,12px))}
+.tg--below::after{top:auto;bottom:100%}
+.tg--chip{padding:2px 7px;font:600 13px/16px var(--f-text)}
+.tg--live{border-color:var(--red);box-shadow:0 0 0 1.5px var(--red)}
+.tg--live b{max-width:190px}
+.tg--wide b{max-width:260px}
+.tg--ex{border-style:dashed}
+.tg .live,.live{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--red-press)}
+.tg .live{display:flex}
+.live::before{content:'';flex:none;width:8px;height:8px;border-radius:50%;background:var(--red)}
+
+/* Зоны HUD — прямоугольники с подписью, без стиля HUD. */
+.hz{position:absolute;z-index:3;display:flex;align-items:center;padding:6px 12px;border:1.5px dashed var(--ink);border-radius:var(--r-md);background:rgba(22,24,29,.05);font:600 13px/16px var(--f-mono);color:var(--ink);pointer-events:none}
+.hz--ghost{border-color:var(--soft);color:var(--muted);background:none}
+.hz--top{align-items:flex-start}
+.hz--panel{border-radius:0;border-width:0 0 0 1.5px;background:var(--card);flex-direction:column;align-items:stretch;gap:10px;padding:16px}
+.hz--panel div{padding:10px 12px;border:1.5px dashed var(--ink);border-radius:var(--r-md)}
+.hz--panel div:last-child{flex:1}
+.scap{position:absolute;z-index:1;font:600 13px/16px var(--f-mono);color:var(--muted);pointer-events:none}
+
+/* R — переключатель квадратов: рабочий, три пункта + шаг по кругу. */
+.sw{position:absolute;z-index:4;display:flex;gap:4px;padding:3px;border:1.5px dashed var(--ink);border-radius:var(--r-md);background:var(--card)}
+.sw button{display:flex;align-items:center;justify-content:center;gap:6px;min-width:44px;height:100%;padding:0 12px;border-radius:9px;font:600 14px/18px var(--f-text);white-space:nowrap;transition:background-color .16s var(--ease-out)}
+.sw button:hover{background:var(--hover)}
+.sw button[aria-current="true"]{background:var(--night);color:var(--card)}
+.sw b{font:700 13px/16px var(--f-mono);opacity:.75}
+.sw .dot{width:8px;height:8px;border-radius:50%;background:var(--red)}
+.sw [aria-current="true"] .dot{background:var(--red-night)}
+.sw__seg{flex:1 1 auto}
+.sw__arr{flex:none;font-size:18px!important}
+.sw--d{right:16px;top:16px;height:48px}
+.sw--p{left:16px;top:62.5px;width:358px;height:47px;gap:2px;padding:0}
+.sw--p button{padding:0 8px;font-size:13px;gap:5px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+
+/* Обзор кольца. */
+.ring text{font-family:var(--f-text);font-weight:600;font-size:14px;fill:var(--ink)}
+.ring .rn rect{fill:var(--card);stroke:var(--ink);stroke-width:1.5}
+.ring .rn{cursor:pointer}
+.ring .rn.is-cur rect{fill:var(--night)}
+.ring .rn.is-cur text{fill:var(--card)}
+.ring .ra{fill:none;stroke:var(--ink-2);stroke-width:2}
+.ring .rl{font-family:var(--f-mono);font-size:13px;fill:var(--muted)}
+.mini{display:block;border-radius:var(--r-md);background:var(--card);box-shadow:inset 0 0 0 1px var(--line)}
+.mini text{font-family:var(--f-text);font-weight:600;font-size:13px;fill:var(--ink)}
+.mini .m-cur{fill:var(--night);stroke:var(--night)}
+.mini .m-cur-t{fill:var(--card);font-family:var(--f-display);font-weight:700;font-size:14px}
+.mini .m-sl{fill:var(--line);stroke:var(--ctl);stroke-dasharray:5 4;stroke-width:1.5}
+.mini .m-k{font-family:var(--f-mono);fill:var(--muted)}
+
+@media (max-width:760px){
+  .bud,.bud tbody,.bud tr,.bud th,.bud td{display:block}
+  .bud th{padding:10px 0 0;border:0;white-space:normal}
+  .bud td{padding:2px 0;border:0}
+  .bud td:last-child{padding-bottom:10px;border-bottom:1px solid var(--line)}
+}
+@media (max-width:440px){
+  .page{padding:16px 0}
+  .h1,.h2,.txt,.note,.list,.tb,.cap,.lg,.pad{margin-left:16px;margin-right:16px}
+  .list{padding-left:20px}
+  .row{gap:16px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none!important;animation:none!important}
+  .slab:hover .slab__lift,.slab.is-hover .slab__lift,.slab:focus-visible .slab__lift{transform:none}
+}
+</style>
+</head>
+<body>
+<main class="page" id="page">
+  <h1 class="h1">Мир из трёх квадратов по кругу — чертёж зон (с49)</h1>
+  <p class="txt">Шаг 2 скилла <b>design-game-ui</b>: зоны и переходы, без содержимого зданий и без стиля HUD. Сотрудник стоит на одном квадрате, видит у его сторон два соседних как плоские плиты с надписью на земле и числом; клик по плите, пункт переключателя, клавиша или свайп переносят камеру. Первым читается: <b>где я</b> (переключатель) и <b>куда можно шагнуть</b> (две плиты). Успех — дойти до любого квадрата за один шаг в любую сторону, не теряясь в круге. Названия площадок и числа на странице — пример, не данные базы.</p>
+
+  <h2 class="h2">Бюджет самого тесного режима — 390</h2>
+  <div class="scroll pad"><table class="bud">
+    <tr><th>Рабочая область</th><td>390 × 560</td><td>390 × 844 минус шапка и нижняя панель 64 (как в чертеже HUD с47). Поля 16 → полезная ширина 358.</td></tr>
+    <tr><th>C · плашка дня</th><td>358 × 48</td><td>y 8–56, принятая зона.</td></tr>
+    <tr><th>R · переключатель квадратов</th><td>358 × 44</td><td>y 64–108, три цели высотой 44, самая узкая шире 86. <span class="yes">≥ 44</span></td></tr>
+    <tr><th>A · кнопки-дубли</th><td>248 × 64</td><td>y 480–544 справа, цели 56 × 56; левый нижний угол 102 × 64 пуст (правило с47).</td></tr>
+    <tr><th>Сцена</th><td>390 × 356</td><td>y 116–472 — 64 % высоты (порог ≥ 45 %). Ромб квадрата 352 × 176.</td></tr>
+    <tr><th>Участок площадки, сетка 3 × 2</th><td>147 × 73</td><td>вписанный квадрат 48,9 <span class="yes">≥ 44</span> — цель на 390 — весь участок, грузовик и отель отдельными целями не являются.</td></tr>
+    <tr><th>Ячейка архива, сетка 6 × 5</th><td>59 × 29</td><td>вписанный квадрат 19,6 <span class="no">&lt; 44</span> — здание архива на 390 целью быть не может; цель — квартал из 5 мест (147 × 73, 48,9 <span class="yes">≥ 44</span>).</td></tr>
+    <tr><th>Плита-сосед (обе у передних сторон)</th><td>197 × 89</td><td>полоса полной ширины 48 × 159 <span class="yes">≥ 44</span>; надпись на земле 14 px, число и единица 13–14 px.</td></tr>
+    <tr><th>1440: ячейка архива</th><td>107 × 53</td><td>здание не ниже 31 px — силуэт вмещает 44 × 44 <span class="yes">≥ 44</span>.</td></tr>
+    <tr><th>Минимальный кегль</th><td>13 px</td><td>на плитах 1440: имя 44, число 40, единица 20.</td></tr>
+    <tr><th>Worst case</th><td>30 / 6 / 44</td><td>30 мест в архиве, 6 площадок, имя площадки 44 знака (обрезается в вывеске, целиком — в панели).</td></tr>
+  </table></div>
+
+  <h2 class="h2">1. Кольцо: кто чей сосед</h2>
+  <p class="txt" id="ring-txt"></p>
+  <div class="row pad" id="ring"></div>
+
+  <h2 class="h2">2. Кадр 1440 — вид с квадрата</h2>
+  <div class="tb" id="tb"></div>
+  <div class="scroll"><div id="live-d"></div></div>
+  <div class="lg">
+    <span><i class="i-s"></i>плита-сосед (клик, Enter, наведение — подъём)</span>
+    <span><i class="i-z"></i>зона HUD</span>
+    <span><i class="i-v"></i>здание</span><span><i class="i-h"></i>отель</span><span><i class="i-t"></i>грузовик</span>
+  </div>
+  <p class="note">C, A, E — принятые зоны HUD с48 на своих местах; R — новая зона, переключатель квадратов (рабочий: клик, Tab, стрелки ← → внутри него, шаг по кругу кнопками ‹ ›). Плиты не красные: красная кромка и «идёт сегодня» появляются только на плите «Площадки» в день мероприятия.</p>
+
+  <h2 class="h2">3. Те же три кадра в рамке 390 × 560</h2>
+  <p class="txt">Обе плиты у передних сторон помещаются под ромбом и остаются целями. Основной путь — переключатель R, жест — свайп по сцене: влево = вперёд по кругу, вправо = назад (на этой странице работает мышью и пальцем). Вывески — короткие: на площадках дата, в архиве год квартала; имя — у выбранного и в списке.</p>
+  <div class="row" id="live-p"></div>
+
+  <h2 class="h2">4. «Площадки», мероприятие сегодня</h2>
+  <p class="txt">Участок = здание площадки + грузовик у проезда спереди + отель слева спереди. В общем виде квадрата у участка <b>одна вывеска</b> — над зданием; в день мероприятия она раскрывается строками про грузовик и отель, участок залит красным тоном. Свои подписи у трёх блоков появляются, когда камера стоит на участке (разделённый экран, как гараж).</p>
+  <div class="scroll"><div id="fx-today"></div></div>
+  <p class="cap">Камера на участке: три блока, их подписи и панель справа</p>
+  <div class="scroll"><div id="fx-lot"></div></div>
+
+  <h2 class="h2">5. «Где работали», worst case — 30 мест</h2>
+  <p class="txt">Квартал = тот же модуль, что участок площадки (сетка 3 × 2). В квартале 5 зданий и пустая ячейка-площадь с вывеской квартала; 6 кварталов × 5 = 30. Высота здания — число мероприятий в его истории. Постоянных вывесок у зданий нет (30 табличек не помещаются): имя — по наведению и фокусу, полный путь — «Списком» и поиск. На 390 цель — квартал.</p>
+  <div class="row">
+    <div class="scroll"><div id="fx-arch"></div></div>
+    <div id="fx-archp"></div>
+  </div>
+
+  <h2 class="h2">6. Открытые вопросы</h2>
+  <ol class="list">
+    <li><b>Стороны соседей.</b> В чертеже оба соседа у передних сторон: назад — слева снизу, вперёд — справа снизу. Пример из задания («справа снизу и справа сверху») включается кнопкой «как в примере»: у задней стороны вывески дальнего ряда ложатся на надпись плиты (нужен разрыв 76 вместо 22), а на 390 задняя плита уходит за кадр. Нужен выбор.</li>
+    <li><b>Числа.</b> Что считает плита «Кампус» (заложено «6 списков») и что считает «Где работали» — места или мероприятия.</li>
+    <li><b>Грузовик и отель.</b> Отдельные цели клика (панель открывается сразу на оборудовании или расселении) или только признаки участка? На 390 отдельными целями они быть не могут.</li>
+    <li><b>Карточка события и указатель «выезд».</b> На «Кампусе» карточка привязана к плите «Площадки»: плечо к указателю пересекло бы плиту. На «Площадках» плеча нет — участок помечен сам. Остаётся ли указатель «выезд» отдельным предметом?</li>
+    <li><b>Переполнение и дубли.</b> Ключ кварталов архива (год последнего мероприятия по 5 ровно не делится), что после 30 мест и 7-й площадки; на 390 тап по кварталу — приближение или лист из 5 строк; что лежит в четырёх кнопках-дублях A на «Площадках» и в архиве (шесть площадок в 248 × 64 не помещаются).</li>
+  </ol>
+</main>
+
+<script>
+/* =========================================================
+   Чертёж строится из данных: одна функция кадра на оба размера.
+   Адрес: ?sq=k|p|a  ?today=1  ?places=0|4|6  ?arch=12|30  ?nb=front|right
+          ?hover=fwd|back  ?frame=ring|d|p|today|lot|arch|archp
+   ========================================================= */
+(function () {
+  var qs = new URLSearchParams(location.search);
+  var ORDER = ['k', 'p', 'a'];
+  var SQN = { '1': 'k', '2': 'p', '3': 'a' };
+  var st = {
+    sq: ORDER.indexOf(qs.get('sq')) >= 0 ? qs.get('sq') : (SQN[qs.get('sq')] || 'k'),
+    today: qs.get('today') === '1',
+    places: ['0', '4', '6'].indexOf(qs.get('places')) >= 0 ? +qs.get('places') : 4,
+    arch: qs.get('arch') === '30' ? 30 : 12,
+    nb: qs.get('nb') === 'right' ? 'right' : 'front',
+    hover: qs.get('hover')
+  };
+  var SOLO = qs.get('frame');
+  var fwd = function (s) { return ORDER[(ORDER.indexOf(s) + 1) % 3]; };
+  var back = function (s) { return ORDER[(ORDER.indexOf(s) + 2) % 3]; };
+
+  var VENUES = [
+    { name: 'Hyatt Regency Tashkent', date: '7–8 окт', truck: 32, hotel: 14 },
+    { name: 'Hilton Tashkent City', date: '12 окт', truck: 18 },
+    { name: 'InterContinental Tashkent', date: '15–16 окт', truck: 40, hotel: 22 },
+    { name: 'Humo Arena', date: '21 окт' },
+    { name: 'Wyndham Tashkent', date: '2 ноя', hotel: 8 },
+    { name: 'Международный конгресс-центр «Узэкспоцентр»', date: '14 ноя', truck: 12 }
+  ];
+  var YEARS = ['2025', '2024', '2023', '2022', '2021', 'до 2021'];
+
+  function places(n) { return n === 1 ? 'место' : (n >= 2 && n <= 4 ? 'места' : 'мест'); }
+  function info(sq, o) {
+    if (sq === 'k') return { name: 'Кампус', num: 6, unit: 'списков' };
+    if (sq === 'p') return { name: 'Площадки', num: o.places, unit: places(o.places), live: o.today && o.places > 0 };
+    return { name: 'Где работали', num: o.arch, unit: places(o.arch) };
+  }
+
+  /* --- геометрия: квадрат 360×360 в локальных единицах, изометрия 2:1 --- */
+  function geo(mode, nb) {
+    var g = mode === 'd'
+      ? (nb === 'right' ? { fw: 1376, fh: 687, W: 320, cx: 540, cy: 340 } : { fw: 1376, fh: 687, W: 320, cx: 580, cy: 325 })
+      : { fw: 390, fh: 560, W: 176, cx: 195, cy: 296 };
+    g.H = g.W / 2; g.kx = g.W / 360; g.ky = g.H / 360; g.Tx = g.cx; g.Ty = g.cy - g.H; g.hs = g.W / 320;
+    return g;
+  }
+  function projector(g) {
+    return function (u, v, z) { return [g.Tx + (u - v) * g.kx, g.Ty + (u + v) * g.ky - (z || 0) * g.hs]; };
+  }
+  function mtx(g) { return 'matrix(' + g.kx + ' ' + g.ky + ' ' + (-g.kx) + ' ' + g.ky + ' ' + g.Tx + ' ' + g.Ty + ')'; }
+  function n1(x) { return (Math.round(x * 10) / 10).toString(); }
+  function poly(pts, cls) { return '<polygon class="' + cls + '" points="' + pts.map(function (p) { return n1(p[0]) + ',' + n1(p[1]); }).join(' ') + '"/>'; }
+  function prism(P, u0, v0, u1, v1, h, cls) {
+    var D0 = P(u0, v1), C0 = P(u1, v1), B0 = P(u1, v0), A1 = P(u0, v0, h), B1 = P(u1, v0, h), C1 = P(u1, v1, h), D1 = P(u0, v1, h);
+    return { k: u1 + v1, s: '<g class="blk ' + (cls || '') + '">' + poly([D0, C0, C1, D1], 'f-l') + poly([C0, B0, B1, C1], 'f-r') + poly([A1, B1, C1, D1], 'f-t') + '</g>' };
+  }
+  function tg(pt, html, cls, leg) {
+    return '<div class="tg ' + (cls || '') + '" style="left:' + n1(pt[0]) + 'px;top:' + n1(pt[1]) + 'px;--leg:' + (leg == null ? 12 : leg) + 'px">' + html + '</div>';
+  }
+  function gridPath(w, h, step) {
+    var d = '', i;
+    for (i = step; i < w; i += step) d += 'M' + i + ' 0V' + h;
+    for (i = step; i < h; i += step) d += 'M0 ' + i + 'H' + w;
+    return d;
+  }
+
+  /* --- плита-сосед --- */
+  var SLAB_D = 162;
+  function slab(o, g, side, target, dir) {
+    var inf = info(target, o), ph = o.mode === 'p';
+    var G = side === 'NE' ? 76 : 22, D = SLAB_D;
+    var tf = mtx(g) + ' ' + (side === 'SE' ? 'translate(' + (360 + G) + ' 360) rotate(-90)' : side === 'SW' ? 'translate(0 ' + (360 + G) + ')' : 'translate(0 ' + (-(G + D)) + ')');
+    var end = side === 'SW', x = end ? 338 : 22, anc = end ? 'end' : 'start';
+    var f = ph ? { n: 26, c: 26, u: 24, y1: 46, y2: 88 } : { n: 44, c: 40, u: 20, y1: 60, y2: 112 };
+    var live = inf.live ? '<tspan class="slab__live" font-size="' + f.u + '" dx="' + (ph ? 12 : 14) + '">● ' + (ph ? 'сегодня' : 'идёт сегодня') + '</tspan>' : '';
+    var edge = inf.live ? '<rect class="slab__edge" x="0" y="' + (side === 'NE' ? D - 7 : 0) + '" width="360" height="7"/>' : '';
+    var attrs = o.fixed ? '' : ' tabindex="0" role="button" data-go="' + target + '" data-f="' + o.id + ':slab:' + dir + '" aria-label="Перейти на квадрат «' + inf.name + '», ' + inf.num + ' ' + inf.unit + (inf.live ? ', мероприятие идёт сегодня' : '') + '"';
+    return '<g class="slab' + (o.hover === dir ? ' is-hover' : '') + '"' + attrs + '>' +
+      '<g transform="' + tf + '"><rect class="slab__base" width="360" height="' + D + '"/></g>' +
+      '<g class="slab__lift"><g transform="' + tf + '">' +
+        '<rect class="slab__face" width="360" height="' + D + '"/>' +
+        '<path class="slab__grid" d="' + gridPath(360, D, 18) + '"/>' + edge +
+        '<text class="slab__name" x="' + x + '" y="' + f.y1 + '" font-size="' + f.n + '" text-anchor="' + anc + '">' + inf.name + '</text>' +
+        '<text x="' + x + '" y="' + f.y2 + '" text-anchor="' + anc + '"><tspan class="slab__num" font-size="' + f.c + '">' + inf.num + '</tspan><tspan class="slab__unit" font-size="' + f.u + '" dx="' + (ph ? 7 : 9) + '">' + inf.unit + '</tspan>' + live + '</text>' +
+      '</g></g></g>';
+  }
+
+  /* --- участок площадки / квартал архива: модуль 120×180, сетка 3×2.
+         Порядок: ближний ряд слева направо, потом дальний. --- */
+  function cellOf(i) { return i < 3 ? { u: i * 120, v: 180 } : { u: (i - 3) * 120, v: 0 }; }
+  function lotBlocks(P, c, v, out) {
+    out.push(prism(P, c.u + 26, c.v + 22, c.u + 80, c.v + 90, 52));
+    if (v.hotel) out.push(prism(P, c.u + 6, c.v + 112, c.u + 40, c.v + 156, 72, 'blk--h'));
+    if (v.truck) {
+      out.push(prism(P, c.u + 46, c.v + 128, c.u + 82, c.v + 148, 22, 'blk--t'));
+      out.push(prism(P, c.u + 82, c.v + 130, c.u + 94, c.v + 146, 14, 'blk--t'));
+    }
+  }
+
+  function buildCampus(c) {
+    var P = c.P, ph = c.ph, o = c.o;
+    c.ground += '<path class="route" d="M120 270H360"/>';
+    c.blocks.push(prism(P, 30, 220, 120, 320, 44), prism(P, 110, 110, 180, 180, 70), prism(P, 230, 60, 340, 150, 46));
+    if (o.today) c.blocks.push(prism(P, 250, 262, 290, 278, 18, 'blk--t'), prism(P, 290, 264, 302, 276, 13, 'blk--t'));
+    var s = ph
+      ? [['Гараж · 6'], ['Офис · 6'], ['Склад · 1 867']]
+      : [['<b>Гараж</b><span>6 машин</span>'], ['<b>Офис</b><span>6 списков</span>'], ['<b>Склад</b><span>1 867 единиц</span>']];
+    var cls = ph ? 'tg--chip' : '', leg = ph ? 7 : 12;
+    c.tags += tg(P(75, 270, 44), s[0][0], cls, leg) + tg(P(145, 145, 70), s[1][0], cls, leg) + tg(P(285, 105, 46), s[2][0], cls, leg);
+    c.tags += tg(P(354, 270), 'выезд →', 'tg--chip', ph ? 6 : 10);
+  }
+
+  function buildPlaces(c) {
+    var P = c.P, ph = c.ph, o = c.o, i;
+    for (i = 0; i < 6; i++) {
+      var q = cellOf(i), v = VENUES[i], used = i < o.places, live = used && o.today && i === 0;
+      c.ground += '<rect class="zone ' + (live ? 'zone--live' : used ? '' : 'zone--empty') + '" x="' + (q.u + 5) + '" y="' + (q.v + 5) + '" width="110" height="170"/>';
+      if (!used) {
+        if (!ph && o.places > 0) c.ground += '<text class="gt" font-size="15" x="' + (q.u + 22) + '" y="' + (q.v + 96) + '">свободно</text>';
+        continue;
+      }
+      if (v.truck) c.ground += '<rect class="zone zone--unload" x="' + (q.u + 42) + '" y="' + (q.v + 108) + '" width="58" height="48"/>';
+      lotBlocks(P, q, v, c.blocks);
+      var at = P(q.u + 53, q.v + 56, 52);
+      if (ph) c.tags += tg(at, live ? '<span class="live">сегодня</span>' : v.date, 'tg--chip' + (live ? ' tg--live' : ''), 6);
+      else if (live) c.tags += tg(at, '<b>' + v.name + '</b><span class="live">идёт сегодня</span><span>Грузовик · ' + v.truck + ' позиции</span><span>Отель · ' + v.hotel + ' человек</span>', 'tg--live', 14);
+      else c.tags += tg(at, '<b>' + v.name + '</b><span>' + v.date + '</span>', '', 14);
+    }
+    if (o.places === 0) c.ground += '<text class="gt" font-size="' + (ph ? 30 : 22) + '" x="' + (ph ? 28 : 46) + '" y="190">' + (ph ? 'Площадок пока нет' : 'Нет предстоящих площадок') + '</text>';
+  }
+
+  var CELLS = [[0, 0], [1, 0], [0, 1], [1, 1], [0, 2]];
+  function buildArchive(c) {
+    var P = c.P, ph = c.ph, o = c.o, i, j;
+    for (i = 0; i < 6; i++) {
+      var q = cellOf(i), cnt = Math.max(0, Math.min(5, o.arch - i * 5));
+      c.ground += '<rect class="zone ' + (cnt ? '' : 'zone--empty') + '" x="' + (q.u + 3) + '" y="' + (q.v + 3) + '" width="114" height="174"/>';
+      if (!cnt) continue;
+      for (j = 0; j < cnt; j++) {
+        var a = q.u + CELLS[j][0] * 60, b = q.v + CELLS[j][1] * 60, n = 1 + ((i * 5 + j) * 7 + 3) % 9, h = 26 + n * 5;
+        var hov = !ph && i === 0 && j === 0;
+        c.blocks.push(prism(P, a + 8, b + 8, a + 52, b + 52, h, hov ? 'is-hover' : ''));
+        if (hov) c.tags += tg(P(a + 30, b + 30, h), '<b>Hilton Tashkent City</b><span>' + n + ' мероприятий · 2019–2025</span><span>пример наведения</span>', 'tg--ex', 12);
+      }
+      c.tags += tg(P(q.u + 90, q.v + 150), YEARS[i] + ' · ' + cnt, 'tg--chip', ph ? 6 : 10);
+    }
+  }
+
+  /* --- R: переключатель квадратов --- */
+  function switcher(o) {
+    var ph = o.mode === 'p', h = '';
+    if (!ph) h += '<button class="sw__arr" type="button" data-go="' + back(o.sq) + '" data-f="' + o.id + ':sw:prev" aria-label="Назад по кругу: ' + info(back(o.sq), o).name + '">‹</button>';
+    ORDER.forEach(function (s) {
+      var inf = info(s, o);
+      h += '<button class="sw__seg" type="button" data-go="' + s + '" data-f="' + o.id + ':sw:' + s + '"' + (s === o.sq ? ' aria-current="true"' : '') + '>' +
+        '<span>' + inf.name + '</span><b>' + inf.num + '</b>' + (inf.live ? '<span class="dot"></span><span class="vh">идёт сегодня</span>' : '') + '</button>';
+    });
+    if (!ph) h += '<button class="sw__arr" type="button" data-go="' + fwd(o.sq) + '" data-f="' + o.id + ':sw:next" aria-label="Вперёд по кругу: ' + info(fwd(o.sq), o).name + '">›</button>';
+    return '<nav class="sw sw--' + o.mode + '" aria-label="Квадраты мира">' + h + '</nav>';
+  }
+
+  /* --- кадр --- */
+  function frame(o) {
+    var g = geo(o.mode, o.nb), ph = o.mode === 'p';
+    var c = { o: o, g: g, P: projector(g), ph: ph, ground: '', blocks: [], tags: '', over: '' };
+    ({ k: buildCampus, p: buildPlaces, a: buildArchive })[o.sq](c);
+    c.blocks.sort(function (a, b) { return a.k - b.k; });
+    var sideBack = o.nb === 'right' ? 'NE' : 'SW';
+    var sBack = slab(o, g, sideBack, back(o.sq), 'back'), sFwd = slab(o, g, 'SE', fwd(o.sq), 'fwd');
+    var live = o.today && o.places > 0;
+
+    var hud = '';
+    if (ph) {
+      hud += '<div class="hz" style="left:16px;top:8px;width:358px;height:48px">C · плашка дня' + (live ? ' · событие · идёт' : '') + '</div>';
+      hud += switcher(o);
+      hud += '<div class="scap" style="left:16px;top:114px">S · сцена · свайп ← → по кругу</div>';
+      hud += '<div class="hz" style="right:16px;bottom:16px;width:248px;height:64px">A · кнопки-дубли 4 × 56</div>';
+    } else {
+      var A = { k: 'Офис · Склад · Гараж · Списком', p: 'площадки по дате · Списком', a: 'Поиск места · Списком' }[o.sq];
+      hud += '<div class="hz" style="left:16px;top:16px;width:360px;height:48px">C · плашка дня</div>';
+      hud += switcher(o);
+      hud += '<div class="scap" style="right:16px;top:70px">R · переключатель квадратов</div>';
+      hud += '<div class="hz" style="left:16px;bottom:16px;width:600px;height:56px">A · кнопки-дубли: ' + A + '</div>';
+      hud += live
+        ? '<div class="hz hz--top" style="right:16px;bottom:16px;width:340px;height:200px">E · карточка события:<br>название · площадка · «идёт»<br>· «Открыть список»</div>'
+        : '<div class="hz hz--top hz--ghost" style="right:16px;bottom:16px;width:340px;height:200px">E · карточка события —<br>только в день мероприятия</div>';
+      if (live && o.sq === 'k') {
+        var e = c.P(360 + 22 + SLAB_D - 8, 34), ax = g.fw - 16 - 340 + 24;
+        c.over += '<path class="arm" d="M' + ax + ' ' + (g.fh - 216) + 'V' + n1(e[1] + (ax - e[0]) * -0.5 + 6) + '"/><circle class="arm-dot" cx="' + ax + '" cy="' + n1(e[1] + (ax - e[0]) * -0.5 + 4) + '" r="4.5"/>';
+      }
+    }
+    var name = info(o.sq, o).name;
+    return '<section class="frame' + (o.here ? ' is-here' : '') + '" data-frame="' + o.id + '" data-sq="' + o.sq + '"' + (o.fixed ? ' inert' : '') + ' aria-label="' + name + ', ' + (ph ? '390' : '1440') + '" style="width:' + g.fw + 'px;height:' + g.fh + 'px">' +
+      '<svg class="scene" width="' + g.fw + '" height="' + g.fh + '" viewBox="0 0 ' + g.fw + ' ' + g.fh + '">' +
+        (sideBack === 'NE' ? sBack : '') +
+        '<g transform="' + mtx(g) + '"><rect class="sq" width="360" height="360"/><path class="grid" d="' + gridPath(360, 360, 30) + '"/>' + c.ground + '</g>' +
+        c.blocks.map(function (b) { return b.s; }).join('') +
+        (sideBack === 'SW' ? sBack : '') + sFwd + c.over +
+      '</svg>' + c.tags + hud + '</section>';
+  }
+
+  /* --- камера на участке: три блока, подписи, панель --- */
+  function lotFrame() {
+    var g = { kx: 2.311, ky: 1.1556, Tx: 547, Ty: 227, hs: 2.6 }, P = projector(g), bl = [], v = VENUES[0];
+    lotBlocks(P, { u: 0, v: 0 }, v, bl);
+    bl.sort(function (a, b) { return a.k - b.k; });
+    var ground = '<rect class="zone zone--live" width="120" height="180"/><path class="grid" d="' + gridPath(120, 180, 30) + '"/>' +
+      '<rect class="zone zone--unload" x="42" y="108" width="58" height="48"/>' +
+      '<text class="gt" font-size="6" x="44" y="155">разгрузка</text>';
+    var tags = tg(P(53, 56, 52), '<b>' + v.name + '</b><span class="live">идёт сегодня</span><span>' + v.date + ' · здание площадки</span>', 'tg--live tg--wide', 14) +
+      tg(P(23, 134, 72), '<b>Отель</b><span>' + v.hotel + ' человек · кто где живёт</span>', '', 12) +
+      tg(P(88, 152), '<b>Грузовик</b><span>' + v.truck + ' позиции · разгрузка</span>', 'tg--below', 14);
+    return '<section class="frame" data-frame="lot" inert aria-label="Камера на участке" style="width:1376px;height:687px">' +
+      '<svg class="scene" width="956" height="687" viewBox="0 0 956 687"><g transform="' + mtx(g) + '">' + ground + '</g>' + bl.map(function (b) { return b.s; }).join('') + '</svg>' + tags +
+      '<div class="hz" style="left:16px;top:16px;width:360px;height:48px">C · плашка дня</div>' +
+      '<div class="hz" style="left:16px;bottom:16px;width:220px;height:56px">← назад на «Площадки»</div>' +
+      '<div class="scap" style="left:392px;top:32px">сцена 956 × 687 — живой выбор блока</div>' +
+      '<div class="hz hz--panel" style="left:956px;top:0;width:420px;height:687px">' +
+        '<div>P · панель 420 — ' + v.name + ' · ' + v.date + '</div>' +
+        '<div>вкладки: Списки · Планы залов · Расселение</div>' +
+        '<div>содержимое вкладки: клик по грузовику открывает «Списки», по отелю — «Расселение», по зданию — «Планы залов»</div>' +
+      '</div></section>';
+  }
+
+  /* --- обзор кольца --- */
+  function ring() {
+    var cx = 180, cy = 128, r = 86, pos = { k: -90, p: 30, a: 150 }, h = '';
+    ORDER.forEach(function (s) {
+      var a1 = (pos[s] + 40) * Math.PI / 180, a2 = (pos[s] + 78) * Math.PI / 180;
+      h += '<path class="ra" marker-end="url(#ah)" d="M' + n1(cx + r * Math.cos(a1)) + ' ' + n1(cy + r * Math.sin(a1)) + 'A' + r + ' ' + r + ' 0 0 1 ' + n1(cx + r * Math.cos(a2)) + ' ' + n1(cy + r * Math.sin(a2)) + '"/>';
+    });
+    ORDER.forEach(function (s) {
+      var a = pos[s] * Math.PI / 180, x = cx + r * Math.cos(a), y = cy + r * Math.sin(a);
+      h += '<g class="rn' + (s === st.sq ? ' is-cur' : '') + '" data-go="' + s + '"><rect x="' + n1(x - 62) + '" y="' + n1(y - 20) + '" width="124" height="40" rx="10"/><text x="' + n1(x) + '" y="' + n1(y + 5) + '" text-anchor="middle">' + info(s, st).name + '</text></g>';
+    });
+    var svg = '<div class="col"><p class="cap">Круг: вперёд — по часовой</p><svg class="ring mini" width="360" height="236" viewBox="0 0 360 236" role="img" aria-label="Кампус, Площадки, Где работали — по кругу">' +
+      '<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2A2E36"/></marker></defs>' + h +
+      '<text class="rl" x="180" y="134" text-anchor="middle">вперёд ↻</text></svg></div>';
+    ORDER.forEach(function (s) { svg += mini(s); });
+    return svg;
+  }
+  function mini(s) {
+    var g = { kx: 0.178, ky: 0.089, Tx: 150, Ty: 34, hs: 1 }, P = projector(g), right = st.nb === 'right';
+    var G = right ? 76 : 22, D = SLAB_D;
+    var se = [P(382, 0), P(382 + D, 0), P(382 + D, 360), P(382, 360)];
+    var bk = right ? [P(0, -G), P(360, -G), P(360, -G - D), P(0, -G - D)] : [P(0, 382), P(360, 382), P(360, 382 + D), P(0, 382 + D)];
+    var bt = right ? [236, 22, 'start'] : [58, 132, 'middle'];
+    return '<div class="col"><p class="cap">Стоишь на «' + info(s, st).name + '»</p><svg class="mini" width="300" height="164" viewBox="0 0 300 164" role="img" aria-label="Соседи квадрата ' + info(s, st).name + '">' +
+      poly(bk, 'm-sl') + poly([P(0, 0), P(360, 0), P(360, 360), P(0, 360)], 'm-cur') + poly(se, 'm-sl') +
+      '<text class="m-cur-t" x="150" y="71" text-anchor="middle">' + info(s, st).name + '</text>' +
+      '<text x="' + bt[0] + '" y="' + bt[1] + '" text-anchor="' + bt[2] + '">‹ ' + info(back(s), st).name + '</text>' +
+      '<text x="242" y="132" text-anchor="middle">' + info(fwd(s), st).name + ' ›</text>' +
+      '<text class="m-k" x="' + (right ? 236 : 58) + '" y="' + (right ? 40 : 150) + '" text-anchor="' + bt[2] + '">назад</text><text class="m-k" x="242" y="150" text-anchor="middle">вперёд</text></svg></div>';
+  }
+
+  /* --- сборка страницы --- */
+  function opt(extra) {
+    var o = { sq: st.sq, today: st.today, places: st.places, arch: st.arch, nb: st.nb };
+    for (var k in extra) o[k] = extra[k];
+    return o;
+  }
+  function tbHtml() {
+    var b = function (key, val, label, kbd) { return '<button type="button" data-set="' + key + '" data-val="' + val + '" aria-pressed="' + (String(st[key]) === String(val)) + '">' + (kbd ? '<kbd>' + kbd + '</kbd>' : '') + label + '</button>'; };
+    return b('sq', 'k', 'Кампус', '1') + b('sq', 'p', 'Площадки', '2') + b('sq', 'a', 'Где работали', '3') +
+      '<span class="tb__sep"></span><button type="button" data-set="today" data-val="toggle" aria-pressed="' + st.today + '"><kbd>T</kbd>мероприятие сегодня</button>' +
+      '<span class="tb__sep"></span><span class="tb__lbl">площадок</span>' + b('places', 0, '0') + b('places', 4, '4') + b('places', 6, '6') +
+      '<span class="tb__sep"></span><span class="tb__lbl">архив</span>' + b('arch', 12, '12') + b('arch', 30, '30') +
+      '<span class="tb__sep"></span><span class="tb__lbl">соседи</span>' + b('nb', 'front', 'у передних сторон') + b('nb', 'right', 'как в примере');
+  }
+  var $ = function (id) { return document.getElementById(id); };
+  function fit() {
+    document.querySelectorAll('.slab__name').forEach(function (t) {
+      var len = t.getComputedTextLength(), max = 316;
+      if (len > max) t.setAttribute('font-size', Math.floor(+t.getAttribute('font-size') * max / len));
+    });
+  }
+  function render() {
+    var keep = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-f');
+    if (SOLO) {
+      var h = '';
+      if (SOLO === 'ring') h = '<div class="row" style="padding:16px">' + ring() + '</div>';
+      else if (SOLO === 'd') h = frame(opt({ id: 'd', mode: 'd', hover: st.hover }));
+      else if (SOLO === 'p') h = frame(opt({ id: 'p-' + st.sq, mode: 'p', hover: st.hover }));
+      else if (SOLO === 'today') h = frame(opt({ id: 'today', mode: 'd', sq: 'p', today: true, places: Math.max(4, st.places), fixed: true }));
+      else if (SOLO === 'lot') h = lotFrame();
+      else if (SOLO === 'arch') h = frame(opt({ id: 'arch', mode: 'd', sq: 'a', arch: 30, fixed: true }));
+      else if (SOLO === 'archp') h = frame(opt({ id: 'archp', mode: 'p', sq: 'a', arch: 30, fixed: true }));
+      $('page').innerHTML = h;
+    } else {
+      var right = st.nb === 'right';
+      $('ring-txt').innerHTML = 'Три квадрата — кольцо: Кампус → Площадки → Где работали → Кампус. С любого квадрата видны оба других: <b>вперёд по кругу — всегда плита справа снизу</b>, назад — всегда плита ' + (right ? 'справа сверху' : 'слева снизу') + '. Порядок в переключателе тот же, что по кругу; до любого квадрата — один шаг.';
+      $('ring').innerHTML = ring();
+      $('tb').innerHTML = tbHtml();
+      $('live-d').innerHTML = frame(opt({ id: 'd', mode: 'd', hover: st.hover }));
+      $('live-p').innerHTML = ORDER.map(function (s) {
+        return '<div class="col"><p class="cap">' + info(s, st).name + (s === st.sq ? ' — ты здесь' : '') + '</p>' + frame(opt({ id: 'p-' + s, mode: 'p', sq: s, here: s === st.sq, hover: s === st.sq ? st.hover : null })) + '</div>';
+      }).join('');
+      $('fx-today').innerHTML = frame(opt({ id: 'today', mode: 'd', sq: 'p', today: true, places: Math.max(4, st.places), fixed: true }));
+      $('fx-lot').innerHTML = lotFrame();
+      $('fx-arch').innerHTML = frame(opt({ id: 'arch', mode: 'd', sq: 'a', arch: 30, fixed: true }));
+      $('fx-archp').innerHTML = '<div class="col">' + frame(opt({ id: 'archp', mode: 'p', sq: 'a', arch: 30, fixed: true })) + '</div>';
+    }
+    fit();
+    if (keep) { var el = document.querySelector('[data-f="' + keep + '"]'); if (el) el.focus(); }
+  }
+  function sync() {
+    var p = new URLSearchParams();
+    p.set('sq', st.sq);
+    if (st.today) p.set('today', '1');
+    if (st.places !== 4) p.set('places', st.places);
+    if (st.arch !== 12) p.set('arch', st.arch);
+    if (st.nb !== 'front') p.set('nb', st.nb);
+    if (SOLO) p.set('frame', SOLO);
+    history.replaceState(null, '', location.pathname + '?' + p.toString());
+  }
+  function set(key, val) {
+    if (key === 'today') st.today = val === 'toggle' ? !st.today : !!val;
+    else if (key === 'places' || key === 'arch') st[key] = +val;
+    else st[key] = val;
+    st.hover = null;
+    render(); sync();
+  }
+
+  document.addEventListener('click', function (e) {
+    var go = e.target.closest('[data-go]');
+    if (go) { set('sq', go.getAttribute('data-go')); return; }
+    var b = e.target.closest('[data-set]');
+    if (b) set(b.getAttribute('data-set'), b.getAttribute('data-val'));
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var t = e.target;
+    if ((e.key === 'Enter' || e.key === ' ') && t.classList && t.classList.contains('slab')) { e.preventDefault(); set('sq', t.getAttribute('data-go')); return; }
+    if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && t.closest && t.closest('.sw')) {
+      e.preventDefault();
+      var id = t.closest('.frame').getAttribute('data-frame'), next = e.key === 'ArrowRight' ? fwd(st.sq) : back(st.sq);
+      set('sq', next);
+      var el = document.querySelector('[data-f="' + (id.indexOf('p-') === 0 ? 'p-' + next : id) + ':sw:' + next + '"]');
+      if (el) el.focus();
+      return;
+    }
+    if (SQN[e.key]) set('sq', SQN[e.key]);
+    else if (e.key === 't' || e.key === 'T' || e.key === 'е' || e.key === 'Е') set('today', 'toggle');
+  });
+  /* Свайп по сцене в рамке 390: влево — вперёд по кругу, вправо — назад. */
+  var sx = null, sf = null;
+  document.addEventListener('pointerdown', function (e) {
+    var f = e.target.closest('.frame');
+    sf = f && f.getAttribute('data-frame').indexOf('p-') === 0 ? f : null; sx = e.clientX;
+  });
+  document.addEventListener('pointerup', function (e) {
+    if (!sf) return;
+    var dx = e.clientX - sx, s = sf.getAttribute('data-sq'); sf = null;
+    if (Math.abs(dx) > 40) set('sq', dx < 0 ? fwd(s) : back(s));
+  });
+
+  if (SOLO) document.documentElement.setAttribute('data-solo', SOLO);
+  render();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+})();
+</script>
+</body>
+</html>
