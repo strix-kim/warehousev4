@@ -2,6 +2,7 @@ import { CalendarDays, CircleAlert, Minus, Plus, Save, X } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useState } from 'react'
 import { hallPlanErrorText, type HallPlanInput } from './api'
+import { PlanProjectField } from './PlanProjectField'
 import type { HallPlan } from './types'
 import { AppDatePicker } from '../../components/AppDatePicker'
 import { DrawerLayer } from '../../components/DrawerLayer'
@@ -17,7 +18,7 @@ const MIN_HALL_COUNT = 1
 const MAX_HALL_COUNT = 12
 const DEFAULT_HALL_COUNT = 3
 
-// Шапка плана: название и даты. Один дровер на создание и на правку — разъедься
+// Шапка плана: название, даты и мероприятие. Один дровер на создание и на правку — разъедься
 // они, «Изменить» показывало бы не те поля, которые заполняли при создании.
 // Отличие ровно одно: при создании здесь же спрашивается, сколько залов завести
 // сразу, а у существующего плана залы уже есть и меняются в редакторе.
@@ -36,6 +37,7 @@ export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
     name: plan?.name ?? '',
     eventFrom: plan?.event_from ?? '',
     eventTo: plan?.event_to ?? '',
+    projectId: plan?.project_id ?? null,
   }))
   const [draft, setDraft] = useState<HallPlanInput>(initialDraft)
   const [hallCount, setHallCount] = useState(DEFAULT_HALL_COUNT)
@@ -56,6 +58,7 @@ export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
   const isDirty = draft.name !== initialDraft.name
     || draft.eventFrom !== initialDraft.eventFrom
     || draft.eventTo !== initialDraft.eventTo
+    || draft.projectId !== initialDraft.projectId
     || (!isEditing && hallCount !== DEFAULT_HALL_COUNT)
   // Пока идёт сохранение, защита снята — и после успеха тоже (isSaving остаётся
   // поднятым, см. save): HallPlansPage.createPlan уводит в редактор нового плана,
@@ -147,6 +150,8 @@ export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
         {rangeError && <small className="field-hint field-hint--error">{tr('Окончание раньше начала', 'Tugash sanasi boshlanishdan oldin')}</small>}
         {endWithoutStart && <small className="field-hint field-hint--error">{tr('Сначала укажите дату начала', 'Avval boshlanish sanasini ko‘rsating')}</small>}
       </div>
+
+      <PlanProjectField value={draft.projectId} onChange={(projectId) => patch({ projectId })} disabled={isSaving} />
 
       {!isEditing && (
         <div className="field">

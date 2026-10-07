@@ -13,6 +13,7 @@ import {
   type Tr,
 } from './types'
 import { EMPLOYEE_BRIEF_COLUMNS } from '../employees/types'
+import { invalidateProjectCounters } from '../projects/cacheKeys'
 
 // Зал на карточке плана — цветная точка с именем. Полная строка там не нужна:
 // created_by и created_at на карточке не показывают, а редактор в Ш4 читает залы
@@ -27,6 +28,10 @@ export type HallPlanInput = {
   // и второго способа записать «не знаю» быть не должно.
   eventFrom: string
   eventTo: string
+  // Мероприятие, к которому относится план; null — «без мероприятия». Только
+  // ссылка: название и даты у плана остаются своими и с мероприятием не
+  // сверяются (план event-s53, развилка 9).
+  projectId: string | null
 }
 
 // Раскладка формы в строку плана. Одна на вставку и на правку: разъедься они,
@@ -39,6 +44,7 @@ function planRow(input: HallPlanInput) {
     name: input.name.trim(),
     event_from: input.eventFrom || null,
     event_to: input.eventTo || null,
+    project_id: input.projectId,
   }
 }
 
@@ -59,6 +65,15 @@ const HALL_PLANS_CACHE_TTL = 5 * 60 * 1000
 function touched<T>(value: T): T {
   invalidateCachePrefix(HALL_PLANS_CACHE_PREFIX)
   return value
+}
+
+// Запись САМОГО плана (создать, поправить шапку, удалить) двигает ещё и реестр
+// мероприятий: там счётчик «есть план залов». Отдельно от touched намеренно —
+// правка клетки или зала привязку не меняет, и сносить кэш мероприятий на
+// каждое имя в матрице незачем.
+function planTouched<T>(value: T): T {
+  invalidateProjectCounters()
+  return touched(value)
 }
 
 // Отказ удаления, который база не называет ошибкой. RLS не бросает исключение,
@@ -160,7 +175,7 @@ export async function createHallPlan(
     const { error: hallsError } = await supabase.from('halls').insert(hallRows, { defaultToNull: false })
     insertError = hallsError ?? null
   }
-  return touched({ plan, hallsError: insertError })
+  return planTouched({ plan, hallsError: insertError })
 }
 
 // Правка шапки плана без оптимистичной блокировки: планов десятки, правят их по
@@ -174,7 +189,7 @@ export async function updateHallPlan(id: string, input: HallPlanInput): Promise<
     .select()
     .single()
   if (error) throw error
-  return touched(data)
+  return planTouched(data)
 }
 
 // Залы, строки матрицы и ячейки уходят вместе с планом каскадом — отдельных
@@ -182,7 +197,7 @@ export async function updateHallPlan(id: string, input: HallPlanInput): Promise<
 // без залов, если второй не прошёл.
 export async function deleteHallPlan(id: string): Promise<void> {
   await deleteRow('hall_plans', id)
-  touched(null)
+  planTouched(null)
 }
 
 // Перевод отказа базы в человеческую фразу. Разбираем ИМЕНЕМ ограничения, а не
@@ -201,6 +216,10 @@ export function hallPlanErrorText(error: unknown, tr: Tr): string {
   }
   if (code === '23514' && message.includes('name')) {
     return tr('Название не может быть пустым.', 'Nom bo‘sh bo‘lishi mumkin emas.')
+  }
+  // Выбранное мероприятие успели удалить, пока дровер был открыт.
+  if (code === '23503' && message.includes('hall_plans_project_id_fkey')) {
+    return tr('Выбранного мероприятия больше нет — выберите другое.', 'Tanlangan tadbir endi yo‘q — boshqasini tanlang.')
   }
   // Ячейка занята: пока здесь заполняли клетку, её занял кто-то из другой
   // вкладки. Клиент об этом узнать не мог — правило держит база (UNIQUE

@@ -186,7 +186,9 @@ export function ProjectPage() {
           )}
       </section>
 
-      <ProjectStaffSection projectId={current.id} />
+      {/* key: блок держит свой состав и фазу выгрузки — у другого мероприятия
+          они обязаны начаться с нуля, а не достаться по наследству. */}
+      <ProjectStaffSection key={current.id} project={current} />
 
       <section className="data-panel project-section">
         <header className="project-section__head">
@@ -198,7 +200,7 @@ export function ProjectPage() {
             <EmptyState
               icon={<Presentation size={27} />}
               title={tr('Плана залов пока нет', 'Hozircha zallar rejasi yo‘q')}
-              text={tr('К этому мероприятию не привязан ни один план расстановки по залам.', 'Bu tadbirga zallar bo‘yicha taqsimot rejasi biriktirilmagan.')}
+              text={tr('Чтобы привязать план: откройте его в «Планах залов» → «Изменить» → поле «Мероприятие».', 'Rejani biriktirish uchun: uni «Zallar rejalari»da oching → «O‘zgartirish» → «Tadbir» maydoni.')}
               action={<Link className="button button--secondary" to="/halls">{tr('К планам залов', 'Zallar rejalariga')}</Link>}
             />
           )

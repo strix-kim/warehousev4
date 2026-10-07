@@ -38,6 +38,30 @@
 .project-row__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-row small { color: var(--faint); font-size: 12px; font-weight: 500; white-space: nowrap; }
 
+/* Блок «Состав». Панель не режет содержимое: выдача пикера (position: absolute
+   под полем) при коротком составе выходит за нижний край блока, а общая
+   .data-panel её обрезала бы. Фонов у краёв блока нет — скруглению нечего терять.
+   z-index: у .data-panel анимация rise-in с fill both, она держит на панели свой
+   контекст наложения, и блок «Залы» (ниже в разметке) лёг бы поверх выдачи. */
+.project-section--staff { position: relative; z-index: 1; overflow: visible; }
+.project-staff-tools { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.project-staff-tools .employee-picker { width: min(460px, 100%); }
+.project-staff-tools .project-error { margin: 0; }
+.project-staff-notice { margin: 0; padding: 10px 12px; border-radius: var(--r-sm); color: var(--muted); background: var(--sunk); font-size: 13px; line-height: 1.45; }
+.project-staff-summary { margin: 0; color: var(--muted); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Выгрузка: язык бумаги, галка адреса, кнопка; подсказка — отдельной строкой. */
+.project-staff-export { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.project-staff-export__lang, .project-staff-export__option { min-height: 40px; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.project-staff-export__lang .language-switch { margin: 0; }
+.project-staff-export__option { cursor: pointer; }
+.project-staff-export__option input { width: 20px; height: 20px; accent-color: var(--ink); cursor: pointer; }
+.project-staff-export .button { min-height: 40px; margin-left: auto; }
+.project-staff-export .field-hint { flex: 1 0 100%; margin: 0; }
+
+.project-staff-row { min-height: 56px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 16px; }
+.project-staff-row .equipment-cell { min-width: 0; }
+
 /* Болванка страницы: шапка реквизитов и два блока. */
 .project-skeleton { display: grid; gap: 12px; padding: 16px; }
 .project-skeleton span { height: 72px; border-radius: var(--r-md); background: linear-gradient(90deg, var(--sunk) 25%, var(--card) 50%, var(--sunk) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
@@ -55,4 +79,6 @@
   .project-row__name { grid-column: 2; white-space: normal; overflow-wrap: anywhere; }
   .project-row small { grid-column: 2; white-space: normal; }
   .project-section__head .button { flex: 1 0 100%; margin-left: 0; }
+  .project-staff-export__lang, .project-staff-export__option { min-height: 44px; }
+  .project-staff-export .button { flex: 1 0 100%; min-height: 44px; margin-left: 0; }
 }
