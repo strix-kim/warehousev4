@@ -50,6 +50,24 @@ export function formatDayMonth(date: Date, locale: string) {
   return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long' }).format(date)
 }
 
+// Короткий месяц для тесной ячейки («окт», «okt») — три буквы того же слова, что стоит
+// в formatDayMonth («октября», «oktabr»). Слово до четырёх букв идёт целиком («мая»,
+// «iyun», «iyul»): урезанные «iyu» неразличимы. Короткую форму Intl не берём и для
+// русского: она то с точкой, то в четыре буквы («сент.», «нояб.»).
+export function formatMonthShort(date: Date, locale: string) {
+  const word = locale.toLowerCase().startsWith('uz')
+    ? uzbekMonths[date.getMonth()]!
+    : new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long' }).formatToParts(date).find((part) => part.type === 'month')?.value ?? ''
+  return word.length <= 4 ? word : word.slice(0, 3)
+}
+
+// Диапазон календарных дней без года: «7 октября», «7–8 октября», «30 октября – 2 ноября»
+// («7–8-oktabr»). Месяц пишется один раз, пока оба дня в одном месяце одного года.
+export function formatDayRange(from: Date, to: Date, locale: string) {
+  if (from.getMonth() !== to.getMonth() || from.getFullYear() !== to.getFullYear()) return `${formatDayMonth(from, locale)} – ${formatDayMonth(to, locale)}`
+  return from.getDate() === to.getDate() ? formatDayMonth(from, locale) : `${from.getDate()}–${formatDayMonth(to, locale)}`
+}
+
 // Заголовок месяца в календаре — тот же список месяцев, без числа.
 export function formatMonthTitle(date: Date, locale: string) {
   if (locale.toLowerCase().startsWith('uz')) return `${uzbekMonths[date.getMonth()]} ${date.getFullYear()}`

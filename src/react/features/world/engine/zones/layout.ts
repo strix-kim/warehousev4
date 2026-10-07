@@ -10,7 +10,7 @@ import type { WorldCtx } from '../createWorld'
 import { glide, glideStep } from '../ease'
 import { GATE_MIN_WIDTH, makeGate, tickGates, type Gate } from '../groundLabel'
 import { CAMPUS_HALF, POS, ROAD_Z } from '../ground'
-import { hitPlane, pickable } from '../pointer'
+import { collectPicks, hitPlane, pickable } from '../pointer'
 import { kit } from '../primitives'
 import { flat, setZoneDim, switchZone } from '../style'
 import { buildArchive } from './archive'
@@ -72,7 +72,7 @@ export function buildMap(ctx: WorldCtx, data: WorldData, texts: WorldTexts) {
   if (has('archive')) { switchZone(style, 'archive'); road(-ZONE_STEP - ZONE_HALF, -ZONE_STEP + ZONE_HALF) }
   switchZone(style, 'map')
   if (has('archive')) road(-ZONE_STEP + ZONE_HALF, POS.garage[0] - 8)
-  if (has('venues')) road(CAMPUS_HALF + 4, ZONE_STEP - ZONE_HALF)
+  if (has('venues')) road(CAMPUS_HALF, ZONE_STEP - ZONE_HALF)
   // В промежутке две кнопки — в левую зону и в правую; видна та, что ведёт ОТ зоны под камерой
   WORLD_ZONES.slice(0, -1).forEach((left, gap) => {
     const right = WORLD_ZONES[gap + 1]!
@@ -83,6 +83,9 @@ export function buildMap(ctx: WorldCtx, data: WorldData, texts: WorldTexts) {
       pickable(ctx, gate.g, id)
     }
   })
+  // Здания кампуса — цели; до расстановки зон: без зоны приглушённый кампус отвечал бы
+  // кликом по зданию (переход в раздел) вместо своей кнопки на земле
+  collectPicks(ctx)
   // Зона у подписей и целей — по предкам: строители зон о ней не думают
   for (const o of ctx.picks) o.userData.zone = zoneOfObject(o)
   return map

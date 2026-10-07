@@ -71,8 +71,14 @@ export function bindPointer(ctx: WorldCtx, deps: PointerDeps) {
     if (zone && zone !== ctx.zone) return gateId(zone, ctx.zone)
     if (id.startsWith('zone:')) return null
     // Пальцем и в компактной сцене грузовик, отель и план в 44 px не помещаются: цель — весь участок
+    const coarse = e.pointerType !== 'mouse' || store.getState().hudCompact
     const lot = parseLotId(id)
-    if (lot && (e.pointerType !== 'mouse' || store.getState().hudCompact)) return lotPartId('lot', lot.venueId)
+    if (lot && coarse) return lotPartId('lot', lot.venueId)
+    // «Где работали»: там же здание отвечает как свой квартал (userData.block). Мышью
+    // квартал — не цель: его выбирает вывеска, а клик по земле снимает выбор.
+    const block = hit.object.userData.block as string | undefined
+    if (block && coarse) return block
+    if (id.startsWith('block:') && !coarse) return null
     return id
   }
 

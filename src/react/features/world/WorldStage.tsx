@@ -5,6 +5,10 @@ import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+// Общие стили — раньше компонентов: world-venues.css и world-archive.css (их тянут
+// панели зон) правят общие классы и обязаны встать в бандл после world-hud.css
+import './world.css'
+import './hud/world-hud.css'
 import { useWorldData } from './data/useWorldData'
 import { ArchivePanel } from './hud/ArchivePanel'
 import { DayCap } from './hud/DayCap'
@@ -20,8 +24,6 @@ import { loadWorld } from './loadWorld'
 import type { WorldLook } from './settings'
 import { hasWebGL2, prefersReducedMotion } from './support'
 import { createWorldStore, isAddId, isWorldZone, useWorldState, WORLD_SITES, type CameraPose, type WorldSiteId, type WorldTexts, type WorldZone } from './worldStore'
-import './world.css'
-import './hud/world-hud.css'
 
 // unsupported — WebGL2 нет; failed — чанк не приехал или мир не собрался;
 // lost — браузер отобрал контекст у живого мира

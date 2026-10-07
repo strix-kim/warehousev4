@@ -147,13 +147,27 @@
 .w-toast { position: absolute; z-index: 2; left: 50%; bottom: 88px; translate: -50% 0; max-width: calc(100% - 32px); margin: 0; padding: 10px 16px; border-radius: var(--r-md); background: var(--night); color: var(--on-night); font: 600 14px/18px var(--f-text); text-align: center; box-shadow: var(--shadow-sign-up); }
 
 /* «Плюс» пустого места — свободная подпись: якорь 0×0 в центре места, кнопка — вокруг
-   него. В покое — тихий кружок; под указателем и в фокусе (is-hover ставит движок) —
-   плашка с подписью. Облик доводит кодер В (заход 2 Ш5). */
+   него; она же дубль цели в сцене для клавиатуры и скринридера. В покое бледная, с
+   пунктирной рамкой; под указателем и в фокусе (is-hover ставит движок) — яркая плашка
+   с подписью; там, где наведения нет (палец, компактная сцена), яркая всегда. Цель — 44 px. */
+.w-stage { --plus-line: var(--ctl); --plus-ink: var(--muted); }
+.w-stage.is-dark { --plus-line: var(--on-night-2); --plus-ink: var(--on-night-2); }
 .w-plus { width: 0; height: 0; }
-.w-plus__btn { position: absolute; left: 0; top: 0; translate: -50% -50%; height: 32px; min-width: 32px; display: flex; align-items: center; gap: 6px; padding: 0 7px; border: 1.5px solid var(--key-line); border-radius: 16px; background: var(--card); color: var(--ink); font: 600 13px/16px var(--f-text); white-space: nowrap; pointer-events: auto; opacity: .7; transition: opacity .16s var(--ease-out); }
-.w-plus__ico { position: relative; flex: none; width: 14px; height: 14px; }
-.w-plus__ico::before, .w-plus__ico::after { content: ""; position: absolute; left: 0; top: 6px; width: 14px; height: 2px; border-radius: 1px; background: currentColor; }
+.w-plus__btn { position: absolute; left: 0; top: 0; translate: -50% -50%; height: 44px; min-width: 44px; display: flex; align-items: center; padding: 0; border: 1.5px dashed var(--plus-line); border-radius: var(--r-lg); background: transparent; color: var(--plus-ink); font: 600 14px/18px var(--f-text); white-space: nowrap; pointer-events: auto; touch-action: none; -webkit-tap-highlight-color: transparent; transition: background-color .16s var(--ease-out), border-color .16s var(--ease-out), color .16s var(--ease-out), box-shadow .16s var(--ease-out); }
+.w-plus__ico { position: relative; flex: none; width: 41px; height: 41px; }
+.w-plus__ico::before, .w-plus__ico::after { content: ""; position: absolute; left: 50%; top: 50%; width: 18px; height: 3px; border-radius: 2px; background: currentColor; translate: -50% -50%; }
 .w-plus__ico::after { rotate: 90deg; }
-.w-plus__cap { display: none; }
-.w-plus.is-hover .w-plus__btn, .w-plus__btn:hover, .w-plus__btn:focus-visible { opacity: 1; }
-.w-plus.is-hover .w-plus__cap, .w-plus__btn:hover .w-plus__cap, .w-plus__btn:focus-visible .w-plus__cap { display: inline; }
+.w-plus__cap { max-width: 0; overflow: hidden; opacity: 0; transition: max-width .2s var(--ease-out), opacity .16s var(--ease-out); }
+.w-plus__btn:hover, .w-plus__btn:focus-visible, .w-plus.is-hover .w-plus__btn, .w-plus--cap .w-plus__btn { border-style: solid; border-color: var(--ink); background: var(--card); color: var(--ink); box-shadow: var(--shadow-card); }
+.w-plus__btn:hover .w-plus__cap, .w-plus__btn:focus-visible .w-plus__cap, .w-plus.is-hover .w-plus__cap, .w-plus--cap .w-plus__cap { max-width: 180px; padding-right: 14px; opacity: 1; }
+/* Места внутри участка мельче: цель мыши. Пальцу и компактной сцене цель — весь участок;
+   там их «плюсы» видны только у выбранного участка (w-plus--cap ставит движок). Прячем
+   кнопку, а не якорь: display якоря каждый кадр пишет CSS2DRenderer. */
+.w-plus--in:not(.w-plus--cap) .w-plus__btn { height: 30px; min-width: 30px; border-radius: var(--r-sm); }
+.w-plus--in:not(.w-plus--cap) .w-plus__ico { width: 27px; height: 27px; }
+.w-plus--in:not(.w-plus--cap) .w-plus__ico::before, .w-plus--in:not(.w-plus--cap) .w-plus__ico::after { width: 12px; height: 2px; }
+.w-stage.is-sm .w-plus--in:not(.w-plus--cap) .w-plus__btn { display: none; }
+.w-stage.is-sm .w-plus__btn { border-style: solid; border-color: var(--ink); background: var(--card); color: var(--ink); box-shadow: var(--shadow-card); }
+@media (hover: none) { .w-plus__btn { border-style: solid; border-color: var(--ink); background: var(--card); color: var(--ink); box-shadow: var(--shadow-card); } }
+/* Reduced-motion: подпись появляется без разворота */
+@media (prefers-reduced-motion: reduce) { .w-plus__cap { transition: none; } }

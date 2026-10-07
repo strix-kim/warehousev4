@@ -1,2 +1,106 @@
-/* HUD «Где работали»: подписи кварталов и мест, панель истории. Заготовка захода 1 Ш5 —
-   наполняет кодер Б. Все селекторы — с префиксом w-. */
+/* HUD «Где работали» (облик — макет voxel-world-s51.html, раздел «Архив»): вывески
+   кварталов, чипы мест, плашка итога, панель — строки квартала, список мест, карточка
+   места с историей. Все селекторы — с префиксом w-. Файл встаёт в бандл после
+   world-hud.css (порядок импортов в WorldStage.tsx); двойные классы у правок общих
+   (w-sign, w-plaque, w-cell) остались с тех пор, когда порядок был обратным. */
+
+/* Вывеска квартала слабее вывесок зданий кампуса: роли чипа имени (--who-*), а не
+   тёмной вывески, тонкая ножка. Высоту ножки (--leg) не трогаем — её знает раскладка. */
+.w-sign.w-sign--block .w-sign__leg { left: -1px; width: 2px; height: calc(var(--leg) + var(--lift) + 4px); border-radius: 1px; }
+.w-sign.w-sign--block .w-sign__leg::after { left: -1.5px; bottom: -2.5px; width: 5px; height: 5px; }
+.w-sign.w-sign--block .w-sign__board { height: 32px; gap: 7px; padding: 0 10px; border: 1px solid var(--who-line); border-radius: var(--r-sm); background: var(--who-bg); color: var(--who-ink); box-shadow: none; font: 700 14px/18px var(--f-display); font-variant-numeric: tabular-nums; white-space: nowrap; transition: border-color .16s var(--ease-out), transform .16s var(--ease-out); }
+/* Зона нажатия вывески — 44 px по высоте */
+.w-sign.w-sign--block .w-sign__board::before { content: ""; position: absolute; inset: -7px -4px; }
+.w-ablock__n { font: 500 13px/16px var(--f-text); color: var(--who-ink-2); }
+.w-ablock__n i { font-style: normal; }
+.w-sign.w-sign--block.is-hover .w-sign__board, .w-sign.w-sign--block .w-sign__board:hover { border-color: var(--who-ink); box-shadow: none; }
+.w-sign.w-sign--block.is-selected .w-sign__board::after { border-radius: calc(var(--r-sm) + 4px); }
+.w-sign--block.w-sign--sm .w-sign__board { height: 24px; gap: 4px; padding: 0 6px; border-radius: 6px; font-size: 13px; }
+.w-sign--block.w-sign--sm .w-sign__board::before { inset: -10px -4px; }
+.w-sign--block.w-sign--sm .w-ablock__n i { display: none; }
+
+/* Чип имени здания: под указателем и в фокусе строки — белый, у выбранного — тёмный.
+   Мышь не ловит. Якорь w-place — свободная подпись; сдвиг от края кадра (translate)
+   пишет ему движок. */
+.w-place { padding-bottom: 8px; pointer-events: none; }
+.w-place__in { display: grid; justify-items: center; gap: 1px; width: max-content; padding: 4px 10px 5px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--card); box-shadow: var(--shadow-sign); text-align: center; }
+.w-place__in b { max-width: 272px; font: 700 14px/18px var(--f-display); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-place__in span { font: 500 13px/16px var(--f-text); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.w-place.is-selected .w-place__in { background: var(--key-on); border-color: var(--key-on-line); }
+.w-place.is-selected .w-place__in b { color: var(--card); }
+.w-place.is-selected .w-place__in span { color: var(--on-night-2); }
+.w-stage.is-sm .w-place__in b { max-width: 200px; }
+
+/* Пустой архив: вывеска посреди квадрата */
+.w-aempty { width: 0; height: 0; }
+.w-aempty__leg { position: absolute; left: -1.5px; bottom: 0; width: 3px; height: 22px; border-radius: 2px; background: var(--sign-leg); }
+.w-aempty__board { position: absolute; left: 0; bottom: 18px; translate: -50% 0; width: max-content; max-width: 320px; display: grid; gap: 4px; padding: 12px 18px 13px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card); box-shadow: var(--shadow-sign); text-align: center; }
+.w-aempty__board b { font: 700 16px/21px var(--f-display); color: var(--ink); text-wrap: balance; }
+.w-aempty__board span { font: 500 13px/17px var(--f-text); color: var(--muted); text-wrap: balance; }
+.w-stage.is-sm .w-aempty__board { max-width: 240px; padding: 10px 14px 11px; }
+
+/* Плашка итога — под плашкой дня: две ячейки рядом; «ещё N — списком» — кнопка под ней.
+   В компактной сцене верх занят переключателем зон — итог уходит в левый нижний угол. */
+.w-atotal { position: absolute; left: 16px; top: 72px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: calc(100% - 32px); }
+.w-atotal__cap { height: 48px; display: flex; gap: 5px; margin: 0; padding: 6px; }
+.w-atotal__cap .w-cell { flex-direction: row; gap: 6px; min-width: 0; padding: 0 10px; }
+.w-atotal__cap .w-cell__num { font-size: 20px; line-height: 36px; color: var(--card); }
+.w-atotal__cap .w-cell__unit { line-height: 36px; }
+.w-plaque.w-atotal__over { min-height: 40px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: var(--r-md); font: 600 14px/18px var(--f-text); box-shadow: var(--shadow-sign); transition: background-color .16s var(--ease-out); }
+.w-atotal__over::after { content: ""; width: 6px; height: 6px; border-right: 2px solid var(--muted); border-top: 2px solid var(--muted); border-radius: 1px; transform: rotate(45deg); }
+.w-atotal__over:hover { background: var(--hover); }
+.w-stage.is-sm .w-atotal { left: 8px; top: auto; bottom: 8px; flex-direction: column-reverse; max-width: calc(100% - 16px); }
+.w-stage.is-sm .w-plaque.w-atotal__over { min-height: 44px; }
+
+/* Панель — справа под переключателем зон и его меткой; сцена остаётся под ней.
+   В компактной сцене — лист снизу во всю ширину, не выше 62 % сцены: выбранное
+   здание остаётся в кадре над листом. */
+.w-plaque.w-apanel { position: absolute; right: 16px; top: 108px; width: min(360px, calc(100% - 32px)); max-height: calc(100% - 124px); display: flex; flex-direction: column; overflow: hidden; animation: w-apanel-in .2s var(--ease-out); }
+@keyframes w-apanel-in { from { opacity: 0; transform: translateX(12px); } }
+@keyframes w-apanel-up { from { opacity: 0; transform: translateY(16px); } }
+.w-stage.is-sm .w-plaque.w-apanel { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; max-height: min(calc(100% - 125px), 62%); animation-name: w-apanel-up; }
+/* Шапка: шаг назад своей строкой, имя целиком (44 знака — в две-три строки), крестик */
+.w-apanel__head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 4px 12px; padding: 16px 16px 14px 20px; border-bottom: 1px solid var(--line-2); }
+.w-apanel__kicker { margin: 0 0 5px; font: 600 12px/1.2 var(--f-text); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.w-apanel__name { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0; font: 800 20px/1.2 var(--f-display); letter-spacing: -.025em; overflow-wrap: anywhere; }
+.w-apanel__count { display: inline-grid; place-items: center; min-width: 28px; height: 26px; padding: 0 8px; border-radius: 999px; background: var(--select); font: 700 13px/1 var(--f-text); letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.w-apanel__back { grid-column: 1 / -1; justify-self: start; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; margin: -6px 0 2px -10px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: 600 14px/18px var(--f-text); }
+.w-apanel__back::before { content: ""; width: 7px; height: 7px; border-left: 2px solid var(--muted); border-bottom: 2px solid var(--muted); border-radius: 1px; transform: rotate(45deg); }
+.w-apanel__back:hover { background: var(--hover); }
+.w-apanel__close { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); font-size: 20px; line-height: 1; }
+.w-apanel__close:hover { background: var(--hover); }
+/* Итог места: число мероприятий в ячейке (та же высота, что читается в сцене) и дата последнего */
+.w-apanel__stats { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 14px 20px; border-bottom: 1px solid var(--line-2); }
+.w-cell.w-apanel__cell { align-self: auto; min-width: 56px; height: 52px; background: var(--night); }
+.w-apanel__last { display: grid; gap: 1px; margin: 0; font: 500 13px/16px var(--f-text); color: var(--muted); }
+.w-apanel__last b { font: 700 16px/20px var(--f-display); color: var(--ink); font-variant-numeric: tabular-nums; }
+.w-apanel__note { flex-basis: 100%; margin: 0; font: 500 13px/18px var(--f-text); color: var(--muted); }
+.w-apanel__body { flex: 1; min-height: 0; overflow: auto; padding: 14px 20px 8px; }
+.w-apanel__sub { margin: 0 0 4px; font: 600 12px/1.2 var(--f-text); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.w-apanel__hist { margin: 0; padding: 0; list-style: none; }
+.w-apanel__hist li { display: grid; gap: 1px; min-height: 48px; align-content: center; padding: 6px 0; border-bottom: 1px solid var(--line-2); }
+.w-apanel__hist li:last-child { border-bottom: 0; }
+.w-apanel__hist b { font: 600 14.5px/19px var(--f-text); overflow-wrap: anywhere; }
+.w-apanel__hist span { font: 500 13px/16px var(--f-text); color: var(--muted); font-variant-numeric: tabular-nums; }
+.w-apanel__more { margin: 0; padding: 8px 0 6px; font: 500 13px/18px var(--f-text); color: var(--muted); }
+
+/* Строка места — одна на квартал и на список: число мероприятий, имя, итог */
+.w-apanel__rows { flex: 1; min-height: 0; overflow: auto; }
+.w-arow { position: relative; width: 100%; min-height: 60px; display: grid; grid-template-columns: 40px minmax(0, 1fr) 10px; align-items: center; gap: 12px; padding: 8px 18px 8px 16px; border: 0; border-bottom: 1px solid var(--line-2); background: transparent; color: var(--ink); text-align: left; }
+.w-arow:last-child { border-bottom: 0; }
+.w-arow:hover { background: var(--sunk); }
+.w-arow:focus-visible { outline-offset: -2px; }
+.w-arow__n { display: grid; place-items: center; height: 40px; border-radius: var(--r-sm); background: var(--select); font: 800 18px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.w-arow__t { min-width: 0; display: grid; gap: 2px; }
+.w-arow__t b { font: 600 14.5px/19px var(--f-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-arow__t small { font: 500 13px/16px var(--f-text); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-arow__chev { width: 8px; height: 8px; border-right: 2px solid var(--soft); border-top: 2px solid var(--soft); border-radius: 1px; transform: rotate(45deg); }
+
+.w-stage.is-sm .w-apanel__head { padding: 16px 14px 12px 18px; }
+.w-stage.is-sm :is(.w-apanel__stats, .w-apanel__body) { padding-inline: 18px; }
+.w-stage.is-sm .w-apanel__back { min-height: 44px; margin-top: -10px; }
+.w-stage.is-sm .w-apanel__close { width: 44px; height: 44px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .w-plaque.w-apanel { animation: none; }
+}

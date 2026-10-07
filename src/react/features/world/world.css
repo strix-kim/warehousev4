@@ -19,8 +19,10 @@
 /* Над целью движок ставит контейнеру is-pick */
 .w-scene.is-pick canvas { cursor: pointer; }
 /* Слой CSS2DRenderer: размер ему пишет движок, display его детям — сам рендерер.
-   Мышь слой пропускает к сцене; ловит её только плашка вывески (world-hud.css). */
-.w-labels { position: absolute; inset: 0; pointer-events: none; }
+   Мышь слой пропускает к сцене; ловит её только плашка вывески (world-hud.css).
+   z-index: 0 — свой контекст наложения: рендерер пишет подписям z-index по дальности,
+   и без него ближняя подпись («плюс» пустого места) вставала поверх панелей обвязки. */
+.w-labels { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
 
 .w-stage__state { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; margin: 0; padding: 24px; background: var(--bg); }
 .w-stage__state > * { width: min(100%, 460px); }

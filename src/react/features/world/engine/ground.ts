@@ -31,15 +31,18 @@ export function ground(ctx: WorldCtx, parent: THREE.Object3D, size: number) {
 
 // Дорожки — короткие светлые полосы без бордюров; два толстых фонаря.
 // Главная дорога — вдоль фронта, от площадки гаража направо за край сетки (выезд);
-// к ней от входа в офис и от рампы склада — по прямой полосе.
+// к ней от входа в офис и от рампы склада — по прямой полосе. С «Площадками» справа
+// дорога кампуса кончается на краю сетки: дальше её ведёт карта (zones/layout.ts)
+// своими материалами — иначе выезд гас бы вместе с кампусом посреди промежутка.
 export function roads(ctx: WorldCtx, k: Kit) {
   const { P, roles } = ctx.style
   const road = flat(ctx.style, P.road), mark = flat(ctx.style, P.mark)
   const [OX, OZ] = POS.office, [WX, WZ] = POS.warehouse, [GX] = POS.garage, r0 = ROAD_Z - 1.25
+  const end = CAMPUS_HALF + (ctx.zones.includes('venues') ? 0 : 4)
   const rect = (x0: number, x1: number, z0: number, z1: number) => k(road, x1 - x0, 0.04, z1 - z0, (x0 + x1) / 2, 0, (z0 + z1) / 2)
-  rect(GX - 8, CAMPUS_HALF + 4, r0, r0 + 2.5)
+  rect(GX - 8, end, r0, r0 + 2.5)
   // Осевая пунктиром --ctl: без неё полотно --line на фоне --bg не читается как дорога
-  for (let x = GX - 7; x < CAMPUS_HALF + 4; x += 2) k(mark, 1, 0.05, 0.14, x + 0.5, 0, ROAD_Z)
+  for (let x = GX - 7; x < end; x += 2) k(mark, 1, 0.05, 0.14, x + 0.5, 0, ROAD_Z)
   rect(WX - 5.25, WX - 2.75, WZ + 6.5, r0)
   rect(OX + 1.1, OX + 3.4, OZ + 4.1, r0)
   const lamps: Array<[number, number]> = [[OX + 5, r0 - 1.2], [WX - 6.6, WZ + 9]]

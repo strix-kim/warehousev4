@@ -4,15 +4,17 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CSS2DRenderer, type CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
-import { isAddId, WORLD_ZONES, type CameraPose, type WorldStore, type WorldTexts, type WorldZone } from '../worldStore'
+import type { CameraPose, WorldStore, WorldTexts, WorldZone } from '../worldStore'
 import type { WorldData } from '../data/types'
-import { createLimit, fit, framePoints, limitTo, placeCamera, pullIn, readPose, restorePose, startFlight, tickFlight, type Flight } from './camera'
+import { createLimit, fit, framePoints, limitTo, placeCamera, pullIn, readPose, restorePose, tickFlight, type Flight } from './camera'
 import { still, type Glide } from './ease'
 import type { Gate } from './groundLabel'
 import { createHudLayout } from './hudLayout'
-import { bindPointer, collectPicks } from './pointer'
+import { createPanelShift } from './panelShift'
+import { bindPointer } from './pointer'
 import { createSelection, type Fence, type Plus, type Ring } from './selection'
-import { buildMap, retextGates, tickZones, zoneLabels } from './zones/layout'
+import { buildMap, retextGates, tickZones } from './zones/layout'
+import { createZoneTravel } from './zoneTravel'
 import type { WorldLook } from '../settings'
 import { createStyle, disposeStyle, restyle, type WorldStyle } from './style'
 import { readTokens } from './tokens'
@@ -115,10 +117,12 @@ export type World = {
   dispose: () => void
 }
 
-// Освободить всё, что висит на узле: геометрии, материалы и их текстуры
+// Освободить всё, что висит на узле: геометрии, материалы и их текстуры, буферы
+// матриц InstancedMesh (ограды участков)
 function release(root: THREE.Object3D) {
   root.traverse((o) => {
     const { geometry, material } = o as Partial<THREE.Mesh>
+    if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose()
     geometry?.dispose()
     for (const m of Array.isArray(material) ? material : material ? [material] : []) {
       (m as THREE.MeshBasicMaterial).map?.dispose()
@@ -223,6 +227,7 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     tickZones(ctx, now, deps.store.getState().hover)
     for (const tick of ctx.ticks) tick(now)
     selection.tick(now)
+    panelShift(now)
     renderer.render(scene, camera)
     css2d.render(scene, camera)
     hud.layout(now)
@@ -237,6 +242,7 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
   ctx.invalidate = () => { if (deps.reducedMotion && !disposed) requestRender() }
   const selection = createSelection(ctx, deps.store, deps.reducedMotion)
   const hud = createHudLayout(ctx, deps.store, deps.reducedMotion)
+  const panelShift = createPanelShift(ctx, deps.store, deps.reducedMotion)
   const unbindPointer = bindPointer(ctx, deps)
 
   const isCompact = () => container.clientWidth < HUD_COMPACT_WIDTH
@@ -249,63 +255,8 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     hud.dirty()   // он же просит кадр неподвижному миру
   })
 
-  // Камера встала на зону: позу покоя считаем заново (окно могло смениться), кнопки на
-  // земле — под новую зону, нажатая гаснет
-  function land() {
-    ctx.flight = null
-    controls.enabled = true
-    ctx.zoneShown = ctx.zone
-    for (const gate of ctx.gates.values()) gate.lit = false
-    ctx.userMoved = false
-    placeCamera(ctx, isCompact())
-    deps.store.setState({ flying: false })
-    hud.dirty()
-  }
-
-  // Зона из адреса (последняя просьба оболочки) и зона под камерой: расходятся, пока у
-  // запрошенной нет данных
-  let wanted: WorldZone = deps.zone ?? 'campus'
-  // Сменить зону под камерой. fly — переезд по карте; иначе камера встаёт сразу
-  // (неподвижный мир, сборка мира, пропавшая зона).
-  const enterZone = (to: WorldZone, fly: boolean) => {
-    const from = ctx.zone
-    if (ctx.flight) land()
-    ctx.zone = to
-    limitTo(ctx.limit, to)
-    zoneLabels(ctx)
-    deps.store.setState({ zone: to, hover: null, pick: null, flying: fly })
-    if (fly) startFlight(ctx, from, isCompact(), performance.now())
-    else {
-      ctx.zoneShown = to
-      // Без переезда приглушение не перетекает, а встаёт
-      for (const zone of WORLD_ZONES) ctx.zoneDim[zone] = still(zone === to ? 0 : 1)
-      ctx.userMoved = false
-      if (placed) placeCamera(ctx, isCompact())
-    }
-    hud.dirty()
-  }
-  const goZone = (zone: WorldZone) => {
-    if (disposed) return
-    wanted = zone
-    const to = ctx.zones.includes(zone) ? zone : 'campus'
-    if (to !== ctx.zone) enterZone(to, !deps.reducedMotion && seenFrame)
-  }
-
-  // Клик по кнопке зоны: она загорается и держит свет до посадки; зону меняет адрес
-  // (оболочка зовёт goZone). Переезд не начался — короткая вспышка.
-  ctx.activate = (id) => {
-    const gate = ctx.gates.get(id)
-    if (!gate) {
-      // «Плюс» — действие, а не выбор
-      if (!isAddId(id)) deps.store.setState({ pick: id })
-      deps.onActivate?.(id)
-      return
-    }
-    gate.lit = true
-    ctx.invalidate()
-    deps.onZone?.(gate.to)
-    window.setTimeout(() => { if (!ctx.flight && gate.lit) { gate.lit = false; ctx.invalidate() } }, 260)
-  }
+  const travel = createZoneTravel(ctx, deps, { hud, isCompact, seenFrame: () => seenFrame, placed: () => placed, disposed: () => disposed })
+  const { land, goZone } = travel
 
   const onContextLost = () => deps.onContextLost?.()
 
@@ -365,19 +316,11 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     const before = ctx.zones
     scene.add(buildMap(ctx, data, texts))
     ctx.framePts = framePoints(ctx)
-    collectPicks(ctx)
     const same = before.length === ctx.zones.length && before.every((zone, i) => zone === ctx.zones[i])
     // Карта — новым объектом: оболочка рисует в элементы порталом и следит за сменой.
     // Состав зон — тем же массивом, пока не изменился.
     deps.store.setState({ labels: new Map([...ctx.labels].map(([id, o]) => [id, o.element])), zones: same ? deps.store.getState().zones : [...ctx.zones] })
-    // Зона из адреса могла появиться (данные пришли) или пропасть: камера встаёт без переезда
-    const to = ctx.zones.includes(wanted) ? wanted : 'campus'
-    if (to !== ctx.zone) enterZone(to, false)
-    else {
-      zoneLabels(ctx)
-      // У кампуса появились или пропали соседи — в рамку вошли или вышли их кнопки
-      if (!same && placed && !ctx.userMoved) placeCamera(ctx, isCompact())
-    }
+    travel.settle(same)
     selection.rebuilt()
     hud.dirty()
   }
