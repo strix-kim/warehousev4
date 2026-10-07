@@ -301,7 +301,7 @@ export function ProjectStaffSection({ project }: {
               <>
                 <div className="project-staff-export">
                   {/* Язык бумаги, а не интерфейса — та же пара кнопок, что в
-                      EventDocumentFields. */}
+                      дроверах «на мероприятие» (состав, машины). */}
                   <span className="project-staff-export__lang">
                     {tr('Язык документа', 'Hujjat tili')}
                     <span className="language-switch" role="group" aria-label={tr('Язык документа', 'Hujjat tili')}>

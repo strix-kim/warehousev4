@@ -36,11 +36,6 @@
 .hall-count-stepper button:disabled { color: var(--faint); opacity: .55; }
 .hall-count-stepper output { color: var(--ink); font-size: 16px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
 
-/* «Повторить» в подсказке поля «Мероприятие» — ссылкой в строке текста. Своё
-   правило, а не .venue-field__retry: тот стиль приезжает с VenueField, а в
-   дровере плана его может не быть в каскаде. */
-.plan-project-field__retry { padding: 0; border: 0; color: inherit; background: none; font: inherit; text-decoration: underline; }
-
 @media (max-width: 820px) {
   .hall-count-stepper { width: 100%; }
 }

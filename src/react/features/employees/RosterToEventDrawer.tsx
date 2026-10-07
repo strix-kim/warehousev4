@@ -1,22 +1,19 @@
-import { CalendarDays, CircleAlert, FileSpreadsheet, Save, X } from 'lucide-react'
+import { CircleAlert, FileSpreadsheet, Save, X } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { pickDocumentPhoto, type EmployeePhotoRef } from './api'
 import { addEmployeesToProject, fetchProjectStaffCount, rosterErrorText } from './rosterApi'
 import { employeeFullName, type EmployeeListItem } from './types'
-import { AppDatePicker } from '../../components/AppDatePicker'
-import { AppSelect } from '../../components/AppSelect'
 import { DrawerLayer } from '../../components/DrawerLayer'
-import { RetryButton } from '../../components/ErrorState'
+import { ProjectChoiceField, useProjectChoice } from '../../components/ProjectChoiceField'
 import { UnsavedPrompt } from '../../components/UnsavedPrompt'
-import { VenueField } from '../../components/VenueField'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import { useGuardedClose } from '../../lib/useGuardedClose'
 import { useModalLayer } from '../../lib/useModalLayer'
 import type { EventDocumentMeta } from '../../lib/xlsx/eventDocument'
-import { createProject, fetchProjectBriefs, projectErrorText } from '../projects/api'
-import { formatProjectPeriod, type ProjectBrief, type ProjectInput } from '../projects/types'
+import { projectErrorText } from '../projects/api'
+import type { ProjectBrief } from '../projects/types'
 
 // Фаза одного нажатия. Союзом, а не флагами: «готовим» без счётчика и «готово»
 // без числа непрочитанных фото — состояния, которых не бывает.
@@ -32,8 +29,6 @@ export type RosterExportRun = (meta: EventDocumentMeta, options: {
   onProgress: (done: number, total: number) => void
   signal: AbortSignal
 }) => Promise<{ failed: number }>
-
-const EMPTY_DRAFT: ProjectInput = { name: '', clientName: '', dateFrom: '', dateTo: '', venueId: null, description: '' }
 
 // «Состав на мероприятие»: отмеченных в реестре людей записываем в состав
 // выбранного либо тут же заведённого мероприятия. Разовой выгрузки без записи
@@ -54,12 +49,9 @@ export function RosterToEventDrawer({ employees, photos, photosKnown, onClose, o
   onExport: RosterExportRun
 }) {
   const { tr, locale } = useLanguage()
-  const [projects, setProjects] = useState<ProjectBrief[]>([])
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'failed'>('loading')
-  const [reloadKey, setReloadKey] = useState(0)
-  const [mode, setMode] = useState<'existing' | 'new'>('existing')
-  const [projectId, setProjectId] = useState('')
-  const [draft, setDraft] = useState<ProjectInput>(EMPTY_DRAFT)
+  // Выбор «существующее / новое» — общий с планом залов и списком машин.
+  const choice = useProjectChoice({ report: { route: '/employees', source: 'roster-projects' } })
+  const { mode, projectId, selected, hasDate } = choice
   // Язык документа по умолчанию UZ: бумагу на объект подают по-узбекски, а
   // интерфейс у большинства русский — совпадать этим двум незачем.
   const [language, setLanguage] = useState<EventDocumentMeta['language']>('uz')
@@ -79,26 +71,6 @@ export function RosterToEventDrawer({ employees, photos, photosKnown, onClose, o
   useEffect(() => () => abortRef.current?.abort(), [])
 
   useEffect(() => {
-    let isCurrent = true
-    setLoadState('loading')
-    fetchProjectBriefs()
-      .then((rows) => {
-        if (!isCurrent) return
-        setProjects(rows)
-        setLoadState('ready')
-        // Выбирать не из чего — сразу форма нового: пустой список с подписью
-        // «мероприятий нет» был бы лишним шагом.
-        if (rows.length === 0) setMode('new')
-      })
-      .catch((error: unknown) => {
-        if (!isCurrent) return
-        setLoadState('failed')
-        reportAppError(error, { scope: 'loader', route: '/employees', detail: { source: 'roster-projects' } })
-      })
-    return () => { isCurrent = false }
-  }, [reloadKey])
-
-  useEffect(() => {
     if (!projectId) return
     let isCurrent = true
     setStaffCount(null)
@@ -109,26 +81,17 @@ export function RosterToEventDrawer({ employees, photos, photosKnown, onClose, o
     return () => { isCurrent = false }
   }, [projectId])
 
-  const patch = (fields: Partial<ProjectInput>) => setDraft((current) => ({ ...current, ...fields }))
-  const selected = mode === 'existing' ? projects.find((project) => project.id === projectId) ?? null : null
-
   // Клиентская проверка здесь — подсказка, а не защита: период держит
   // projects_dates_check, дубль — projects_identity_key, повтор человека —
   // project_staff_member_key. Кнопку запирает только заведомо мёртвый запрос:
   // мероприятие не выбрано либо у нового нет названия.
-  const nameEmpty = !draft.name.trim()
-  const rangeError = Boolean(draft.dateFrom && draft.dateTo && draft.dateTo < draft.dateFrom)
-  const endWithoutStart = Boolean(draft.dateTo && !draft.dateFrom)
   const isBusy = phase.kind === 'saving' || phase.kind === 'preparing'
-  const canSave = employees.length > 0 && (mode === 'existing' ? Boolean(selected) : !nameEmpty)
-  // Документу нужна дата начала: из неё складывается фраза периода в шапке
-  // (EventDocumentMeta.dateFrom обязателен). Состав сохраняется и без даты.
-  const hasDate = mode === 'existing' ? Boolean(selected?.date_from) : Boolean(draft.dateFrom)
+  // Состав сохраняется и без даты начала; Excel без неё не собрать (hasDate).
+  const canSave = employees.length > 0 && choice.isReady
 
-  // Терять есть что, пока набранные реквизиты нового мероприятия не записаны:
-  // после создания черновик очищается (см. resolveProject). Выбор из списка,
-  // язык и галка — выбор, а не набранная работа.
-  const isDirty = (Object.keys(EMPTY_DRAFT) as Array<keyof ProjectInput>).some((key) => draft[key] !== EMPTY_DRAFT[key])
+  // Терять есть что, пока набранные реквизиты нового мероприятия не записаны.
+  // Выбор из списка, язык и галка — выбор, а не набранная работа.
+  const isDirty = choice.isDirty
   // Во время записи и сборки не спрашиваем: закрытие здесь — отмена скачивания,
   // а уход на мероприятие после записи — не потеря ввода.
   const { requestClose, isPrompting, confirmClose, keepEditing } = useGuardedClose(isDirty && !isBusy, onClose)
@@ -138,32 +101,25 @@ export function RosterToEventDrawer({ employees, photos, photosKnown, onClose, o
   // что и миниатюры списка, чтобы сводка не расходилась с бумагой.
   const withoutPhoto = employees.filter((employee) => !pickDocumentPhoto(employee, photos.get(employee.id)))
 
-  // Мероприятие, в которое пишем. Новое создаётся ОДИН раз: после создания оно
-  // встаёт в список выбранным, а форма очищается — иначе повтор после отказа
-  // записи состава создавал бы его снова и упирался в projects_identity_key.
-  async function resolveProject(): Promise<ProjectBrief> {
-    if (selected) return selected
-    const created = await createProject(draft)
-    setProjects((current) => [created, ...current])
-    setProjectId(created.id)
-    setMode('existing')
-    setDraft(EMPTY_DRAFT)
-    return created
-  }
-
   async function run(withFile: boolean) {
     if (!canSave || isBusy || (withFile && !hasDate)) return
     const controller = new AbortController()
     abortRef.current = controller
     setPhase({ kind: 'saving' })
 
-    let project: ProjectBrief
+    // Новое мероприятие создаётся здесь и один раз — см. useProjectChoice.ensure.
+    let project: ProjectBrief | null
     try {
-      project = await resolveProject()
+      project = await choice.ensure()
     } catch (error) {
       if (controller.signal.aborted) return
       reportAppError(error, { scope: 'loader', route: '/employees', detail: { source: 'roster-project' } })
       setPhase({ kind: 'error', text: projectErrorText(error, tr) })
+      return
+    }
+    // canSave такого не пускает; ветка — для типа, а не для человека.
+    if (!project) {
+      setPhase({ kind: 'idle' })
       return
     }
 
@@ -209,27 +165,6 @@ export function RosterToEventDrawer({ employees, photos, photosKnown, onClose, o
     }
   }
 
-  const datePickerLabels = {
-    locale,
-    placeholder: tr('Не указана', 'Ko‘rsatilmagan'),
-    todayLabel: tr('Сегодня', 'Bugun'),
-    clearLabel: tr('Очистить', 'Tozalash'),
-    previousMonthLabel: tr('Предыдущий месяц', 'Oldingi oy'),
-    nextMonthLabel: tr('Следующий месяц', 'Keyingi oy'),
-  }
-
-  const modes: { value: 'existing' | 'new'; label: string }[] = [
-    { value: 'existing', label: tr('Существующее', 'Mavjud') },
-    { value: 'new', label: tr('Новое мероприятие', 'Yangi tadbir') },
-  ]
-
-  // Первый пункт — приглашение: AppSelect показывает options[0], когда значения
-  // нет в списке, и чужое мероприятие «по умолчанию» было бы враньём.
-  const projectOptions = [
-    { value: '', label: loadState === 'loading' ? tr('Загружаем мероприятия…', 'Tadbirlar yuklanmoqda…') : tr('Выберите мероприятие', 'Tadbirni tanlang') },
-    ...projects.map((project) => ({ value: project.id, label: `${project.name} · ${formatProjectPeriod(project.date_from, project.date_to, locale, tr)}` })),
-  ]
-
   return (
     <DrawerLayer ariaLabel={tr('Состав на мероприятие', 'Tadbir tarkibi')} onRequestClose={requestClose} className="drawer">
       <div className="drawer__header">
@@ -256,78 +191,7 @@ export function RosterToEventDrawer({ employees, photos, photosKnown, onClose, o
         )}
       </AnimatePresence>
 
-      <div className="segmented" role="group" aria-label={tr('Куда записать состав', 'Tarkibni qayerga yozish')}>
-        {modes.map((item) => (
-          <button key={item.value} type="button" aria-pressed={mode === item.value} disabled={isBusy} onClick={() => setMode(item.value)}>
-            {mode === item.value && <span className="segmented__thumb" />}
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="event-document-fields">
-        {mode === 'existing' ? (
-          <div className="field">
-            <span>{tr('Мероприятие', 'Tadbir')} *</span>
-            <AppSelect value={projectId} options={projectOptions} onChange={setProjectId} ariaLabel={tr('Мероприятие', 'Tadbir')} />
-            {loadState === 'failed' && (
-              <>
-                <small className="field-hint field-hint--error">{tr('Не удалось загрузить мероприятия.', 'Tadbirlarni yuklab bo‘lmadi.')}</small>
-                <RetryButton onClick={() => setReloadKey((value) => value + 1)} />
-              </>
-            )}
-            {loadState === 'ready' && projects.length === 0 && (
-              <small className="field-hint">{tr('Мероприятий пока нет — заведите новое.', 'Hozircha tadbirlar yo‘q — yangisini yarating.')}</small>
-            )}
-          </div>
-        ) : (
-          <>
-            <label className="field">
-              <span>{tr('Название', 'Nomi')} *</span>
-              <input
-                value={draft.name}
-                disabled={isBusy}
-                onChange={(event) => patch({ name: event.target.value })}
-                placeholder={tr('Например, Форум в Hyatt', 'Masalan, Hyatt forumi')}
-              />
-            </label>
-
-            <label className="field">
-              <span>{tr('Заказчик', 'Buyurtmachi')}</span>
-              <input
-                value={draft.clientName}
-                disabled={isBusy}
-                onChange={(event) => patch({ clientName: event.target.value })}
-                placeholder={tr('Компания или человек', 'Kompaniya yoki shaxs')}
-              />
-            </label>
-
-            <div className="field">
-              <span><CalendarDays size={13} /> {tr('Дата начала', 'Boshlanish sanasi')}</span>
-              <AppDatePicker
-                value={draft.dateFrom}
-                onChange={(next) => patch({ dateFrom: next })}
-                ariaLabel={tr('Дата начала', 'Boshlanish sanasi')}
-                {...datePickerLabels}
-              />
-            </div>
-
-            <div className="field">
-              <span>{tr('Дата окончания', 'Tugash sanasi')} <small>{tr('Один день — оставьте пустым', 'Bir kun bo‘lsa — bo‘sh qoldiring')}</small></span>
-              <AppDatePicker
-                value={draft.dateTo}
-                onChange={(next) => patch({ dateTo: next })}
-                ariaLabel={tr('Дата окончания', 'Tugash sanasi')}
-                {...datePickerLabels}
-              />
-              {rangeError && <small className="field-hint field-hint--error">{tr('Окончание раньше начала', 'Tugash sanasi boshlanishdan oldin')}</small>}
-              {endWithoutStart && <small className="field-hint field-hint--error">{tr('Сначала укажите дату начала', 'Avval boshlanish sanasini ko‘rsating')}</small>}
-            </div>
-
-            <VenueField value={draft.venueId} onChange={(venueId) => patch({ venueId })} disabled={isBusy} />
-          </>
-        )}
-
+      <ProjectChoiceField choice={choice} groupLabel={tr('Куда записать состав', 'Tarkibni qayerga yozish')} disabled={isBusy}>
         {/* Язык бумаги, а не интерфейса: в UZ-документ уходят узбекские заголовки,
             даже если человек работает в русском интерфейсе. */}
         <div className="field">
@@ -344,7 +208,7 @@ export function RosterToEventDrawer({ employees, photos, photosKnown, onClose, o
             <span>{tr('С адресом — графа «Место жительства» в Excel', 'Manzil bilan — Excelda «Yashash manzili» ustuni')}</span>
           </label>
         </div>
-      </div>
+      </ProjectChoiceField>
 
       <div className="event-export-summary">
         {/* В файл идут отмеченные сейчас люди, а не весь состав: говорим это
