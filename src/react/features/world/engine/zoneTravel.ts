@@ -1,6 +1,7 @@
 // Зона под камерой и переезд между зонами — часть экземпляра мира, вынесенная из
 // createWorld.ts: посадка камеры, смена зоны, просьба оболочки (goZone), клик по
 // объекту сцены и кнопке на земле (ctx.activate).
+import type { Object3D } from 'three'
 import { isAddId, WORLD_ZONES, type WorldZone } from '../worldStore'
 import { limitTo, placeCamera, startFlight } from './camera'
 import type { WorldCtx, WorldDeps } from './createWorld'
@@ -17,6 +18,15 @@ type TravelEnv = {
   seenFrame: () => boolean
   placed: () => boolean
   disposed: () => boolean
+  // Камера встала на зону — после переезда или сразу: отложенная подводка (World.focus)
+  landed: () => void
+}
+
+// Зона объекта — по группе зоны среди предков (userData.zone ставит buildMap); у общего
+// карты (кнопки зон, дорога) её нет
+export function zoneOf(o: Object3D | null | undefined): WorldZone | null {
+  for (; o; o = o.parent) if (o.userData.zone) return o.userData.zone as WorldZone
+  return null
 }
 
 export function createZoneTravel(ctx: WorldCtx, deps: WorldDeps, env: TravelEnv) {
@@ -38,6 +48,7 @@ export function createZoneTravel(ctx: WorldCtx, deps: WorldDeps, env: TravelEnv)
     placeCamera(ctx, env.isCompact())
     deps.store.setState({ flying: false })
     env.hud.dirty()
+    env.landed()
   }
 
   // Зона из адреса (последняя просьба оболочки) и зона под камерой: расходятся, пока у
@@ -61,6 +72,7 @@ export function createZoneTravel(ctx: WorldCtx, deps: WorldDeps, env: TravelEnv)
       if (env.placed()) placeCamera(ctx, env.isCompact())
     }
     env.hud.dirty()
+    if (!fly) env.landed()
   }
   const goZone = (zone: WorldZone) => {
     if (env.disposed()) return

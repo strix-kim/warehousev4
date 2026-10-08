@@ -103,6 +103,14 @@ export type WorldTexts = { zones: Record<WorldZone, { name: string; sub: string 
    WorldData.venues. Пальцем и в компактной сцене части участка отвечают как 'lot'.
    Клик по пустой земле своей зоны (не кампуса) снимает pick. Смена зоны снимает
    hover и pick. Клик по «плюсу» (isAddId) pick не ставит — только deps.onActivate.
+   Выбранный участок живёт и в адресе (?lot=<id мероприятия>, без части): хозяин —
+   адрес, синхронизацию ведёт WorldStage; движок адреса не знает.
+
+   Дровер действия (modal). Пока поверх сцены открыт дровер действия, modal = true.
+   Пишет флаг только хост действий (actions/), и он же обязан снять его при закрытии.
+   Под флагом выбор не трогают: панель участка не слушает Esc (иначе один Esc закрыл бы
+   и дровер, и панель — их обработчики висят на window и document порознь), движок не
+   активирует цели.
 
    Классы якорей — по ним раскладка решает, что делать с подписью:
      w-sign — вывеска на ножке: внутри обязателен .w-sign__board, движок ищет ей место
@@ -136,6 +144,8 @@ export type WorldState = {
   labels: ReadonlyMap<string, HTMLElement>
   // Сцена уже 920 px: вывески и клавиши переходят в компактный вид
   hudCompact: boolean
+  // Поверх сцены открыт дровер действия (контракт выше, «Дровер действия»)
+  modal: boolean
 }
 
 // Поза камеры числами, без Vector3: её держит оболочка между пересозданиями мира.
@@ -152,7 +162,7 @@ export type WorldStore = {
   subscribe: (listener: () => void) => () => void
 }
 
-const INITIAL: WorldState = { zone: 'campus', zones: ['campus'], flying: false, hover: null, pick: null, labels: new Map(), hudCompact: false }
+const INITIAL: WorldState = { zone: 'campus', zones: ['campus'], flying: false, hover: null, pick: null, labels: new Map(), hudCompact: false, modal: false }
 
 export function createWorldStore(): WorldStore {
   let state = INITIAL

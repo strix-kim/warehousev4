@@ -3,7 +3,7 @@
 // владельцы значений остаются в своих фичах (home, lists, vehicles, employees,
 // projects). Участки и архив — из реестра мероприятий (projects:list): его сбрасывают
 // записи мероприятий, списков, состава и планов залов.
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { todayDateValue } from '../../../lib/date'
 import { reportAppError } from '../../../lib/reportAppError'
 import { fetchEmployeeList, readCachedEmployeeList } from '../../employees/api'
@@ -16,9 +16,11 @@ import type { WorldArchivePlace, WorldData, WorldLot } from './types'
 
 type Mock = { venues: WorldLot[]; archive: WorldArchivePlace[] }
 
-// null — ни один источник ещё не ответил и в кэше пусто: кампус стоит без машин,
+// data: null — ни один источник ещё не ответил и в кэше пусто: кампус стоит без машин,
 // фигурок и чисел. Ссылка меняется только вместе с ответом источника.
-export function useWorldData(): WorldData | null {
+// reload — перечитать реестр мероприятий мимо кэша после записи из мира: участки и
+// архив пересобираются тем же путём, что и на свежий ответ при входе.
+export function useWorldData(): { data: WorldData | null; reload: () => Promise<void> } {
   // Первый кадр — из кэша, затем свежий ответ (как на главной). Запрос списков —
   // тот же, что у плитки главной и первой страницы /lists: общий ключ и то же число.
   const [listsQuery] = useState(() => ({ page: 1, search: '', pageSize: preferredListsPageSize() }))
@@ -81,7 +83,21 @@ export function useWorldData(): WorldData | null {
   // на каждый ответ машин или списков (createWorld сравнивает venues и archive по ссылке)
   const split = useMemo(() => (projects ? splitProjects(projects, today) : null), [projects, today])
 
-  return useMemo(() => {
+  const isMounted = useRef(true)
+  useEffect(() => {
+    isMounted.current = true
+    return () => { isMounted.current = false }
+  }, [])
+  // Ключ projects:list остаётся у своей фичи: запрос идёт её же функцией, она же кладёт
+  // ответ в кэш. Промис не падает: отказ оставляет мир как был и след в журнале. При
+  // живой записи кэша отказ сети сюда не доходит вовсе — cachedQuery отдаёт прежнее
+  // значение (gotchas §4), и мир так же остаётся прежним.
+  const reload = useCallback(() => fetchProjects({ bypassCache: true }).then(
+    (value) => { if (isMounted.current) setProjects(value) },
+    (error: unknown) => { reportAppError(error, { scope: 'loader', route: window.location.pathname, detail: { source: 'world-projects-reload' } }) },
+  ), [])
+
+  const data = useMemo(() => {
     const { vehicles, employees } = crowd
     if (!summary && !lists && !vehicles && !employees && !split && !mock) return null
     return {
@@ -99,4 +115,6 @@ export function useWorldData(): WorldData | null {
       },
     }
   }, [crowd, lists, mock, split, summary])
+
+  return useMemo(() => ({ data, reload }), [data, reload])
 }

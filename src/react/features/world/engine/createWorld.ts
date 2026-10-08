@@ -6,7 +6,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CSS2DRenderer, type CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import type { CameraPose, WorldStore, WorldTexts, WorldZone } from '../worldStore'
 import type { WorldData } from '../data/types'
-import { createLimit, fit, framePoints, limitTo, placeCamera, pullIn, readPose, restorePose, tickFlight, type Flight } from './camera'
+import { appear } from './appear'
+import { aimAt, createLimit, fit, framePoints, limitTo, placeCamera, pullIn, readPose, restorePose, tickFlight, type Flight } from './camera'
 import { still, type Glide } from './ease'
 import type { Gate } from './groundLabel'
 import { createHudLayout } from './hudLayout'
@@ -14,7 +15,7 @@ import { createPanelShift } from './panelShift'
 import { bindPointer } from './pointer'
 import { createSelection, type Fence, type Plus, type Ring } from './selection'
 import { buildMap, retextGates, tickZones } from './zones/layout'
-import { createZoneTravel } from './zoneTravel'
+import { createZoneTravel, zoneOf } from './zoneTravel'
 import type { WorldLook } from '../settings'
 import { createStyle, disposeStyle, restyle, type WorldStyle } from './style'
 import { readTokens } from './tokens'
@@ -114,6 +115,11 @@ export type World = {
   // Камера переезжает к зоне (неподвижный мир — мгновенно). Зоны без данных нет на
   // карте — камера остаётся на кампусе, а просьбу мир помнит до появления данных.
   goZone: (zone: WorldZone) => void
+  // Камера подъезжает к объекту по его id (неподвижный мир — мгновенно). Объект в другой
+  // зоне — сначала переезд в неё: зону просим у оболочки (onZone), как кнопка на земле, и
+  // смена зоны, как всегда, снимает выбор; в своей зоне pick не меняется. Незнакомый id —
+  // ничего.
+  focus: (id: string) => void
   dispose: () => void
 }
 
@@ -215,14 +221,21 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     limit: createLimit(),
     userMoved: false,
   }
-  controls.addEventListener('start', () => { ctx.userMoved = true })
+  // Подводка к объекту (focus): aim — камера едет к нему; aimNext — id объекта, к которому
+  // она подъедет, когда встанет на зону (объект в другой зоне или переезд ещё идёт)
+  let aim: Flight | null = null, aimNext: string | null = null
+  // Человек взял камеру сам — подводка отпускает её там, где застал
+  controls.addEventListener('start', () => { ctx.userMoved = true; aim = null })
 
   const tmp = new THREE.Vector3()
   let seenFrame = false
   const render = (now: number) => {
     if (ctx.flight) {
       // Переезд: камерой правит анимация, OrbitControls выключены
+      aim = null
       if (tickFlight(ctx, ctx.flight, now)) land()
+    } else if (aim) {
+      if (tickFlight(ctx, aim, now)) endAim()
     } else pullIn(ctx.limit, controls.target, camera.position, tmp)   // сдвиг камеры не уводит цель за пределы сцены
     tickZones(ctx, now, deps.store.getState().hover)
     for (const tick of ctx.ticks) tick(now)
@@ -251,11 +264,46 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     const compact = isCompact()
     deps.store.setState({ hudCompact: compact })
     if (ctx.flight) land()   // цель переезда посчитана под прежнее окно
+    else if (aim) endAim()
     else if (!ctx.userMoved) placeCamera(ctx, compact)
     hud.dirty()   // он же просит кадр неподвижному миру
   })
 
-  const travel = createZoneTravel(ctx, deps, { hud, isCompact, seenFrame: () => seenFrame, placed: () => placed, disposed: () => disposed })
+  // Подводка встала (или оборвана пересборкой): камера — в конечной позе. Поза теперь
+  // «своя», как после руки человека: ресайз не возвращает рабочий ракурс зоны.
+  const endAim = () => {
+    if (!aim) return
+    camera.position.copy(aim.p1)
+    controls.target.copy(aim.t1)
+    aim = null
+    controls.update()
+    ctx.userMoved = true
+    hud.dirty()   // он же просит кадр неподвижному миру
+  }
+  const focus = (id: string) => {
+    if (disposed) return
+    const root = ctx.roots.get(id), zone = zoneOf(root)
+    if (!root || !zone) return
+    aimNext = null
+    if (zone !== ctx.zone) {
+      // Хозяин зоны — адрес: просим оболочку, она позовёт goZone; подводка — с посадки
+      aimNext = id
+      if (deps.onZone) deps.onZone(zone)
+      else goZone(zone)
+      return
+    }
+    if (ctx.flight) { aimNext = id; return }
+    aim = aimAt(ctx, root, performance.now())
+    if (deps.reducedMotion || !seenFrame) endAim()
+  }
+  // Камера встала на зону: отложенная подводка — если объект ещё есть и зона его
+  const landed = () => {
+    const id = aimNext
+    aimNext = null
+    if (id && zoneOf(ctx.roots.get(id)) === ctx.zone) focus(id)
+  }
+
+  const travel = createZoneTravel(ctx, deps, { hud, isCompact, seenFrame: () => seenFrame, placed: () => placed, disposed: () => disposed, landed })
   const { land, goZone } = travel
 
   const onContextLost = () => deps.onContextLost?.()
@@ -323,14 +371,18 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     travel.settle(same)
     selection.rebuilt()
     hud.dirty()
+    // Новое в сцене появляется движением. Последним: рамка кадра и состояние выбора уже
+    // сняты с объектов в полный рост
+    appear(ctx)
   }
 
   // Пересборка наполнения: renderer, свет, камера и её поза остаются, выбор и наведение
   // возвращает selection.rebuilt() внутри build(). change — что меняется между сносом
   // и сборкой (облик); данным менять нечего, они уже лежат в data.
   const refill = (change?: () => void) => {
-    // Переезд целился в сцену, которой сейчас не станет
+    // Переезд и подводка целились в сцену, которой сейчас не станет
     if (ctx.flight) land()
+    endAim()
     // Всё, кроме света: что именно лежит в сцене, этот код не знает и знать не должен
     for (const o of [...scene.children]) {
       if ((o as THREE.Light).isLight) continue
@@ -395,7 +447,7 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
       requestRender()
     } else {
       renderer.setAnimationLoop((now) => {
-        if (!ctx.flight) controls.update()
+        if (!ctx.flight && !aim) controls.update()
         render(now)
       })
     }
@@ -404,5 +456,5 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     throw error
   }
 
-  return { store: deps.store, getPose: () => readPose(ctx), setStyle, setData, setTexts, goZone, dispose }
+  return { store: deps.store, getPose: () => readPose(ctx), setStyle, setData, setTexts, goZone, focus, dispose }
 }

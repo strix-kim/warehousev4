@@ -188,6 +188,30 @@ export function tickFlight(ctx: WorldCtx, flight: Flight, now: number) {
   return k >= 1
 }
 
+// Подводка к объекту (World.focus) в зоне под камерой: направление взгляда прежнее, цель —
+// основание объекта, дистанция — чтобы он вошёл в кадр с запасом, но не ближе AIM_NEAR:
+// рядом с мелким (грузовик, стол) должен читаться его участок. Кадр — тот же tickFlight;
+// OrbitControls при этом не выключаются: человек может перехватить камеру (createWorld).
+const AIM_MS = 600, AIM_NEAR = 34
+
+export function aimAt(ctx: WorldCtx, root: THREE.Object3D, now: number): Flight {
+  const { camera, controls } = ctx
+  // Сразу после пересборки матрицы предков ещё не считаны — кадра не было
+  root.updateWorldMatrix(true, true)
+  const box = new THREE.Box3().setFromObject(root), size = new THREE.Vector3()
+  const t1 = box.isEmpty() ? root.getWorldPosition(new THREE.Vector3()) : box.getCenter(new THREE.Vector3())
+  if (!box.isEmpty()) box.getSize(size)
+  t1.y = 0
+  // Радиус — по основанию и высоте; угол — меньший из полууглов кадра (на телефоне — по ширине)
+  const r = Math.max(Math.hypot(size.x, size.z) / 2, size.y)
+  const half = Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * Math.min(1, camera.aspect))
+  const dist = THREE.MathUtils.clamp(Math.max(AIM_NEAR, r / Math.sin(half) * 1.15), controls.minDistance, controls.maxDistance)
+  const p0 = camera.position.clone(), t0v = controls.target.clone()
+  const p1 = p0.clone().sub(t0v).normalize().multiplyScalar(dist).add(t1)
+  pullIn(ctx.limit, t1, p1)
+  return { t0: now, dur: AIM_MS, p0, t0v, p1, t1 }
+}
+
 export function readPose(ctx: WorldCtx): CameraPose {
   return { position: ctx.camera.position.toArray(), target: ctx.controls.target.toArray(), moved: ctx.userMoved }
 }

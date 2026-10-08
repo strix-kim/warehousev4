@@ -1,6 +1,6 @@
 import { ChevronRight, Lock, Plus, X } from 'lucide-react'
 import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { formatDayRange, formatMonthShort, parseDateValue } from '../../../lib/date'
 import { useLanguage } from '../../../lib/i18n'
 import { formatProjectPeriod } from '../../projects/types'
@@ -54,9 +54,10 @@ export function LotCard({ store, lot, part }: { store: WorldStore; lot: WorldLot
   const titleId = useId()
   const bodyRef = useRef<HTMLDivElement>(null)
   const { lists, plans, meals, staff } = useLotDetails(lot)
-  // Esc снимает выбор — как клик по пустой земле зоны
+  // Esc снимает выбор — как клик по пустой земле зоны. Под дровером действия (modal,
+  // контракт — worldStore.ts) Esc принадлежит дроверу: панель его не слушает.
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') store.setState({ pick: null }) }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !store.getState().modal) store.setState({ pick: null }) }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [store])
@@ -72,6 +73,11 @@ export function LotCard({ store, lot, part }: { store: WorldStore; lot: WorldLot
   const span = dateSpan(lot, locale)
   const count = (n: number, ru: [string, string, string], uz: string) => `${n.toLocaleString(locale)} ${tr(ruPlural(n, ...ru), uz)}`
   const { place } = lot
+  // Ссылки панели уводят со сцены push-переходом и несут адрес мира: интерьер по
+  // state.from возвращает «назад» на эту же запись (lib/returnTo.ts). Адрес уже с
+  // ?lot= — возврат откроет панель на этом участке.
+  const { pathname, search } = useLocation()
+  const leave = { from: pathname + search }
   const projectPath = `/projects/${lot.id}`
   const newListPath = `/lists/new?project=${lot.id}`
   const onClass = (...parts: WorldLotPart[]) => `w-vsec${parts.includes(part) ? ' is-on' : ''}`
@@ -84,7 +90,7 @@ export function LotCard({ store, lot, part }: { store: WorldStore; lot: WorldLot
   const empty = (note: string, action: string, to: string) => (
     <>
       <p className="w-vsec__note">{note}</p>
-      <Link className="button button--secondary" to={to}>{action}</Link>
+      <Link className="button button--secondary" to={to} state={leave}>{action}</Link>
     </>
   )
   const noLists = empty(tr('Списков нет', 'Ro‘yxatlar yo‘q'), tr('Создать список', 'Ro‘yxat yaratish'), newListPath)
@@ -108,12 +114,12 @@ export function LotCard({ store, lot, part }: { store: WorldStore; lot: WorldLot
           <div>
             <dt>{tr('Место', 'Joy')}</dt>
             {/* Площадка выбирается в реквизитах мероприятия — туда и ведёт строка */}
-            <dd>{place ? `${place.name}, ${place.city}` : <Link className="w-vlink" to={projectPath} aria-label={tr('Площадка не указана. Указать площадку', 'Maydon ko‘rsatilmagan. Maydonni ko‘rsatish')}>{tr('Указать площадку', 'Maydonni ko‘rsatish')}</Link>}</dd>
+            <dd>{place ? `${place.name}, ${place.city}` : <Link className="w-vlink" to={projectPath} state={leave} aria-label={tr('Площадка не указана. Указать площадку', 'Maydon ko‘rsatilmagan. Maydonni ko‘rsatish')}>{tr('Указать площадку', 'Maydonni ko‘rsatish')}</Link>}</dd>
           </div>
           <div><dt>{tr('Даты', 'Sanalar')}</dt><dd>{span ? span.text : tr('Не указаны', 'Ko‘rsatilmagan')}</dd></div>
         </dl>
         <p className="w-vpanel__open">
-          <Link className="button button--secondary" to={projectPath}>{tr('Открыть мероприятие', 'Tadbirni ochish')}</Link>
+          <Link className="button button--secondary" to={projectPath} state={leave}>{tr('Открыть мероприятие', 'Tadbirni ochish')}</Link>
         </p>
 
         <section className={onClass('truck', 'addtruck')}>
@@ -127,14 +133,14 @@ export function LotCard({ store, lot, part }: { store: WorldStore; lot: WorldLot
                 <ul className="w-vrows">
                   {rows.map((list) => (
                     <li key={list.id}>
-                      <Link className="w-vrow" to={`/lists/${list.id}/edit`}>
+                      <Link className="w-vrow" to={`/lists/${list.id}/edit`} state={leave}>
                         <span className="w-vrow__name">{list.name}</span>
                         <ChevronRight size={16} aria-hidden="true" />
                       </Link>
                     </li>
                   ))}
                   <li>
-                    <Link className="w-vrow w-vrow--add" to={newListPath}>
+                    <Link className="w-vrow w-vrow--add" to={newListPath} state={leave}>
                       <Plus size={16} aria-hidden="true" />
                       <span className="w-vrow__name">{tr('Добавить список', 'Ro‘yxat qo‘shish')}</span>
                     </Link>
@@ -153,7 +159,7 @@ export function LotCard({ store, lot, part }: { store: WorldStore; lot: WorldLot
                 <ul className="w-vrows">
                   {rows.map((plan) => (
                     <li key={plan.id}>
-                      <Link className="w-vrow" to={`/halls/${plan.id}`}>
+                      <Link className="w-vrow" to={`/halls/${plan.id}`} state={leave}>
                         <span className="w-vrow__name">{plan.name}</span>
                         <small>{formatProjectPeriod(plan.event_from, plan.event_to, locale, tr)}</small>
                         <ChevronRight size={16} aria-hidden="true" />
@@ -183,7 +189,7 @@ export function LotCard({ store, lot, part }: { store: WorldStore; lot: WorldLot
           </SectionBody>
           <ul className="w-vrows">
             <li>
-              <Link className="w-vrow" to={`${projectPath}/meals`}>
+              <Link className="w-vrow" to={`${projectPath}/meals`} state={leave}>
                 <span className="w-vrow__name">{tr('Открыть обеды', 'Ovqatlanishni ochish')}</span>
                 <ChevronRight size={16} aria-hidden="true" />
               </Link>
@@ -207,7 +213,7 @@ export function LotCard({ store, lot, part }: { store: WorldStore; lot: WorldLot
               </SectionBody>
               <ul className="w-vrows">
                 <li>
-                  <Link className="w-vrow" to={projectPath}>
+                  <Link className="w-vrow" to={projectPath} state={leave}>
                     <span className="w-vrow__name">{tr('Открыть состав', 'Tarkibni ochish')}</span>
                     <ChevronRight size={16} aria-hidden="true" />
                   </Link>

@@ -193,3 +193,23 @@
 @media (hover: none) { .w-plus__btn { border-style: solid; border-color: var(--ink); background: var(--card); color: var(--ink); box-shadow: var(--shadow-card); } }
 /* Reduced-motion: подпись появляется без разворота */
 @media (prefers-reduced-motion: reduce) { .w-plus__cap { transition: none; } }
+
+/* Тост — ответ мира на действие. Слева под плашкой дня: клавиши (слева снизу) и панель
+   участка (справа снизу) не задевает; в архиве место под днём занято итогом — тост ниже
+   него. Компактная сцена: во всю ширину под переключателем зон — над листом участка,
+   который снизу занимает до 56 % сцены. Само место (.w-toast) стоит всегда и без тоста
+   пустое, нулевого размера. */
+.w-toast { position: absolute; z-index: 2; left: 16px; top: 76px; max-width: min(420px, calc(100% - 32px)); }
+.w-stage:has(.w-atotal) .w-toast { top: 184px; }
+.w-toast__card { min-height: 48px; display: flex; align-items: center; gap: 4px; padding: 2px 2px 2px 16px; animation: w-toast-in .2s var(--ease-out); }
+@keyframes w-toast-in { from { opacity: 0; translate: 0 -8px; } }
+.w-toast__text { flex: 1; min-width: 0; padding: 6px 8px 6px 0; font: 600 14px/18px var(--f-text); overflow-wrap: anywhere; }
+/* Ссылка и крестик — цели 44 px */
+.w-toast__link { flex: none; min-height: 44px; display: flex; align-items: center; padding: 0 8px; border-radius: var(--r-md); color: var(--ink); font: 600 14px/18px var(--f-text); white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; }
+.w-toast__link:hover { background: var(--hover); }
+.w-toast__close { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: var(--r-md); background: transparent; color: var(--muted); transition: background-color .16s var(--ease-out), color .16s var(--ease-out); }
+.w-toast__close:hover { background: var(--hover); color: var(--ink); }
+.w-stage.is-sm .w-toast { left: 8px; right: 8px; top: 117px; max-width: none; }
+/* Один кампус: переключателя зон нет — тост сразу под плашкой дня */
+.w-stage.is-sm:not(:has(.w-zones)) .w-toast { top: 64px; }
+@media (prefers-reduced-motion: reduce) { .w-toast__card { animation: none; } }

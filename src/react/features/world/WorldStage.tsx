@@ -1,6 +1,6 @@
 import { MonitorOff } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { useLanguage } from '../../lib/i18n'
@@ -9,6 +9,7 @@ import { reportAppError } from '../../lib/reportAppError'
 // панели зон) правят общие классы и обязаны встать в бандл после world-hud.css
 import './world.css'
 import './hud/world-hud.css'
+import { useWorldActions } from './actions/useWorldActions'
 import { useWorldData } from './data/useWorldData'
 import { ArchivePanel } from './hud/ArchivePanel'
 import { DayCap } from './hud/DayCap'
@@ -23,7 +24,8 @@ import type { World } from './engine/createWorld'
 import { loadWorld } from './loadWorld'
 import type { WorldLook } from './settings'
 import { hasWebGL2, prefersReducedMotion } from './support'
-import { ADD_LOT_ID, createWorldStore, isAddId, isWorldZone, parseLotId, useWorldState, WORLD_SITES, type CameraPose, type WorldSiteId, type WorldTexts, type WorldZone } from './worldStore'
+import { savePose, takePose } from './worldMemory'
+import { createWorldStore, isAddId, isWorldZone, lotPartId, parseLotId, useWorldState, WORLD_SITES, type CameraPose, type WorldSiteId, type WorldTexts, type WorldZone } from './worldStore'
 
 // unsupported — WebGL2 нет; failed — чанк не приехал или мир не собрался;
 // lost — браузер отобрал контекст у живого мира
@@ -40,8 +42,6 @@ if (hot) hot.dispose((data) => { data.swapping = true })
 // Зоны, которые в dev по ?mock=on наполняет макет (fixtures.dev.ts) вместо реестра
 const MOCK_ZONES: readonly WorldZone[] = ['venues', 'archive']
 const NO_ZONES: readonly WorldZone[] = []
-// Раздел продукта за каждым зданием
-const SITE_ROUTES: Record<WorldSiteId, string> = { office: '/lists', warehouse: '/equipment', garage: '/vehicles' }
 
 type Props = {
   // Облик мира: палитра и тон контура. Смена на живом мире — без перезагрузки
@@ -55,23 +55,33 @@ type Props = {
 
 export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
   const { tr, locale } = useLanguage()
-  const navigate = useNavigate()
   // Зона живёт в адресе (?zone=): хозяин — адрес, мир только догоняет. Незнакомое
   // значение — кампус; зона без данных — тоже кампус (решает движок), адрес не трогаем:
   // данные могут ещё прийти.
   const [params, setParams] = useSearchParams()
   const zoneParam = params.get('zone')
-  const wantedZone: WorldZone = isWorldZone(zoneParam) ? zoneParam : 'campus'
+  // Выбранный участок — тоже в адресе (?lot=<id мероприятия>). Участки стоят только на
+  // «Площадках»: с параметром камера идёт туда, что бы ни стояло в zone.
+  const lotParam = params.get('lot') || null
+  const wantedZone: WorldZone = lotParam ? 'venues' : isWorldZone(zoneParam) ? zoneParam : 'campus'
+  // Запись истории, на которой стоит мир: по её ключу worldMemory держит позу камеры.
+  // Каждый replace зоны и участка даёт записи новый ключ — помним последний.
+  const entryKey = useLocation().key
+  const entryRef = useRef(entryKey)
+  useEffect(() => { entryRef.current = entryKey }, [entryKey])
   const slotRef = useRef<HTMLDivElement>(null)
   const [store] = useState(createWorldStore)
   // Одна ссылка и движку, и HUD: машины в сцене, числа вывесок и имена — из одного
   // объекта. null — данных нет, вывески стоят без чисел.
-  const data = useWorldData()
+  const { data } = useWorldData()
+  const { activate } = useWorldActions({ store, mock: data?.mock ?? false })
   const hover = useWorldState(store, (state) => state.hover)
   const zone = useWorldState(store, (state) => state.zone)
   const zones = useWorldState(store, (state) => state.zones)
   const labels = useWorldState(store, (state) => state.labels)
   const hudCompact = useWorldState(store, (state) => state.hudCompact)
+  // Мероприятие выбранного участка; часть участка (truck, plan…) в адрес не идёт
+  const pickLot = useWorldState(store, (state) => parseLotId(state.pick)?.venueId ?? null)
   const [status, setStatus] = useState<Status>(() => (hasWebGL2() ? 'loading' : 'unsupported'))
   const onFirstFrameRef = useRef(onFirstFrame)
   useEffect(() => { onFirstFrameRef.current = onFirstFrame }, [onFirstFrame])
@@ -107,40 +117,65 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
   }, [tr, locale, listCount, venueCount, placeCount])
   const textsRef = useRef(texts)
   // Зона — в адрес через replace: переезды по карте историю не плодят, «назад» уводит
-  // со страницы мира, а не по зонам (gotchas §7)
+  // со страницы мира, а не по зонам (gotchas §7). Участок остаётся на «Площадках»:
+  // с ним в адресе камера с них не уехала бы.
   const goZone = (next: WorldZone) => {
     setParams((prev) => {
       const query = new URLSearchParams(prev)
       if (next === 'campus') query.delete('zone')
       else query.set('zone', next)
+      if (next !== 'venues') query.delete('lot')
       return query
     }, { replace: true })
   }
   const goZoneRef = useRef(goZone)
   useEffect(() => { goZoneRef.current = goZone })
-  // Выбор и переход — один путь для вывески, клавиши и клика по зданию в сцене.
-  // Движок к этому моменту pick уже поставил: повторная запись того же id стор не будит.
-  // Участки и места — выбор без перехода: их показывают панели зон по pick из стора.
-  // «Плюс» ведёт туда, где недостающее создаётся: записи в базу из мира нет.
-  const activate = (id: string) => {
-    if (isAddId(id)) {
-      const lot = parseLotId(id)
-      // Макетного мероприятия (?mock=on) в базе нет — вести некуда, кроме реестра
-      if (id === ADD_LOT_ID || !lot || data?.mock) navigate('/projects')
-      // Параметр project читает ListEditorPage: новый список сразу на мероприятии
-      else if (lot.part === 'addtruck') navigate(`/lists/new?project=${lot.venueId}`)
-      // HallPlansPage по new=1 открывает дровер нового плана с этим мероприятием
-      else navigate(`/halls?new=1&project=${lot.venueId}`)
-      return
-    }
-    if (!WORLD_SITES.includes(id as WorldSiteId)) return
-    store.setState({ pick: id })
-    navigate(SITE_ROUTES[id as WorldSiteId])
-  }
-  // Движку колбэк уходит через ref: navigate и язык меняются между рендерами, а мир
-  // из-за них пересоздаваться не должен
+  // Разбор активированного id (выбор, переход, «плюс») — в useWorldActions. Движку
+  // колбэк уходит через ref: navigate и язык меняются между рендерами, а мир из-за них
+  // пересоздаваться не должен.
   const activateRef = useRef(activate)
   useEffect(() => { activateRef.current = activate })
+
+  // Участок: адрес ↔ стор. Хозяин — адрес, но выбирает человек в сцене, то есть через
+  // стор. Кто из двоих сменился, решает память о прошлом значении стора (gotchas §7):
+  // сменился стор — это выбор человека, он уходит в адрес; стор прежний, а с адресом
+  // не сходится — догоняет стор. Каждая сторона пишет только при расхождении, поэтому
+  // своя же запись, вернувшись вторым рендером, ничего не будит — петли нет.
+  const venues = data?.venues ?? null
+  const pickLotRef = useRef<string | null>(null)
+  useEffect(() => {
+    const picked = pickLot !== pickLotRef.current
+    pickLotRef.current = pickLot
+    // replace: выбор участков историю не плодит, «назад» уводит со страницы мира
+    const writeLot = (id: string | null) => setParams((prev) => {
+      const query = new URLSearchParams(prev)
+      if (id === null) query.delete('lot')
+      else { query.set('zone', 'venues'); query.set('lot', id) }
+      return query
+    }, { replace: true })
+    if (picked) {
+      // Закрытая панель, клик по пустой земле и Esc приходят сюда же: pick снят
+      if (pickLot !== lotParam) writeLot(pickLot)
+      return
+    }
+    if (lotParam === null) {
+      // Параметр ушёл из адреса не выбором (переезд в зону, шаг по истории)
+      if (pickLot !== null) store.setState({ pick: null })
+      return
+    }
+    // Реестр ещё не ответил — существует ли участок, неизвестно
+    if (!venues) return
+    if (!venues.some((lot) => lot.id === lotParam)) {
+      // Мероприятия нет (чужая или устаревшая ссылка, ушло в прошлое) — параметр молча снимается
+      writeLot(null)
+      if (pickLot === lotParam) store.setState({ pick: null })
+      return
+    }
+    // Ссылка с одним ?lot=: зону дописываем, иначе закрытие панели увело бы камеру на кампус
+    if (zoneParam !== 'venues') writeLot(lotParam)
+    // Вход в зону снимает pick (движок), поэтому ставим его, только когда камера уже на ней
+    else if (pickLot !== lotParam && zone === 'venues') store.setState({ pick: lotPartId('lot', lotParam) })
+  }, [lotParam, pickLot, zoneParam, zone, venues, store, setParams])
 
   useEffect(() => {
     const slot = slotRef.current
@@ -160,7 +195,9 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
           look: lookRef.current,
           data: dataRef.current,
           reducedMotion: prefersReducedMotion(),
-          pose: (hot?.data.pose as CameraPose | undefined) ?? null,
+          // Поза: после замены модуля — прежняя; при возврате на ту же запись истории —
+          // та, с которой ушли (worldMemory); иначе рабочий ракурс
+          pose: (hot?.data.pose as CameraPose | undefined) ?? takePose(entryRef.current),
           texts: textsRef.current,
           zone: wantedRef.current,
           onActivate: (id) => activateRef.current(id),
@@ -191,6 +228,8 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
     return () => {
       cancelled = true
       if (hot?.data.swapping && getPose) hot.data.pose = getPose()
+      // Уход со страницы мира: позу помним за записью истории, с которой ушли
+      else if (getPose) savePose(entryRef.current, getPose())
       worldRef.current = null
       dispose?.()
     }
