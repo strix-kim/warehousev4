@@ -90,6 +90,8 @@
    остаётся табличка «Состав: N». visibility, а не display: раскладке нужен размер чипа,
    подпись без размера она перемеряет каждый кадр (hudLayout.ts). */
 .w-stage.is-sm .w-who--lot { visibility: hidden; }
+/* Участок выбран — над бригадой его табличка «Состав: N» (NameChip, muted) */
+.w-who--lot:has(> [data-muted]) { visibility: hidden; }
 
 /* Плашка дня — слева сверху, ширина по содержимому */
 .w-day { position: absolute; left: 16px; top: 16px; height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 16px; }

@@ -385,7 +385,7 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
       ))}
       {data?.people.map((person) => <NameChip key={person.id} store={store} person={person} />)}
       {/* День мероприятия: состав стоит на своём участке поимённо. Якоря есть только у тех, кто встал в сцену */}
-      {data?.venues?.flatMap((lot) => (lot.crew ?? []).slice(0, CREW_MAX).map((person) => <NameChip key={`${lot.id}:${person.id}`} store={store} person={person} short />))}
+      {data?.venues?.flatMap((lot) => (lot.crew ?? []).slice(0, CREW_MAX).map((person) => <NameChip key={`${lot.id}:${person.id}`} store={store} person={person} short muted={pickLot === lot.id} />))}
       {[...labels.keys()].filter(isAddId).map((id) => <Plus key={id} store={store} id={id} busy={building && id === ADD_LOT_ID} onActivate={activate} />)}
       {/* HUD зоны живёт, пока камера стоит на ней; якоря чужих зон движок прячет сам.
           Макетных мероприятий (?mock=on) в базе нет — действий у панели участка тоже нет */}
