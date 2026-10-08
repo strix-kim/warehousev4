@@ -17,10 +17,13 @@ export type WorldCar = {
 }
 
 // Только имя для чипа: телефон, должность и документы сотрудника в мир не едут
+// packing — «сборы»: человек в составе мероприятия, которое начинается завтра; на кампусе
+// он стоит у рампы склада с кейсом. Расставляет data/placePeople.ts
 export type WorldPerson = {
   id: string
   firstName: string
   lastName: string
+  packing: boolean
 }
 
 // Тип места решает силуэт здания. Колонки в базе нет: тип угадывает venueKind.ts
@@ -44,6 +47,11 @@ export type WorldLot = {
   lists: number
   staff: number
   hasPlan: boolean
+  // Состав поимённо — только у мероприятия, которое идёт сегодня, и только когда состав
+  // ответил (data/placePeople.ts): фигурки на участке в цветной одежде и с чипами имён,
+  // штатные и наёмные. null — не сегодня или ответа нет: серые фигурки по счётчику staff.
+  // Человек стоит в мире один раз: кто здесь — того нет в WorldData.people
+  crew: WorldPerson[] | null
 }
 
 export type WorldArchiveKind = WorldVenueKind | 'palace'
@@ -65,6 +73,7 @@ export type WorldArchivePlace = {
 
 export type WorldData = {
   cars: WorldCar[]
+  // Люди кампуса: штат минус те, кто сегодня стоит на участке своего мероприятия
   people: WorldPerson[]
   // null — источник (реестр мероприятий) не ответил: зона на карте не строится вовсе
   // (решение 6 плана world-s51). Пустой массив — источник есть, мероприятий нет: зона

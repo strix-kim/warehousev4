@@ -158,7 +158,7 @@ function sameFill(a: WorldData, b: WorldData) {
     })
     && a.people.every((person, i) => {
       const other = b.people[i]!
-      return person.id === other.id && person.firstName === other.firstName && person.lastName === other.lastName
+      return person.id === other.id && person.firstName === other.firstName && person.lastName === other.lastName && person.packing === other.packing
     })
 }
 

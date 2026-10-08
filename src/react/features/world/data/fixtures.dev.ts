@@ -8,16 +8,16 @@ import type { WorldArchiveKind, WorldArchivePlace, WorldLot } from './types'
 // ячейка с «плюсом». Третий — худший случай по длине имени мероприятия и места.
 export const FIXTURE_VENUES: WorldLot[] = [
   { id: 'mock-lot-1', kind: 'hotel', name: 'Bionorica Workshop', client: 'Bionorica', place: { id: 'mock-venue-1', name: 'Hyatt Regency Tashkent', city: 'Ташкент' },
-    dateFrom: '2026-10-07', dateTo: '2026-10-08', lists: 1, staff: 14, hasPlan: true },
+    dateFrom: '2026-10-07', dateTo: '2026-10-08', lists: 1, staff: 14, hasPlan: true, crew: null },
   { id: 'mock-lot-2', kind: 'arena', name: 'Tashkent IT Week', client: null, place: { id: 'mock-venue-2', name: 'Humo Arena', city: 'Ташкент' },
-    dateFrom: '2026-10-09', dateTo: null, lists: 2, staff: 0, hasPlan: true },
+    dateFrom: '2026-10-09', dateTo: null, lists: 2, staff: 0, hasPlan: true, crew: null },
   { id: 'mock-lot-3', kind: 'hall', name: 'Международный форум Uzbekistan Travel & Hospitality 2026', client: 'Uzbekistan Tourism Committee', place: { id: 'mock-venue-3', name: 'Hilton Tashkent City Congress Hall', city: 'Ташкент' },
-    dateFrom: '2026-10-13', dateTo: '2026-10-15', lists: 3, staff: 22, hasPlan: true },
+    dateFrom: '2026-10-13', dateTo: '2026-10-15', lists: 3, staff: 22, hasPlan: true, crew: null },
   { id: 'mock-lot-4', kind: 'hotel', name: 'Uzcard Partner Day', client: 'Uzcard', place: { id: 'mock-venue-4', name: 'InterContinental Tashkent', city: 'Ташкент' },
-    dateFrom: '2026-10-21', dateTo: '2026-10-23', lists: 0, staff: 11, hasPlan: false },
+    dateFrom: '2026-10-21', dateTo: '2026-10-23', lists: 0, staff: 11, hasPlan: false, crew: null },
   // 43 знака — предел чертежа: в вывеске обрезается, целиком — в панели. Без дат и места
   { id: 'mock-lot-5', kind: 'hall', name: 'Международный конгресс-центр «Узэкспоцентр»', client: null, place: null,
-    dateFrom: null, dateTo: null, lists: 1, staff: 0, hasPlan: false },
+    dateFrom: null, dateTo: null, lists: 1, staff: 0, hasPlan: false, crew: null },
 ]
 
 // Имя · тип · город · число мероприятий · дата последнего. 34 места: в сцену встаёт 30.

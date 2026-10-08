@@ -28,6 +28,7 @@ function toLot(project: ProjectListItem): WorldLot {
     lists: project.listCount,
     staff: project.staffCount,
     hasPlan: project.hasHallPlan,
+    crew: null,
   }
 }
 
