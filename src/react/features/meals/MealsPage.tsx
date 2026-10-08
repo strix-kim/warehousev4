@@ -1,11 +1,15 @@
-import { ArrowLeft, CalendarRange, Plus } from 'lucide-react'
+import { ArrowLeft, CalendarRange, CircleAlert, ClipboardList, Plus } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { deleteOrder, ensureMeal, fetchMealDay, fetchProjectDishes, fetchProjectMealDays, saveGuestOrder, saveStaffOrder, updateOrder, type MealDay, type MealDayMark, type MealDishHint } from './api'
+import { deleteOrder, ensureMeal, fetchMealDay, fetchProjectDishes, fetchProjectMealDays, mealErrorText, saveGuestOrder, saveStaffOrder, setMealStatus, updateOrder, type MealDay, type MealDayMark, type MealDishHint } from './api'
+import { MealExpenseDrawer } from './MealExpenseDrawer'
 import { MealOrderSheet } from './MealOrderSheet'
 import { MealPersonRow } from './MealPersonRow'
-import { isMealSlot, MEAL_SLOTS, periodDays, type MealOrder, type MealOrderInput, type MealSlot, type ProjectMeal, type Tr } from './types'
+import { MealStatusBar } from './MealStatusBar'
+import { MealSummarySheet } from './MealSummarySheet'
+import { summarizeMeal, type MealTextContext } from './mealSummary'
+import { isMealSlot, MEAL_SLOTS, MEAL_STATUSES, periodDays, type MealOrder, type MealOrderInput, type MealSlot, type MealStatus, type ProjectMeal, type Tr } from './types'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState, RetryButton } from '../../components/ErrorState'
 import { employeeDisplayName } from '../employees/types'
@@ -37,11 +41,16 @@ type PersonRow = {
 // «не сохранено, повторить» открывало лист с набранным, а не со строкой базы.
 type RowPending = { state: 'saving' } | { state: 'failed'; input: MealOrderInput }
 
-// Открытый лист: строка списка или новый гость. session — номер открытия:
+// Открытый лист — ОДИН на экран (у каждого свой useModalLayer, два слоя
+// разом снимали бы блокировку прокрутки друг у друга): строка списка, новый
+// гость, сводка или «В расходы». session — номер открытия:
 // «Сохранить → следующий» меняет key строки, но не session, и лист остаётся
 // тем же смонтированным (MealOrderSheet, draftKey). Новое открытие — новый
 // номер: строку, закрытую на прошлом, AnimatePresence не вернёт с её уходом.
-type SheetTarget = { kind: 'row'; key: string; session: number } | { kind: 'guest'; session: number }
+type SheetTarget =
+  | { kind: 'row'; key: string; session: number }
+  | { kind: 'guest'; session: number }
+  | { kind: 'summary' | 'expense' }
 
 const NOT_EATING: MealOrderInput = { dish: null, qty: 1, price: null }
 
@@ -135,6 +144,9 @@ export function MealsPage() {
   // Ключ — «день:слот|строка»: у человека состава ключ строки один на все дни.
   const [pending, setPending] = useState<Record<string, RowPending>>({})
   const sheetSessionRef = useRef(0)
+  const [statusBusy, setStatusBusy] = useState(false)
+  // Отказ смены статуса — под ключом приёма: на другом дне его не показываем.
+  const [statusError, setStatusError] = useState<{ key: string; text: string } | null>(null)
 
   useDocumentTitle(project ? tr(`Обеды — ${project.name}`, `Ovqatlanish — ${project.name}`) : '')
 
@@ -197,6 +209,16 @@ export function MealsPage() {
   const dayKey = `${day}:${slot}`
   const markedDays = useMemo(() => new Set(mealDays.filter((mark) => mark.slot === slot).map((mark) => mark.meal_on)), [mealDays, slot])
 
+  // Строки, сводка и контекст текста — до раннего выхода (хуки) и в useMemo:
+  // текст сводки иначе пересобирался бы на каждый рендер страницы.
+  const shown = mealDay?.key === dayKey ? mealDay : null
+  const rows = useMemo(() => (shown ? buildRows(staff, shown.orders, tr) : []), [shown, staff, tr])
+  // Порядок «Полной» сводки — как в списке: состав, вне состава, гости.
+  const summaryOrders = useMemo(() => rows.flatMap((row) => (row.order ? [row.order] : [])), [rows])
+  const summary = useMemo(() => summarizeMeal(summaryOrders, tr), [summaryOrders, tr])
+  const projectName = project?.name ?? ''
+  const textContext = useMemo<MealTextContext>(() => ({ projectName, day, slot, locale }), [projectName, day, slot, locale])
+
   useEffect(() => {
     if (loadState !== 'ready' || !projectId || !day) return
     let isCurrent = true
@@ -249,8 +271,6 @@ export function MealsPage() {
     }, { replace: true })
   }
 
-  const shown = mealDay?.key === dayKey ? mealDay : null
-  const rows = shown ? buildRows(staff, shown.orders, tr) : []
   // Итог плашки — простым проходом по строкам (план 1.6: UX, не деньги).
   let ordered = 0
   let notEating = 0
@@ -267,6 +287,8 @@ export function MealsPage() {
 
   // Обед в расходах — ввод заперт (пара в базе: guard_meal_orders_locked).
   const isLocked = Boolean(shown?.meal?.expense_id)
+  // Статус из базы строкой — сужаем до известных; обеда нет — «Собираем».
+  const mealStatus: MealStatus = MEAL_STATUSES.find((value) => value === shown?.meal?.status) ?? 'collecting'
   const dishHints = shown ? buildDishHints(shown.orders, projectDishes) : []
 
   function setRowPending(key: string, value: RowPending | null) {
@@ -414,6 +436,31 @@ export function MealsPage() {
     )
   }
 
+  // Смена статуса: первый «Дальше» создаёт обед (ensureMeal), строка в state —
+  // из ответа базы. Шаг назад и замок после внесения держит база
+  // (project_meals_expense_status_check), бар лишь не предлагает мёртвое.
+  async function changeStatus(view: MealDay & { key: string }, next: MealStatus) {
+    setStatusBusy(true)
+    setStatusError(null)
+    try {
+      const meal = await mealForWrite(view)
+      const updated = await setMealStatus(meal.id, next)
+      setMealDay((prev) => (prev?.key === view.key ? { ...prev, meal: updated } : prev))
+      setMealDays((marks) => marks.map((mark) => (mark.id === updated.id ? { ...mark, status: updated.status } : mark)))
+    } catch (error) {
+      reportAppError(error, { scope: 'loader', route: ROUTE, detail: { source: 'meal-status' } })
+      setStatusError({ key: view.key, text: mealErrorText(error, tr) })
+    } finally {
+      setStatusBusy(false)
+    }
+  }
+
+  // Расход внесён: ссылка — в обед на экране, ввод запирается тем же замком.
+  function markExpense(viewKey: string, expenseId: string) {
+    setMealDay((prev) => (prev?.key === viewKey && prev.meal ? { ...prev, meal: { ...prev.meal, expense_id: expenseId } } : prev))
+    setSheet(null)
+  }
+
   function chip(value: string, isOutside: boolean) {
     const date = parseDateValue(value)
     if (!date) return null
@@ -473,6 +520,24 @@ export function MealsPage() {
               ))}
             </div>
 
+            {shown && (
+              <div className="meals-status">
+                <MealStatusBar
+                  status={mealStatus}
+                  hasMeal={Boolean(shown.meal)}
+                  expenseId={shown.meal?.expense_id ?? null}
+                  // Расход виден только автору (owner-таблица), а кто автор —
+                  // без запроса не узнать: ссылка ведёт в журнал, подпись честная.
+                  expenseNote={<Link to="/expenses">{tr('в журнале автора', 'muallif jurnalida')}</Link>}
+                  busy={statusBusy}
+                  onAdvance={(next) => void changeStatus(shown, next)}
+                  onStepBack={(prev) => void changeStatus(shown, prev)}
+                  onCreateExpense={() => setSheet({ kind: 'expense' })}
+                />
+                {statusError?.key === dayKey && <p className="form-error" role="alert"><CircleAlert size={15} /> {statusError.text}</p>}
+              </div>
+            )}
+
             <section className="data-panel meals-panel">
               {dayFailedKey === dayKey
                 ? (
@@ -523,12 +588,17 @@ export function MealsPage() {
             </section>
 
             {shown && (
-              <div className="meals-bar" role="status">
-                {tr(
-                  `Заказано ${ordered} · не ест ${notEating} · не спрошены ${notAsked} · ${formatSum(total)} ${currency}`,
-                  `Buyurtma ${ordered} · ovqatlanmaydi ${notEating} · so‘ralmagan ${notAsked} · ${formatSum(total)} ${currency}`,
-                )}
-                {isLocked && <small className="meals-bar__locked">{tr('В расходах — ввод закрыт', 'Xarajatlarda — kiritish yopiq')}</small>}
+              <div className="meals-bar">
+                <span className="meals-bar__text" role="status">
+                  {tr(
+                    `Заказано ${ordered} · не ест ${notEating} · не спрошены ${notAsked} · ${formatSum(total)} ${currency}`,
+                    `Buyurtma ${ordered} · ovqatlanmaydi ${notEating} · so‘ralmagan ${notAsked} · ${formatSum(total)} ${currency}`,
+                  )}
+                  {isLocked && <small className="meals-bar__locked">{tr('В расходах — ввод закрыт', 'Xarajatlarda — kiritish yopiq')}</small>}
+                </span>
+                <button type="button" className="button button--secondary meals-bar__summary" onClick={() => setSheet({ kind: 'summary' })}>
+                  <ClipboardList size={16} /> {tr('Сводка', 'Xulosa')}
+                </button>
               </div>
             )}
           </>
@@ -537,6 +607,19 @@ export function MealsPage() {
       <AnimatePresence>
         {shown && !isLocked && sheet?.kind === 'guest' && renderGuestSheet(shown, sheet.session)}
         {shown && !isLocked && sheet?.kind === 'row' && sheetRow && renderRowSheet(shown, sheetRow, sheet.session)}
+        {shown && sheet?.kind === 'summary' && (
+          <MealSummarySheet key="summary" orders={summaryOrders} ctx={textContext} onRequestClose={() => setSheet(null)} />
+        )}
+        {shown?.meal && !isLocked && sheet?.kind === 'expense' && (
+          <MealExpenseDrawer
+            key="expense"
+            mealId={shown.meal.id}
+            summary={summary}
+            ctx={textContext}
+            onRequestClose={() => setSheet(null)}
+            onCreated={(expenseId) => markExpense(shown.key, expenseId)}
+          />
+        )}
       </AnimatePresence>
     </>
   )

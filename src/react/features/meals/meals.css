@@ -47,9 +47,35 @@
 /* Плашка итога прибита к низу окна: sticky, а не fixed — стоит в потоке под
    списком и не перекрывает его конец. Вне .data-panel намеренно: overflow
    панели сделал бы её контейнером прокрутки, и sticky бы не сработал. */
-.meals-bar { position: sticky; z-index: 5; bottom: 16px; margin-top: 14px; padding: 12px 16px; border-radius: var(--r-lg); color: #fff; background: rgba(15,17,21,.96); box-shadow: 0 14px 36px rgba(15,17,21,.28); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center; }
+.meals-bar { position: sticky; z-index: 5; bottom: 16px; margin-top: 14px; padding: 12px 16px; border-radius: var(--r-lg); color: #fff; background: rgba(15,17,21,.96); box-shadow: 0 14px 36px rgba(15,17,21,.28); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.meals-bar__text { min-width: 0; }
+.meals-bar__summary { flex: none; min-height: 40px; border-color: rgba(255,255,255,.16); color: #fff; background: rgba(255,255,255,.08); }
+.meals-bar__summary:not(:disabled):hover { background: rgba(255,255,255,.14); }
 
 .meals-bar__locked { display: block; margin-top: 4px; color: var(--on-night-2); font-size: 12px; font-weight: 500; }
+
+/* Статус приёма (MealStatusBar) — под слотом, над списком: гонец видит, на
+   каком шаге приём, раньше, чем людей. */
+.meals-status { display: grid; gap: 10px; margin: 0 0 14px; }
+.meals-status > .form-error { margin: 0; }
+.meal-status { display: grid; gap: 10px; }
+.meal-status__steps { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.meal-status__steps li { display: flex; align-items: center; gap: 4px; flex: 1; justify-content: center; padding: 6px 8px; border-radius: 999px; background: var(--sunk); color: var(--faint); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.meal-status__steps li.is-done { color: var(--ink); }
+.meal-status__steps li.is-current { color: var(--ink); background: var(--card); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.meal-status__actions { display: flex; align-items: center; gap: 8px; }
+.meal-status__main { flex: 1; min-height: 48px; }
+.meal-status__expense { display: flex; align-items: center; gap: 6px; flex: 1; margin: 0; font-weight: 600; }
+
+/* Дровер «В расходы» (MealExpenseDrawer). */
+.drawer--meal-expense .drawer__head, .sheet--meal-expense .drawer__head { grid-template-columns: minmax(0, 1fr) auto; }
+.drawer--meal-expense .field, .sheet--meal-expense .field { margin-bottom: 0; }
+.meal-expense__spender { margin: 0; }
+.meal-expense__unpriced { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--bad); }
+.meal-expense__sum { position: relative; }
+.meal-expense__sum > input { width: 100%; height: 45px; padding: 0 58px 0 13px; border: 1px solid var(--ctl); border-radius: var(--r-md); outline: 0; color: var(--ink); background: var(--card); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.meal-expense__sum > input:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+.meal-expense__sum > span { position: absolute; top: 50%; right: 13px; transform: translateY(-50%); color: var(--faint); font-size: 14px; font-weight: 500; pointer-events: none; }
 
 /* Лист заказа (MealOrderSheet): шапка без фото — две колонки вместо трёх;
    отступы между полями даёт gap тела рамы, хвост .field лишний. */
