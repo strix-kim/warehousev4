@@ -30,6 +30,7 @@ const loadHallPlanPage = () => import('../features/halls/HallPlanPage').then((mo
 const loadHallTvPage = () => import('../features/halls/HallTvPage').then((module) => ({ default: module.HallTvPage }))
 const loadProjectsPage = () => import('../features/projects/ProjectsPage').then((module) => ({ default: module.ProjectsPage }))
 const loadProjectPage = () => import('../features/projects/ProjectPage').then((module) => ({ default: module.ProjectPage }))
+const loadMealsPage = () => import('../features/meals/MealsPage').then((module) => ({ default: module.MealsPage }))
 const loadHomePage = () => import('../features/home/HomePage').then((module) => ({ default: module.HomePage }))
 const loadDelayCalculatorPage = () => import('../features/delay/DelayCalculatorPage').then((module) => ({ default: module.DelayCalculatorPage }))
 const loadExpensesPage = () => import('../features/expenses/ExpensesPage').then((module) => ({ default: module.ExpensesPage }))
@@ -48,6 +49,7 @@ const HallPlanPage = lazyWithReload(loadHallPlanPage)
 const HallTvPage = lazyWithReload(loadHallTvPage)
 const ProjectsPage = lazyWithReload(loadProjectsPage)
 const ProjectPage = lazyWithReload(loadProjectPage)
+const MealsPage = lazyWithReload(loadMealsPage)
 const HomePage = lazyWithReload(loadHomePage)
 const DelayCalculatorPage = lazyWithReload(loadDelayCalculatorPage)
 const ExpensesPage = lazyWithReload(loadExpensesPage)
@@ -154,6 +156,7 @@ export function App() {
         <Route path="/vehicles/:vehicleId/edit" element={<RouteBoundary><VehicleFormPage /></RouteBoundary>} />
         <Route path="/projects" element={<RouteBoundary><ProjectsPage /></RouteBoundary>} />
         <Route path="/projects/:projectId" element={<RouteBoundary><ProjectPage /></RouteBoundary>} />
+        <Route path="/projects/:projectId/meals" element={<RouteBoundary><MealsPage /></RouteBoundary>} />
         <Route path="/halls" element={<RouteBoundary><HallPlansPage /></RouteBoundary>} />
         <Route path="/halls/:planId" element={<RouteBoundary><HallPlanPage /></RouteBoundary>} />
         <Route path="/delay" element={<RouteBoundary><DelayCalculatorPage /></RouteBoundary>} />
@@ -248,6 +251,7 @@ function AppShell() {
         loadHallPlanPage(),
         loadProjectsPage(),
         loadProjectPage(),
+        loadMealsPage(),
         loadDelayCalculatorPage(),
         loadExpensesPage(),
       ])

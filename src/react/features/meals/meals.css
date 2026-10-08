@@ -1,0 +1,53 @@
+/* Обеды на мероприятии (с57, план meals-s56): лента дней, слот, список людей,
+   плашка итога. Импортируется страницей и встаёт в каскад ПОСЛЕ styles.css.
+   Шапка — общая .editor-header, слот — общий .segmented; здесь только своё.
+   Телефон первичен: экран — инструмент гонца с одной рукой. */
+
+/* Лента дней: прокручивается сама, страница горизонтально не едет — у ленты
+   min-width: 0 и свой overflow. */
+.meals-days { min-width: 0; display: flex; gap: 8px; margin: 0 0 12px; padding: 2px 2px 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.meals-days::-webkit-scrollbar { display: none; }
+.meals-day { position: relative; flex: none; min-width: 56px; min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--r-md); color: var(--ink); background: var(--card); cursor: pointer; }
+.meals-day small { color: var(--faint); font-size: 11px; font-weight: 600; text-transform: uppercase; white-space: nowrap; }
+.meals-day strong { font: 700 18px/1.1 var(--f-display); font-variant-numeric: tabular-nums; }
+.meals-day:hover { background: var(--hover); }
+.meals-day:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.meals-day[aria-pressed='true'] { border-color: var(--ink); color: #fff; background: var(--ink); }
+.meals-day[aria-pressed='true'] small { color: var(--on-night-2); }
+/* День вне периода — пунктиром: обед есть, а мероприятие этот день уже не держит. */
+.meals-day--outside { border-style: dashed; }
+.meals-day__dot { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
+
+.meals-slot { margin: 0 0 14px; }
+.meals-slot button { min-height: 40px; padding: 0 18px; font-size: 14px; }
+
+/* Список людей: строка целиком — цель касания ≥ 48 px (шаг 3 повесит на неё тап). */
+.meal-rows { margin: 0; padding: 0; list-style: none; }
+.meal-rows > li + li { border-top: 1px solid var(--line); }
+.meal-row { min-height: 56px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: center; gap: 4px 14px; padding: 10px 16px; }
+.meal-row__who { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.meal-row__who strong { overflow: hidden; color: var(--ink); font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.meal-row__who small { color: var(--faint); font-size: 12px; }
+.meal-row__dish { min-width: 0; color: var(--ink); font-size: 14px; overflow-wrap: anywhere; }
+.meal-row__dish em { color: var(--muted); font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+.meal-row__dish--empty { color: var(--faint); }
+.meal-row__price { color: var(--ink); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+
+/* Плашка итога прибита к низу окна: sticky, а не fixed — стоит в потоке под
+   списком и не перекрывает его конец. Вне .data-panel намеренно: overflow
+   панели сделал бы её контейнером прокрутки, и sticky бы не сработал. */
+.meals-bar { position: sticky; z-index: 5; bottom: 16px; margin-top: 14px; padding: 12px 16px; border-radius: var(--r-lg); color: #fff; background: rgba(15,17,21,.96); box-shadow: 0 14px 36px rgba(15,17,21,.28); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center; }
+
+.meals-skeleton { display: grid; gap: 12px; padding: 16px; }
+.meals-skeleton span { height: 56px; border-radius: var(--r-md); background: linear-gradient(90deg, var(--sunk) 25%, var(--card) 50%, var(--sunk) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+
+@media (max-width: 820px) {
+  /* Строка: имя и блюдо столбцом слева, цена справа на обе строки. */
+  .meal-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .meal-row__who { grid-column: 1; }
+  .meal-row__dish { grid-column: 1; grid-row: 2; }
+  .meal-row__price { grid-column: 2; grid-row: 1 / span 2; }
+  .meal-row__who strong { white-space: normal; overflow-wrap: anywhere; }
+  /* Над нижней навигацией (64 px) тем же отступом, что .expenses-bar. */
+  .meals-bar { bottom: calc(76px + env(safe-area-inset-bottom)); font-size: 13px; }
+}

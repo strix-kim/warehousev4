@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarRange, ChevronRight, CircleAlert, ClipboardList, ListPlus, Pencil, Presentation, Trash2 } from 'lucide-react'
+import { ArrowLeft, CalendarRange, ChevronRight, CircleAlert, ClipboardList, ListPlus, Pencil, Presentation, Trash2, UtensilsCrossed } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -189,6 +189,17 @@ export function ProjectPage() {
       {/* key: блок держит свой состав и фазу выгрузки — у другого мероприятия
           они обязаны начаться с нуля, а не достаться по наследству. */}
       <ProjectStaffSection key={current.id} project={current} />
+
+      {/* Обеды — свой экран (план meals-s56, развилка 8): здесь только ссылка,
+          данных обедов страница не грузит. */}
+      <section className="data-panel project-section">
+        <header className="project-section__head">
+          <h2>{tr('Обеды', 'Ovqatlanish')}</h2>
+          <Link className="button button--secondary" to={`/projects/${current.id}/meals`}>
+            <UtensilsCrossed size={16} /> {tr('Открыть обеды', 'Ovqatlanishni ochish')}
+          </Link>
+        </header>
+      </section>
 
       <section className="data-panel project-section">
         <header className="project-section__head">
