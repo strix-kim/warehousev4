@@ -22,11 +22,12 @@
 .home-screen__tools .segmented { width: auto; }
 
 /* Главная в 3D-виде: экран ровно в окно, шапка сверху, слот мира — всё остальное.
-   96px — поля .app-content (40 + 56); деление на --app-zoom — gotchas §16. Ниже
+   96px — поля .app-content (40 + 56), --appbar-h — верхняя полоса навигации (на
+   телефоне 0); деление на --app-zoom — gotchas §16. Ниже
    420 px экран не сжимается: в совсем низком окне страница прокручивается.
    .w-stage (world.css, чанк сцены) рассчитан на флекс-колонку /world и на ≤ 820
    сам берёт 60svh — здесь он обязан заполнить слот, отсюда два класса в селекторе. */
-.home-screen--world { display: flex; flex-direction: column; height: calc(100dvh / var(--app-zoom) - 96px); min-height: 420px; }
+.home-screen--world { display: flex; flex-direction: column; height: calc(100dvh / var(--app-zoom) - 96px - var(--appbar-h)); min-height: 420px; }
 .home-screen--world .home-screen__head { flex: none; }
 .home-world { flex: 1; min-height: 0; display: flex; }
 .home-world .w-stage { flex: 1; height: auto; min-height: 0; }
@@ -145,7 +146,7 @@
    не помещаются в половину экрана — панели встают столбиком. */
 @media (max-width: 820px) {
   .home { grid-template-columns: minmax(0, 1fr); }
-  /* Поля .app-content без сайдбара: 25 сверху, снизу 90 + safe-area под нижнюю панель */
+  /* Поля .app-content на телефоне: 25 сверху, снизу 90 + safe-area под нижнюю панель */
   .home-screen--world { height: calc(100dvh / var(--app-zoom) - 115px - env(safe-area-inset-bottom)); }
 }
 

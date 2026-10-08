@@ -74,6 +74,10 @@
      со всем остальным, и 100vh превращается в 112,5 % окна; поэтому всё, что
      обязано совпасть с краем окна, пишется как calc(100vh / var(--app-zoom)). */
   --app-zoom: 1;
+  /* Высота верхней полосы навигации (с59, .appbar в 02-shell). Всё, что считает
+     себя от высоты окна или липнет к его верху, вычитает её отсюда; на телефоне
+     полосы сверху нет — там переменная 0 (06-responsive-shell). */
+  --appbar-h: 56px;
 }
 
 * { box-sizing: border-box; }
@@ -92,7 +96,7 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
    с классом и outline в том же слое каскада теперь перебивают его. На тёмных
    поверхностях тёмная обводка не видна — там белая. */
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.sidebar :focus-visible, .login-brand-panel :focus-visible, .hall-tv :focus-visible { outline-color: #fff; }
+.appbar :focus-visible, .login-brand-panel :focus-visible, .hall-tv :focus-visible { outline-color: #fff; }
 h1, h2, h3, p { margin-top: 0; }
 /* Display-начертания макета: h1 и бренд — 800, h2/h3 — 700. 800 в системе живёт
    только у Manrope; текстовый Inter — 400/500/600/700. */

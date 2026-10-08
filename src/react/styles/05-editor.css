@@ -9,7 +9,7 @@
 /* Шапка редактора липкая: сетка ниже занимает весь экран, и кнопки «Сохранить»/
    «Скачать» должны оставаться на виду. Отрицательный margin гасит собственный
    padding, поэтому геометрия (шапка 58 + зазор 22 до реквизитов) не меняется. */
-.editor-header--quick { position: sticky; z-index: 9; top: 0; margin: -12px 0 10px; padding: 12px 0; background: var(--bg); }
+.editor-header--quick { position: sticky; z-index: 9; top: var(--appbar-h); margin: -12px 0 10px; padding: 12px 0; background: var(--bg); }
 /* Строка состояния на месте eyebrow. Высота фиксирована высотой eyebrow: смена
    текста на результат действия не должна двигать заголовок и сетку под ним. */
 .editor-status { min-height: 15px; display: flex; align-items: center; gap: 12px; margin: 0 0 8px; overflow: hidden; color: var(--muted); font-size: 12.5px; font-weight: 500; line-height: 15px; white-space: nowrap; }
@@ -30,7 +30,7 @@
 .editor-status--success { color: var(--ok); }
 .editor-status--error { color: var(--bad); }
 .mobile-editor-tabs { display: none; }
-.editor-grid { height: clamp(520px, calc(100dvh / var(--app-zoom) - 380px), 760px); min-height: 0; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; }
+.editor-grid { height: clamp(520px, calc(100dvh / var(--app-zoom) - 380px - var(--appbar-h)), 760px); min-height: 0; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; }
 /* Запасное значение на один кадр до измерения: 40 top + 58 шапка + 22 + 50 полоса
    реквизитов + 18 + 56 нижний отступ. Живое ставит useEditorChrome инлайном,
    измеряя всё, что реально стоит над сеткой (баннеры, раскрытые реквизиты). */

@@ -2,8 +2,9 @@
    в макете они голые (.stage, .scene, .labels) и пересеклись бы с продуктом. */
 
 /* Dev-стенд /world: сцена занимает всё, что осталось под шапкой. 96px — поля
-   .app-content; деление на --app-zoom — gotchas §16. */
-.w-page { display: flex; flex-direction: column; height: calc(100dvh / var(--app-zoom) - 96px); min-height: 420px; }
+   .app-content, --appbar-h — верхняя полоса навигации (на телефоне 0); деление
+   на --app-zoom — gotchas §16. */
+.w-page { display: flex; flex-direction: column; height: calc(100dvh / var(--app-zoom) - 96px - var(--appbar-h)); min-height: 420px; }
 .w-page .page-header { flex: none; }
 .w-page__panel { display: flex; flex-wrap: wrap; gap: 8px 20px; }
 .w-page__axis { display: flex; align-items: center; gap: 10px; color: var(--muted); font: 500 13px/1.5 var(--f-text); }

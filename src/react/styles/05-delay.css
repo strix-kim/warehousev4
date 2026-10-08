@@ -272,11 +272,10 @@
 
 /* Плашка «Вернуть» после удаления, снятия линии и сброса. Облик — как у вопроса
    о несохранённом (unsaved-prompt.css): тёмная, это не ошибка. Фиксирована внизу
-   по центру рабочей области — отступ слева под сайдбар, как у .bulk-bar. Закрытая
+   по центру окна, как .bulk-bar. Закрытая
    остаётся в разметке: уход (180 мс) играет transition, visibility выключается
    после него и убирает кнопку из обхода Tab. */
-.delay-undo { position: fixed; z-index: 14; left: 256px; right: 0; bottom: 22px; width: max-content; max-width: calc(100vw / var(--app-zoom) - 300px); margin-inline: auto; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: 14px; color: var(--on-night); background: var(--ink); box-shadow: 0 14px 36px rgba(15,17,21,.28); font: 600 14px/1.3 var(--f-text); opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity .18s ease, transform .18s ease, visibility 0s .18s, left .22s ease; }
-.app-shell--sidebar-collapsed .delay-undo { left: 76px; max-width: calc(100vw / var(--app-zoom) - 120px); }
+.delay-undo { position: fixed; z-index: 14; left: 0; right: 0; bottom: 22px; width: max-content; max-width: calc(100vw / var(--app-zoom) - 44px); margin-inline: auto; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: 14px; color: var(--on-night); background: var(--ink); box-shadow: 0 14px 36px rgba(15,17,21,.28); font: 600 14px/1.3 var(--f-text); opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity .18s ease, transform .18s ease, visibility 0s .18s, left .22s ease; }
 .delay-undo--open { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 .delay-undo__text { min-width: 0; }
 .delay-undo__back { flex: none; min-height: 32px; padding: 0 11px; border-radius: 9px; color: var(--ink); background: #fff; font-size: 13px; font-weight: 600; }
@@ -305,7 +304,7 @@
   .delay-dock .button { min-height: 52px; border-radius: 15px; font-size: 16px; }
   /* Плашка «Вернуть» — над панелью (72 px) с зазором 10, во всю ширину экрана;
      навигацию и панель не закрывает. */
-  .delay-undo, .app-shell--sidebar-collapsed .delay-undo { left: 16px; right: 16px; bottom: calc(64px + 82px + env(safe-area-inset-bottom)); width: auto; max-width: none; justify-content: space-between; }
+  .delay-undo { left: 16px; right: 16px; bottom: calc(64px + 82px + env(safe-area-inset-bottom)); width: auto; max-width: none; justify-content: space-between; }
   .delay-undo__back { min-height: 44px; font-size: 14px; }
   /* Место под панель: обычные 90 px под навигацию плюс высота самой панели. */
   .app-content:has(.delay-dock) { padding-bottom: calc(90px + 72px + env(safe-area-inset-bottom)); }

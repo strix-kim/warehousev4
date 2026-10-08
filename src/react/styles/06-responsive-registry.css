@@ -35,7 +35,7 @@
   .data-table.data-table--registry tbody tr td:nth-child(n + 3):not(.registry-only-desktop):not(.registry-empty) { align-items: flex-start; }
   /* Над нижней навигацией (её высота 64 px), тем же отступом, что у полосы выбора
      в редакторе, — две панели не должны стоять на разной высоте. */
-  .bulk-bar, .app-shell--sidebar-collapsed .bulk-bar { left: 15px; right: 15px; bottom: calc(76px + env(safe-area-inset-bottom)); width: auto; max-width: none; margin: 0; flex-wrap: wrap; }
+  .bulk-bar { left: 15px; right: 15px; bottom: calc(76px + env(safe-area-inset-bottom)); width: auto; max-width: none; margin: 0; flex-wrap: wrap; }
   .bulk-bar .button { flex: 1 1 40%; }
   /* Панель в две строки (счётчик · «Снять» · «Список») — 110 px плюс 76 от низа. */
   .app-content:has(.bulk-bar) { padding-bottom: calc(200px + env(safe-area-inset-bottom)); }

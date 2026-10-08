@@ -44,11 +44,9 @@
 .select-all { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; }
 .select-all input:disabled { cursor: default; }
 
-/* Панель действий над выбранным составом. Левый край считаем от сайдбара, а не
-   от окна: fixed не знает про сетку оболочки, и по центру ЭКРАНА панель заезжала
-   бы под меню. transition повторяет анимацию сворачивания сайдбара. */
-.bulk-bar { position: fixed; z-index: 14; left: 256px; right: 0; bottom: 22px; width: max-content; max-width: calc(100vw / var(--app-zoom) - 300px); margin-inline: auto; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid rgba(255,255,255,.16); border-radius: var(--r-lg); color: #fff; background: rgba(15,17,21,.96); box-shadow: 0 14px 36px rgba(15,17,21,.28); backdrop-filter: blur(14px); transition: left .22s ease; animation: slide-soft .2s ease both; }
-.app-shell--sidebar-collapsed .bulk-bar { left: 76px; max-width: calc(100vw / var(--app-zoom) - 120px); }
+/* Панель действий над выбранным составом — по центру окна: навигация с с59
+   сверху, и слева панели обходить нечего. 44 px — поля от краёв окна. */
+.bulk-bar { position: fixed; z-index: 14; left: 0; right: 0; bottom: 22px; width: max-content; max-width: calc(100vw / var(--app-zoom) - 44px); margin-inline: auto; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid rgba(255,255,255,.16); border-radius: var(--r-lg); color: #fff; background: rgba(15,17,21,.96); box-shadow: 0 14px 36px rgba(15,17,21,.28); backdrop-filter: blur(14px); animation: slide-soft .2s ease both; }
 .bulk-bar > span { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; }
 .bulk-bar strong { min-width: 26px; height: 26px; display: inline-grid; place-items: center; border-radius: var(--r-sm); background: var(--red-act); font-family: inherit; font-size: 13px; }
 .bulk-bar .button { min-height: 38px; }

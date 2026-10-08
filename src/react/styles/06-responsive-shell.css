@@ -1,74 +1,82 @@
-/* Адаптив ОБОЛОЧКИ (сайдбар → узкая колонка на 1050, → нижняя панель на 820,
-   .app-content). Вынесен из 06-responsive чистым переносом в с35, чтобы оболочку и
-   экраны правили разные руки. Импортируется перед 06-responsive: селекторы здесь
-   (.app-shell, .sidebar*, .language-switch--compact, .app-content) с правилами
+/* Адаптив ОБОЛОЧКИ (верхняя полоса: ступени ширины десктопа, → нижняя панель на
+   820, .app-content). Вынесен из 06-responsive чистым переносом в с35, чтобы
+   оболочку и экраны правили разные руки. Импортируется перед 06-responsive:
+   селекторы здесь (.app-shell, .appbar*, .user-copy, .app-content) с правилами
    того файла не пересекаются, поэтому порядок между ними каскад не меняет. */
 
-@media (max-width: 1050px) {
-  .app-shell { grid-template-columns: 76px minmax(0, 1fr); }
-  .sidebar { padding-inline: 10px; }
-  .sidebar__brand { justify-content: center; }
-  .sidebar__home small, .sidebar__brand > button, .sidebar__nav a span, .sidebar__count, .sidebar__scope span, .user-copy { display: none; }
-  /* Подпись группы — чертой, как в свёрнутом сайдбаре (02-shell). */
-  .nav-section-label { height: 1px; margin: 9px 12px; overflow: hidden; font-size: 0; background: var(--night-line); }
-  .nav-section-label:first-child { display: none; }
-  .sidebar__nav a { justify-content: center; padding: 0; }
-  .sidebar__nav a.active::before { left: -10px; }
-  .sidebar__scope { justify-content: center; padding: 12px 0; }
-  .sidebar__footer { grid-template-columns: 1fr; justify-items: center; }
-  .sidebar__utility { display: none; }
-  .app-shell--sidebar-collapsed .sidebar__home { display: flex; }
-  .app-shell--sidebar-collapsed .sidebar__brand > button { display: none; }
-  .sidebar__language { width: 100%; overflow: hidden; }
-  .language-switch--compact { grid-template-columns: 1fr; }
-  .language-switch--compact button { width: 100%; min-width: 0; padding-inline: 0; }
+/* Ступени верхней полосы (с59). Строка не переносится и не прокручивается —
+   вместо этого на каждой ступени что-то убирается. Все ступени — с нижней
+   границей 821: телефонный блок ниже их не видит и сбрасывать ему нечего.
+   Пороги взяты с запасом по оценке ширин подписей (русский и узбекский дают
+   близкую сумму): полная полоса ≈ 1690, без подписей края ≈ 1360. */
+
+/* До 1800 — без подписей правого края и без слова «Склад»: почта остаётся в
+   title аватара, имя «Нового списка» — в aria-label и title. */
+@media (min-width: 821px) and (max-width: 1799px) {
+  .appbar__home small, .appbar__quick strong, .appbar .user-copy { display: none; }
+  .appbar__quick { padding: 0 2px; }
+}
+
+/* До 1400 (в том числе 1280) — без счётчиков и плотнее: ≈ 1210. */
+@media (min-width: 821px) and (max-width: 1400px) {
+  .appbar { gap: 16px; }
+  .appbar__count { display: none; }
+  .appbar__nav > a, .appbar__more { gap: 6px; padding: 0 9px; }
+  .appbar__nav > a.active::before, .appbar__more.active::before { left: 9px; right: 9px; }
+}
+
+/* До 1279 — одни значки, как было в узком сайдбаре. Подпись скрыта визуально,
+   а не display: none — имя ссылки для экранного диктора остаётся. */
+@media (min-width: 821px) and (max-width: 1279px) {
+  .appbar__nav > a, .appbar__more { width: 40px; justify-content: center; padding: 0; }
+  .appbar__nav > a > span, .appbar__more > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .appbar__more svg.appbar__chevron { display: none; }
 }
 
 @media (max-width: 820px) {
+  /* Верхней полосы нет — и вычитать её из высоты окна нечего (01-tokens). */
+  :root { --appbar-h: 0px; }
   .app-shell { display: block; }
   /* Нижняя панель — СВЕТЛАЯ, как .p-tabs макета: полупрозрачная карточка с
      размытием и волосяной линией сверху. Тёмная она спорила со светлым экраном
-     и тянула взгляд вниз сильнее содержимого. Цвета тёмного сайдбара из 02-shell
-     здесь перекрыты один к одному — селекторы те же, выигрывает порядок. */
-  .sidebar { position: fixed; z-index: 15; top: auto; bottom: 0; width: 100%; height: calc(64px + env(safe-area-inset-bottom)); flex-direction: row; padding: 7px 12px calc(7px + env(safe-area-inset-bottom)); color: var(--muted); background: color-mix(in srgb, var(--card) 90%, transparent); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent); }
-  .sidebar::after { content: none; }
-  /* Белая обводка фокуса тёмного сайдбара (01-tokens) на светлой панели не видна. */
-  .sidebar :focus-visible { outline-color: var(--ink); }
-  .sidebar__brand, .sidebar__scope, .sidebar__footer, .nav-section-label { display: none; }
-  .sidebar__nav { width: auto; min-width: 0; display: flex; flex: 1; justify-content: center; gap: 4px; padding: 0; }
-  .sidebar__nav a { width: auto; min-width: 0; height: 50px; margin: 0; flex: 1; flex-direction: column; gap: 3px; color: var(--muted); font-size: 11px; font-weight: 600; }
-  .sidebar__nav a svg, .sidebar__more svg { width: 22px; height: 22px; color: inherit; }
-  .sidebar__nav a:hover { background: transparent; }
-  .sidebar__nav a.active, .sidebar__nav a.active svg { color: var(--ink); }
-  .sidebar__nav a span { display: block; }
-  .app-shell--sidebar-collapsed .sidebar__nav a span { display: block; }
-  /* Подсветку активной вкладки несёт индикатор (.sidebar__tab-ind, общий
+     и тянула взгляд вниз сильнее содержимого. Раскладка и цвета тёмной полосы из
+     02-shell здесь перекрыты один к одному — селекторы те же, выигрывает порядок. */
+  .appbar { position: fixed; z-index: 15; top: auto; bottom: 0; width: 100%; height: calc(64px + env(safe-area-inset-bottom)); align-items: stretch; gap: 0; overflow: hidden; padding: 7px 12px calc(7px + env(safe-area-inset-bottom)); color: var(--muted); background: color-mix(in srgb, var(--card) 90%, transparent); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent); }
+  /* Белая обводка фокуса тёмной полосы (01-tokens) на светлой панели не видна. */
+  .appbar :focus-visible { outline-color: var(--ink); }
+  /* Бренд и правый край (новый список, язык, аккаунт) уехали в лист «Ещё»:
+     постоянный слот под два символа RU/UZ стоил четверти ширины панели, а язык
+     переключают раз в жизни. */
+  .appbar__home, .appbar__end { display: none; }
+  .appbar__nav { width: auto; min-width: 0; flex: 1; align-items: stretch; justify-content: center; gap: 4px; padding: 0; }
+  .appbar__nav > a { width: auto; min-width: 0; height: 50px; margin: 0; flex: 1; flex-direction: column; justify-content: center; gap: 3px; padding: 0; color: var(--muted); font-size: 11px; font-weight: 600; white-space: normal; }
+  .appbar__nav > a svg, .appbar__more svg { width: 22px; height: 22px; color: inherit; }
+  .appbar__nav > a:hover, .appbar__more:hover, .appbar__more[aria-expanded='true'] { background: transparent; }
+  .appbar__nav > a.active, .appbar__nav > a.active svg, .appbar__more.active svg { color: var(--ink); }
+  /* Счётчики — только в верхней полосе: слоту в пятую часть экрана не до чисел. */
+  .appbar__count { display: none; }
+  /* Подсветку активной вкладки несёт индикатор (.appbar__tab-ind, общий
      layoutId в App.tsx): motion переносит его между вкладками за 200 мс. Свой
      фон и полоска у .active здесь сняты — иначе они вспыхивали бы на новой
      вкладке раньше, чем туда доедет индикатор. isolation — чтобы индикатор с
      z-index: -1 лёг под значок, но не под фон панели. */
-  .sidebar__nav a, .sidebar__more { position: relative; isolation: isolate; }
-  .sidebar__nav a.active, .sidebar__more.active { background: transparent; }
-  .sidebar__nav a.active::before { content: none; }
+  .appbar__nav > a, .appbar__more { position: relative; isolation: isolate; }
+  .appbar__nav > a.active, .appbar__more.active { background: transparent; }
+  .appbar__nav > a.active::before, .appbar__more.active::before { content: none; }
   /* Индикатор — серая плашка --select, как .p-tab-ind макета; красной метки
      над вкладкой в светлой панели нет: красный остаётся за главным действием. */
-  .sidebar__nav .sidebar__tab-ind { position: absolute; inset: 0; z-index: -1; border-radius: var(--r-lg); background: var(--select); }
+  .appbar__nav .appbar__tab-ind { position: absolute; inset: 0; z-index: -1; border-radius: var(--r-lg); background: var(--select); }
   /* Подпись вкладки — в одну строку (V-05): переноса слоту в 50 px не пережить. */
-  .sidebar__nav a span:not(.sidebar__tab-ind), .sidebar__more span:not(.sidebar__tab-ind) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  /* RU/UZ уехал в лист «Ещё»: постоянный слот под два символа стоил четверти
-     ширины панели, а язык переключают раз в жизни. */
-  .sidebar__language { display: none; }
+  .appbar__nav > a span:not(.appbar__tab-ind), .appbar__more span:not(.appbar__tab-ind) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* В нижней панели ровно пять вкладок: Главная, Техника, Списки, Залы, Ещё.
-     Сотрудники, Автомобили и Задержки живут в листе «Ещё» (пара в разметке:
+     Мероприятия, Сотрудники и Автомобили живут в листе «Ещё» (пара в разметке:
      NavLink с этим классом в App.tsx). Селектор с тегом —
-     ради специфичности: голый класс проигрывал `.sidebar__nav a { display: flex }`
+     ради специфичности: голый класс проигрывал `.appbar__nav > a { display: flex }`
      из 02-shell, и «Залы» стояли в нижней панели седьмым слотом (найдено в с30). */
-  .sidebar__nav a.sidebar__nav-extra { display: none; }
+  .appbar__nav > a.appbar__nav-extra { display: none; }
   /* «Ещё» стоит в одном ряду с пунктами меню — и выглядит как они. */
-  .sidebar__more { width: auto; min-width: 0; height: 50px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; margin: 0; padding: 0; border: 0; border-radius: var(--r-md); color: var(--muted); background: transparent; font-size: 11px; font-weight: 600; }
-  .sidebar__more.active { color: var(--ink); }
-  .language-switch--compact, .app-shell--sidebar-collapsed .language-switch--compact { height: 50px; grid-template-columns: 1fr 1fr; align-content: center; border: 0; background: transparent; }
-  .language-switch--compact button { min-width: 0; height: 44px; padding: 0; width: 100%; font-size: 11px; }
+  .appbar__more { width: auto; min-width: 0; height: 50px; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 3px; margin: 0; padding: 0; border: 0; border-radius: var(--r-md); color: var(--muted); background: transparent; font-size: 11px; font-weight: 600; white-space: normal; transition: none; }
+  .appbar__more.active { color: var(--ink); }
   .app-content { padding: 25px 15px calc(90px + env(safe-area-inset-bottom)); }
 }
 
@@ -79,6 +87,12 @@
    зеркало верхних 25px плюс safe-area: места под панель больше не держим, а
    место под липкую плашку редактора добавляет 06-responsive-editor. */
 @media (max-width: 700px) {
-  .app-shell--task .sidebar { display: none; }
+  .app-shell--task .appbar { display: none; }
   .app-shell--task .app-content { padding-bottom: calc(25px + env(safe-area-inset-bottom)); }
+}
+
+/* Навигация на бумаге не нужна ни на одной странице (gotchas §14). Залы прячут
+   её ещё и своим печатным блоком — тот обязан быть самодостаточным. */
+@media print {
+  .appbar { display: none; }
 }

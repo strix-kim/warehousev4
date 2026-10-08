@@ -1,5 +1,5 @@
-import { ArrowUpRight, Boxes, CalendarRange, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, MapIcon, PanelLeftClose, PanelLeftOpen, Presentation, RadioTower, Receipt, Users, Warehouse, X } from 'lucide-react'
-import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
+import { ArrowUpRight, Boxes, CalendarRange, CarFront, ChevronDown, ClipboardList, Ellipsis, House, ListPlus, LogOut, MapIcon, Presentation, RadioTower, Receipt, Users, Warehouse, X } from 'lucide-react'
+import { Suspense, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { AnimatePresence, m, type Transition } from 'motion/react'
 import { Link, matchPath, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AppErrorBoundary } from '../components/AppErrorBoundary'
@@ -15,6 +15,7 @@ import { reportAppError } from '../lib/reportAppError'
 import { hasUnsavedWork } from '../lib/unsavedRegistry'
 import { useArmedAction } from '../lib/useArmedAction'
 import { useModalLayer } from '../lib/useModalLayer'
+import { usePopoverLayer } from '../lib/usePopoverLayer'
 
 const loadLoginPage = () => import('../features/auth/LoginPage').then((module) => ({ default: module.LoginPage }))
 const loadEquipmentPage = () => import('../features/equipment/EquipmentPage').then((module) => ({ default: module.EquipmentPage }))
@@ -63,8 +64,8 @@ const WorldPage = lazyWithReload(() => import('../features/world/WorldPage').the
 const MotionNavLink = m.create(NavLink)
 
 // Пять вкладок телефона (макет с31): четыре раздела и «Ещё». Мероприятия,
-// Сотрудники, Автомобили, Задержки и Расходы на ≤820 живут в листе «Ещё», и на
-// их адресах подсвечивается именно «Ещё».
+// Сотрудники, Автомобили, Задержки, Расходы и Мир на ≤820 живут в листе «Ещё», и
+// на их адресах подсвечивается именно «Ещё».
 type PhoneTab = 'home' | 'equipment' | 'lists' | 'halls' | 'more'
 
 function isUnder(pathname: string, base: string) {
@@ -77,6 +78,15 @@ function phoneTabOf(pathname: string): PhoneTab {
   if (isUnder(pathname, '/lists')) return 'lists'
   if (isUnder(pathname, '/halls')) return 'halls'
   return 'more'
+}
+
+// Разделы меню «Ещё» верхней полосы (десктоп): редкие инструменты, которым не
+// хватило места в строке. На их адресах подсвечивается сама кнопка «Ещё».
+// Список адресов один — по нему же рисуются пункты меню (DesktopMoreMenu).
+const DESKTOP_MORE_PATHS = ['/delay', '/expenses', '/world']
+
+function isDesktopMorePath(pathname: string) {
+  return DESKTOP_MORE_PATHS.some((base) => isUnder(pathname, base))
 }
 
 // Режим «задача» (макет с31, решение прораба с35): редактор списка — как экран
@@ -161,7 +171,7 @@ export function App() {
         <Route path="/expenses" element={<RouteBoundary><ExpensesPage /></RouteBoundary>} />
         <Route path="/world" element={<RouteBoundary><WorldPage /></RouteBoundary>} />
       </Route>
-      {/* ТВ-режим — вне AppShell: на экране в зале не нужны ни сайдбар, ни
+      {/* ТВ-режим — вне AppShell: на экране в зале не нужны ни навигация, ни
           отступы приложения. Гейт сессии у маршрута свой, как у шелла. */}
       <Route path="/halls/:planId/tv" element={session ? <RouteBoundary variant="app"><HallTvPage /></RouteBoundary> : <LoginRedirect />} />
       <Route path="*" element={<Navigate to={session ? '/' : '/login'} replace />} />
@@ -199,8 +209,10 @@ function AppShell() {
   const { session, signOut } = useAuth()
   const { tr, locale } = useLanguage()
   const email = session?.user.email ?? tr('Сотрудник ARGO', 'ARGO xodimi')
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('argo:sidebar-collapsed') === 'true')
+  // «Ещё» — одна кнопка на оба вида: на телефоне открывает нижний лист, на
+  // десктопе — выпадающее меню полосы. Состояние общее, слой выбирает isPhone.
   const [isMoreOpen, setMoreOpen] = useState(false)
+  const moreButtonRef = useRef<HTMLButtonElement>(null)
   const [isPhone, setPhone] = useState(() => window.matchMedia(MOBILE_MEDIA_QUERY).matches)
   const { pathname } = useLocation()
   const navSummary = useNavSummary(pathname)
@@ -211,27 +223,23 @@ function AppShell() {
   // заново заводить таймер.
   const catalogWarmedRef = useRef(false)
 
-  // Лист закрывается на любую смену маршрута, а не только по своей ссылке:
+  // Лист и меню закрываются на любую смену маршрута, а не только по своей ссылке:
   // жест «назад» увёл бы страницу из-под открытого листа, и он остался бы
   // висеть поверх чужого экрана.
   useEffect(() => { setMoreOpen(false) }, [pathname])
 
   // Индикатор вкладки и подпись «Техника» — только телефонные, поэтому граница
-  // нужна в JS, а не одним CSS. Лист «Ещё» при переходе на десктоп закрывается:
-  // кнопки, которая его открыла, там нет.
+  // нужна в JS, а не одним CSS. «Ещё» при переходе границы закрывается в обе
+  // стороны: лист и меню — разные слои, и открытый не должен превратиться в другой.
   useEffect(() => {
     const media = window.matchMedia(MOBILE_MEDIA_QUERY)
     const handleChange = () => {
       setPhone(media.matches)
-      if (!media.matches) setMoreOpen(false)
+      setMoreOpen(false)
     }
     media.addEventListener('change', handleChange)
     return () => media.removeEventListener('change', handleChange)
   }, [])
-
-  useEffect(() => {
-    window.localStorage.setItem('argo:sidebar-collapsed', String(sidebarCollapsed))
-  }, [sidebarCollapsed])
 
   useEffect(() => {
     const moduleTimer = window.setTimeout(() => {
@@ -335,50 +343,42 @@ function AppShell() {
   }, [pathname])
 
   // Открытый лист забирает подсветку себе, как в макете: индикатор уезжает на
-  // «Ещё», а вкладка текущего раздела гаснет до закрытия листа.
-  const activeTab: PhoneTab = isMoreOpen ? 'more' : phoneTabOf(pathname)
-  const tabClass = ({ isActive }: { isActive: boolean }) => (isActive && !isMoreOpen ? 'active' : '')
+  // «Ещё», а вкладка текущего раздела гаснет до закрытия листа. Это телефон; на
+  // десктопе открытое меню подсветку не трогает — раздел остаётся виден в строке.
+  const isSheetOpen = isPhone && isMoreOpen
+  const activeTab: PhoneTab = isSheetOpen ? 'more' : phoneTabOf(pathname)
+  const isMoreActive = isPhone ? activeTab === 'more' : isDesktopMorePath(pathname)
+  const tabClass = ({ isActive }: { isActive: boolean }) => (isActive && !isSheetOpen ? 'active' : '')
   const tabPress = isPhone ? TAB_PRESS : undefined
   // Один элемент с общим layoutId: motion переносит его из вкладки во вкладку.
   // На десктопе его нет вовсе — там подсветку рисует .active, как и раньше.
   const tabIndicator = (tab: PhoneTab) => (isPhone && activeTab === tab
-    ? <m.span layoutId="phone-tab-indicator" className="sidebar__tab-ind" transition={TAB_INDICATOR_TRANSITION} aria-hidden="true" />
+    ? <m.span layoutId="phone-tab-indicator" className="appbar__tab-ind" transition={TAB_INDICATOR_TRANSITION} aria-hidden="true" />
     : null)
   // Число у пункта меню; сводки нет — нет и элемента. <em>, а не <span>: подпись
-  // пункта — это span, и правила подписей в узком сайдбаре и в нижней панели
+  // пункта — это span, и правила подписей в узкой полосе и в нижней панели
   // (06-responsive-shell) не должны задевать счётчик.
   const navCount = (value: number | undefined) => (value === undefined
     ? null
-    : <em className="sidebar__count">{value.toLocaleString(locale)}</em>)
+    : <em className="appbar__count">{value.toLocaleString(locale)}</em>)
 
   return (
-    <div className={`app-shell ${sidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}${isTaskRoute(pathname) ? ' app-shell--task' : ''}`}>
-      <aside className="sidebar">
-        <div className="sidebar__brand">
-          {/* Знак — SVG из точек (ArgoDots), а не картинка: растровых ассетов в
-              продукте нет, и точки берут цвет из currentColor. */}
-          <Link className="sidebar__home" to="/" aria-label={tr('Вернуться на главную', 'Bosh sahifaga qaytish')}>
-            <ArgoDots className="sidebar__mark" />
-            <small>{tr('Склад', 'Ombor')}</small>
-          </Link>
-          <button
-            className="icon-button icon-button--dark sidebar__toggle"
-            onClick={() => setSidebarCollapsed((current) => !current)}
-            aria-label={sidebarCollapsed ? tr('Развернуть меню', 'Menyuni ochish') : tr('Свернуть меню', 'Menyuni yig‘ish')}
-            aria-expanded={!sidebarCollapsed}
-            title={sidebarCollapsed ? tr('Развернуть меню', 'Menyuni ochish') : tr('Свернуть меню', 'Menyuni yig‘ish')}
-          >
-            {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-          </button>
-        </div>
+    <div className={`app-shell${isTaskRoute(pathname) ? ' app-shell--task' : ''}`}>
+      {/* Одна разметка на оба вида: на десктопе — тёмная полоса сверху (решение
+          прораба с59, до него — сайдбар слева), на телефоне — нижняя панель из
+          пяти вкладок. Вид переключает 06-responsive-shell. */}
+      <header className="appbar">
+        {/* Знак — SVG из точек (ArgoDots), а не картинка: растровых ассетов в
+            продукте нет, и точки берут цвет из currentColor. */}
+        <Link className="appbar__home" to="/" aria-label={tr('Вернуться на главную', 'Bosh sahifaga qaytish')}>
+          <ArgoDots className="appbar__mark" />
+          <small>{tr('Склад', 'Ombor')}</small>
+        </Link>
 
         {/* layoutRoot — только на телефоне: там панель fixed, и без него motion
             прибавил бы к пути индикатора прокрутку страницы (смена раздела
             сбрасывает её между замерами). */}
-        <m.nav className="sidebar__nav" layoutRoot={isPhone} aria-label={tr('Основная навигация', 'Asosiy navigatsiya')}>
-          {/* Три группы, как в макете. Подписи групп — только в широком сайдбаре:
-              в узком и в нижней панели их прячет 06-responsive-shell. */}
-          <p className="nav-section-label">{tr('Склад', 'Ombor')}</p>
+        <m.nav className="appbar__nav" layoutRoot={isPhone} aria-label={tr('Основная навигация', 'Asosiy navigatsiya')}>
           <MotionNavLink to="/" end className={tabClass} whileTap={tabPress}>{tabIndicator('home')}<House size={19} /><span>{tr('Главная', 'Bosh sahifa')}</span></MotionNavLink>
           {/* На телефоне — «Техника»: в слоте шириной в пятую часть экрана
               «Оборудование» слипалось с соседями (V-05 макета). Счётчик —
@@ -387,76 +387,75 @@ function AppShell() {
           {/* Счётчика у «Списков» нет: home_summary их не считает, а второй
               источник числа ради меню не заводим. */}
           <MotionNavLink to="/lists" className={tabClass} whileTap={tabPress}>{tabIndicator('lists')}<ClipboardList size={19} /><span>{tr('Списки', 'Ro‘yxatlar')}</span></MotionNavLink>
-          <p className="nav-section-label">{tr('Люди и площадка', 'Odamlar va maydon')}</p>
-          {/* Сотрудники, Автомобили и Задержки на телефоне в нижнюю панель не
+          {/* Мероприятия, Сотрудники и Автомобили на телефоне в нижнюю панель не
               входят: там ровно пять вкладок (Главная, Техника, Списки, Залы, Ещё),
               шестая ужала бы подписи до слипания. На ≤820 эти ссылки прячутся
-              (sidebar__nav-extra), а сами разделы живут в листе «Ещё».
-              Мероприятия — первыми в группе: к ним привязаны и люди, и залы.
+              (appbar__nav-extra), а сами разделы живут в листе «Ещё».
+              Мероприятия — перед людьми и залами: к ним привязаны и те, и другие.
               Счётчика нет: home_summary мероприятия не считает. */}
-          <NavLink className="sidebar__nav-extra" to="/projects"><CalendarRange size={19} /><span>{tr('Мероприятия', 'Tadbirlar')}</span></NavLink>
-          <NavLink className="sidebar__nav-extra" to="/employees"><Users size={19} /><span>{tr('Сотрудники', 'Xodimlar')}</span>{navCount(navSummary?.employees.count)}</NavLink>
-          <NavLink className="sidebar__nav-extra" to="/vehicles"><CarFront size={19} /><span>{tr('Автомобили', 'Avtomobillar')}</span>{navCount(navSummary?.vehicles.count)}</NavLink>
+          <NavLink className="appbar__nav-extra" to="/projects"><CalendarRange size={19} /><span>{tr('Мероприятия', 'Tadbirlar')}</span></NavLink>
+          <NavLink className="appbar__nav-extra" to="/employees"><Users size={19} /><span>{tr('Сотрудники', 'Xodimlar')}</span>{navCount(navSummary?.employees.count)}</NavLink>
+          <NavLink className="appbar__nav-extra" to="/vehicles"><CarFront size={19} /><span>{tr('Автомобили', 'Avtomobillar')}</span>{navCount(navSummary?.vehicles.count)}</NavLink>
           <MotionNavLink to="/halls" className={tabClass} whileTap={tabPress}>{tabIndicator('halls')}<Presentation size={19} /><span>{tr('Залы', 'Zallar')}</span></MotionNavLink>
-          <p className="nav-section-label">{tr('Инструменты', 'Asboblar')}</p>
-          {/* В сайдбаре — «Задержки ITC», как в макете: полное «Задержка излучателей»
-              ломалось на две строки. Полное имя — в заголовке страницы и в листе «Ещё». */}
-          <NavLink className="sidebar__nav-extra" to="/delay"><RadioTower size={19} /><span>{tr('Задержки ITC', 'ITC kechikishlari')}</span></NavLink>
-          {/* Счётчика нет: home_summary расходы не считает, а журнал у каждого свой. */}
-          <NavLink className="sidebar__nav-extra" to="/expenses"><Receipt size={19} /><span>{tr('Расходы', 'Xarajatlar')}</span></NavLink>
-          <NavLink className="sidebar__nav-extra" to="/world"><MapIcon size={19} /><span>{tr('Мир', 'Dunyo')}</span></NavLink>
-          {/* Пятый слот нижней панели, на десктопе скрыт: язык, аккаунт, быстрый
-              переход в новый список и три раздела сверх пяти живут в сайдбаре,
-              которого на телефоне нет. Горит и на адресах этих разделов. */}
+          {/* «Ещё»: на телефоне — пятый слот нижней панели (лист с языком,
+              аккаунтом, новым списком и разделами сверх пяти), на десктопе —
+              меню редких инструментов, которым не хватило строки. Горит и на
+              адресах этих разделов. Раскрытие, а не role="menu": внутри обычные
+              ссылки, и Tab по ним ходит без стрелочной навигации. */}
           <m.button
+            ref={moreButtonRef}
             type="button"
-            className={`sidebar__more ${activeTab === 'more' ? 'active' : ''}`}
-            onClick={() => setMoreOpen(true)}
+            className={`appbar__more ${isMoreActive ? 'active' : ''}`}
+            onClick={() => setMoreOpen((current) => (isPhone ? true : !current))}
             whileTap={tabPress}
-            aria-haspopup="dialog"
+            aria-haspopup={isPhone ? 'dialog' : undefined}
+            aria-controls={isPhone ? undefined : DESKTOP_MORE_MENU_ID}
             aria-expanded={isMoreOpen}
           >
-            {tabIndicator('more')}<Ellipsis size={19} /><span>{tr('Ещё', 'Yana')}</span>
+            {tabIndicator('more')}<Ellipsis size={19} /><span>{tr('Ещё', 'Yana')}</span>{!isPhone && <ChevronDown className="appbar__chevron" size={14} />}
           </m.button>
+          {!isPhone && isMoreOpen && <DesktopMoreMenu buttonRef={moreButtonRef} onClose={() => setMoreOpen(false)} />}
         </m.nav>
 
-        <div className="sidebar__utility">
-          <NavLink className="sidebar__quick-action" to="/lists/new">
-            <span><ListPlus size={19} /></span>
-            <div><strong>{tr('Новый список', 'Yangi ro‘yxat')}</strong><small>{tr('Собрать комплект', 'Jamlanma tuzish')}</small></div>
-            <ArrowUpRight size={16} />
+        {/* Правый край полосы; на телефоне скрыт целиком — его содержимое живёт
+            в листе «Ещё». */}
+        <div className="appbar__end">
+          {/* Подпись видна только на широком экране (06-responsive-shell), поэтому
+              имя ссылки держит aria-label, а подсказку — title. */}
+          <NavLink className="appbar__quick" to="/lists/new" aria-label={tr('Новый список', 'Yangi ro‘yxat')} title={tr('Новый список — собрать комплект', 'Yangi ro‘yxat — jamlanma tuzish')}>
+            <span><ListPlus size={18} /></span>
+            <strong>{tr('Новый список', 'Yangi ro‘yxat')}</strong>
           </NavLink>
-        </div>
 
-        {/* Локация одна на весь каталог, выбирать не из чего: строка осталась
-            реквизитом склада — без подписи «текущая» и без шеврона, который
-            ничего не открывал. */}
-        <div className="sidebar__scope">
-          <Warehouse size={18} />
-          <span><strong>{tr('Офис · Ташкент', 'Ofis · Toshkent')}</strong></span>
-        </div>
+          <div className="appbar__language"><LanguageSwitcher compact /></div>
 
-        <div className="sidebar__language"><LanguageSwitcher compact /></div>
-
-        <div className="sidebar__footer">
-          {/* Инициалы вместо фото: растровых картинок в продукте нет, а чужой
-              портрет у каждого сотрудника врал бы. */}
-          <div className="user-avatar" aria-hidden="true">{initialsOf(email)}</div>
-          <div className="user-copy">{signOutConfirm.armed
-            ? <><strong>{tr('Выйти? Несохранённое пропадёт', 'Chiqasizmi? Saqlanmagan ish yo‘qoladi')}</strong><span>{tr('Нажмите ещё раз', 'Yana bir bor bosing')}</span></>
-            : <><strong>{email.split('@')[0]}</strong><span>{email}</span></>}</div>
-          {/* onMouseDown — Safari: иначе onBlur гасит взвод раньше второго click
-              (gotchas §6). title — для свёрнутого сайдбара, где .user-copy скрыт. */}
-          <button
-            className="icon-button icon-button--dark"
-            onClick={signOutConfirm.requestSignOut}
-            onBlur={signOutConfirm.disarm}
-            onMouseDown={(event) => { if (signOutConfirm.armed) event.preventDefault() }}
-            aria-label={signOutLabel}
-            title={signOutConfirm.armed ? signOutLabel : undefined}
-          ><LogOut size={18} /></button>
+          <div className="appbar__account">
+            {/* Инициалы вместо фото: растровых картинок в продукте нет, а чужой
+                портрет у каждого сотрудника врал бы. title — почта: подпись
+                рядом видна только на широком экране. */}
+            <div className="user-avatar" aria-hidden="true" title={email}>{initialsOf(email)}</div>
+            <div className="user-copy"><strong>{email.split('@')[0]}</strong><span>{email}</span></div>
+            {/* onMouseDown — Safari: иначе onBlur гасит взвод раньше второго click
+                (gotchas §6). */}
+            <button
+              className="icon-button icon-button--dark"
+              onClick={signOutConfirm.requestSignOut}
+              onBlur={signOutConfirm.disarm}
+              onMouseDown={(event) => { if (signOutConfirm.armed) event.preventDefault() }}
+              aria-label={signOutLabel}
+              title={signOutLabel}
+            ><LogOut size={18} /></button>
+            {/* Вопрос взвода — плашкой под кнопкой, а не вместо подписи: подпись
+                на обычном ноутбуке скрыта, и взвод остался бы невидимым; а подмена
+                текста в строке сдвинула бы кнопку из-под курсора перед вторым
+                нажатием. */}
+            {signOutConfirm.armed && <div className="appbar__confirm" role="status">
+              <strong>{tr('Выйти? Несохранённое пропадёт', 'Chiqasizmi? Saqlanmagan ish yo‘qoladi')}</strong>
+              <span>{tr('Нажмите ещё раз', 'Yana bir bor bosing')}</span>
+            </div>}
+          </div>
         </div>
-      </aside>
+      </header>
 
       {/* Сетку фона включает оболочка, а не страница: поле — вся колонка, а
           .home-screen кончается на паддингах .app-content, и линии обрывались бы. */}
@@ -466,19 +465,71 @@ function AppShell() {
 
       {/* AnimatePresence держит лист в DOM, пока он уезжает вниз. */}
       <AnimatePresence>
-        {isMoreOpen && <MobileMoreSheet key="more" email={email} onSignOut={() => void signOut()} onClose={() => setMoreOpen(false)} />}
+        {isSheetOpen && <MobileMoreSheet key="more" email={email} onSignOut={() => void signOut()} onClose={() => setMoreOpen(false)} />}
       </AnimatePresence>
     </div>
   )
 }
 
-// Нижний лист телефона: то, что на десктопе висит в сайдбаре постоянно.
+// Меню «Ещё» верхней полосы (десктоп). Не портал и не fixed: абсолютный блок
+// внутри липкой полосы едет вместе с ней, и координаты от getBoundingClientRect
+// под zoom широкого экрана считать не нужно (gotchas §16). Пункты — полные имена
+// разделов, как в листе телефона: места здесь хватает.
+const DESKTOP_MORE_MENU_ID = 'appbar-more-menu'
+
+function DesktopMoreMenu({ buttonRef, onClose }: { buttonRef: RefObject<HTMLButtonElement | null>; onClose: () => void }) {
+  const { tr } = useLanguage()
+  const menuRef = useRef<HTMLDivElement>(null)
+  // Клик мимо, Escape, прокрутка и смена размера окна — общий слой поповеров.
+  usePopoverLayer(true, onClose, [buttonRef, menuRef])
+
+  // Возврат фокуса на кнопку — на размонтировании, одной точкой для всех причин
+  // закрытия (Escape, клик мимо, переход по пункту). Только если фокус потерян:
+  // пункт исчез вместе с меню или клик пришёлся в нефокусируемое место. Нажали
+  // на поле или кнопку — фокус уже там, и отбирать его нельзя. Таймер — потому
+  // что клик мимо закрывает меню на pointerdown, а фокус браузер снимает позже,
+  // на mousedown.
+  useEffect(() => {
+    const button = buttonRef.current
+    return () => {
+      window.setTimeout(() => {
+        const active = document.activeElement
+        if (button?.isConnected && (active === null || active === document.body)) button.focus({ preventScroll: true })
+      }, 0)
+    }
+  }, [buttonRef])
+
+  return (
+    <div
+      ref={menuRef}
+      id={DESKTOP_MORE_MENU_ID}
+      className="appbar__menu"
+      // Tab увёл фокус за меню — оно закрывается. relatedTarget пуст при клике
+      // мышью (в Safari — по любой ссылке): это не уход, клик мимо ловит слой.
+      onBlur={(event) => {
+        const next = event.relatedTarget
+        if (next instanceof Node && !menuRef.current?.contains(next) && !buttonRef.current?.contains(next)) onClose()
+      }}
+    >
+      {/* Порядок — как в DESKTOP_MORE_PATHS: по этому списку горит кнопка «Ещё». */}
+      <NavLink to="/delay"><RadioTower size={18} /><span>{tr('Задержка излучателей', 'Nurlatgichlar kechikishi')}</span></NavLink>
+      {/* Счётчика нет: home_summary расходы не считает, а журнал у каждого свой. */}
+      <NavLink to="/expenses"><Receipt size={18} /><span>{tr('Производственные расходы', 'Ishlab chiqarish xarajatlari')}</span></NavLink>
+      <NavLink to="/world"><MapIcon size={18} /><span>{tr('Мир', 'Dunyo')}</span></NavLink>
+      {/* Локация одна на весь каталог, выбирать не из чего: строка осталась
+          реквизитом склада. В полосе ей места нет — стоит подвалом меню. */}
+      <p className="appbar__scope"><Warehouse size={16} /><span>{tr('Офис · Ташкент', 'Ofis · Toshkent')}</span></p>
+    </div>
+  )
+}
+
+// Нижний лист телефона: то, что на десктопе стоит в верхней полосе постоянно.
 // Отдельный слой, а не выпадашка: панель навигации фиксирована у нижнего края,
 // и попап пришлось бы позиционировать вручную поверх safe-area.
 function MobileMoreSheet({ email, onSignOut, onClose }: { email: string; onSignOut: () => void; onClose: () => void }) {
   const { tr } = useLanguage()
   useModalLayer(onClose)
-  // Свой взвод, а не сайдбара: лист закрылся — взвод ушёл вместе с ним.
+  // Свой взвод, а не полосы: лист закрылся — взвод ушёл вместе с ним.
   const signOutConfirm = useSignOutConfirm(onSignOut)
 
   return (
@@ -487,15 +538,15 @@ function MobileMoreSheet({ email, onSignOut, onClose }: { email: string; onSignO
         <strong>{tr('Ещё', 'Yana')}</strong>
         <button autoFocus className="icon-button icon-button--bordered" onClick={onClose} aria-label={tr('Закрыть', 'Yopish')}><X size={19} /></button>
       </div>
-      {/* Тот же путь, что у быстрого действия сайдбара: на телефоне сайдбар
-          скрыт, и одношаговый вход в сборку комплекта пропадал. Единственный
-          красный значок листа — главное действие (V-17 макета). */}
+      {/* Тот же путь, что у быстрого действия верхней полосы: на телефоне её
+          правый край скрыт, и одношаговый вход в сборку комплекта пропадал.
+          Единственный красный значок листа — главное действие (V-17 макета). */}
       <Link className="sheet__action" to="/lists/new" onClick={onClose}>
         <span><ListPlus size={19} /></span>
         <div><strong>{tr('Новый список', 'Yangi ro‘yxat')}</strong><small>{tr('Собрать комплект', 'Jamlanma tuzish')}</small></div>
         <ArrowUpRight size={16} />
       </Link>
-      {/* Разделы, которым нет слота в нижней панели (см. sidebar__nav-extra).
+      {/* Разделы, которым нет слота в нижней панели (см. appbar__nav-extra).
           Значки серые: красный остаётся за «Новым списком». */}
       <nav className="sheet__nav" aria-label={tr('Другие разделы', 'Boshqa bo‘limlar')}>
         <NavLink to="/projects" onClick={onClose}><span><CalendarRange size={19} /></span>{tr('Мероприятия', 'Tadbirlar')}</NavLink>
@@ -543,7 +594,7 @@ function RouteBoundary({ children, variant = 'page' }: { children: ReactNode; va
 
 // Dev-триггер постраничной границы. Отдельный компонент, а не проверка в теле
 // RouteBoundary: бросок обязан случиться ВНУТРИ границы, иначе его поймает
-// вышестоящая корневая и унесёт сайдбар.
+// вышестоящая корневая и унесёт навигацию.
 function CrashTrigger({ search }: { search: string }) {
   if (new URLSearchParams(search).get('__crash') === '1') throw new Error('проверка границы')
   return null

@@ -97,7 +97,7 @@
    Вычет 376px — шапка, сводка, поля страницы и ряд позиций под таблицей
    (замер на 1440×900 — 373 px плюс запас на округление): страница целиком
    встаёт в окно, а длинная матрица листается внутри. */
-.hall-matrix-scroll { max-height: calc(100vh / var(--app-zoom) - 376px); min-height: 220px; overflow: auto; border-bottom: 1px solid var(--line-2); background: var(--card); }
+.hall-matrix-scroll { max-height: calc(100vh / var(--app-zoom) - 376px - var(--appbar-h)); min-height: 220px; overflow: auto; border-bottom: 1px solid var(--line-2); background: var(--card); }
 
 /* Матрица и плитка «+ Зал» — одна полоса: кнопка стоит справа от последнего
    зала и уезжает вместе с ним. min-width: 100% растягивает полосу на контейнер,
@@ -317,7 +317,7 @@
 
    ВСЁ висит на маркере `.hall-print`, который HallPlanPage вешает на body при
    монтировании и снимает при уходе. До с24 блок был написан глобальными
-   селекторами (`:root`, `.sidebar`, `.data-panel`), а CSS ленивого чанка при
+   селекторами (`:root`, `.sidebar` — тогдашняя навигация, `.data-panel`), а CSS ленивого чанка при
    уходе со страницы НЕ выгружается — и печать каталога портилась после любого
    захода в «Залы».
 
@@ -342,7 +342,7 @@
 
   /* Всё интерактивное: навигация, кнопки шапки, добавление зала и позиций,
      подтверждения удаления, пикер клетки. */
-  .hall-print .sidebar,
+  .hall-print .appbar,
   .hall-print .editor-header > .icon-button,
   .hall-print .editor-header__actions,
   .hall-print .hall-add-column,
