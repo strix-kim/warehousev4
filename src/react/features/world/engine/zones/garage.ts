@@ -26,6 +26,11 @@ const BAYS = 3, VAN_SLOT = 5, CAR_MAX = 8
 const BAY_NOSE = 4.7, PAD_Z = 6.6, VAN_Z = 6.9
 // Место под новую машину: основание пунктира
 const SPOT_W = 2.6, SPOT_D = 5
+// Таблички (w-tag) двух рядов одного столбца на экране стояли друг на друге: якорь над
+// передком машины в проёме и якорь над крышей машины перед ним разделяли ~20 px при
+// плашке 28 px. Задний ряд поднят на перемычку над проёмом (стена — 4 м, лента ворот —
+// до 3 м), крайние столбцы разведены от среднего: в ряду плашке шире шага столбца тесно
+const BAY_TAG_Y = 3.6, TAG_SPREAD = 0.3
 
 // Локальный x места: проём или место ряда перед ним (с четвёртого — правее площадки)
 const slotX = (slot: number) => bayX(slot < BAYS ? slot : slot - BAYS)
@@ -50,8 +55,10 @@ export function fillGarage(ctx: WorldCtx, zone: THREE.Group, garage: THREE.Group
     v.traverse((o) => { o.userData.car = id })
     garage.add(v)
     ctx.roots.set(id, v)
-    // Табличка — над крышей; у машины в проёме крыша под коробкой гаража — над передком
-    label(ctx, v, id, 'w-tag', 0, (v.userData.top as number) + 0.5, bay ? len / 2 - 0.6 : 0).userData.inside = SITE
+    // Табличка — над крышей; у машины в проёме крыша под коробкой гаража — над передком,
+    // на перемычке. Столбцы правее среднего сдвинуты вместе: шаг между ними прежний
+    const tagX = Math.sign((bay ? slot : slot - BAYS) - 1) * TAG_SPREAD
+    label(ctx, v, id, 'w-tag', tagX, bay ? BAY_TAG_Y : (v.userData.top as number) + 0.5, bay ? len / 2 - 0.6 : 0).userData.inside = SITE
     // Кольцо: у машины в проёме из-под ворот видна только его передняя половина
     ctx.rings.set(id, makeRing(ctx, zone, bay ? 1.5 : 1.9, GX + x, GZ + (bay ? BAY_NOSE - 0.5 : z), 0.07, 0.9, 0.09))
   }

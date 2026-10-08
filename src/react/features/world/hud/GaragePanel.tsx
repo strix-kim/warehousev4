@@ -11,9 +11,15 @@ import './world-garage.css'
 
 // Табличка машины — госномер кнопкой в якоре движка (класс w-tag, ключ — carId): она же
 // дубль цели в сцене для клавиатуры и скринридера. Клик выбирает машину — карточка
-// справа, действия в ней. У машины без водителя в конце таблички бейдж «!» (тот же знак,
+// справа, действия в ней. У машины без водителя на углу таблички бейдж «!» (тот же знак,
 // что у кафе с делом про обед — world-venues.css). Якоря нет (движок машину не поставил) —
-// таблички нет.
+// таблички нет. В компактной сцене шести номерам целиком тесно: невыбранная машина
+// показывает короткий номер, выбранная — полный (world-garage.css); имя кнопки — всегда
+// полный номер и марка.
+// Короткий номер — трёхзначная группа цифр («01 T 769 MC» → «769», «01 439 SNA» → «439»):
+// по ней машины и различают на слух. Нет такой группы — последние три знака без пробелов.
+const shortPlate = (plate: string) => plate.split(/\D+/).find((group) => group.length === 3) ?? plate.replace(/\s/g, '').slice(-3)
+
 function CarTag({ store, car }: { store: WorldStore; car: WorldCar }) {
   const { tr } = useLanguage()
   const id = carId(car.id)
@@ -24,7 +30,9 @@ function CarTag({ store, car }: { store: WorldStore; car: WorldCar }) {
   const name = `${car.plate}, ${vehicleTitle(car.brand, car.model)}`
   return (
     <TagButton store={store} id={id} anchor={anchor} plate name={free ? `${name}. ${tr('Водитель не назначен', 'Haydovchi tayinlanmagan')}` : name}>
-      {car.plate}{free && <span className="w-tag__bang" aria-hidden="true">!</span>}
+      <span className="w-tag__full">{car.plate}</span>
+      <span className="w-tag__short">{shortPlate(car.plate)}</span>
+      {free && <span className="w-tag__bang" aria-hidden="true">!</span>}
     </TagButton>
   )
 }

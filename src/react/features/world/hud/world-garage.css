@@ -6,8 +6,21 @@
    ширина у неё та же, 336 px. Порядок файлов в бандле не закреплён — свои правила
    тяжелее соседских на класс. */
 
-/* Табличка машины — госномер: моноширинный, как на знаке (.plate) */
-.w-tag__btn.w-tag__btn--plate { font-family: var(--f-mono); letter-spacing: .02em; }
+/* Табличка машины — госномер: моноширинный, как на знаке (.plate). Поля уже, чем у
+   таблички участка, а «!» машины без водителя висит на углу, а не стоит в строке: ширина
+   плашки не зависит от бейджа и держится под шагом столбца машин на экране (расчёт —
+   zones/garage.ts, якоря). Выбранная лежит выше соседей: z-index якорю пишет рендерер
+   подписей инлайном (по дальности), перебить его можно только !important. */
+.w-tag__btn.w-tag__btn--plate { padding: 0 8px; font-family: var(--f-mono); letter-spacing: .02em; }
+.w-stage .w-tag__btn--plate .w-tag__bang { position: absolute; top: -8px; right: -6px; width: 16px; height: 16px; margin: 0; font-size: 12px; }
+.w-tag__short { display: none; }
+.w-tag.is-selected:has(.w-tag__btn--plate) { z-index: 1000 !important; }
+/* Компактная сцена: шести номерам целиком тесно (шаг столбца ~67 px) — невыбранная машина
+   показывает трёхзначную группу цифр, выбранная — номер целиком. Цель пальца — те же
+   ::before таблички (world-venues.css): 48 × 44 px при плашке 40 × 28. */
+.w-stage.is-sm .w-tag__btn--plate:not([aria-pressed="true"]) { min-width: 40px; justify-content: center; }
+.w-stage.is-sm .w-tag__btn--plate:not([aria-pressed="true"]) .w-tag__full { display: none; }
+.w-stage.is-sm .w-tag__btn--plate:not([aria-pressed="true"]) .w-tag__short { display: inline; }
 
 /* «К кампусу» — выход из гаража, на месте клавиш кампуса (их внутри нет). Та же плита
    с кромкой, что у клавиши: наведение приподнимает, нажатие вдавливает. */
