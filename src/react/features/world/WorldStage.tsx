@@ -48,9 +48,12 @@ type Props = {
   look: WorldLook
   // Миллисекунды от запроса чанка до первого кадра — цифра для dev-стенда
   onFirstFrame?: (ms: number) => void
+  // Сцены нет и не будет (unsupported, failed, lost). Главная по нему возвращает
+  // плитки; без колбэка (/world) остаётся запасной вид самой сцены.
+  onUnavailable?: () => void
 }
 
-export function WorldStage({ look, onFirstFrame }: Props) {
+export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
   const { tr, locale } = useLanguage()
   const navigate = useNavigate()
   // Зона живёт в адресе (?zone=): хозяин — адрес, мир только догоняет. Незнакомое
@@ -72,6 +75,11 @@ export function WorldStage({ look, onFirstFrame }: Props) {
   const [status, setStatus] = useState<Status>(() => (hasWebGL2() ? 'loading' : 'unsupported'))
   const onFirstFrameRef = useRef(onFirstFrame)
   useEffect(() => { onFirstFrameRef.current = onFirstFrame }, [onFirstFrame])
+  const onUnavailableRef = useRef(onUnavailable)
+  useEffect(() => { onUnavailableRef.current = onUnavailable }, [onUnavailable])
+  useEffect(() => {
+    if (status === 'unsupported' || status === 'failed' || status === 'lost') onUnavailableRef.current?.()
+  }, [status])
   const { palette, ink } = look
   // Мир собирается после загрузки чанка — к тому моменту облик мог смениться, поэтому
   // стартовое значение читается из ref. Живому миру смену передаёт эффект ниже.

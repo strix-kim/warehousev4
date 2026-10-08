@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type ComponentType } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState, type ComponentType } from 'react'
 import { DataAge } from '../../components/DataAge'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
@@ -9,26 +9,46 @@ import { fetchHomeSummary, readCachedHomeSummary, readCachedHomeSummaryMeta, typ
 import { HomeTiles } from './HomeTiles'
 import './home.css'
 
+type StageProps = { look: WorldLook; onUnavailable?: () => void }
+
+// Чанк сцены не приехал: рисовать нечего, остаётся сообщить главной — она вернёт плитки
+function WorldStageDown({ onUnavailable }: StageProps) {
+  useEffect(() => { onUnavailable?.() }, [onUnavailable])
+  return null
+}
+
 // Сцена мира — своим чанком: обвязка мира и three (его WorldStage тянет сам через
 // loadWorld) не входят в чанк главной и не запрашиваются, пока на устройстве выбраны
 // «Плитки». Не lazyWithReload: тот при провале чанка перезагружает страницу, а главная —
-// прежде всего навигация. Отказ оставляет след и отдаёт пустой компонент: слот
-// схлопывается, плитки под ним остаются как были.
-const WorldStage = lazy((): Promise<{ default: ComponentType<{ look: WorldLook }> }> => import('../world/WorldStage').then(
+// прежде всего навигация. Отказ оставляет след и отдаёт заглушку-вестника.
+const WorldStage = lazy((): Promise<{ default: ComponentType<StageProps> }> => import('../world/WorldStage').then(
   (module) => ({ default: module.WorldStage }),
   (error: unknown) => {
     reportAppError(error, { scope: 'chunk', route: '/', detail: { chunk: 'world-stage' } })
-    return { default: () => null }
+    return { default: WorldStageDown }
   },
 ))
+
+// 3D-вид отказал в этом сеансе (чанк не приехал, мир не собрался, браузер отобрал
+// контекст). На уровне модуля, а не в состоянии страницы: главная размонтируется при
+// каждом уходе в раздел, а возврат не должен снова упираться в тот же отказ. В настройку
+// устройства не пишем — после перезагрузки страницы 3D-вид пробуется заново.
+let worldUnavailable = false
 
 export function HomePage() {
   const { tr } = useLanguage()
   // Вид главной — настройка устройства (settings.ts), палитра мира — оттуда же:
-  // переключатели цвета и контура живут только на /world. Без WebGL2 выбирать не из
-  // чего — переключателя нет, чанк мира не запрашивается.
+  // переключатели цвета и контура живут только на /world. Без WebGL2 или после отказа
+  // движка выбирать не из чего — переключателя нет, чанк мира не запрашивается.
   const style = useWorldStyle()
-  const [canWorld] = useState(hasWebGL2)
+  const [hasWebGL] = useState(hasWebGL2)
+  const [worldDown, setWorldDown] = useState(() => worldUnavailable)
+  const dropWorld = useCallback(() => {
+    worldUnavailable = true
+    setWorldDown(true)
+  }, [])
+  const canWorld = hasWebGL && !worldDown
+  // Либо мир, либо плитки (решение прораба с59): под сценой плитки мешали «быть в игре»
   const showWorld = canWorld && style.home === 'world'
   const homeNames: Record<WorldHome, string> = { world: tr('3D-вид', '3D ko‘rinish'), tiles: tr('Плитки', 'Plitkalar') }
 
@@ -48,6 +68,8 @@ export function HomePage() {
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
+    // Сводка и списки нужны только плиткам: мир берёт свои числа сам (useWorldData)
+    if (showWorld) return
     let isCurrent = true
     // Показали кэш — обязаны перепроверить у сервера; «Обновить» обходит кэш всегда.
     const bypassCache = reloadKey > 0
@@ -89,10 +111,10 @@ export function HomePage() {
 
     void Promise.allSettled([summaryLoad, listsLoad]).then(() => { if (isCurrent) setIsFetching(false) })
     return () => { isCurrent = false }
-  }, [cachedLists, cachedSummary, listsQuery, reloadKey])
+  }, [cachedLists, cachedSummary, listsQuery, reloadKey, showWorld])
 
   return (
-    <section className="home-screen">
+    <section className={`home-screen${showWorld ? ' home-screen--world' : ''}`}>
       <header className="home-screen__head">
         <div>
           <p className="eyebrow">ARGO Warehouse</p>
@@ -109,21 +131,22 @@ export function HomePage() {
               ))}
             </div>
           )}
-          <DataAge touchedAt={dataAt} isRefreshing={isFetching} failed={summaryFailed} onRefresh={() => setReloadKey((value) => value + 1)} />
+          {/* Возраст — у сводки плиток; в мире её на экране нет */}
+          {!showWorld && <DataAge touchedAt={dataAt} isRefreshing={isFetching} failed={summaryFailed} onRefresh={() => setReloadKey((value) => value + 1)} />}
         </div>
       </header>
 
-      {/* Мир над плитками. Плитки его не ждут: они вне Suspense и рисуются из кэша
-          первым кадром; пока чанк сцены едет, слот держит высоту скелетом. */}
-      {showWorld && (
+      {/* Мир на всю высоту экрана; пока чанк сцены едет, слот держит скелет. Отказ
+          движка (onUnavailable) возвращает плитки вместо запасного вида сцены. */}
+      {showWorld ? (
         <div className="home-world">
           <Suspense fallback={<span className="home-world__skeleton" role="status" aria-label={tr('Загружаем мир…', 'Dunyo yuklanmoqda…')} />}>
-            <WorldStage look={style} />
+            <WorldStage look={style} onUnavailable={dropWorld} />
           </Suspense>
         </div>
+      ) : (
+        <HomeTiles summary={summary} lists={lists} summaryFailed={summaryFailed} listsFailed={listsFailed} />
       )}
-
-      <HomeTiles summary={summary} lists={lists} summaryFailed={summaryFailed} listsFailed={listsFailed} />
     </section>
   )
 }
