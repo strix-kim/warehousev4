@@ -11,7 +11,7 @@ export function WorldPage() {
   useDocumentTitle(tr('Мир', 'Dunyo'))
   const [firstFrameMs, setFirstFrameMs] = useState<number | null>(null)
   const [reduced] = useState(prefersReducedMotion)
-  // home пока только хранится: экран «Настройки» и выбор главной — Ш6
+  // home здесь не читается: вид главной выбирают на самой главной (HomePage)
   const style = useWorldStyle()
   const paletteNames: Record<WorldPalette, string> = { white: tr('Белая схема', 'Oq sxema'), night: tr('Ночь', 'Tun') }
   const inkNames: Record<WorldInk, string> = { ink1: tr('Мягче', 'Yumshoqroq'), ink2: tr('Светлый', 'Och'), ink3: tr('Бледный', 'Xira') }
