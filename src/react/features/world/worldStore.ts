@@ -25,13 +25,17 @@ export const gateId = (to: WorldZone, from: WorldZone) =>
 // с58; поле venueId — историческое имя этого id). lot — здание и весь надел, truck —
 // грузовик (у мероприятия есть списки), plan — стол с планом залов, cafe — кафе (обеды,
 // стоит всегда), stay — отель расселения: таблиц нет, стоит запертым и никуда не ведёт;
-// addtruck / addplan — пустое место под грузовик и стол с «плюсом».
+// crew — бригада: серые фигурки без имён по числу людей в составе (WorldLot.staff),
+// не больше CREW_MAX, остальное — числом на табличке; addtruck / addplan / addcrew —
+// пустое место под грузовик, стол и бригаду с «плюсом».
 // Клик по части в сцене только выбирает её (pick): панель участка открывается с этой
 // секцией, а действие — кнопкой в панели. Данные секций (id списков и планов) грузит
 // панель, движок их не знает; заодно палец на телефоне не уводит со сцены промахом.
-// Таблички cafe и stay: движок ставит якорь label под их id (класс w-tag), текст
+// Таблички cafe, stay и crew: движок ставит якорь label под их id (класс w-tag), текст
 // порталом кладёт VenuePanel — только у выбранного участка.
-export const LOT_PARTS = ['lot', 'truck', 'stay', 'plan', 'cafe', 'addtruck', 'addplan'] as const
+export const LOT_PARTS = ['lot', 'truck', 'stay', 'plan', 'cafe', 'crew', 'addtruck', 'addplan', 'addcrew'] as const
+// Сколько фигурок бригады встаёт на участке
+export const CREW_MAX = 6
 export type WorldLotPart = (typeof LOT_PARTS)[number]
 export const lotPartId = (part: WorldLotPart, venueId: string) => `${part}:${venueId}`
 // Пустая ячейка сетки после последнего участка — «Новое мероприятие»
@@ -43,7 +47,7 @@ export function parseLotId(id: string | null): { part: WorldLotPart; venueId: st
   return LOT_PARTS.includes(part) ? { part, venueId: id.slice(at + 1) } : null
 }
 // «Плюс» — пустое место, которое можно заполнить
-export const isAddId = (id: string) => id === ADD_LOT_ID || id.startsWith('addtruck:') || id.startsWith('addplan:')
+export const isAddId = (id: string) => id === ADD_LOT_ID || id.startsWith('addtruck:') || id.startsWith('addplan:') || id.startsWith('addcrew:')
 
 // «Где работали»: здание места и квартал (номер по порядку нарезки, с нуля)
 export const placeId = (archivePlaceId: string) => `place:${archivePlaceId}`
@@ -121,13 +125,10 @@ export type WorldTexts = { zones: Record<WorldZone, { name: string; sub: string 
        гасит, только is-hover / is-selected по стору.
    Модификаторы дописываются вторым классом: 'w-sign w-sign--lot'.
 
-   Владение файлами в заходе 2 Ш5 (три кодера параллельно, чужие файлы не править):
-     А — engine/zones/venues.ts, hud/VenuePanel.tsx, hud/world-venues.css;
-     Б — engine/zones/archive.ts, hud/ArchivePanel.tsx, hud/world-archive.css;
-     В — engine/selection.ts (ограда, «плюс»), hud/Plus.tsx и блок .w-plus в конце
-         hud/world-hud.css.
-   Общее и неприкосновенное для всех троих: worldStore.ts, createWorld.ts, pointer.ts,
-   hudLayout.ts, camera.ts, zones/layout.ts, groundLabel.ts, style.ts, WorldStage.tsx. */
+   «Плюсы» участка открывают действие хоста (actions/useWorldActions.ts): addtruck —
+   интерьер нового списка, addplan — дровер плана залов (action plan-new), addcrew —
+   дровер состава (action staff); оба дровера несут lotId. Те же действия зовут секции
+   панели участка через onAction. */
 
 export type WorldState = {
   // Зона под камерой и зоны, построенные на карте (в порядке ряда). Массив меняется
