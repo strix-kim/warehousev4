@@ -5,9 +5,11 @@
       подъём на ступень → посадка на крышу без ножки → компактный вид → скрыта.
       Вернуться на ступень лучше можно только с запасом +10 px — без мерцания на границе
       при повороте камеры.
-   3. Чипы имён — ниже всех: не двигаются и не гаснут — имя видно у каждой фигурки
-      активной зоны постоянно (прораб, с58). Чип под указателем (is-near) выделен и
-      раскрывает фамилию; у края кадра сдвигается внутрь.
+   3. Чипы имён — ниже всех: не гаснут — имя видно у каждой фигурки активной зоны
+      постоянно (прораб, с58). Вывесок и обвязки не обходят, только друг друга: чип,
+      севший на уже размещённый, поднимается ступенькой (высота чипа + 2 px, не больше
+      двух ступеней); у края кадра сдвигается внутрь. Чип под указателем (is-near)
+      выделен и раскрывает фамилию.
    4. Свободные подписи (ни w-sign, ни w-who — «плюс» пустого места) раскладка не трогает.
    Подписи приглушённых зон сняты со слоя камеры (zones/layout.ts) — их как нет.
    Скрытая вывеска не теряет объект: у каждого здания есть клавиша.
@@ -20,9 +22,13 @@ import type { WorldCtx } from './createWorld'
 const HUD_GAP = 8, HUD_EDGE = 8   // зазор между плашками HUD и поле от края сцены
 // Ступени вывески по высоте: подъём над соседкой; последние две — посадка на крышу
 // (ножка прячется), когда сверху тесно
-const LIFTS = [0, 26, 52, -12, -24]
+// 78 — выше компактной соседки целиком (44 + ножка 10 + зазор): в сцене 390 три вывески
+// кампуса стоят в ряд во всю ширину, и средней на 26 и 52 места нет
+const LIFTS = [0, 26, 52, 78, -12, -24]
 // Высота ножки в полном и компактном виде — пара к --leg в CSS вывески
 const LEGS = [12, 10] as const
+// Чипы: поле от края сцены, зазор между собой и число ступеней подъёма
+const CHIP_EDGE = 4, CHIP_GAP = 2, CHIP_STEPS = 2
 
 type Rect = { x: number; y: number; w: number; h: number }
 type Size = readonly [w: number, h: number]
@@ -41,7 +47,7 @@ type Item = {
   fresh: boolean
   x: number; y: number; z: number; ok: boolean; tight: boolean
   shift: number; lift: number; px: string
-  near: boolean; dx: number
+  near: boolean; dx: number; dy: number
 }
 
 export type HudLayout = {
@@ -86,7 +92,7 @@ export function createHudLayout(ctx: WorldCtx, store: WorldStore, reduced: boole
     items = laid.map(([id, o]) => {
       const el = o.element, chip = el.classList.contains('w-who')
       // Новая подпись рождается скрытой и проявляется, когда раскладка нашла ей место
-      const s: Item = old.get(o) ?? { id, o, el, chip, size: null, hidden: false, level: chip ? 1 : 2, fresh: true, x: 0, y: 0, z: 0, ok: false, tight: false, shift: 0, lift: 0, px: '', near: false, dx: 0 }
+      const s: Item = old.get(o) ?? { id, o, el, chip, size: null, hidden: false, level: chip ? 1 : 2, fresh: true, x: 0, y: 0, z: 0, ok: false, tight: false, shift: 0, lift: 0, px: '', near: false, dx: 0, dy: 0 }
       if (!old.has(o)) el.classList.add('is-away')
       // Вне кадра рендерер ставит якорю display: none — размера нет; вернётся в кадр — перемерим
       s.hidden = el.style.display === 'none'
@@ -176,18 +182,32 @@ export function createHudLayout(ctx: WorldCtx, store: WorldStore, reduced: boole
         s.el.classList.toggle('is-away', !fit)
       }
     }
-    for (const s of items.filter((v) => v.chip)) {
+    // Чипы: сначала выделенный, потом ближние к камере — они остаются над своей фигуркой,
+    // дальние поднимаются над ними
+    const chips: Rect[] = []
+    for (const s of items.filter((v) => v.chip).sort((a, b) => +(b.id === ctx.near) - +(a.id === ctx.near) || a.z - b.z)) {
       const near = s.id === ctx.near
-      // Виден всегда, когда фигурка в кадре активной зоны: место не ищем, соседей не гасим
+      // Виден всегда, когда фигурка в кадре активной зоны: соседей не гасим
       const show = s.ok
       if (s.level !== +!show) { s.level = +!show; s.el.classList.toggle('is-away', !show) }
       s.fresh = false
-      if (s.near !== near) { s.near = near; s.el.classList.toggle('is-near', near); s.el.style.translate = ''; s.dx = 0 }
-      // Чип с фамилией шире обычного — у края кадра сдвигаем внутрь
-      if (near && s.ok) {
-        const half = s.el.offsetWidth / 2, dx = Math.round(Math.max(4 - (s.x - half), 0) + Math.min(w - 4 - (s.x + half), 0))
-        if (dx !== s.dx) { s.dx = dx; s.el.style.translate = `${dx}px 0` }
+      // С фамилией чип шире: размер перемерим следующим кадром
+      if (s.near !== near) { s.near = near; s.el.classList.toggle('is-near', near); dirty() }
+      if (!show) continue
+      const [cw, ch] = s.size![0]
+      const dx = Math.round(Math.max(CHIP_EDGE - (s.x - cw / 2), 0) + Math.min(w - CHIP_EDGE - (s.x + cw / 2), 0))
+      // Якорь — низ чипа по центру. Ступень — первая свободная; все заняты — та, где наезд меньше
+      const rect: Rect = { x: s.x - cw / 2 + dx, y: s.y - ch, w: cw, h: ch }
+      let dy = 0, least = Infinity
+      for (let step = 0; step <= CHIP_STEPS && least > 0; step++) {
+        const y = rect.y - step * (ch + CHIP_GAP)
+        let over = 0
+        for (const b of chips) over += Math.max(0, Math.min(rect.x + cw, b.x + b.w) + CHIP_GAP - Math.max(rect.x, b.x)) * Math.max(0, Math.min(y + ch, b.y + b.h) + CHIP_GAP - Math.max(y, b.y))
+        if (over < least) { least = over; dy = step * (ch + CHIP_GAP) }
       }
+      rect.y -= dy
+      chips.push(rect)
+      if (dx !== s.dx || dy !== s.dy) { s.dx = dx; s.dy = dy; s.el.style.translate = dx || dy ? `${dx}px ${-dy}px` : '' }
     }
   }
 

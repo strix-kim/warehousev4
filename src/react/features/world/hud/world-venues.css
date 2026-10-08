@@ -19,10 +19,13 @@
 .w-sign.w-sign--lot .w-sign__board.is-on :is(.w-cell__num, .w-cell__unit) { color: var(--card); }
 .w-sign.w-sign--lot .w-sign__leg.is-on { background: var(--red); }
 .w-sign.w-sign--lot .w-sign__board.is-on::after { content: ""; position: absolute; inset: -4px; border: 2px solid var(--red); border-radius: calc(var(--r-sm) + 4px); pointer-events: none; }
-/* Компактная (телефон, узкая сцена): только дата, метка 22 px. Палец её не ловит: цель
-   тапа — весь участок под ней (он ≥ 44 px), шесть меток по 44 px в зону не встают.
-   С клавиатуры метка остаётся кнопкой. Имя — в панели выбранного места. */
-.w-sign--lot.w-sign--sm .w-sign__board { min-height: 0; height: 22px; gap: 0; padding: 2px; pointer-events: none; }
+/* Компактная (телефон, узкая сцена): только дата, метка 22 px. Метка — настоящая кнопка:
+   она висит над зданием, и палец, попавший в неё, под ней участка не находит (луч уходит
+   в соседа сзади или в пустую землю). Цель пальца — ::before, 40 px по высоте; соседние
+   цели могут перекрыться краями — тогда отвечает ближняя к камере. Мимо метки цель
+   тапа — по-прежнему весь участок (pointer.ts). Имя — в панели выбранного места. */
+.w-sign--lot.w-sign--sm .w-sign__board { min-height: 0; height: 22px; gap: 0; padding: 2px; }
+.w-sign--lot.w-sign--sm .w-sign__board::before { content: ""; position: absolute; inset: -9px -6px; }
 .w-sign--lot.w-sign--sm .w-cell { padding: 0 6px; border-radius: 5px; }
 .w-sign--lot.w-sign--sm .w-cell__num { font-size: 13px; line-height: 16px; }
 .w-sign--lot.w-sign--sm .w-cell__unit { display: block; }
