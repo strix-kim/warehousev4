@@ -20,7 +20,10 @@ type Mock = { venues: WorldLot[]; archive: WorldArchivePlace[] }
 // фигурок и чисел. Ссылка меняется только вместе с ответом источника.
 // reload — перечитать реестр мероприятий мимо кэша после записи из мира: участки и
 // архив пересобираются тем же путём, что и на свежий ответ при входе.
-export function useWorldData(): { data: WorldData | null; reload: () => Promise<void> } {
+// expiries — сроки документов сотрудников из сводки главной (голые даты) для доски
+// «Дела»; null — сводка не ответила. В WorldData их нет: это вход движка, а сроки
+// сцена не рисует. today — «сегодня» мира, одно на зоны, дела и обеды.
+export function useWorldData(): { data: WorldData | null; reload: () => Promise<void>; expiries: string[] | null; today: string } {
   // Первый кадр — из кэша, затем свежий ответ (как на главной). Запрос списков —
   // тот же, что у плитки главной и первой страницы /lists: общий ключ и то же число.
   const [listsQuery] = useState(() => ({ page: 1, search: '', pageSize: preferredListsPageSize() }))
@@ -29,7 +32,8 @@ export function useWorldData(): { data: WorldData | null; reload: () => Promise<
   const [cachedVehicles] = useState(() => readCachedVehicles())
   const [cachedEmployees] = useState(() => readCachedEmployeeList())
   const [cachedProjects] = useState(() => readCachedProjects())
-  // «Сегодня» — часы устройства на момент входа в мир; делит мероприятия на зоны
+  // «Сегодня» — часы устройства на момент входа в мир; делит мероприятия на зоны и
+  // отвечает делам (data/quests.ts), что идёт сегодня
   const [today] = useState(todayDateValue)
   const [summary, setSummary] = useState(cachedSummary)
   const [lists, setLists] = useState(cachedLists)
@@ -116,5 +120,6 @@ export function useWorldData(): { data: WorldData | null; reload: () => Promise<
     }
   }, [crowd, lists, mock, split, summary])
 
-  return useMemo(() => ({ data, reload }), [data, reload])
+  const expiries = summary?.employees.expiries ?? null
+  return useMemo(() => ({ data, reload, expiries, today }), [data, reload, expiries, today])
 }

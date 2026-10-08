@@ -1,9 +1,11 @@
 import { ChevronRight, Lock, Pencil, Plus } from 'lucide-react'
-import type { CSSProperties, ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { todayDateValue } from '../../../lib/date'
 import { useLanguage } from '../../../lib/i18n'
 import { formatProjectPeriod } from '../../projects/types'
 import type { WorldAction } from '../actions/useWorldActions'
+import { mealToday, needsMealToday, type MealToday } from '../data/quests'
 import type { WorldLot } from '../data/types'
 import type { WorldLotPart } from '../worldStore'
 import { ruPlural } from './plural'
@@ -11,6 +13,9 @@ import { useLotDetails, type LotSection } from './useLotDetails'
 
 // Сколько имён состава помещается строкой; остальные — «и ещё N»
 const STAFF_NAMES_MAX = 6
+
+// Пилюля обеда на сегодня: модификаторы общего .pill — как у сроков (lib/expiry.ts)
+const MEAL_PILL: Record<MealToday, string> = { missing: 'pill pill--bad', collecting: 'pill pill--warn', done: 'pill pill--ok' }
 
 // Содержимое секции по состоянию запроса. Скелет держит высоту будущих строк (rows ×
 // row px), чтобы панель не прыгала на ответе; отказ — строка с повтором этой секции,
@@ -58,6 +63,15 @@ export function LotSections({ lot, part, leave, onAction }: Props) {
   // Счётчик в заголовке: пока ответа нет — число реестра, пришёл — число строк из базы
   const listCount = lists.section.state === 'ready' ? lists.section.data.length : lot.lists
   const staffCount = staff.section.state === 'ready' ? staff.section.data.length : lot.staff
+  // «Сегодня» — часы устройства, один раз на карточку. Обед на сегодня — вопрос только
+  // к мероприятию, которое сегодня идёт и где есть кого кормить (data/quests.ts)
+  const [today] = useState(todayDateValue)
+  const mealDue = needsMealToday(lot, today)
+  const mealText: Record<MealToday, string> = {
+    missing: tr('Обед на сегодня не заказан', 'Bugungi tushlik buyurtma qilinmagan'),
+    collecting: tr('Собираем заказы', 'Buyurtmalar yig‘ilmoqda'),
+    done: tr('Обед заказан', 'Tushlik buyurtma qilingan'),
+  }
 
   // Пустая секция: слова и одно действие — кнопка хоста (run) или, без неё, ссылка.
   // Она же — когда счётчик реестра устарел и база ответила нулём строк.
@@ -127,16 +141,29 @@ export function LotSections({ lot, part, leave, onAction }: Props) {
 
     <section className={onClass('cafe')}>
       <h3 className="w-vsec__head"><span>{tr('Обеды', 'Ovqatlanish')}</span></h3>
-      {/* Счётчика обедов в реестре нет — подстрочник целиком из запроса */}
-      <SectionBody section={meals.section} retry={meals.retry} row={20}>
+      {/* Счётчика обедов в реестре нет — подстрочник целиком из запроса. Статус обеда на
+          сегодня — из тех же строк и только после ответа: до него сказать нечего. Скелет
+          держит и его высоту: пилюля 24 + кнопка 44 + подстрочник 20 + два зазора по 6 */}
+      <SectionBody section={meals.section} retry={meals.retry} row={mealDue ? 100 : 20}>
         {(rows) => {
           const days = new Set(rows.map((meal) => meal.meal_on)).size
+          const status = mealToday(rows, today)
           return (
-            <p className="w-vsec__note">
-              {rows.length === 0
-                ? tr('Обедов ещё нет', 'Ovqatlar hali yo‘q')
-                : `${count(rows.length, ['приём', 'приёма', 'приёмов'], 'ta ovqat')} · ${count(days, ['день', 'дня', 'дней'], 'kun')}`}
-            </p>
+            <>
+              {mealDue && (
+                <>
+                  <p className="w-vsec__today"><span className={MEAL_PILL[status]}>{mealText[status]}</span></p>
+                  <Link className="button button--secondary" to={`${projectPath}/meals?day=${today}`} state={leave}>
+                    {status === 'done' ? tr('Открыть обед', 'Tushlikni ochish') : tr('Заказать обед', 'Tushlikka buyurtma berish')}
+                  </Link>
+                </>
+              )}
+              <p className="w-vsec__note">
+                {rows.length === 0
+                  ? tr('Обедов ещё нет', 'Ovqatlar hali yo‘q')
+                  : `${count(rows.length, ['приём', 'приёма', 'приёмов'], 'ta ovqat')} · ${count(days, ['день', 'дня', 'дней'], 'kun')}`}
+              </p>
+            </>
           )
         }}
       </SectionBody>

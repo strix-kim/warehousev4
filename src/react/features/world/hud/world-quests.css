@@ -1,0 +1,75 @@
+/* Доска «Дела» (hud/QuestBoard.tsx). Обвязка: светлая в обеих палитрах, только токены
+   01-tokens.css. Все селекторы — с префиксом w-. Файл встаёт в бандл после world-hud.css
+   (порядок импортов в WorldStage.tsx).
+
+   Место — левый нижний угол: плашка «Дела: N» стоит над клавишами кампуса, список
+   раскрывается от неё ВВЕРХ (column-reverse: плашка при сворачивании не прыгает, а в
+   порядке фокуса остаётся первой). Слева сверху — день и тост, справа — переключатель
+   зон и панель выбранного: их доска не задевает.
+   --q-bottom — что занято под доской: клавиши кампуса (16 + 56 + 16) или плашка зоны
+   (.w-vnone, до 86 px высотой); --q-top — что занято над ней: день и место тоста
+   (76 + 48 + 8), в архиве ещё плашка итога под днём. Между ними список прокручивается
+   внутри себя. */
+.w-quests { --q-bottom: 16px; --q-top: 132px; position: absolute; z-index: 1; left: 16px; bottom: var(--q-bottom); max-width: calc(100% - 32px); max-height: calc(100% - var(--q-bottom) - var(--q-top)); display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 8px; pointer-events: none; }
+/* Сама доска мышь пропускает к сцене (рядом с плашкой — пустое место), ловят её дети */
+.w-quests > * { pointer-events: auto; }
+.w-quests.is-open { width: 320px; }
+.w-stage:has(.w-dock) .w-quests { --q-bottom: 88px; }
+.w-stage:has(.w-vnone) .w-quests { --q-bottom: 112px; }
+.w-stage:has(.w-atotal) .w-quests { --q-top: 240px; }
+/* Плашка стоит на земле сцены: в «Ночи» кольцо фокуса светлое; строки лежат на белой
+   карточке — у них прежнее */
+.w-stage.is-dark .w-quests { --focus: var(--on-night); }
+.w-stage.is-dark .w-quests__list { --focus: var(--ink); }
+
+/* Плашка-заголовок: по содержимому, высота как у плашки дня */
+.w-quests__head { flex: none; height: 48px; display: flex; align-items: center; gap: 8px; margin: 0; padding: 0 12px 0 14px; font: 700 16px/20px var(--f-display); font-variant-numeric: tabular-nums; white-space: nowrap; -webkit-tap-highlight-color: transparent; transition: background-color .16s var(--ease-out); }
+.w-quests__head svg { flex: none; color: var(--muted); }
+button.w-quests__head:hover { background: var(--hover); }
+button.w-quests__head:active { background: var(--select); }
+/* Шеврон смотрит туда, куда поедет список: свёрнута — вверх, раскрыта — вниз */
+.w-quests__chev { rotate: 180deg; transition: rotate .16s var(--ease-out); }
+.w-quests__head[aria-expanded="true"] .w-quests__chev { rotate: 0deg; }
+/* «Всё собрано» — не кнопка: дел нет, раскрывать нечего */
+.w-quests__head--done { padding-right: 16px; }
+.w-quests__head--done svg { color: var(--ok); }
+
+/* Список: карточка во всю ширину доски, длинный (6 участков × 5 дел) крутится внутри */
+.w-quests__list { align-self: stretch; flex: 0 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 6px; animation: w-quests-in .2s var(--ease-out); }
+@keyframes w-quests-in { from { opacity: 0; translate: 0 8px; } }
+.w-quests__rows { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+/* Строка дела — кнопка, цель 48 px: значок, текст с подстрочником, шеврон */
+.w-quest { width: 100%; min-height: 48px; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 6px 8px; border: 0; border-radius: var(--r-md); background: transparent; color: var(--ink); text-align: left; -webkit-tap-highlight-color: transparent; transition: background-color .16s var(--ease-out); }
+.w-quest:hover { background: var(--hover); }
+.w-quest:active { background: var(--select); }
+.w-quest:focus-visible { outline-offset: -2px; }
+.w-quest__ico { width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--r-sm); background: var(--sunk); color: var(--ink); }
+.w-quest--bad .w-quest__ico { background: var(--bad-bg); color: var(--bad); }
+.w-quest--warn .w-quest__ico { background: var(--warn-bg); color: var(--warn); }
+.w-quest__text { min-width: 0; display: grid; gap: 1px; }
+.w-quest__text b { font: 600 14px/18px var(--f-text); overflow-wrap: anywhere; }
+/* Имя мероприятия — в одну строку: целиком оно в карточке участка */
+.w-quest__text small { overflow: hidden; color: var(--muted); font: 500 13px/16px var(--f-text); white-space: nowrap; text-overflow: ellipsis; }
+.w-quest > svg { flex: none; color: var(--muted); }
+
+/* Компактная сцена: одна плашка, список — нижним листом (.w-qsheet). Слева снизу:
+   клавиши кампуса там стоят справа. Правила — после десктопных с :has: специфичность
+   у них равная, решает порядок. */
+.w-stage.is-sm .w-quests { --q-bottom: 8px; left: 8px; max-width: calc(100% - 16px); }
+/* Плашка зоны («мероприятий нет», «ещё N») в компактной сцене — во всю ширину снизу */
+.w-stage.is-sm:has(.w-vnone) .w-quests { --q-bottom: 104px; }
+/* Архив: левый нижний угол занят итогом — плашка уходит в правый */
+.w-stage.is-sm:has(.w-atotal) .w-quests { left: auto; right: 8px; }
+/* Открыта панель выбранного (лист снизу до 62 % сцены) — человек занят участком, а
+   дела вернутся с её закрытием */
+.w-stage.is-sm:has([data-w-chrome="panel"]) .w-quests { display: none; }
+
+/* Лист дел: шапка стоит, строки крутятся. Высота — от слоя (он fixed во весь экран),
+   без vh: его считать под --app-zoom не нужно. На планшете лист не шире 560 px. */
+.sheet.w-qsheet { max-width: 560px; max-height: calc(100% - 48px); margin: 0 auto; }
+.w-qsheet .w-quests__rows { min-height: 0; margin: 0 -8px; overflow-y: auto; overscroll-behavior: contain; }
+
+@media (prefers-reduced-motion: reduce) {
+  .w-quests__list { animation: none; }
+  .w-quests__chev { transition: none; }
+}

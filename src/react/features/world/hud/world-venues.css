@@ -109,6 +109,8 @@
 /* Строка-действие хоста (дровер поверх сцены) — кнопка в том же облике, что ссылка;
    ширину добирает сама: кнопка, в отличие от ссылки-грида, не тянется на строку */
 button.w-vrow { width: calc(100% + 16px); border: 0; background-color: transparent; text-align: left; }
+/* Обед на сегодня (секция «Обеды»): пилюля статуса строкой, по левому краю */
+.w-vsec__today { margin: 0; display: flex; }
 /* Загрузка: тихая плашка высотой будущих строк (--rows × --row пишет LotCard) */
 .w-vsec__skel { margin: 0; height: calc(var(--rows, 1) * var(--row, 44px)); border-radius: var(--r-sm); background: var(--sunk); }
 .w-vsec.is-on .w-vsec__skel { background: var(--select); }
@@ -120,7 +122,7 @@ button.w-vrow { width: calc(100% + 16px); border: 0; background-color: transpare
 /* Компактная сцена: лист снизу во всю ширину, сцена с участком остаётся видна над ним */
 .w-stage.is-sm .w-vpanel { left: 0; right: 0; bottom: 0; width: auto; max-width: none; max-height: 56%; border-width: 1px 0 0; border-radius: var(--r-lg) var(--r-lg) 0 0; }
 
-/* Таблички кафе, бригады и отеля у выбранного участка. Якорь .w-tag — точка 0×0
+/* Таблички кафе, бригады и отеля у выбранного участка и маркер «!» над кафе. Якорь .w-tag — точка 0×0
    (свободная подпись, раскладка её не двигает), табличка стоит над ним по центру.
    «Обеды» и бригада (значок людей и число) — кнопки в цветах вывески (обе палитры), цель пальца добирает ::before до 44 px.
    Запертый отель — тихая пунктирная плашка в цветах чипа имени, мышь не ловит. Она
@@ -132,6 +134,17 @@ button.w-vrow { width: calc(100% + 16px); border: 0; background-color: transpare
 .w-tag__btn::before { content: ""; position: absolute; inset: -8px -4px; }
 .w-tag__btn:hover, .w-tag.is-hover .w-tag__btn { transform: translateY(-2px); box-shadow: var(--shadow-sign-up); }
 .w-tag__btn[aria-pressed="true"]::after { content: ""; position: absolute; inset: -4px; border: 2px solid var(--red); border-radius: calc(var(--r-sm) + 4px); pointer-events: none; }
+/* Маркер «!» над кафе: у участка сегодня дело про обед (VenuePanel, CafeTag). Янтарный
+   кружок 28 px с тёмным знаком — один цвет в обеих палитрах, как янтарь диагностики на
+   тёмной панели; цель пальца добирает ::before до 44 × 44. Кольцо расходится от него
+   раз в два с небольшим секунды: маркер стоит без выбора и обязан быть замечен. У
+   выбранного участка тот же знак — бейджем 18 px в конце таблички «Обеды». */
+.w-tag__btn--alert { width: 28px; padding: 0; justify-content: center; border-radius: 50%; background: var(--warn-night); color: var(--night); }
+.w-tag__btn--alert::before { inset: -8px; }
+.w-tag__btn--alert::after { content: ""; position: absolute; inset: 0; border: 2px solid var(--warn-night); border-radius: 50%; pointer-events: none; animation: w-tag-alert 2.4s var(--ease-out) infinite; }
+@keyframes w-tag-alert { from { opacity: .9; scale: 1; } 70%, to { opacity: 0; scale: 1.9; } }
+.w-tag__bang { font: 800 16px/1 var(--f-display); }
+.w-tag__btn:not(.w-tag__btn--alert) .w-tag__bang { flex: none; width: 18px; height: 18px; display: grid; place-items: center; margin-right: -4px; border-radius: 50%; background: var(--warn-night); color: var(--night); font-size: 13px; }
 .w-tag__lock { left: auto; right: 6px; translate: none; border: 1px dashed var(--who-line); background: var(--who-bg); color: var(--who-ink-2); pointer-events: none; }
 
 /* Пустая зона — светлая плашка со словами, слева снизу */
@@ -145,4 +158,5 @@ button.w-vrow { width: calc(100% + 16px); border: 0; background-color: transpare
 @media (prefers-reduced-motion: reduce) {
   .w-stage .w-vpanel { animation: none; }
   .w-tag__btn { transform: none !important; }
+  .w-tag__btn--alert::after { animation: none; opacity: 0; }
 }

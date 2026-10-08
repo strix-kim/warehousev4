@@ -11,13 +11,16 @@ import './world.css'
 import './hud/world-hud.css'
 import { useWorldActions } from './actions/useWorldActions'
 import { WorldActions } from './actions/WorldActions'
+import type { Quest } from './data/quests'
 import { LOT_MAX } from './data/splitProjects'
+import { useQuests } from './data/useQuests'
 import { useWorldData } from './data/useWorldData'
 import { ArchivePanel } from './hud/ArchivePanel'
 import { DayCap } from './hud/DayCap'
 import { Dock } from './hud/Dock'
 import { NameChip } from './hud/NameChip'
 import { Plus } from './hud/Plus'
+import { QuestBoard } from './hud/QuestBoard'
 import { ruPlural } from './hud/plural'
 import { Sign } from './hud/Sign'
 import { Toast, useWorldToast } from './hud/Toast'
@@ -69,7 +72,7 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
   const wantedZone: WorldZone = lotParam ? 'venues' : isWorldZone(zoneParam) ? zoneParam : 'campus'
   // Запись истории, на которой стоит мир: по её ключу worldMemory держит позу камеры.
   // Каждый replace зоны и участка даёт записи новый ключ — помним последний.
-  const entryKey = useLocation().key
+  const { key: entryKey, pathname } = useLocation()
   const entryRef = useRef(entryKey)
   useEffect(() => { entryRef.current = entryKey }, [entryKey])
   const slotRef = useRef<HTMLDivElement>(null)
@@ -77,8 +80,10 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
   const [store] = useState(createWorldStore)
   // Одна ссылка и движку, и HUD: машины в сцене, числа вывесок и имена — из одного
   // объекта. null — данных нет, вывески стоят без чисел.
-  const { data, reload } = useWorldData()
-  const { action, run, close, activate, building, setBuilding } = useWorldActions({ store, mock: data?.mock ?? false })
+  const { data, reload, expiries, today } = useWorldData()
+  const { action, run, close, activate, runQuest, building, setBuilding } = useWorldActions({ store, mock: data?.mock ?? false, today })
+  // Дела доски и маркеры обедов — из тех же данных, что участки (data/useQuests.ts)
+  const { quests, mealAlerts, said: questsSaid } = useQuests({ venues: data?.venues ?? null, mock: data?.mock ?? false, expiries, today })
   const { toast, show, hide } = useWorldToast()
   // Новое мероприятие записано, реестр перечитан: id ждёт посадки (эффект ниже, после
   // setData). titleFor — участок, в заголовок карточки которого уйдёт фокус.
@@ -327,6 +332,29 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
     setTitleFor(null)
   }, [titleFor, pickLot])
 
+  // Строка доски «Дела». Дело про участок в сетке: участок встаёт в адрес (карточку
+  // откроет механизм ?lot= выше), камера едет к объекту дела — из другой зоны движок сам
+  // просит переезд и подводит после посадки, — и тем же ходом открывается действие.
+  // Порядок важен: focus из кампуса пишет в адрес зону (onZone), наша запись идёт следом
+  // и несёт и зону, и участок — setParams очереди не ведёт, остаётся последняя.
+  // Макетных участков (?mock=on) в базе нет: их дела уводят в реестр без посадки.
+  const openQuest = (quest: Quest) => {
+    if (!quest.lot || quest.part === null || data?.mock) {
+      // «Нет мероприятий впереди»: объект дела — пустая ячейка с «плюсом» на «Площадках»
+      if (quest.kind === 'no-lots' && !data?.mock) worldRef.current?.focus(ADD_LOT_ID)
+      runQuest(quest)
+      return
+    }
+    const query = new URLSearchParams(params)
+    query.set('zone', 'venues')
+    query.set('lot', quest.lot.id)
+    worldRef.current?.focus(lotPartId(quest.part, quest.lot.id))
+    // replace — как у любого выбора участка (gotchas §7)
+    setParams(query, { replace: true })
+    // Интерьеру — уже новый адрес мира: «Назад в мир» вернёт на карточку этого участка
+    runQuest(quest, `${pathname}?${query}`)
+  }
+
   useEffect(() => {
     textsRef.current = texts
     worldRef.current?.setTexts(texts)
@@ -349,7 +377,7 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
       {[...labels.keys()].filter(isAddId).map((id) => <Plus key={id} store={store} id={id} busy={building && id === ADD_LOT_ID} onActivate={activate} />)}
       {/* HUD зоны живёт, пока камера стоит на ней; якоря чужих зон движок прячет сам.
           Макетных мероприятий (?mock=on) в базе нет — действий у панели участка тоже нет */}
-      {zone === 'venues' && data?.venues && <VenuePanel store={store} venues={data.venues} onAction={data.mock ? undefined : run} />}
+      {zone === 'venues' && data?.venues && <VenuePanel store={store} venues={data.venues} onAction={data.mock ? undefined : run} mealAlerts={mealAlerts} />}
       {zone === 'archive' && data?.archive && <ArchivePanel store={store} places={data.archive} />}
       {status === 'ready' && (
         <>
@@ -359,12 +387,18 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
           {zones.length > 1 && <ZoneSwitch store={store} texts={texts} mockZones={data?.mock ? MOCK_ZONES : NO_ZONES} onGo={goZone} />}
           {/* Клавиши — дубли зданий кампуса */}
           {zone === 'campus' && <Dock store={store} names={names} onActivate={activate} />}
+          {/* Доска «Дела» — на всех зонах; пока реестр не ответил, дел про участки нет и доски нет */}
+          {data?.venues && <QuestBoard store={store} quests={quests} onQuest={openQuest} />}
         </>
       )}
       {/* Дроверы действий поверх сцены */}
       <WorldActions store={store} action={action} venues={data?.venues ?? null} onClose={close} reload={reload} onCreated={setLanding} onSettled={setSettled} onBuilding={setBuilding} toast={show} />
       {/* Скринридеру: имя здания под указателем или в фокусе клавиши */}
       <p className="w-live" aria-live="polite">{hover !== null && WORLD_SITES.includes(hover as WorldSiteId) ? names[hover as WorldSiteId] : ''}</p>
+      {/* Число дел при его смене — своей областью: имя здания выше оно не затирает */}
+      <p className="w-live" aria-live="polite">
+        {questsSaid === null ? '' : questsSaid === 0 ? tr('Всё собрано', 'Hammasi tayyor') : tr(`Дел: ${questsSaid.toLocaleString(locale)}`, `Ishlar: ${questsSaid.toLocaleString(locale)}`)}
+      </p>
       {status === 'loading' && <p className="w-stage__state w-stage__loading" role="status">{tr('Загружаем мир…', 'Dunyo yuklanmoqda…')}</p>}
       {status === 'unsupported' && (
         <div className="w-stage__state">

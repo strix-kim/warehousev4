@@ -32,7 +32,9 @@ export const gateId = (to: WorldZone, from: WorldZone) =>
 // секцией, а действие — кнопкой в панели. Данные секций (id списков и планов) грузит
 // панель, движок их не знает; заодно палец на телефоне не уводит со сцены промахом.
 // Таблички cafe, stay и crew: движок ставит якорь label под их id (класс w-tag), текст
-// порталом кладёт VenuePanel — только у выбранного участка.
+// порталом кладёт VenuePanel — только у выбранного участка. Исключение — якорь cafe:
+// у участка с делом про обед на сегодня (mealAlerts) VenuePanel кладёт в него маркер «!»
+// и без выбора; клик по маркеру = pick кафе.
 export const LOT_PARTS = ['lot', 'truck', 'stay', 'plan', 'cafe', 'crew', 'addtruck', 'addplan', 'addcrew'] as const
 // Сколько фигурок бригады встаёт на участке
 export const CREW_MAX = 6

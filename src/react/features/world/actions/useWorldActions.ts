@@ -3,6 +3,7 @@
 // интерьером (план world-game-s59.md, решение 2).
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import type { Quest } from '../data/quests'
 import { ADD_LOT_ID, isAddId, parseLotId, WORLD_SITES, type WorldSiteId, type WorldStore } from '../worldStore'
 
 // Дровер действия поверх сцены. null — дровера нет. Живёт локальным состоянием, не в
@@ -16,8 +17,9 @@ export type WorldAction = {
 // Раздел продукта за каждым зданием
 const SITE_ROUTES: Record<WorldSiteId, string> = { office: '/lists', warehouse: '/equipment', garage: '/vehicles' }
 
-// mock — мир наполнен макетом (?mock=on): его мероприятий в базе нет
-export function useWorldActions({ store, mock }: { store: WorldStore; mock: boolean }) {
+// mock — мир наполнен макетом (?mock=on): его мероприятий в базе нет.
+// today — «сегодня» мира (useWorldData): день, на котором открывается интерьер обедов
+export function useWorldActions({ store, mock, today }: { store: WorldStore; mock: boolean; today: string }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [action, setAction] = useState<WorldAction>(null)
@@ -35,8 +37,10 @@ export function useWorldActions({ store, mock }: { store: WorldStore; mock: bool
     setAction(next)
   }
   const close = () => setAction(null)
-  // Интерьер — обычный маршрут на весь экран, push-переходом
-  const leaveTo = (path: string) => navigate(path, { state: { from } })
+  // Интерьер — обычный маршрут на весь экран, push-переходом. back — адрес мира, если
+  // тем же ходом он сменился (строка доски пишет в него участок): location этого рендера
+  // новой записи ещё не видит
+  const leaveTo = (path: string, back = from) => navigate(path, { state: { from: back } })
 
   // Выбор и переход — один путь для вывески, клавиши и клика по зданию в сцене.
   // Движок к этому моменту pick уже поставил: повторная запись того же id стор не будит.
@@ -61,5 +65,29 @@ export function useWorldActions({ store, mock }: { store: WorldStore; mock: bool
     navigate(SITE_ROUTES[id as WorldSiteId])
   }
 
-  return { action, run, close, leaveTo, activate, building, setBuilding }
+  // Действие дела — строка доски «Дела» (hud/QuestBoard.tsx). Те же действия, что у
+  // «плюсов» и секций карточки участка: короткие формы — дровером, тяжёлые экраны —
+  // интерьером. Адрес и камеру ведёт сцена; back — адрес мира для возврата из интерьера.
+  const runQuest = (quest: Quest, back?: string) => {
+    const { kind, lot } = quest
+    if (!lot) {
+      // Сроки документов — в реестре сотрудников (там же их пилюли)
+      if (kind === 'docs-expired' || kind === 'docs-soon') leaveTo('/employees', back)
+      else if (mock) navigate('/projects')
+      else run({ kind: 'project-new' })
+      return
+    }
+    // Макетного мероприятия (?mock=on) в базе нет — вести некуда, кроме реестра
+    if (mock) { navigate('/projects'); return }
+    // Участок вне сетки (седьмой и дальше): объекта в сцене нет — страница мероприятия
+    if (quest.part === null) { leaveTo(`/projects/${lot.id}`, back); return }
+    if (kind === 'no-place' || kind === 'no-dates') run({ kind: 'project-edit', lotId: lot.id })
+    else if (kind === 'no-lists') leaveTo(`/lists/new?project=${lot.id}`, back)
+    else if (kind === 'no-plan') run({ kind: 'plan-new', lotId: lot.id })
+    else if (kind === 'no-staff') run({ kind: 'staff', lotId: lot.id })
+    // Обеды: параметр day читает MealsPage
+    else if (kind === 'meal-missing' || kind === 'meal-collecting') leaveTo(`/projects/${lot.id}/meals?day=${today}`, back)
+  }
+
+  return { action, run, close, leaveTo, activate, runQuest, building, setBuilding }
 }
