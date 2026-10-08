@@ -1,6 +1,6 @@
 import { CalendarDays, CircleAlert, Minus, Plus, Save, X } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { hallPlanErrorText, type HallPlanInput } from './api'
 import type { HallPlan } from './types'
 import { AppDatePicker } from '../../components/AppDatePicker'
@@ -24,8 +24,11 @@ const DEFAULT_HALL_COUNT = 3
 // они, «Изменить» показывало бы не те поля, которые заполняли при создании.
 // Отличие ровно одно: при создании здесь же спрашивается, сколько залов завести
 // сразу, а у существующего плана залы уже есть и меняются в редакторе.
-export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
+export function HallPlanMetaDrawer({ plan, initialProjectId, onClose, onSubmit }: {
   plan?: HallPlan
+  // Мероприятие, с которым пришли создавать план (ссылка из мира). Только для
+  // создания: у существующего плана привязка своя.
+  initialProjectId?: string
   onClose: () => void
   onSubmit: (input: HallPlanInput, hallCount: number) => Promise<void>
 }) {
@@ -39,7 +42,7 @@ export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
     name: plan?.name ?? '',
     eventFrom: plan?.event_from ?? '',
     eventTo: plan?.event_to ?? '',
-    projectId: plan?.project_id ?? null,
+    projectId: plan?.project_id ?? initialProjectId ?? null,
   }))
   // Свои поля плана. Мероприятие держит choice — тот же выбор «существующее /
   // новое», что в составе сотрудников и в списке машин, плюс «Без мероприятия».
@@ -52,6 +55,24 @@ export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
     initialMode: isEditing && !initialDraft.projectId ? 'none' : 'existing',
     report: { route: '/halls', source: 'plan-projects' },
   })
+  // Привязка, от которой считается «несохранённое». Отдельно от initialDraft
+  // ради предвыбора из ссылки: снятый недоступный id (эффект ниже) — не правка
+  // человека.
+  const [baseProjectId, setBaseProjectId] = useState(initialDraft.projectId)
+  // Предвыбор из адреса мог оказаться мусором, чужим или удалённым мероприятием.
+  // Реестр загрузился и такого id в нём нет — выбор снимается: «существующее»
+  // без значения честнее пункта «Мероприятие недоступно» в форме СОЗДАНИЯ.
+  // Подсказка, а не защита: привязку держат внешний ключ и RLS hall_plans.
+  // При правке не срабатывает — там недоступная привязка остаётся как есть.
+  useEffect(() => {
+    if (isEditing || !initialProjectId || choice.loadState !== 'ready') return
+    if (choice.projectId !== initialProjectId) return
+    if (choice.projects.some((project) => project.id === initialProjectId)) return
+    choice.setProjectId('')
+    setBaseProjectId(null)
+    // Сверка один раз на каждую загрузку реестра; остальное — снимок открытия.
+  }, [choice.loadState])
+
   // Что человек уже набрал руками. При создании нетронутое повторяет
   // мероприятие; при правке «тронуто» всё с самого начала: у плана свои
   // реквизиты, и смена мероприятия их не трогает (план event-s53, развилка 9).
@@ -102,11 +123,14 @@ export function HallPlanMetaDrawer({ plan, onClose, onSubmit }: {
   const projectMissing = choice.mode === 'existing' ? !linkedProjectId : !choice.isReady
   const canSave = !nameEmpty && !projectMissing
 
-  const isDirty = name !== initialDraft.name
-    || eventFrom !== initialDraft.eventFrom
-    || eventTo !== initialDraft.eventTo
+  // Название и период считаются только тронутыми: нетронутое подставлено из
+  // мероприятия, и при предвыборе из ссылки «несохранённое» горело бы сразу
+  // после открытия. Сама смена мероприятия ловится строкой привязки ниже; при
+  // правке «тронуто» всё с начала, так что там сравнение прежнее.
+  const isDirty = (nameTouched && name !== initialDraft.name)
+    || (periodTouched && (eventFrom !== initialDraft.eventFrom || eventTo !== initialDraft.eventTo))
     || choice.isDirty
-    || (choice.mode !== 'new' && linkedProjectId !== initialDraft.projectId)
+    || (choice.mode !== 'new' && linkedProjectId !== baseProjectId)
     || (!isEditing && hallCount !== DEFAULT_HALL_COUNT)
   // Пока идёт сохранение, защита снята — и после успеха тоже (isSaving остаётся
   // поднятым, см. save): HallPlansPage.createPlan уводит в редактор нового плана,

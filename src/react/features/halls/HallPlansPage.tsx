@@ -1,7 +1,7 @@
 import { CircleAlert, Copy, Ellipsis, PanelsTopLeft, Plus, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { AnimatePresence } from 'motion/react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { createHallPlan, deleteHallPlan, duplicateHallPlan, fetchHallPlans, readCachedHallPlans, readCachedHallPlansMeta, type HallPlanInput, type HallPlanWithHalls } from './api'
 import { HallPlanMetaDrawer } from './HallPlanMetaDrawer'
 import { formatPlanPeriod, sortHalls } from './types'
@@ -42,6 +42,11 @@ export function HallPlansPage() {
   const [lastFetchFailed, setLastFetchFailed] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [isCreateOpen, setCreateOpen] = useState(false)
+  const [params, setParams] = useSearchParams()
+  // Мероприятие, с которым пришли создавать план (`?new=1&project=…` — стол
+  // плана в мире). Живёт здесь, а не в адресе: параметры снимаются сразу, а
+  // дроверу значение нужно до закрытия.
+  const [createProjectId, setCreateProjectId] = useState('')
   const [deletingId, setDeletingId] = useState('')
   const [deleteFailed, setDeleteFailed] = useState(false)
   // Копирование — один план за раз: id копируемого держит меню в состоянии
@@ -85,6 +90,28 @@ export function HallPlansPage() {
       })
     return () => { isCurrent = false }
   }, [reloadKey])
+
+  // Вход по ссылке «создать план»: открываем дровер и тут же снимаем параметры
+  // replace-ом — иначе «назад» и перезагрузка открывали бы его заново
+  // (gotchas §7). Повторный прогон эффекта в StrictMode видит те же params и
+  // пишет те же значения, второго дровера не будет. id из адреса — подсказка
+  // выбору, а не право: привязку решает база при сохранении.
+  useEffect(() => {
+    if (params.get('new') !== '1') return
+    setCreateProjectId(params.get('project') ?? '')
+    setCreateOpen(true)
+    const next = new URLSearchParams(params)
+    next.delete('new')
+    next.delete('project')
+    setParams(next, { replace: true })
+  }, [params])
+
+  // Предвыбор живёт одно открытие: кнопка «Новый план» после закрытия обязана
+  // дать пустой дровер, а не мероприятие из давно снятой ссылки.
+  function closeCreate() {
+    setCreateOpen(false)
+    setCreateProjectId('')
+  }
 
   const query = search.trim()
   const visible = useMemo(() => {
@@ -237,7 +264,7 @@ export function HallPlansPage() {
       </section>
 
       <AnimatePresence>
-        {isCreateOpen && <HallPlanMetaDrawer key="create" onClose={() => setCreateOpen(false)} onSubmit={createPlan} />}
+        {isCreateOpen && <HallPlanMetaDrawer key="create" initialProjectId={createProjectId || undefined} onClose={closeCreate} onSubmit={createPlan} />}
       </AnimatePresence>
     </>
   )

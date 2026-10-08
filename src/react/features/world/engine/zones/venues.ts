@@ -1,9 +1,11 @@
 // «Площадки» — зона карты справа от кампуса: сетка участков 3 × 2, ближний ряд слева
 // направо, потом дальний. Участок = мероприятие: здание места + грузовик у проезда (у
 // мероприятия есть списки) + стол с макетом залов справа перед зданием (есть план
-// залов). Чего нет — пустое место с «плюсом»; после последнего участка — одна пустая
-// ячейка «Новое мероприятие». Расселения в базе нет — отеля на участке нет (Э2 плана
-// world-work-s58 поставит его запертым).
+// залов). Грузовика или стола нет — пустое место с «плюсом». Всегда стоят кафе слева
+// спереди (обеды) и отель расселения слева от здания места: расселения в базе нет,
+// отель заперт — окна тёмные, вход за шлагбаумом. Над кафе и отелем — якоря табличек
+// (w-tag), текст в них кладёт оболочка. После последнего участка — одна пустая ячейка
+// «Новое мероприятие».
 // Колец на участках нет: наведение и выбор показывает ограда надела (selection.ts).
 // Числа — из макета voxel-world-s51.html, раздел «Площадки (с50): квадрат мира».
 import * as THREE from 'three'
@@ -26,6 +28,9 @@ const LOT_W = 18, LOT_D = 26
 const lotAt = (i: number): XZ => [(i % 3 - 1) * LOT_W, (i < 3 ? 0.5 : -0.5) * LOT_D]
 // Блоки — в осях участка: центр в (0, 0), +z — к зрителю. LOT_LANE — ось проезда ряда.
 const LOT_BLD: XZ = [0.5, -5], LOT_TRUCK: XZ = [2.6, 6.4], LOT_PLAN: XZ = [5.9, 2.9], LOT_LANE = 11.5
+// Кафе — слева от площадки разгрузки, отель — слева от здания места, на линии его
+// фасада: камера смотрит справа спереди, так он не закрыт зданием и сам не закрывает кафе
+const LOT_CAFE: XZ = [-4.9, 5.4], LOT_STAY: XZ = [-5.9, -3.6]
 // Надел — прямоугольник внутри ячейки: между соседними наделами улица 2 м, спереди —
 // проезд ряда. Калитка в переднем бордюре стоит против съезда грузовика к проезду.
 const PLOT: FencePlot = { hw: 8, z0: -11.4, z1: 9.8, curb: 0.4, gate: [3, 6] }
@@ -105,6 +110,43 @@ function buildPlan(ctx: WorldCtx) {
   return g
 }
 
+// Кафе — низкий павильон с маркизой и парой столиков перед входом: обеды мероприятия.
+// Самый низкий дом участка: здание места и вывеску не закрывает.
+function buildCafe(ctx: WorldCtx) {
+  const g = new THREE.Group(), k = kit(ctx), { roof, glass, door, canopy, dark, white, signMark } = ctx.style.roles
+  k(mat(ctx.style, ctx.style.P.wall), 3.2, 2.1, 2.2, 0, 0, -0.9)
+  k.slab(roof, 3.4, 0.2, 2.4, 0, 2.1, -0.9)
+  k(glass, 1.5, 0.8, 0.1, 0.6, 0.9, 0.22)                      // витрина
+  k(door, 0.8, 1.6, 0.12, -0.9, 0, 0.22)
+  k.slab(canopy, 3.4, 0.16, 1.3, 0, 1.75, 0.85)               // маркиза
+  k(signMark, 3.4, 0.14, 0.1, 0, 1.62, 1.5)                    // её красная кромка
+  for (const dx of [-0.85, 0.85]) {                            // столики
+    k(dark, 0.12, 0.62, 0.12, dx, 0, 2)
+    k.slab(white, 0.7, 0.1, 0.7, dx, 0.62, 2)
+  }
+  k.into(g)
+  return g
+}
+
+// Основание и высота отеля расселения в чертеже (до масштаба VENUE_SCALE)
+const STAY_SIDE = 3.6, STAY_TOP = 5.6
+
+// Отель расселения — башенка меньше и уже здания места, уменьшена тем же VENUE_SCALE.
+// Заперт: окна и вход тёмные (не светятся и в «Ночи»), перед входом шлагбаум.
+function buildStay(ctx: WorldCtx) {
+  const g = new THREE.Group(), k = kit(ctx), { roof, dark, white, signMark } = ctx.style.roles, f = STAY_SIDE / 2 + 0.02
+  g.scale.setScalar(VENUE_SCALE)
+  k(mat(ctx.style, ctx.style.P.wall), STAY_SIDE, STAY_TOP, STAY_SIDE, 0, 0, 0)
+  k.slab(roof, STAY_SIDE + 0.2, 0.3, STAY_SIDE + 0.2, 0, STAY_TOP, 0)
+  for (const y of [2.2, 3.4, 4.6]) { k(dark, 2.8, 0.6, 0.1, 0, y, f); k(dark, 0.1, 0.6, 2.8, f, y, 0) }   // окна — на двух видимых гранях
+  k(dark, 1.2, 1.7, 0.14, 0, 0, f)
+  for (const dx of [-1.9, 1.9]) k(dark, 0.3, 1.3, 0.3, dx, 0, 2.7)                                       // шлагбаум
+  k(white, 3.8, 0.22, 0.22, 0, 0.95, 2.7)
+  for (const dx of [-1.2, 0, 1.2]) k(signMark, 0.6, 0.26, 0.26, dx, 0.93, 2.7)
+  k.into(g)
+  return g
+}
+
 // Группа зоны в своих осях: центр квадрата в (0, 0), +z — к зрителю; на место в ряду её
 // ставит zones/layout.ts. userData.frame — точки (в осях зоны), которые обязаны попасть
 // в кадр, когда камера стоит на зоне: земля и место над крышами под вывески.
@@ -132,7 +174,13 @@ export function buildVenues(ctx: WorldCtx, venues: WorldLot[]) {
       block(ctx, g, lotPartId('truck', lot.id), truck, X + LOT_TRUCK[0], Z + LOT_TRUCK[1])
     }
     if (lot.hasPlan) block(ctx, g, lotPartId('plan', lot.id), buildPlan(ctx), X + LOT_PLAN[0], Z + LOT_PLAN[1])
-    // Чего у мероприятия нет — пустое место с «плюсом»
+    // Кафе и запертый отель стоят всегда; над каждым — якорь таблички (в осях своей группы)
+    const cafe = buildCafe(ctx), stay = buildStay(ctx)
+    block(ctx, g, lotPartId('cafe', lot.id), cafe, X + LOT_CAFE[0], Z + LOT_CAFE[1])
+    label(ctx, cafe, lotPartId('cafe', lot.id), 'w-tag', 0, 2.8, -0.9)
+    block(ctx, g, lotPartId('stay', lot.id), stay, X + LOT_STAY[0], Z + LOT_STAY[1])
+    label(ctx, stay, lotPartId('stay', lot.id), 'w-tag', 0, STAY_TOP + 0.9, 0)
+    // Грузовика или стола у мероприятия нет — пустое место с «плюсом»
     for (const part of ['addtruck', 'addplan'] as const) {
       if (part === 'addtruck' ? lot.lists > 0 : lot.hasPlan) continue
       const [[x, z], w, d] = SLOTS[part]

@@ -121,8 +121,8 @@ export function WorldStage({ look, onFirstFrame }: Props) {
       if (id === ADD_LOT_ID || !lot || data?.mock) navigate('/projects')
       // Параметр project читает ListEditorPage: новый список сразу на мероприятии
       else if (lot.part === 'addtruck') navigate(`/lists/new?project=${lot.venueId}`)
-      // План залов до Э2 (world-work-s58) создаётся со страницы мероприятия
-      else navigate(`/projects/${lot.venueId}`)
+      // HallPlansPage по new=1 открывает дровер нового плана с этим мероприятием
+      else navigate(`/halls?new=1&project=${lot.venueId}`)
       return
     }
     if (!WORLD_SITES.includes(id as WorldSiteId)) return
