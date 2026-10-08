@@ -708,6 +708,103 @@ export type Database = {
       }
       // ПРАВКА РУКАМИ: таблица заведена миграцией 20261007184926 (с54), типы дописаны
       // вслед за ней — генератор с прода не перезапускался.
+      // ПРАВКА РУКАМИ: таблицы заведены миграцией 20261008031050 (с57, обеды),
+      // фрагменты перенесены из generate_typescript_types.
+      project_meal_orders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dish: string | null
+          employee_id: string | null
+          guest_name: string | null
+          id: string
+          meal_id: string
+          price: number | null
+          qty: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dish?: string | null
+          employee_id?: string | null
+          guest_name?: string | null
+          id?: string
+          meal_id: string
+          price?: number | null
+          qty?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dish?: string | null
+          employee_id?: string | null
+          guest_name?: string | null
+          id?: string
+          meal_id?: string
+          price?: number | null
+          qty?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_meal_orders_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_meal_orders_meal_id_fkey"
+            columns: ["meal_id"]
+            isOneToOne: false
+            referencedRelation: "project_meals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_meals: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          meal_on: string
+          project_id: string
+          slot: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          meal_on: string
+          project_id: string
+          slot?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          meal_on?: string
+          project_id?: string
+          slot?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_meals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_staff: {
         Row: {
           created_at: string
@@ -1078,6 +1175,11 @@ export type Database = {
       // ПРАВКА РУКАМИ: функция заведена миграцией 20260928133529 (с34), типы
       // дописаны вслед за ней. Аргументов нет — форма та же, что даёт генератор
       // для функции без параметров.
+      // ПРАВКА РУКАМИ: функция заведена миграцией 20261008031050 (с57, обеды).
+      project_meal_dishes: {
+        Args: { p_project_id: string }
+        Returns: Json
+      }
       home_summary: {
         Args: Record<PropertyKey, never>
         Returns: Json
