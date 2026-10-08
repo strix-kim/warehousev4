@@ -4,8 +4,8 @@ import { saveWorldStyle, useWorldStyle, WORLD_INKS, WORLD_PALETTES, type WorldIn
 import { prefersReducedMotion } from './support'
 import { WorldStage } from './WorldStage'
 
-// Dev-стенд мира: маршрут /world существует только под import.meta.env.DEV
-// (App.tsx), в прод-сборку страница не попадает.
+// Страница мира: маршрут /world в проде с с58 (App.tsx). Цифра первого кадра —
+// замер для разработки, в прод-сборке её нет.
 export function WorldPage() {
   const { tr, locale } = useLanguage()
   useDocumentTitle(tr('Мир', 'Dunyo'))
@@ -20,10 +20,10 @@ export function WorldPage() {
     <section className="w-page">
       <header className="page-header">
         <div>
-          <p className="eyebrow">{tr('Стенд разработки', 'Ishlab chiqish stendi')}</p>
+          <p className="eyebrow">{tr('3D-вид', '3D ko‘rinish')}</p>
           <h1>{tr('Мир', 'Dunyo')}</h1>
           <p className="w-page__facts">
-            {firstFrameMs !== null && <span>{tr('Первый кадр', 'Birinchi kadr')}: {firstFrameMs.toLocaleString(locale)} {tr('мс', 'ms')}</span>}
+            {import.meta.env.DEV && firstFrameMs !== null && <span>{tr('Первый кадр', 'Birinchi kadr')}: {firstFrameMs.toLocaleString(locale)} {tr('мс', 'ms')}</span>}
             {reduced && <span>{tr('Движение уменьшено в системе — мир неподвижен', 'Tizimda harakat kamaytirilgan — dunyo harakatsiz')}</span>}
           </p>
         </div>

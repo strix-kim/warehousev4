@@ -1,4 +1,4 @@
-import { ArrowUpRight, Boxes, CalendarRange, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Presentation, RadioTower, Receipt, Users, Warehouse, X } from 'lucide-react'
+import { ArrowUpRight, Boxes, CalendarRange, CarFront, ClipboardList, Ellipsis, House, ListPlus, LogOut, MapIcon, PanelLeftClose, PanelLeftOpen, Presentation, RadioTower, Receipt, Users, Warehouse, X } from 'lucide-react'
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, m, type Transition } from 'motion/react'
 import { Link, matchPath, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom'
@@ -53,12 +53,10 @@ const MealsPage = lazyWithReload(loadMealsPage)
 const HomePage = lazyWithReload(loadHomePage)
 const DelayCalculatorPage = lazyWithReload(loadDelayCalculatorPage)
 const ExpensesPage = lazyWithReload(loadExpensesPage)
-// Мир — dev-стенд до шага выкатки (план world-s51, решение 5): в прод-сборке
-// тернарий сворачивается в null, и ни маршрута, ни чанка three в ней нет.
-// В общий прогрев moduleTimer не входит намеренно — он тяжёлый.
-const WorldPage = import.meta.env.DEV
-  ? lazyWithReload(() => import('../features/world/WorldPage').then((module) => ({ default: module.WorldPage })))
-  : null
+// Мир в проде с с58 (план world-work-s58, Э1а). В общий прогрев moduleTimer
+// не входит намеренно (решение 7 с51): чанк three тяжёлый, грузится только
+// по заходу на /world.
+const WorldPage = lazyWithReload(() => import('../features/world/WorldPage').then((module) => ({ default: module.WorldPage })))
 
 // Пункты нижней панели телефона — m-обёртка над NavLink ради whileTap: сжатие
 // должно ловиться по всей площади вкладки, а не только по значку.
@@ -161,7 +159,7 @@ export function App() {
         <Route path="/halls/:planId" element={<RouteBoundary><HallPlanPage /></RouteBoundary>} />
         <Route path="/delay" element={<RouteBoundary><DelayCalculatorPage /></RouteBoundary>} />
         <Route path="/expenses" element={<RouteBoundary><ExpensesPage /></RouteBoundary>} />
-        {WorldPage && <Route path="/world" element={<RouteBoundary><WorldPage /></RouteBoundary>} />}
+        <Route path="/world" element={<RouteBoundary><WorldPage /></RouteBoundary>} />
       </Route>
       {/* ТВ-режим — вне AppShell: на экране в зале не нужны ни сайдбар, ни
           отступы приложения. Гейт сессии у маршрута свой, как у шелла. */}
@@ -406,6 +404,7 @@ function AppShell() {
           <NavLink className="sidebar__nav-extra" to="/delay"><RadioTower size={19} /><span>{tr('Задержки ITC', 'ITC kechikishlari')}</span></NavLink>
           {/* Счётчика нет: home_summary расходы не считает, а журнал у каждого свой. */}
           <NavLink className="sidebar__nav-extra" to="/expenses"><Receipt size={19} /><span>{tr('Расходы', 'Xarajatlar')}</span></NavLink>
+          <NavLink className="sidebar__nav-extra" to="/world"><MapIcon size={19} /><span>{tr('Мир', 'Dunyo')}</span></NavLink>
           {/* Пятый слот нижней панели, на десктопе скрыт: язык, аккаунт, быстрый
               переход в новый список и три раздела сверх пяти живут в сайдбаре,
               которого на телефоне нет. Горит и на адресах этих разделов. */}
@@ -504,6 +503,7 @@ function MobileMoreSheet({ email, onSignOut, onClose }: { email: string; onSignO
         <NavLink to="/vehicles" onClick={onClose}><span><CarFront size={19} /></span>{tr('Автомобили', 'Avtomobillar')}</NavLink>
         <NavLink to="/delay" onClick={onClose}><span><RadioTower size={19} /></span>{tr('Задержка излучателей', 'Nurlatgichlar kechikishi')}</NavLink>
         <NavLink to="/expenses" onClick={onClose}><span><Receipt size={19} /></span>{tr('Производственные расходы', 'Ishlab chiqarish xarajatlari')}</NavLink>
+        <NavLink to="/world" onClick={onClose}><span><MapIcon size={19} /></span>{tr('Мир', 'Dunyo')}</NavLink>
       </nav>
       <div className="sheet__row">
         <span>{tr('Язык интерфейса', 'Interfeys tili')}</span>
