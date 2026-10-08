@@ -109,7 +109,7 @@ export function useWorldData(): { data: WorldData | null; reload: () => Promise<
       venues: mock?.venues ?? split?.lots ?? null,
       archive: mock?.archive ?? split?.archive ?? null,
       mock: mock !== null,
-      cars: (vehicles ?? []).map((row) => ({ id: row.id, brand: row.brand, model: row.model, color: row.color, plate: row.plate_number })),
+      cars: (vehicles ?? []).map((row) => ({ id: row.id, brand: row.brand, model: row.model, color: row.color, plate: row.plate_number, drivers: row.drivers.length })),
       // Только штат: наёмные в «Сотрудники» не входят (решение прораба с53, п. 11)
       people: (employees ?? []).filter((row) => row.department === 'staff').map((row) => ({ id: row.id, firstName: row.first_name, lastName: row.last_name })),
       sites: {

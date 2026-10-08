@@ -53,7 +53,7 @@ const SLOTS = { addtruck: [LOT_TRUCK, 5.4, 2.6], addplan: [LOT_PLAN, 3.2, 2.6], 
 
 // Грузовик на разгрузке — силуэт бортового Bongo с кейсами. Это знак «у мероприятия
 // есть списки», а не машина из парка: связи машин с мероприятиями в схеме нет.
-const TRUCK: WorldCar = { id: 'lot-truck', brand: 'Kia', model: 'Bongo', color: null, plate: '' }
+const TRUCK: WorldCar = { id: 'lot-truck', brand: 'Kia', model: 'Bongo', color: null, plate: '', drivers: 0 }
 
 // Полосы бордюра по периметру надела с разрывом-калиткой: put(ширина, глубина, x, z)
 function plotCurb(put: (w: number, d: number, x: number, z: number) => void) {

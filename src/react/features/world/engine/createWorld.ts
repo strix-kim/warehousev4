@@ -4,7 +4,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CSS2DRenderer, type CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
-import type { CameraPose, WorldStore, WorldTexts, WorldZone } from '../worldStore'
+import type { CameraPose, WorldInside, WorldStore, WorldTexts, WorldZone } from '../worldStore'
 import type { WorldData } from '../data/types'
 import { appear } from './appear'
 import { aimAt, createLimit, fit, framePoints, limitTo, placeCamera, pullIn, readPose, restorePose, tickFlight, type Flight } from './camera'
@@ -120,6 +120,10 @@ export type World = {
   // смена зоны, как всегда, снимает выбор; в своей зоне pick не меняется. Незнакомый id —
   // ничего.
   focus: (id: string) => void
+  // Камера подъезжает к зданию кампуса «внутрь» (сейчас только гараж) или, с null,
+  // отъезжает к рабочему ракурсу кампуса; по прибытии движок пишет WorldState.inside.
+  // Контракт — worldStore.ts, «Гараж»
+  goInside: (site: WorldInside | null) => void
   dispose: () => void
 }
 
@@ -147,7 +151,7 @@ function sameFill(a: WorldData, b: WorldData) {
     && a.cars.length === b.cars.length && a.people.length === b.people.length
     && a.cars.every((car, i) => {
       const other = b.cars[i]!
-      return car.id === other.id && car.brand === other.brand && car.model === other.model && car.color === other.color && car.plate === other.plate
+      return car.id === other.id && car.brand === other.brand && car.model === other.model && car.color === other.color && car.plate === other.plate && car.drivers === other.drivers
     })
     && a.people.every((person, i) => {
       const other = b.people[i]!
@@ -296,6 +300,8 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     aim = aimAt(ctx, root, performance.now())
     if (deps.reducedMotion || !seenFrame) endAim()
   }
+  // Заглушка контракта Э4 (с61): подъезд к гаражу пишет кодер движка
+  const goInside = (site: WorldInside | null) => { void site }
   // Камера встала на зону: отложенная подводка — если объект ещё есть и зона его
   const landed = () => {
     const id = aimNext
@@ -456,5 +462,5 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     throw error
   }
 
-  return { store: deps.store, getPose: () => readPose(ctx), setStyle, setData, setTexts, goZone, focus, dispose }
+  return { store: deps.store, getPose: () => readPose(ctx), setStyle, setData, setTexts, goZone, focus, goInside, dispose }
 }

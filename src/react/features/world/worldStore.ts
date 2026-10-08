@@ -49,7 +49,14 @@ export function parseLotId(id: string | null): { part: WorldLotPart; venueId: st
   return LOT_PARTS.includes(part) ? { part, venueId: id.slice(at + 1) } : null
 }
 // «Плюс» — пустое место, которое можно заполнить
-export const isAddId = (id: string) => id === ADD_LOT_ID || id.startsWith('addtruck:') || id.startsWith('addplan:') || id.startsWith('addcrew:')
+export const isAddId = (id: string) => id === ADD_LOT_ID || id === ADD_CAR_ID || id.startsWith('addtruck:') || id.startsWith('addplan:') || id.startsWith('addcrew:')
+
+// Гараж изнутри (Э4 плана world-game-s59). Машина в проёме — объект `car:<id машины>`,
+// пустой проём с «плюсом» — ADD_CAR_ID (новая машина, интерьер /vehicles/new).
+export type WorldInside = 'garage'
+export const carId = (vehicleId: string) => `car:${vehicleId}`
+export const parseCarId = (id: string | null) => (id?.startsWith('car:') ? id.slice(4) : null)
+export const ADD_CAR_ID = 'addcar'
 
 // «Где работали»: здание места и квартал (номер по порядку нарезки, с нуля)
 export const placeId = (archivePlaceId: string) => `place:${archivePlaceId}`
@@ -118,6 +125,19 @@ export type WorldTexts = { zones: Record<WorldZone, { name: string; sub: string 
    и дровер, и панель — их обработчики висят на window и document порознь), движок не
    активирует цели.
 
+   Гараж (inside). Хозяин — адрес (?in=garage, только на кампусе): оболочка пишет его
+   через replace и зовёт world.goInside('garage' | null); движок подъезжает и по прибытии
+   пишет inside (отъезд — null сразу). Смена зоны снимает inside, оболочка снимает параметр.
+   Клик по зданию гаража на кампусе, его вывеске и клавише Dock: deps.onActivate('garage')
+   — оболочка ставит ?in=garage вместо перехода в раздел. Пока inside === 'garage':
+   машины в проёмах — цели (hover / pick = carId), клик только выбирает; карточку машины
+   (hud/CarCard.tsx, data-w-chrome="panel") рисует оболочка по pick. Движок ставит якорь
+   label под carId каждой машине гаража (класс w-tag): оболочка кладёт в него номер и
+   маркер «!» машине без водителя (WorldCar.drivers === 0). Свободный проём — якорь
+   ADD_CAR_ID (класс w-plus), клик — deps.onActivate. Вне inside машины не цели, их якоря
+   и «плюс» скрыты (is-away). Клик по пустой земле внутри снимает pick; Esc — оболочка:
+   сначала pick, затем ?in.
+
    Классы якорей — по ним раскладка решает, что делать с подписью:
      w-sign — вывеска на ножке: внутри обязателен .w-sign__board, движок ищет ей место
        и пишет w-sign--sm, is-away, --shift, --lift;
@@ -149,6 +169,8 @@ export type WorldState = {
   hudCompact: boolean
   // Поверх сцены открыт дровер действия (контракт выше, «Дровер действия»)
   modal: boolean
+  // Камера стоит у здания «внутри» (контракт выше, «Гараж»); null — обычный кампус
+  inside: WorldInside | null
 }
 
 // Поза камеры числами, без Vector3: её держит оболочка между пересозданиями мира.
@@ -165,7 +187,7 @@ export type WorldStore = {
   subscribe: (listener: () => void) => () => void
 }
 
-const INITIAL: WorldState = { zone: 'campus', zones: ['campus'], flying: false, hover: null, pick: null, labels: new Map(), hudCompact: false, modal: false }
+const INITIAL: WorldState = { zone: 'campus', zones: ['campus'], flying: false, hover: null, pick: null, labels: new Map(), hudCompact: false, modal: false, inside: null }
 
 export function createWorldStore(): WorldStore {
   let state = INITIAL
