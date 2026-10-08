@@ -768,6 +768,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          expense_id: string | null
           id: string
           meal_on: string
           project_id: string
@@ -778,6 +779,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          expense_id?: string | null
           id?: string
           meal_on: string
           project_id: string
@@ -788,6 +790,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          expense_id?: string | null
           id?: string
           meal_on?: string
           project_id?: string
@@ -796,6 +799,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "project_meals_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "project_meals_project_id_fkey"
             columns: ["project_id"]
@@ -1179,6 +1189,17 @@ export type Database = {
       project_meal_dishes: {
         Args: { p_project_id: string }
         Returns: Json
+      }
+      // ПРАВКА РУКАМИ: функция заведена миграцией 20261008031558 (с57, обеды → расходы).
+      create_meal_expense: {
+        Args: {
+          p_meal_id: string
+          p_name: string
+          p_amount: number
+          p_spent_by: string | null
+          p_comment: string | null
+        }
+        Returns: string
       }
       home_summary: {
         Args: Record<PropertyKey, never>
