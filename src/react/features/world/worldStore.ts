@@ -21,13 +21,15 @@ export const whoLabelId = (personId: string) => `who:${personId}`
 export const gateId = (to: WorldZone, from: WorldZone) =>
   to === 'archive' ? 'gate:0:archive' : to === 'venues' ? 'gate:1:venues' : from === 'venues' ? 'gate:1:campus' : 'gate:0:campus'
 
-// Объекты участка «Площадок»: id = `<часть>:<id места>`. lot — здание и весь надел,
-// truck — грузовик (к месту привязан список), stay — отель расселения, plan — стол с
-// планом залов; addstay / addplan — пустое место под них с «плюсом».
-export const LOT_PARTS = ['lot', 'truck', 'stay', 'plan', 'addstay', 'addplan'] as const
+// Объекты участка «Площадок»: id = `<часть>:<id мероприятия>` (участок = мероприятие,
+// с58; поле venueId — историческое имя этого id). lot — здание и весь надел, truck —
+// грузовик (у мероприятия есть списки), stay — отель расселения (данных нет, в сцене не
+// строится до Э2 плана world-work-s58), plan — стол с планом залов; addtruck / addplan —
+// пустое место под них с «плюсом».
+export const LOT_PARTS = ['lot', 'truck', 'stay', 'plan', 'addtruck', 'addplan'] as const
 export type WorldLotPart = (typeof LOT_PARTS)[number]
 export const lotPartId = (part: WorldLotPart, venueId: string) => `${part}:${venueId}`
-// Пустая ячейка сетки после последнего участка — «Новая площадка»
+// Пустая ячейка сетки после последнего участка — «Новое мероприятие»
 export const ADD_LOT_ID = 'addlot'
 export function parseLotId(id: string | null): { part: WorldLotPart; venueId: string } | null {
   const at = id?.indexOf(':') ?? -1
@@ -36,7 +38,7 @@ export function parseLotId(id: string | null): { part: WorldLotPart; venueId: st
   return LOT_PARTS.includes(part) ? { part, venueId: id.slice(at + 1) } : null
 }
 // «Плюс» — пустое место, которое можно заполнить
-export const isAddId = (id: string) => id === ADD_LOT_ID || id.startsWith('addstay:') || id.startsWith('addplan:')
+export const isAddId = (id: string) => id === ADD_LOT_ID || id.startsWith('addtruck:') || id.startsWith('addplan:')
 
 // «Где работали»: здание места и квартал (номер по порядку нарезки, с нуля)
 export const placeId = (archivePlaceId: string) => `place:${archivePlaceId}`

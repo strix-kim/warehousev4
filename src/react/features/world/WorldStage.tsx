@@ -1,6 +1,6 @@
 import { MonitorOff } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
 import { useLanguage } from '../../lib/i18n'
@@ -23,7 +23,7 @@ import type { World } from './engine/createWorld'
 import { loadWorld } from './loadWorld'
 import type { WorldLook } from './settings'
 import { hasWebGL2, prefersReducedMotion } from './support'
-import { createWorldStore, isAddId, isWorldZone, useWorldState, WORLD_SITES, type CameraPose, type WorldSiteId, type WorldTexts, type WorldZone } from './worldStore'
+import { ADD_LOT_ID, createWorldStore, isAddId, isWorldZone, parseLotId, useWorldState, WORLD_SITES, type CameraPose, type WorldSiteId, type WorldTexts, type WorldZone } from './worldStore'
 
 // unsupported — WebGL2 нет; failed — чанк не приехал или мир не собрался;
 // lost — браузер отобрал контекст у живого мира
@@ -37,12 +37,9 @@ type Status = 'loading' | 'ready' | 'unsupported' | 'failed' | 'lost'
 const hot = import.meta.hot
 if (hot) hot.dispose((data) => { data.swapping = true })
 
-// Зоны, у которых нет источника в базе: в dev их наполняет макет (fixtures.dev.ts)
+// Зоны, которые в dev по ?mock=on наполняет макет (fixtures.dev.ts) вместо реестра
 const MOCK_ZONES: readonly WorldZone[] = ['venues', 'archive']
 const NO_ZONES: readonly WorldZone[] = []
-// Сколько держится сообщение стенда
-const NOTE_MS = 2400
-
 // Раздел продукта за каждым зданием
 const SITE_ROUTES: Record<WorldSiteId, string> = { office: '/lists', warehouse: '/equipment', garage: '/vehicles' }
 
@@ -71,13 +68,6 @@ export function WorldStage({ look, onFirstFrame }: Props) {
   const zone = useWorldState(store, (state) => state.zone)
   const zones = useWorldState(store, (state) => state.zones)
   const labels = useWorldState(store, (state) => state.labels)
-  // Сообщение стенда: «плюс» в макете ничего не добавляет
-  const [note, setNote] = useState<string | null>(null)
-  useEffect(() => {
-    if (note === null) return
-    const timer = window.setTimeout(() => setNote(null), NOTE_MS)
-    return () => window.clearTimeout(timer)
-  }, [note])
   const hudCompact = useWorldState(store, (state) => state.hudCompact)
   const [status, setStatus] = useState<Status>(() => (hasWebGL2() ? 'loading' : 'unsupported'))
   const onFirstFrameRef = useRef(onFirstFrame)
@@ -91,6 +81,8 @@ export function WorldStage({ look, onFirstFrame }: Props) {
   const worldRef = useRef<Pick<World, 'setStyle' | 'setData' | 'setTexts' | 'goZone' | 'dispose'> | null>(null)
   const wantedRef = useRef(wantedZone)
 
+  // Текстовый путь вместо сцены в запасных состояниях: участки мира — это мероприятия
+  const projectsLink = <Link className="button button--secondary" to="/projects">{tr('Мероприятия', 'Tadbirlar')}</Link>
   const names: Record<WorldSiteId, string> = { office: tr('Офис', 'Ofis'), warehouse: tr('Склад', 'Ombor'), garage: tr('Гараж', 'Garaj') }
   // Имена зон и подстрочники с числами: их же движок рисует на кнопках на земле.
   // Числа нет (источник не ответил) — подстрочника нет.
@@ -100,7 +92,7 @@ export function WorldStage({ look, onFirstFrame }: Props) {
     return {
       zones: {
         campus: { name: tr('Кампус', 'Kampus'), sub: count(listCount, ['список', 'списка', 'списков'], 'ro‘yxat') },
-        venues: { name: tr('Площадки', 'Maydonlar'), sub: count(venueCount, ['место', 'места', 'мест'], 'joy') },
+        venues: { name: tr('Площадки', 'Maydonlar'), sub: count(venueCount, ['мероприятие', 'мероприятия', 'мероприятий'], 'tadbir') },
         archive: { name: tr('Где работали', 'Qayerda ishlaganmiz'), sub: count(placeCount, ['место', 'места', 'мест'], 'joy') },
       },
     }
@@ -121,9 +113,16 @@ export function WorldStage({ look, onFirstFrame }: Props) {
   // Выбор и переход — один путь для вывески, клавиши и клика по зданию в сцене.
   // Движок к этому моменту pick уже поставил: повторная запись того же id стор не будит.
   // Участки и места — выбор без перехода: их показывают панели зон по pick из стора.
+  // «Плюс» ведёт туда, где недостающее создаётся: записи в базу из мира нет.
   const activate = (id: string) => {
     if (isAddId(id)) {
-      setNote(tr('Макет: добавление появится вместе с живыми площадками', 'Maket: qo‘shish jonli maydonlar bilan birga paydo bo‘ladi'))
+      const lot = parseLotId(id)
+      // Макетного мероприятия (?mock=on) в базе нет — вести некуда, кроме реестра
+      if (id === ADD_LOT_ID || !lot || data?.mock) navigate('/projects')
+      // Параметр project читает ListEditorPage: новый список сразу на мероприятии
+      else if (lot.part === 'addtruck') navigate(`/lists/new?project=${lot.venueId}`)
+      // План залов до Э2 (world-work-s58) создаётся со страницы мероприятия
+      else navigate(`/projects/${lot.venueId}`)
       return
     }
     if (!WORLD_SITES.includes(id as WorldSiteId)) return
@@ -246,7 +245,6 @@ export function WorldStage({ look, onFirstFrame }: Props) {
           {zones.length > 1 && <ZoneSwitch store={store} texts={texts} mockZones={data?.mock ? MOCK_ZONES : NO_ZONES} onGo={goZone} />}
           {/* Клавиши — дубли зданий кампуса */}
           {zone === 'campus' && <Dock store={store} names={names} onActivate={activate} />}
-          {note !== null && <p className="w-toast" role="status">{note}</p>}
         </>
       )}
       {/* Скринридеру: имя здания под указателем или в фокусе клавиши */}
@@ -258,6 +256,7 @@ export function WorldStage({ look, onFirstFrame }: Props) {
             icon={<MonitorOff size={22} />}
             title={tr('3D-вид недоступен', '3D ko‘rinish mavjud emas')}
             text={tr('Браузер или устройство не поддерживает WebGL2. Все разделы открываются из меню.', 'Brauzer yoki qurilma WebGL2 ni qo‘llab-quvvatlamaydi. Barcha bo‘limlar menyudan ochiladi.')}
+            action={projectsLink}
           />
         </div>
       )}
@@ -267,6 +266,7 @@ export function WorldStage({ look, onFirstFrame }: Props) {
             inline
             title={tr('Не удалось загрузить 3D-вид', '3D ko‘rinishni yuklab bo‘lmadi')}
             text={tr('Проверьте соединение и обновите страницу. Все разделы открываются из меню.', 'Aloqani tekshirib, sahifani yangilang. Barcha bo‘limlar menyudan ochiladi.')}
+            action={projectsLink}
           />
         </div>
       )}
@@ -276,6 +276,7 @@ export function WorldStage({ look, onFirstFrame }: Props) {
             inline
             title={tr('3D-вид остановлен', '3D ko‘rinish to‘xtatildi')}
             text={tr('Браузер отключил графику на этой вкладке. Обновите страницу, чтобы вернуть мир.', 'Brauzer bu varaqda grafikani o‘chirdi. Dunyoni qaytarish uchun sahifani yangilang.')}
+            action={projectsLink}
           />
         </div>
       )}

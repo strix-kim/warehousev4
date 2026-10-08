@@ -17,7 +17,7 @@ type Props = {
 
 const placesWord = (count: number, tr: Tr) => tr(ruPlural(count, 'место', 'места', 'мест'), 'joy')
 const eventsWord = (count: number, tr: Tr) => tr(ruPlural(count, 'мероприятие', 'мероприятия', 'мероприятий'), 'tadbir')
-const itemsWord = (count: number, tr: Tr) => tr(ruPlural(count, 'позиция', 'позиции', 'позиций'), 'pozitsiya')
+const listsWord = (count: number, tr: Tr) => tr(ruPlural(count, 'список', 'списка', 'списков'), 'ro‘yxat')
 
 function kindName(kind: WorldArchiveKind, tr: Tr) {
   if (kind === 'hotel') return tr('Отель', 'Mehmonxona')
@@ -284,11 +284,11 @@ export function ArchivePanel({ store, places }: Props) {
                   {place.history.map((entry, i) => (
                     <li key={i}>
                       <b>{entry.title}</b>
-                      <span>{dateText(entry.date, locale)} · {entry.items.toLocaleString(locale)} {itemsWord(entry.items, tr)}</span>
+                      <span>{dateText(entry.date, locale)} · {entry.listCount.toLocaleString(locale)} {listsWord(entry.listCount, tr)}</span>
                     </li>
                   ))}
                 </ol>
-                {rest > 0 && <p className="w-apanel__more">{tr(`Ещё ${rest} раньше — в разделе «Списки»`, `Yana ${rest} ta avvalroq — «Ro‘yxatlar» bo‘limida`)}</p>}
+                {rest > 0 && <p className="w-apanel__more">{tr(`Ещё ${rest} раньше — в разделе «Мероприятия»`, `Yana ${rest} ta avvalroq — «Tadbirlar» bo‘limida`)}</p>}
               </div>
             </>
           )}

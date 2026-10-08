@@ -1,8 +1,7 @@
 // WorldData — единственный вход движка. Здесь только то, что мир уже рисует:
-// машины, люди, числа вывесок, площадки и архив мест; «сегодня» добавится своим шагом.
-// Поля — как в выдаче vehicles и employees, без копий сверх нужного миру. У площадок и
-// архива источника в базе ещё нет (таблица venues — Ш9): форма — по данным макета с51,
-// числа и даты сырьём, слова и склонения собирает HUD.
+// машины, люди, числа вывесок, участки мероприятий и архив мест; «сегодня» — своим шагом.
+// Поля — как в выдаче vehicles, employees и projects, без копий сверх нужного миру.
+// Числа и даты сырьём, слова и склонения собирает HUD.
 import type { WorldSiteId } from '../worldStore'
 
 export type WorldCar = {
@@ -21,27 +20,27 @@ export type WorldPerson = {
   lastName: string
 }
 
-// Тип места решает силуэт здания
+// Тип места решает силуэт здания. Колонки в базе нет: тип угадывает venueKind.ts
 export type WorldVenueKind = 'hotel' | 'arena' | 'hall'
 
-// Место на «Площадках»: стоит на карте, пока к нему привязано идущее или будущее
-export type WorldVenue = {
+// Участок на «Площадках» = мероприятие (строка projects), идущее или будущее. Два
+// мероприятия в одном месте — два участка (решение прораба с58).
+export type WorldLot = {
+  // id мероприятия
   id: string
-  kind: WorldVenueKind
   name: string
-  // Мероприятие и его зал на этом месте
-  title: string
-  hall: string
-  // Даты мероприятия, ISO (yyyy-mm-dd); один день — обе равны
-  dateFrom: string
-  dateTo: string
-  halls: string[]
-  // У места есть план залов: на участке — стол с макетом; нет — пустое место с «плюсом»
+  client: string | null
+  // Место проведения; null — не указано, участок стоит с типовым зданием
+  place: { id: string; name: string; city: string } | null
+  kind: WorldVenueKind
+  // Даты мероприятия, ISO (yyyy-mm-dd); null — не указана. Нет dateTo — один день
+  dateFrom: string | null
+  dateTo: string | null
+  // Счётчики реестра мероприятий (ProjectListItem): списков, людей в составе, есть ли
+  // план залов. Грузовик на участке — lists > 0, стол с макетом — hasPlan
+  lists: number
+  staff: number
   hasPlan: boolean
-  // Позиций в привязанном списке оборудования (у участка грузовик); null — списка нет
-  gearCount: number | null
-  // Расселение (у участка отель); null — пустое место с «плюсом»
-  stay: { hotel: string; rooms: number; people: number } | null
 }
 
 export type WorldArchiveKind = WorldVenueKind | 'palace'
@@ -56,18 +55,21 @@ export type WorldArchivePlace = {
   events: number
   // Дата последнего мероприятия, ISO
   last: string
-  // До шести последних мероприятий: название, дата (ISO), число позиций списка
-  history: Array<{ title: string; date: string; items: number }>
+  // До шести последних мероприятий: название, дата начала (ISO), число списков.
+  // Позиций в реестре мероприятий нет — считаем списки
+  history: Array<{ title: string; date: string; listCount: number }>
 }
 
 export type WorldData = {
   cars: WorldCar[]
   people: WorldPerson[]
-  // null — источника нет: зона на карте не строится вовсе (решение 6 плана world-s51).
-  // Пустой массив — источник есть, мест нет: зона стоит пустой.
-  venues: WorldVenue[] | null
+  // null — источник (реестр мероприятий) не ответил: зона на карте не строится вовсе
+  // (решение 6 плана world-s51). Пустой массив — источник есть, мероприятий нет: зона
+  // стоит пустой. Участки — все идущие и будущие по date_from; в сцену встают первые
+  // LOT_MAX (splitProjects.ts), остальные — строкой «ещё N» в панели зоны.
+  venues: WorldLot[] | null
   archive: WorldArchivePlace[] | null
-  // Площадки и архив — фикстуры макета (только dev): HUD держит метку «макетные данные»
+  // Площадки и архив — фикстуры макета (только dev и ?mock=on): HUD держит метку «макетные данные»
   mock: boolean
   // Число на вывеске здания: списки, единицы оборудования, машины. null — источник
   // этого числа не ответил, вывеска показывает только имя: ноль был бы ложью, а не

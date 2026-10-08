@@ -9,8 +9,8 @@ export function Plus({ store, id, onActivate }: { store: WorldStore; id: string;
   const anchor = useWorldState(store, (state) => state.labels.get(id))
   if (!anchor) return null
   // name — что произойдёт (скринридеру), cap — короткая подпись на плашке
-  const [name, cap] = id === ADD_LOT_ID ? [tr('Добавить площадку', 'Maydon qo‘shish'), tr('Новая площадка', 'Yangi maydon')]
-    : id.startsWith('addstay:') ? [tr('Добавить расселение', 'Joylashtirishni qo‘shish'), tr('Расселение', 'Joylashtirish')]
+  const [name, cap] = id === ADD_LOT_ID ? [tr('Добавить мероприятие', 'Tadbir qo‘shish'), tr('Новое мероприятие', 'Yangi tadbir')]
+    : id.startsWith('addtruck:') ? [tr('Добавить список оборудования', 'Uskunalar ro‘yxatini qo‘shish'), tr('Список', 'Ro‘yxat')]
       : [tr('Добавить план залов', 'Zallar rejasini qo‘shish'), tr('План залов', 'Zallar rejasi')]
   const enter = () => store.setState({ hover: id })
   const leave = () => { if (store.getState().hover === id) store.setState({ hover: null }) }

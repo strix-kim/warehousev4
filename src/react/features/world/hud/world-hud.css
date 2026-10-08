@@ -167,9 +167,6 @@
 .w-stage.is-sm .w-zones__row button:focus-visible { outline-offset: -3px; }
 .w-stage.is-sm .w-mock { align-self: flex-start; }
 
-/* Короткое сообщение стенда («плюс» в макете ничего не добавляет) — по центру снизу */
-.w-toast { position: absolute; z-index: 2; left: 50%; bottom: 88px; translate: -50% 0; max-width: calc(100% - 32px); margin: 0; padding: 10px 16px; border-radius: var(--r-md); background: var(--night); color: var(--on-night); font: 600 14px/18px var(--f-text); text-align: center; box-shadow: var(--shadow-sign-up); }
-
 /* «Плюс» пустого места — свободная подпись: якорь 0×0 в центре места, кнопка — вокруг
    него; она же дубль цели в сцене для клавиатуры и скринридера. В покое бледная, с
    пунктирной рамкой; под указателем и в фокусе (is-hover ставит движок) — яркая плашка

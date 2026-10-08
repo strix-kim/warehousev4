@@ -1,15 +1,20 @@
 // Адаптер «продукт → мир»: собирает WorldData из тех же кэшей и запросов, что питают
 // главную и реестры. Своих ключей persistentCache не заводит и ничего не пишет —
-// владельцы значений остаются в своих фичах (home, lists, vehicles, employees).
+// владельцы значений остаются в своих фичах (home, lists, vehicles, employees,
+// projects). Участки и архив — из реестра мероприятий (projects:list): его сбрасывают
+// записи мероприятий, списков, состава и планов залов.
 import { useEffect, useMemo, useState } from 'react'
+import { todayDateValue } from '../../../lib/date'
 import { reportAppError } from '../../../lib/reportAppError'
 import { fetchEmployeeList, readCachedEmployeeList } from '../../employees/api'
 import { fetchHomeSummary, readCachedHomeSummary } from '../../home/api'
 import { fetchEquipmentLists, preferredListsPageSize, readCachedEquipmentLists } from '../../lists/api'
+import { fetchProjects, readCachedProjects } from '../../projects/api'
 import { fetchVehicles, readCachedVehicles } from '../../vehicles/api'
-import type { WorldArchivePlace, WorldData, WorldVenue } from './types'
+import { splitProjects } from './splitProjects'
+import type { WorldArchivePlace, WorldData, WorldLot } from './types'
 
-type Mock = { venues: WorldVenue[]; archive: WorldArchivePlace[] }
+type Mock = { venues: WorldLot[]; archive: WorldArchivePlace[] }
 
 // null — ни один источник ещё не ответил и в кэше пусто: кампус стоит без машин,
 // фигурок и чисел. Ссылка меняется только вместе с ответом источника.
@@ -21,16 +26,20 @@ export function useWorldData(): WorldData | null {
   const [cachedLists] = useState(() => readCachedEquipmentLists(listsQuery))
   const [cachedVehicles] = useState(() => readCachedVehicles())
   const [cachedEmployees] = useState(() => readCachedEmployeeList())
+  const [cachedProjects] = useState(() => readCachedProjects())
+  // «Сегодня» — часы устройства на момент входа в мир; делит мероприятия на зоны
+  const [today] = useState(todayDateValue)
   const [summary, setSummary] = useState(cachedSummary)
   const [lists, setLists] = useState(cachedLists)
+  const [projects, setProjects] = useState(cachedProjects)
   // Машины и люди — наполнение сцены, и приходят одним обновлением (см. ниже)
   const [crowd, setCrowd] = useState({ vehicles: cachedVehicles, employees: cachedEmployees })
-  // Площадки и архив: источника в базе нет (Ш9), в проде оба поля null — зон на карте
-  // нет. В dev их даёт макет; ?mock=off выключает (кадр = кампус, как в проде).
+  // Площадки и архив — из реестра мероприятий. Макет худшего случая (fixtures.dev.ts)
+  // подменяет их только в dev и только по ?mock=on; в проде mock всегда null.
   const [mock, setMock] = useState<Mock | null>(null)
   useEffect(() => {
     // Ветка целиком срезается из прод-сборки вместе с чанком фикстур
-    if (!import.meta.env.DEV || new URLSearchParams(window.location.search).get('mock') === 'off') return
+    if (!import.meta.env.DEV || new URLSearchParams(window.location.search).get('mock') !== 'on') return
     let isCurrent = true
     void import('./fixtures.dev').then((module) => {
       if (isCurrent) setMock({ venues: module.FIXTURE_VENUES, archive: module.FIXTURE_ARCHIVE })
@@ -53,6 +62,8 @@ export function useWorldData(): WorldData | null {
       .then((value) => { if (isCurrent) setSummary(value) }, failed('summary', Boolean(cachedSummary)))
     void fetchEquipmentLists({ ...listsQuery, bypassCache: Boolean(cachedLists) })
       .then((value) => { if (isCurrent) setLists(value) }, failed('lists', Boolean(cachedLists)))
+    void fetchProjects({ bypassCache: Boolean(cachedProjects) })
+      .then((value) => { if (isCurrent) setProjects(value) }, failed('projects', Boolean(cachedProjects)))
     // Каждый новый состав машин или людей — пересборка сцены. Ждём оба ответа, чтобы
     // мир с холодным кэшем пересобрался один раз, а не дважды подряд.
     void Promise.all([
@@ -64,14 +75,19 @@ export function useWorldData(): WorldData | null {
       setCrowd((prev) => ({ vehicles: vehicles ?? prev.vehicles, employees: employees ?? prev.employees }))
     })
     return () => { isCurrent = false }
-  }, [cachedEmployees, cachedLists, cachedSummary, cachedVehicles, listsQuery])
+  }, [cachedEmployees, cachedLists, cachedProjects, cachedSummary, cachedVehicles, listsQuery])
+
+  // Новая ссылка — только с новым ответом реестра: иначе движок пересобирал бы зоны
+  // на каждый ответ машин или списков (createWorld сравнивает venues и archive по ссылке)
+  const split = useMemo(() => (projects ? splitProjects(projects, today) : null), [projects, today])
 
   return useMemo(() => {
     const { vehicles, employees } = crowd
-    if (!summary && !lists && !vehicles && !employees && !mock) return null
+    if (!summary && !lists && !vehicles && !employees && !split && !mock) return null
     return {
-      venues: mock?.venues ?? null,
-      archive: mock?.archive ?? null,
+      // Реестр не ответил и в кэше пусто — зон нет, один кампус: выдумывать нечего
+      venues: mock?.venues ?? split?.lots ?? null,
+      archive: mock?.archive ?? split?.archive ?? null,
       mock: mock !== null,
       cars: (vehicles ?? []).map((row) => ({ id: row.id, brand: row.brand, model: row.model, color: row.color, plate: row.plate_number })),
       // Только штат: наёмные в «Сотрудники» не входят (решение прораба с53, п. 11)
@@ -82,5 +98,5 @@ export function useWorldData(): WorldData | null {
         garage: summary?.vehicles.count ?? null,
       },
     }
-  }, [crowd, lists, mock, summary])
+  }, [crowd, lists, mock, split, summary])
 }
