@@ -100,14 +100,16 @@
 /* Таблички кафе и отеля у выбранного участка. Якорь .w-tag — точка 0×0 (свободная
    подпись, раскладка её не двигает), табличка стоит над ним по центру. «Обеды» —
    кнопка в цветах вывески (обе палитры), цель пальца добирает ::before до 44 px.
-   Запертый отель — тихая пунктирная плашка в цветах чипа имени, мышь не ловит. */
+   Запертый отель — тихая пунктирная плашка в цветах чипа имени, мышь не ловит. Она
+   висит от якоря влево (якорь — левый угол башни, venues.ts): правее стоит вывеска
+   участка с ножкой, и по центру табличка ложилась под её доску. */
 .w-tag { width: 0; height: 0; }
 .w-tag__btn, .w-tag__lock { position: absolute; left: 0; bottom: 6px; translate: -50% 0; height: 28px; display: flex; align-items: center; gap: 5px; padding: 0 10px; border-radius: var(--r-sm); font: 600 13px/16px var(--f-text); white-space: nowrap; }
 .w-tag__btn { border: 0; color: var(--sign-ink); background: var(--sign-bg); box-shadow: var(--shadow-sign); pointer-events: auto; -webkit-tap-highlight-color: transparent; transition: transform .16s var(--ease-out), box-shadow .16s var(--ease-out); }
 .w-tag__btn::before { content: ""; position: absolute; inset: -8px -4px; }
 .w-tag__btn:hover, .w-tag.is-hover .w-tag__btn { transform: translateY(-2px); box-shadow: var(--shadow-sign-up); }
 .w-tag__btn[aria-pressed="true"]::after { content: ""; position: absolute; inset: -4px; border: 2px solid var(--red); border-radius: calc(var(--r-sm) + 4px); pointer-events: none; }
-.w-tag__lock { border: 1px dashed var(--who-line); background: var(--who-bg); color: var(--who-ink-2); pointer-events: none; }
+.w-tag__lock { left: auto; right: 6px; translate: none; border: 1px dashed var(--who-line); background: var(--who-bg); color: var(--who-ink-2); pointer-events: none; }
 
 /* Пустая зона — светлая плашка со словами, слева снизу */
 .w-stage .w-vnone { position: absolute; left: 16px; bottom: 16px; max-width: min(340px, calc(100% - 32px)); display: grid; gap: 4px; padding: 12px 14px 14px; }

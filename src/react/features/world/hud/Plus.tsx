@@ -14,11 +14,14 @@ export function Plus({ store, id, busy = false, onActivate }: { store: WorldStor
   const [name, cap] = id === ADD_LOT_ID ? [tr('Добавить мероприятие', 'Tadbir qo‘shish'), tr('Новое мероприятие', 'Yangi tadbir')]
     : id.startsWith('addtruck:') ? [tr('Добавить список оборудования', 'Uskunalar ro‘yxatini qo‘shish'), tr('Список', 'Ro‘yxat')]
       : [tr('Добавить план залов', 'Zallar rejasini qo‘shish'), tr('План залов', 'Zallar rejasi')]
+  // У выбранного участка подпись грузовика уходит от кружка влево, стола плана — вправо
+  // (world-hud.css): места стоят рядом, и подписи по центру якоря перекрывались
+  const side = id.startsWith('addtruck:') ? ' w-plus__btn--left' : ''
   const enter = () => store.setState({ hover: id })
   const leave = () => { if (store.getState().hover === id) store.setState({ hover: null }) }
 
   return createPortal(
-    <button type="button" className={`w-plus__btn${busy ? ' is-busy' : ''}`} aria-label={busy ? tr('Мероприятие создаётся', 'Tadbir yaratilmoqda') : name} aria-busy={busy} aria-disabled={busy} onPointerEnter={enter} onPointerLeave={leave} onFocus={enter} onBlur={leave} onClick={() => { if (!busy) onActivate(id) }}>
+    <button type="button" className={`w-plus__btn${side}${busy ? ' is-busy' : ''}`} aria-label={busy ? tr('Мероприятие создаётся', 'Tadbir yaratilmoqda') : name} aria-busy={busy} aria-disabled={busy} onPointerEnter={enter} onPointerLeave={leave} onFocus={enter} onBlur={leave} onClick={() => { if (!busy) onActivate(id) }}>
       <span className="w-plus__ico" aria-hidden="true" />
       <span className="w-plus__cap">{busy ? tr('Строится…', 'Qurilmoqda…') : cap}</span>
     </button>,

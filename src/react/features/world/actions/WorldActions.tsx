@@ -126,9 +126,11 @@ export function WorldActions({ store, action, onClose, reload, onCreated, onBuil
   // Успех: дровер закрывается сразу, а мир перечитывает реестр — объект в сцене
   // появляется только после ответа базы (решение 4), до него «плюс» строится.
   async function createNew(input: ProjectInput) {
+    // «Строится…» — только после ответа вставки: при отказе записи плюс не мигает,
+    // а под открытым дровером стройки не видно
+    const created = await createProject(input)
     onBuilding(true)
     try {
-      const created = await createProject(input)
       onClose()
       await reload()
       onCreated(created.id)

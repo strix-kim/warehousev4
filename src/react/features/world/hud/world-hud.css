@@ -182,6 +182,13 @@
 .w-plus__cap { max-width: 0; overflow: hidden; opacity: 0; transition: max-width .2s var(--ease-out), opacity .16s var(--ease-out); }
 .w-plus__btn:hover, .w-plus__btn:focus-visible, .w-plus.is-hover .w-plus__btn, .w-plus--cap .w-plus__btn { border-style: solid; border-color: var(--ink); background: var(--card); color: var(--ink); box-shadow: var(--shadow-card); }
 .w-plus__btn:hover .w-plus__cap, .w-plus__btn:focus-visible .w-plus__cap, .w-plus.is-hover .w-plus__cap, .w-plus--cap .w-plus__cap { max-width: 180px; padding-right: 14px; opacity: 1; }
+/* Подписи «плюсов» выбранного участка стоят постоянно, а места под грузовик и стол —
+   рядом: по центру якоря пилюли ложились друг на друга. Поэтому на якоре стоит кружок, а
+   подпись уходит вбок: у стола плана — вправо, у грузовика (w-plus__btn--left) — влево.
+   22 px — центр кружка от края кнопки (рамка 1,5 + половина значка 41). */
+.w-plus--in.w-plus--cap .w-plus__btn { translate: -22px -50%; }
+.w-plus--in.w-plus--cap .w-plus__btn--left { left: auto; right: 0; translate: 22px -50%; flex-direction: row-reverse; }
+.w-plus--in.w-plus--cap .w-plus__btn--left .w-plus__cap { padding: 0 0 0 14px; }
 /* Места внутри участка мельче: цель мыши. Пальцу и компактной сцене цель — весь участок;
    там их «плюсы» видны только у выбранного участка (w-plus--cap ставит движок). Прячем
    кнопку, а не якорь: display якоря каждый кадр пишет CSS2DRenderer. */

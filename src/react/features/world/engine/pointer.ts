@@ -57,8 +57,9 @@ export function bindPointer(ctx: WorldCtx, deps: PointerDeps) {
   const ndc = new THREE.Vector2(), ray = new THREE.Raycaster(), at = new THREE.Vector3()
 
   const pickAt = (e: PointerEvent): string | null => {
-    // В переезде камеры ничего не наводится и не нажимается
-    if (ctx.flight) return null
+    // В переезде камеры и под дровером действия (modal, контракт — worldStore.ts) ничего
+    // не наводится и не нажимается
+    if (ctx.flight || store.getState().modal) return null
     const r = canvas.getBoundingClientRect()
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
     ray.setFromCamera(ndc, ctx.camera)
@@ -134,7 +135,9 @@ export function bindPointer(ctx: WorldCtx, deps: PointerDeps) {
     const from = down
     down = null
     setPress(null)
-    if (!from || ctx.flight || Math.hypot(e.clientX - from[0], e.clientY - from[1]) > CLICK_SLOP) return
+    // Под дровером действия pickAt молчит — без выхода здесь клик сошёл бы за пустую землю
+    // и снял выбор участка, который дровер как раз правит
+    if (!from || ctx.flight || store.getState().modal || Math.hypot(e.clientX - from[0], e.clientY - from[1]) > CLICK_SLOP) return
     const id = pickAt(e)
     if (id) ctx.activate(id)
     // Клик по пустой земле снимает выбор участка или места; у кампуса выбор — переход в раздел
