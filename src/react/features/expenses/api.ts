@@ -109,6 +109,13 @@ function expenseRow(fields: ExpenseInput) {
   }
 }
 
+// Сброс всех снимков журнала. Экспортирован для чужих модулей, которые пишут в
+// expenses мимо этого файла (обеды, с57: create_meal_expense) — префикс остаётся
+// приватным, владелец кэша один.
+export function invalidateExpensesCache(): void {
+  invalidateCachePrefix(EXPENSES_CACHE_PREFIX)
+}
+
 // Запись не применилась: ответ пришёл без ошибки и без строк. RLS на update и
 // delete не отказывает, а молча отбирает ноль строк — и тем же нулём отвечает
 // строка, которую уже удалили в другой вкладке. Клиент эти случаи не различает.
@@ -122,7 +129,7 @@ export async function createExpense(fields: ExpenseInput): Promise<void> {
     .select('id')
     .single()
   if (error) throw error
-  invalidateCachePrefix(EXPENSES_CACHE_PREFIX)
+  invalidateExpensesCache()
 }
 
 export async function updateExpense(id: string, fields: ExpenseInput): Promise<void> {
@@ -134,7 +141,7 @@ export async function updateExpense(id: string, fields: ExpenseInput): Promise<v
     .select('id')
   if (error) throw error
   // Сброс и при нуле строк: раз запись не нашлась, показанный журнал уже врёт.
-  invalidateCachePrefix(EXPENSES_CACHE_PREFIX)
+  invalidateExpensesCache()
   if (!data?.length) throw new Error(EXPENSE_NOT_APPLIED)
 }
 
@@ -146,7 +153,7 @@ export async function deleteExpense(id: string): Promise<void> {
     .eq('id', id)
     .select('id')
   if (error) throw error
-  invalidateCachePrefix(EXPENSES_CACHE_PREFIX)
+  invalidateExpensesCache()
   if (!data?.length) throw new Error(EXPENSE_NOT_APPLIED)
 }
 
