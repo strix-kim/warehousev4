@@ -1,9 +1,10 @@
-import { ChevronRight, Lock, Plus, X } from 'lucide-react'
+import { ChevronRight, Lock, Pencil, Plus, X } from 'lucide-react'
 import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { formatDayRange, formatMonthShort, parseDateValue } from '../../../lib/date'
 import { useLanguage } from '../../../lib/i18n'
 import { formatProjectPeriod } from '../../projects/types'
+import type { WorldAction } from '../actions/useWorldActions'
 import type { WorldLot } from '../data/types'
 import type { WorldLotPart, WorldStore } from '../worldStore'
 import { ruPlural } from './plural'
@@ -43,13 +44,26 @@ function SectionBody<T>({ section, retry, rows = 1, row = 44, children }: { sect
   return null
 }
 
-// Панель выбранного участка — рабочая карточка мероприятия: шапка (заказчик, место,
-// даты, переход на страницу мероприятия) и секции. Каждый объект участка в сцене имеет
-// здесь секцию с действием-ссылкой: клик в сцене только отмечает секцию (is-on), а
-// уводит со сцены ссылка — пальцу промах по сцене ничего не стоит, клавиатуре Tab
-// проходит все действия по порядку. Счётчики — из реестра мероприятий, строки секций —
-// useLotDetails.
-export function LotCard({ store, lot, part }: { store: WorldStore; lot: WorldLot; part: WorldLotPart }) {
+// Панель выбранного участка — рабочая карточка мероприятия: шапка (имя, «Изменить»),
+// реквизиты (заказчик, место, даты), переход на страницу мероприятия и секции.
+// Реквизиты правятся, не выходя из мира: «Изменить», «Указать площадку» и «Указать
+// даты» зовут onAction с project-edit — хост действий открывает дровер поверх сцены
+// (actions/useWorldActions.ts). Без onAction действий-кнопок нет, а площадка — прежняя
+// ссылка на страницу мероприятия. Каждый объект участка в сцене имеет здесь секцию с
+// действием-ссылкой: клик в сцене только отмечает секцию (is-on), а уводит со сцены
+// ссылка-интерьер — пальцу промах по сцене ничего не стоит, клавиатуре Tab проходит все
+// действия по порядку. Счётчики — из реестра мероприятий, строки секций — useLotDetails.
+// После записи мир пересобирает данные и lot приходит новым объектом с тем же id:
+// карточка не перемонтируется (key — id), секции перечитываются только по своим счётчикам.
+type Props = {
+  store: WorldStore
+  lot: WorldLot
+  part: WorldLotPart
+  // Открыть действие дровером поверх сцены; не передан — карточка только ссылками
+  onAction?: (action: WorldAction) => void
+}
+
+export function LotCard({ store, lot, part, onAction }: Props) {
   const { tr, locale } = useLanguage()
   const titleId = useId()
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -79,6 +93,7 @@ export function LotCard({ store, lot, part }: { store: WorldStore; lot: WorldLot
   const { pathname, search } = useLocation()
   const leave = { from: pathname + search }
   const projectPath = `/projects/${lot.id}`
+  const edit = onAction && (() => onAction({ kind: 'project-edit', lotId: lot.id }))
   const newListPath = `/lists/new?project=${lot.id}`
   const onClass = (...parts: WorldLotPart[]) => `w-vsec${parts.includes(part) ? ' is-on' : ''}`
   // Счётчик в заголовке: пока ответа нет — число реестра, пришёл — число строк из базы
@@ -101,22 +116,51 @@ export function LotCard({ store, lot, part }: { store: WorldStore; lot: WorldLot
     <aside className="w-plaque w-vpanel" aria-labelledby={titleId} data-w-chrome="panel">
       <header className="w-vpanel__head">
         <div>
-          <h2 className="w-vpanel__name" id={titleId}>{lot.name}</h2>
+          {/* Сюда хост действий ставит фокус после записи (data-w-lot-title) */}
+          <h2 className="w-vpanel__name" id={titleId} tabIndex={-1} data-w-lot-title>{lot.name}</h2>
           <p className="w-vpanel__kind">{tr('Мероприятие', 'Tadbir')}</p>
         </div>
-        <button type="button" className="w-vpanel__close" aria-label={tr('Закрыть', 'Yopish')} onClick={() => store.setState({ pick: null })}>
-          <X size={18} aria-hidden="true" />
-        </button>
+        <div className="w-vpanel__tools">
+          {edit && (
+            <button type="button" className="w-vpanel__edit" onClick={edit}>
+              <Pencil size={16} aria-hidden="true" />
+              {tr('Изменить', 'O‘zgartirish')}
+            </button>
+          )}
+          <button type="button" className="w-vpanel__close" aria-label={tr('Закрыть', 'Yopish')} onClick={() => store.setState({ pick: null })}>
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
       </header>
       <div className="w-vpanel__body" ref={bodyRef}>
         <dl className="w-vpanel__facts">
           <div><dt>{tr('Заказчик', 'Buyurtmachi')}</dt><dd>{lot.client ?? tr('Не указан', 'Ko‘rsatilmagan')}</dd></div>
           <div>
             <dt>{tr('Место', 'Joy')}</dt>
-            {/* Площадка выбирается в реквизитах мероприятия — туда и ведёт строка */}
-            <dd>{place ? `${place.name}, ${place.city}` : <Link className="w-vlink" to={projectPath} state={leave} aria-label={tr('Площадка не указана. Указать площадку', 'Maydon ko‘rsatilmagan. Maydonni ko‘rsatish')}>{tr('Указать площадку', 'Maydonni ko‘rsatish')}</Link>}</dd>
+            {/* Площадка выбирается в реквизитах мероприятия: с хостом действий — дровером
+                поверх сцены, без него — на странице мероприятия */}
+            <dd>
+              {place ? `${place.name}, ${place.city}` : edit ? (
+                <button type="button" className="w-vlink" onClick={edit} aria-label={tr('Площадка не указана. Указать площадку', 'Maydon ko‘rsatilmagan. Maydonni ko‘rsatish')}>{tr('Указать площадку', 'Maydonni ko‘rsatish')}</button>
+              ) : (
+                <Link className="w-vlink" to={projectPath} state={leave} aria-label={tr('Площадка не указана. Указать площадку', 'Maydon ko‘rsatilmagan. Maydonni ko‘rsatish')}>{tr('Указать площадку', 'Maydonni ko‘rsatish')}</Link>
+              )}
+            </dd>
           </div>
-          <div><dt>{tr('Даты', 'Sanalar')}</dt><dd>{span ? span.text : tr('Не указаны', 'Ko‘rsatilmagan')}</dd></div>
+          <div>
+            <dt>{tr('Даты', 'Sanalar')}</dt>
+            {span ? <dd>{span.text}</dd> : (
+              <dd className="w-vpanel__gap">
+                <span>{tr('Не указаны', 'Ko‘rsatilmagan')}</span>
+                {edit && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <button type="button" className="w-vlink" onClick={edit}>{tr('Указать даты', 'Sanalarni ko‘rsatish')}</button>
+                  </>
+                )}
+              </dd>
+            )}
+          </div>
         </dl>
         <p className="w-vpanel__open">
           <Link className="button button--secondary" to={projectPath} state={leave}>{tr('Открыть мероприятие', 'Tadbirni ochish')}</Link>

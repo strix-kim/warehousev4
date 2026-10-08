@@ -2,6 +2,7 @@ import { Lock, Utensils } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../../../lib/i18n'
+import type { WorldAction } from '../actions/useWorldActions'
 import { LOT_MAX } from '../data/splitProjects'
 import type { WorldLot } from '../data/types'
 import { lotPartId, parseLotId, useWorldState, type WorldStore } from '../worldStore'
@@ -84,13 +85,16 @@ type Props = {
   store: WorldStore
   // Все идущие и будущие мероприятия по дате начала; в сцене — первые LOT_MAX
   venues: WorldLot[]
+  // Действие дровером поверх сцены (хост — WorldStage); не передан — карточка участка
+  // работает одними ссылками
+  onAction?: (action: WorldAction) => void
 }
 
 // HUD «Площадок»: вывески участков (порталами в якоря движка), таблички и панель
 // выбранного участка (LotCard.tsx). Смонтирован, пока камера стоит на зоне. Выбранное — pick из стора:
 // parseLotId(pick) даёт часть участка и id мероприятия (контракт — worldStore.ts).
 // Вывески встают только у участков, которым движок дал якорь: в сетке их LOT_MAX.
-export function VenuePanel({ store, venues }: Props) {
+export function VenuePanel({ store, venues, onAction }: Props) {
   const { tr, locale } = useLanguage()
   const pick = useWorldState(store, (state) => state.pick)
   const picked = parseLotId(pick)
@@ -101,7 +105,7 @@ export function VenuePanel({ store, venues }: Props) {
     <>
       {venues.slice(0, LOT_MAX).map((item) => <LotSign key={item.id} store={store} lot={item} />)}
       {lot && <LotTags key={`tags:${lot.id}`} store={store} lot={lot} />}
-      {picked && lot && <LotCard key={lot.id} store={store} lot={lot} part={picked.part} />}
+      {picked && lot && <LotCard key={lot.id} store={store} lot={lot} part={picked.part} onAction={onAction} />}
       {/* Пустая зона: в сцене только «плюс» нового мероприятия — словами, что здесь будет */}
       {venues.length === 0 && (
         <div className="w-plaque w-vnone" data-w-chrome>

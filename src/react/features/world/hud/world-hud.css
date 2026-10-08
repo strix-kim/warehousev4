@@ -191,8 +191,26 @@
 .w-stage.is-sm .w-plus--in:not(.w-plus--cap) .w-plus__btn { display: none; }
 .w-stage.is-sm .w-plus__btn { border-style: solid; border-color: var(--ink); background: var(--card); color: var(--ink); box-shadow: var(--shadow-card); }
 @media (hover: none) { .w-plus__btn { border-style: solid; border-color: var(--ink); background: var(--card); color: var(--ink); box-shadow: var(--shadow-card); } }
-/* Reduced-motion: подпись появляется без разворота */
-@media (prefers-reduced-motion: reduce) { .w-plus__cap { transition: none; } }
+/* «Строится»: мероприятие пишется в базу, мир ждёт свежий реестр. Плашка яркая и с
+   подписью без наведения, крест проворачивается шагами по четверти оборота. */
+.w-plus__btn.is-busy { border-style: solid; border-color: var(--ink); background: var(--card); color: var(--ink); box-shadow: var(--shadow-card); cursor: progress; }
+.w-plus__btn.is-busy .w-plus__cap { max-width: 180px; padding-right: 14px; opacity: 1; }
+.w-plus__btn.is-busy .w-plus__ico { animation: w-plus-build 1.2s var(--ease-out) infinite; }
+@keyframes w-plus-build { 0%, 20% { rotate: 0deg; } 50%, 70% { rotate: 90deg; } 100% { rotate: 180deg; } }
+/* Reduced-motion: подпись появляется без разворота, крест стоит — занятость словами */
+@media (prefers-reduced-motion: reduce) { .w-plus__cap { transition: none; } .w-plus__btn.is-busy .w-plus__ico { animation: none; } }
+
+/* Действия поверх сцены (actions/WorldActions.tsx). Дровер — обычный слой продукта
+   (.drawer-layer, fixed), сам .w-acts места в сцене не занимает. В мире затемнение
+   слабее обычного (.46): сцена под дровером должна читаться — на ней растёт участок.
+   На .drawer-layer__scrim — только цвет: его opacity ведёт motion (styles.css). */
+.w-acts--soft .drawer-layer__scrim { background: rgba(15,17,21,.2); }
+/* Ожидание перед дровером (чанк формы, строка мероприятия под правку): та же лёгкая
+   пелена на сцене и плашка со словами. Появляется с задержкой — быстрый ответ не мигает. */
+.w-acts__wait { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; padding: 16px; background: rgba(15,17,21,.2); animation: w-acts-in .16s var(--ease-out) .15s backwards; }
+.w-acts__wait p { min-height: 48px; display: flex; align-items: center; margin: 0; padding: 0 18px; font: 600 14px/18px var(--f-text); }
+@keyframes w-acts-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .w-acts__wait { animation-duration: 0s; } }
 
 /* Тост — ответ мира на действие. Слева под плашкой дня: клавиши (слева снизу) и панель
    участка (справа снизу) не задевает; в архиве место под днём занято итогом — тост ниже

@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { ADD_LOT_ID, isAddId, parseLotId, WORLD_SITES, type WorldSiteId, type WorldStore } from '../worldStore'
 
 // Дровер действия поверх сцены. null — дровера нет. Живёт локальным состоянием, не в
-// адресе (решение 7). Хоста дроверов ещё нет (Э1): run пока никто не зовёт.
+// адресе (решение 7). Рисует его хост — actions/WorldActions.tsx.
 export type WorldAction = {
   kind: 'project-new' | 'project-edit' | 'plan-new' | 'staff' | 'expense' | 'car'
   lotId?: string
@@ -21,11 +21,19 @@ export function useWorldActions({ store, mock }: { store: WorldStore; mock: bool
   const navigate = useNavigate()
   const location = useLocation()
   const [action, setAction] = useState<WorldAction>(null)
+  // Новое мероприятие пишется в базу и перечитывается реестр: «плюс» пустой ячейки
+  // стоит в состоянии «строится». Ставит и снимает хост действий.
+  const [building, setBuilding] = useState(false)
   // Откуда ушли в интерьер: путь с query внутри приложения. Интерьер читает
   // state.from (lib/returnTo.ts) и по нему возвращает «Назад в мир» на эту же запись.
   const from = location.pathname + location.search
 
-  const run = (next: WorldAction) => setAction(next)
+  // Дровер один: поверх открытого второй не встаёт. Пока участок строится, новое
+  // мероприятие не заводим — повторный клик по «плюсу» ничего не открывает.
+  const run = (next: WorldAction) => {
+    if (next && (action || (next.kind === 'project-new' && building))) return
+    setAction(next)
+  }
   const close = () => setAction(null)
   // Интерьер — обычный маршрут на весь экран, push-переходом
   const leaveTo = (path: string) => navigate(path, { state: { from } })
@@ -33,12 +41,14 @@ export function useWorldActions({ store, mock }: { store: WorldStore; mock: bool
   // Выбор и переход — один путь для вывески, клавиши и клика по зданию в сцене.
   // Движок к этому моменту pick уже поставил: повторная запись того же id стор не будит.
   // Участки и места — выбор без перехода: их показывают панели зон по pick из стора.
-  // «Плюс» ведёт туда, где недостающее создаётся: записи в базу из мира нет.
+  // «Плюс» пустой ячейки открывает дровер нового мероприятия прямо в мире; «плюсы»
+  // внутри участка пока ведут туда, где недостающее создаётся.
   const activate = (id: string) => {
     if (isAddId(id)) {
       const lot = parseLotId(id)
+      if (id === ADD_LOT_ID && !mock) run({ kind: 'project-new' })
       // Макетного мероприятия (?mock=on) в базе нет — вести некуда, кроме реестра
-      if (id === ADD_LOT_ID || !lot || mock) navigate('/projects')
+      else if (id === ADD_LOT_ID || !lot || mock) navigate('/projects')
       // Параметр project читает ListEditorPage: новый список сразу на мероприятии
       else if (lot.part === 'addtruck') leaveTo(`/lists/new?project=${lot.venueId}`)
       // HallPlansPage по new=1 открывает дровер нового плана с этим мероприятием
@@ -50,5 +60,5 @@ export function useWorldActions({ store, mock }: { store: WorldStore; mock: bool
     navigate(SITE_ROUTES[id as WorldSiteId])
   }
 
-  return { action, run, close, leaveTo, activate }
+  return { action, run, close, leaveTo, activate, building, setBuilding }
 }

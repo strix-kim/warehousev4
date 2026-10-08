@@ -4,7 +4,9 @@ import { ADD_LOT_ID, useWorldState, type WorldStore } from '../worldStore'
 
 // «Плюс» над пустым местом — кнопка в якоре движка (класс w-plus, свободная подпись):
 // она же дубль цели в сцене для клавиатуры и скринридера. Подпись — по виду места.
-export function Plus({ store, id, onActivate }: { store: WorldStore; id: string; onActivate: (id: string) => void }) {
+// busy — «строится»: мероприятие пишется в базу и мир ждёт свежий реестр. Кнопка занята
+// (aria-busy), но не disabled: фокус с неё не слетает, а повторный клик гасит диспетчер.
+export function Plus({ store, id, busy = false, onActivate }: { store: WorldStore; id: string; busy?: boolean; onActivate: (id: string) => void }) {
   const { tr } = useLanguage()
   const anchor = useWorldState(store, (state) => state.labels.get(id))
   if (!anchor) return null
@@ -16,9 +18,9 @@ export function Plus({ store, id, onActivate }: { store: WorldStore; id: string;
   const leave = () => { if (store.getState().hover === id) store.setState({ hover: null }) }
 
   return createPortal(
-    <button type="button" className="w-plus__btn" aria-label={name} onPointerEnter={enter} onPointerLeave={leave} onFocus={enter} onBlur={leave} onClick={() => onActivate(id)}>
+    <button type="button" className={`w-plus__btn${busy ? ' is-busy' : ''}`} aria-label={busy ? tr('Мероприятие создаётся', 'Tadbir yaratilmoqda') : name} aria-busy={busy} aria-disabled={busy} onPointerEnter={enter} onPointerLeave={leave} onFocus={enter} onBlur={leave} onClick={() => { if (!busy) onActivate(id) }}>
       <span className="w-plus__ico" aria-hidden="true" />
-      <span className="w-plus__cap">{cap}</span>
+      <span className="w-plus__cap">{busy ? tr('Строится…', 'Qurilmoqda…') : cap}</span>
     </button>,
     anchor,
   )

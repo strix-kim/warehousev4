@@ -10,6 +10,8 @@ import { reportAppError } from '../../lib/reportAppError'
 import './world.css'
 import './hud/world-hud.css'
 import { useWorldActions } from './actions/useWorldActions'
+import { WorldActions } from './actions/WorldActions'
+import { LOT_MAX } from './data/splitProjects'
 import { useWorldData } from './data/useWorldData'
 import { ArchivePanel } from './hud/ArchivePanel'
 import { DayCap } from './hud/DayCap'
@@ -18,6 +20,7 @@ import { NameChip } from './hud/NameChip'
 import { Plus } from './hud/Plus'
 import { ruPlural } from './hud/plural'
 import { Sign } from './hud/Sign'
+import { Toast, useWorldToast } from './hud/Toast'
 import { VenuePanel } from './hud/VenuePanel'
 import { ZoneSwitch } from './hud/ZoneSwitch'
 import type { World } from './engine/createWorld'
@@ -25,7 +28,7 @@ import { loadWorld } from './loadWorld'
 import type { WorldLook } from './settings'
 import { hasWebGL2, prefersReducedMotion } from './support'
 import { savePose, takePose } from './worldMemory'
-import { createWorldStore, isAddId, isWorldZone, lotPartId, parseLotId, useWorldState, WORLD_SITES, type CameraPose, type WorldSiteId, type WorldTexts, type WorldZone } from './worldStore'
+import { ADD_LOT_ID, createWorldStore, isAddId, isWorldZone, lotPartId, parseLotId, useWorldState, WORLD_SITES, type CameraPose, type WorldSiteId, type WorldTexts, type WorldZone } from './worldStore'
 
 // unsupported — WebGL2 нет; failed — чанк не приехал или мир не собрался;
 // lost — браузер отобрал контекст у живого мира
@@ -70,11 +73,17 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
   const entryRef = useRef(entryKey)
   useEffect(() => { entryRef.current = entryKey }, [entryKey])
   const slotRef = useRef<HTMLDivElement>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
   const [store] = useState(createWorldStore)
   // Одна ссылка и движку, и HUD: машины в сцене, числа вывесок и имена — из одного
   // объекта. null — данных нет, вывески стоят без чисел.
-  const { data } = useWorldData()
-  const { activate } = useWorldActions({ store, mock: data?.mock ?? false })
+  const { data, reload } = useWorldData()
+  const { action, run, close, activate, building, setBuilding } = useWorldActions({ store, mock: data?.mock ?? false })
+  const { toast, show, hide } = useWorldToast()
+  // Новое мероприятие записано, реестр перечитан: id ждёт посадки (эффект ниже, после
+  // setData). titleFor — участок, в заголовок карточки которого уйдёт фокус.
+  const [landing, setLanding] = useState<string | null>(null)
+  const [titleFor, setTitleFor] = useState<string | null>(null)
   const hover = useWorldState(store, (state) => state.hover)
   const zone = useWorldState(store, (state) => state.zone)
   const zones = useWorldState(store, (state) => state.zones)
@@ -96,7 +105,7 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
   const lookRef = useRef<WorldLook>({ palette, ink })
   // То же с данными: к моменту сборки мира они могли прийти, а могли и нет
   const dataRef = useRef(data)
-  const worldRef = useRef<Pick<World, 'setStyle' | 'setData' | 'setTexts' | 'goZone' | 'dispose'> | null>(null)
+  const worldRef = useRef<Pick<World, 'setStyle' | 'setData' | 'setTexts' | 'goZone' | 'focus' | 'dispose'> | null>(null)
   const wantedRef = useRef(wantedZone)
 
   // Текстовый путь вместо сцены в запасных состояниях: участки мира — это мероприятия
@@ -262,6 +271,42 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
     }
   }, [data])
 
+  // Посадка нового мероприятия. Стоит ПОСЛЕ эффекта данных: setLanding приходит тем же
+  // рендером, что и свежий реестр (хост зовёт его следом за reload), и к этому месту
+  // мир уже пересобран — у нового участка есть корень, к которому едет камера.
+  useEffect(() => {
+    if (landing === null) return
+    setLanding(null)
+    const done = tr('Мероприятие создано', 'Tadbir yaratildi')
+    // В сетке первые LOT_MAX по дате; мероприятие могло уйти в прошлое или встать
+    // седьмым (а реестр — не перечитаться): участка в сцене нет, остаётся ссылка
+    if (!venues?.slice(0, LOT_MAX).some((lot) => lot.id === landing)) {
+      show(done, { link: { to: `/projects/${landing}`, label: tr('Открыть мероприятие', 'Tadbirni ochish') } })
+      return
+    }
+    // Карточку откроет механизм ?lot= выше; replace — как у любого выбора участка (gotchas §7)
+    setParams((prev) => {
+      const query = new URLSearchParams(prev)
+      query.set('zone', 'venues')
+      query.set('lot', landing)
+      return query
+    }, { replace: true })
+    worldRef.current?.focus(lotPartId('lot', landing))
+    setTitleFor(landing)
+    show(done)
+  }, [landing, venues, setParams, show, tr])
+
+  // Фокус после создания. «Плюс»-открыватель исчез вместе с якорями пересборки, и
+  // useModalLayer дровера фокус вернуть не может — ставим его в заголовок карточки
+  // участка. Карточка монтируется тем же проходом, которым стор отдаёт pick, и её
+  // эффекты (дочерние) уже отработали — заголовок в DOM.
+  useEffect(() => {
+    // Ждём именно свой участок: до посадки в сторе может стоять выбор другого
+    if (titleFor === null || pickLot !== titleFor) return
+    stageRef.current?.querySelector<HTMLElement>('[data-w-lot-title]')?.focus({ preventScroll: true })
+    setTitleFor(null)
+  }, [titleFor, pickLot])
+
   useEffect(() => {
     textsRef.current = texts
     worldRef.current?.setTexts(texts)
@@ -273,7 +318,7 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
   }, [wantedZone])
 
   return (
-    <div className={`w-stage${palette === 'night' ? ' is-dark' : ''}${hudCompact ? ' is-sm' : ''}`}>
+    <div className={`w-stage${palette === 'night' ? ' is-dark' : ''}${hudCompact ? ' is-sm' : ''}`} ref={stageRef}>
       {/* Без aria-hidden: внутри слота живут вывески — настоящие кнопки с именем */}
       <div className="w-scene" ref={slotRef} />
       {/* Вывески и чипы — порталами в якоря движка; якорей нет (мир не собран или снесён) — пусто */}
@@ -281,19 +326,23 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
         <Sign key={id} store={store} id={id} name={names[id]} count={data?.sites[id] ?? null} onActivate={activate} />
       ))}
       {data?.people.map((person) => <NameChip key={person.id} store={store} person={person} />)}
-      {[...labels.keys()].filter(isAddId).map((id) => <Plus key={id} store={store} id={id} onActivate={activate} />)}
-      {/* HUD зоны живёт, пока камера стоит на ней; якоря чужих зон движок прячет сам */}
-      {zone === 'venues' && data?.venues && <VenuePanel store={store} venues={data.venues} />}
+      {[...labels.keys()].filter(isAddId).map((id) => <Plus key={id} store={store} id={id} busy={building && id === ADD_LOT_ID} onActivate={activate} />)}
+      {/* HUD зоны живёт, пока камера стоит на ней; якоря чужих зон движок прячет сам.
+          Макетных мероприятий (?mock=on) в базе нет — действий у панели участка тоже нет */}
+      {zone === 'venues' && data?.venues && <VenuePanel store={store} venues={data.venues} onAction={data.mock ? undefined : run} />}
       {zone === 'archive' && data?.archive && <ArchivePanel store={store} places={data.archive} />}
       {status === 'ready' && (
         <>
           <DayCap />
+          <Toast toast={toast} onClose={hide} />
           {/* Один кампус (зон нет) — переключать нечего */}
           {zones.length > 1 && <ZoneSwitch store={store} texts={texts} mockZones={data?.mock ? MOCK_ZONES : NO_ZONES} onGo={goZone} />}
           {/* Клавиши — дубли зданий кампуса */}
           {zone === 'campus' && <Dock store={store} names={names} onActivate={activate} />}
         </>
       )}
+      {/* Дроверы действий поверх сцены */}
+      <WorldActions store={store} action={action} onClose={close} reload={reload} onCreated={setLanding} onBuilding={setBuilding} toast={show} />
       {/* Скринридеру: имя здания под указателем или в фокусе клавиши */}
       <p className="w-live" aria-live="polite">{hover !== null && WORLD_SITES.includes(hover as WorldSiteId) ? names[hover as WorldSiteId] : ''}</p>
       {status === 'loading' && <p className="w-stage__state w-stage__loading" role="status">{tr('Загружаем мир…', 'Dunyo yuklanmoqda…')}</p>}

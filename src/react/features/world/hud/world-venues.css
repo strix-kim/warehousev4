@@ -40,15 +40,27 @@
 @keyframes w-vpanel-in { from { opacity: 0; translate: 0 8px; } }
 .w-vpanel__head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; padding: 14px 8px 12px 16px; border-bottom: 1px solid var(--line-2); }
 .w-vpanel__name { margin: 0; font: 800 18px/22px var(--f-display); letter-spacing: -.02em; overflow-wrap: anywhere; }
+/* Заголовок принимает программный фокус после записи (tabIndex −1): кольцо — только
+   когда человек идёт клавиатурой */
+.w-vpanel__name:focus:not(:focus-visible) { outline: none; }
 .w-vpanel__kind { margin: 2px 0 0; color: var(--muted); font: 500 13px/16px var(--f-text); }
-.w-vpanel__close { width: 44px; height: 44px; margin: -8px 0; display: grid; place-items: center; border: 0; border-radius: var(--r-md); background: transparent; color: var(--muted); transition: background-color .16s var(--ease-out), color .16s var(--ease-out); }
-.w-vpanel__close:hover { background: var(--hover); color: var(--ink); }
+/* Кнопки шапки: «Изменить» (есть только с хостом действий) и крестик, цель 44 px.
+   Отрицательное поле не даёт им раздвинуть шапку по высоте; имя рядом переносится. */
+.w-vpanel__tools { display: flex; align-items: center; }
+.w-vpanel__close, .w-vpanel__edit { height: 44px; margin: -8px 0; border: 0; border-radius: var(--r-md); background: transparent; color: var(--muted); transition: background-color .16s var(--ease-out), color .16s var(--ease-out); }
+.w-vpanel__close { width: 44px; display: grid; place-items: center; }
+.w-vpanel__edit { display: flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--ink); font: 600 14px/18px var(--f-text); white-space: nowrap; }
+.w-vpanel__edit svg { flex: none; }
+:is(.w-vpanel__close, .w-vpanel__edit):hover { background: var(--hover); color: var(--ink); }
 .w-vpanel__body { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 2px 16px 16px; }
 .w-vpanel__facts { margin: 0; }
 .w-vpanel__facts > div { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 12px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line-2); }
 .w-vpanel__facts dt { color: var(--faint); font: 500 13px/18px var(--f-text); }
 .w-vpanel__facts dd { margin: 0; font: 500 14px/18px var(--f-text); overflow-wrap: anywhere; }
-/* Единственная кнопка шапки — переход на страницу мероприятия */
+/* Значение с действием в строке («Не указаны · Указать даты»): не влезло — действие
+   уходит на вторую строку */
+.w-vpanel__facts dd.w-vpanel__gap { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; }
+/* Переход на страницу мероприятия — кнопка во всю ширину под реквизитами */
 .w-vpanel__open { margin: 12px 0 2px; display: grid; }
 .w-vpanel .button { text-decoration: none; }
 .w-vsec { margin-top: 10px; padding: 10px 12px; display: grid; gap: 6px; border: 1px solid var(--line-2); border-radius: var(--r-md); transition: border-color .16s var(--ease-out), background-color .16s var(--ease-out); }
