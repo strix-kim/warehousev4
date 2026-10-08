@@ -21,22 +21,65 @@
 .meals-slot { margin: 0 0 14px; }
 .meals-slot button { min-height: 40px; padding: 0 18px; font-size: 14px; }
 
-/* Список людей: строка целиком — цель касания ≥ 48 px (шаг 3 повесит на неё тап). */
+/* Список людей: строка целиком — цель касания ≥ 48 px, тап открывает лист
+   заказа. Обед в расходах — строка не кнопка, а div (MealPersonRow). */
 .meal-rows { margin: 0; padding: 0; list-style: none; }
 .meal-rows > li + li { border-top: 1px solid var(--line); }
-.meal-row { min-height: 56px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: center; gap: 4px 14px; padding: 10px 16px; }
+.meal-row { width: 100%; min-height: 56px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: center; gap: 4px 14px; padding: 10px 16px; }
+.meal-row--button { border: 0; color: inherit; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.meal-row--button:hover { background: var(--hover); }
+.meal-row--button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .meal-row__who { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .meal-row__who strong { overflow: hidden; color: var(--ink); font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .meal-row__who small { color: var(--faint); font-size: 12px; }
 .meal-row__dish { min-width: 0; color: var(--ink); font-size: 14px; overflow-wrap: anywhere; }
 .meal-row__dish em { color: var(--muted); font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
 .meal-row__dish--empty { color: var(--faint); }
+.meal-row__pending { font-weight: 600; }
+.meal-row__who .meal-row__pending--failed { color: var(--bad); }
 .meal-row__price { color: var(--ink); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+
+/* «+ Гость» — последней строкой списка, той же высоты. */
+.meal-add { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border: 0; border-top: 1px solid var(--line); color: var(--ink); background: transparent; font-size: 14px; font-weight: 600; cursor: pointer; }
+.meal-add:hover { background: var(--hover); }
+.meal-add:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 
 /* Плашка итога прибита к низу окна: sticky, а не fixed — стоит в потоке под
    списком и не перекрывает его конец. Вне .data-panel намеренно: overflow
    панели сделал бы её контейнером прокрутки, и sticky бы не сработал. */
 .meals-bar { position: sticky; z-index: 5; bottom: 16px; margin-top: 14px; padding: 12px 16px; border-radius: var(--r-lg); color: #fff; background: rgba(15,17,21,.96); box-shadow: 0 14px 36px rgba(15,17,21,.28); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center; }
+
+.meals-bar__locked { display: block; margin-top: 4px; color: var(--on-night-2); font-size: 12px; font-weight: 500; }
+
+/* Лист заказа (MealOrderSheet): шапка без фото — две колонки вместо трёх;
+   отступы между полями даёт gap тела рамы, хвост .field лишний. */
+.drawer--meal-order .drawer__head, .sheet--meal-order .drawer__head { grid-template-columns: minmax(0, 1fr) auto; }
+.drawer--meal-order .field, .sheet--meal-order .field { margin-bottom: 0; }
+/* Над экранной клавиатурой: высоту клавиатуры кладёт в --meal-keyboard
+   useKeyboardInset листа; без клавиатуры (и на десктопе) — ноль. */
+.sheet--meal-order { margin-bottom: var(--meal-keyboard, 0px); max-height: calc(100dvh - 48px - var(--meal-keyboard, 0px)); }
+.meal-hints { display: flex; flex-wrap: wrap; gap: 6px; }
+.meal-hints .chip { min-height: 40px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.meal-hints .chip:disabled { opacity: .6; }
+.meal-order__row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 14px; }
+.meal-qty { display: flex; align-items: center; gap: 6px; }
+.meal-qty .icon-button { width: 45px; height: 45px; border-color: var(--ctl); border-radius: var(--r-md); color: var(--ink); }
+.meal-qty .icon-button:disabled { color: var(--faint); border-color: var(--line); }
+.meal-qty output { min-width: 34px; color: var(--ink); font: 700 18px/1 var(--f-display); font-variant-numeric: tabular-nums; text-align: center; }
+/* Поле цены: инпут не прямой ребёнок .field (рядом суффикс валюты), поэтому
+   вид поля из 05-features повторён здесь — как .expenses-sum (тот лист стилей
+   на этой странице не грузится). */
+.meal-price { position: relative; }
+.meal-price > input { width: 100%; height: 45px; padding: 0 52px 0 13px; border: 1px solid var(--ctl); border-radius: var(--r-md); outline: 0; color: var(--ink); background: var(--card); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.meal-price > input:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+.meal-price > span { position: absolute; top: 50%; right: 13px; transform: translateY(-50%); color: var(--faint); font-size: 14px; font-weight: 500; pointer-events: none; }
+.drawer--meal-order .drawer__body > .field-hint, .sheet--meal-order .drawer__body > .field-hint { margin-top: -12px; }
+.meal-order__delete { align-self: flex-start; }
+
+/* Сводка (MealSummarySheet). Шрифт — свойствами, а не шорткатом font:
+   inherit внутри шортката невалиден, и объявление отбросилось бы целиком. */
+.meal-summary__text { margin: 0; padding: 14px 16px; border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--card); color: var(--ink); font-family: inherit; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sheet--meal-summary .drawer__foot > .button { flex: 1 1 0; }
 
 .meals-skeleton { display: grid; gap: 12px; padding: 16px; }
 .meals-skeleton span { height: 56px; border-radius: var(--r-md); background: linear-gradient(90deg, var(--sunk) 25%, var(--card) 50%, var(--sunk) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
@@ -48,6 +91,13 @@
   .meal-row__dish { grid-column: 1; grid-row: 2; }
   .meal-row__price { grid-column: 2; grid-row: 1 / span 2; }
   .meal-row__who strong { white-space: normal; overflow-wrap: anywhere; }
+  /* iOS Safari зумит страницу на фокусе поля мельче 16 px. */
+  .meal-price > input { font-size: 16px; }
+  /* Подвал листа: «Не ест» и «Сохранить» в ряд, «→ следующий» — во всю
+     ширину последним рядом, под большим пальцем. */
+  .sheet--meal-order .drawer__foot { flex-wrap: wrap; }
+  .sheet--meal-order .drawer__foot > .button { min-height: 48px; }
+  .sheet--meal-order .drawer__foot > .meal-order__next { flex-basis: 100%; }
   /* Над нижней навигацией (64 px) тем же отступом, что .expenses-bar. */
   .meals-bar { bottom: calc(76px + env(safe-area-inset-bottom)); font-size: 13px; }
 }

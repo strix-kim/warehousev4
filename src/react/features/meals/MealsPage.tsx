@@ -1,8 +1,11 @@
-import { ArrowLeft, CalendarRange } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, CalendarRange, Plus } from 'lucide-react'
+import { AnimatePresence } from 'motion/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { fetchMealDay, fetchProjectMealDays, type MealDay, type MealDayMark } from './api'
-import { isMealSlot, MEAL_SLOTS, periodDays, type MealOrder, type MealSlot, type Tr } from './types'
+import { deleteOrder, ensureMeal, fetchMealDay, fetchProjectDishes, fetchProjectMealDays, saveGuestOrder, saveStaffOrder, updateOrder, type MealDay, type MealDayMark, type MealDishHint } from './api'
+import { MealOrderSheet } from './MealOrderSheet'
+import { MealPersonRow } from './MealPersonRow'
+import { isMealSlot, MEAL_SLOTS, periodDays, type MealOrder, type MealOrderInput, type MealSlot, type ProjectMeal, type Tr } from './types'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState, RetryButton } from '../../components/ErrorState'
 import { employeeDisplayName } from '../employees/types'
@@ -25,8 +28,22 @@ type PersonRow = {
   key: string
   name: string
   note: 'outside' | 'guest' | null
+  // Сотрудник состава или вне состава; у гостя null.
+  employeeId: string | null
   order: MealOrder | null
 }
+
+// Запись строки: идёт или не прошла. Неудавшийся черновик держим, чтобы
+// «не сохранено, повторить» открывало лист с набранным, а не со строкой базы.
+type RowPending = { state: 'saving' } | { state: 'failed'; input: MealOrderInput }
+
+// Открытый лист: строка списка или новый гость. session — номер открытия:
+// «Сохранить → следующий» меняет key строки, но не session, и лист остаётся
+// тем же смонтированным (MealOrderSheet, draftKey). Новое открытие — новый
+// номер: строку, закрытую на прошлом, AnimatePresence не вернёт с её уходом.
+type SheetTarget = { kind: 'row'; key: string; session: number } | { kind: 'guest'; session: number }
+
+const NOT_EATING: MealOrderInput = { dish: null, qty: 1, price: null }
 
 // Узбекские дни недели — своим списком, как в AppDatePicker: Intl для `uz`
 // отдаёт то латиницу, то кириллицу в зависимости от движка. С воскресенья —
@@ -52,23 +69,49 @@ function buildRows(staff: ProjectStaffMember[], orders: MealOrder[], tr: Tr): Pe
     key: `staff:${member.employee_id}`,
     name: employeeDisplayName(member.employee),
     note: null,
+    employeeId: member.employee_id,
     order: byEmployee.get(member.employee_id) ?? null,
   }))
   for (const order of orders) {
     if (order.employee_id && !staffIds.has(order.employee_id)) {
-      rows.push({ key: order.id, name: order.employee ? employeeDisplayName(order.employee) : tr('Сотрудник удалён', 'Xodim o‘chirilgan'), note: 'outside', order })
+      rows.push({ key: order.id, name: order.employee ? employeeDisplayName(order.employee) : tr('Сотрудник удалён', 'Xodim o‘chirilgan'), note: 'outside', employeeId: order.employee_id, order })
     }
   }
   for (const order of orders) {
-    if (order.guest_name) rows.push({ key: order.id, name: order.guest_name, note: 'guest', order })
+    if (order.guest_name) rows.push({ key: order.id, name: order.guest_name, note: 'guest', employeeId: null, order })
   }
   return rows
 }
 
+// Подсказки блюд (план 3.2): сначала блюда этого приёма по частоте — из уже
+// загруженных строк, потом блюда мероприятия (частоту считает база). Слияние
+// без дублей по lower(), как группирует сводка; пишется так, как ввели первым.
+// Цена — последняя введённая в приёме, нет её — последняя по мероприятию.
+function buildDishHints(orders: MealOrder[], projectDishes: MealDishHint[]): MealDishHint[] {
+  const local = new Map<string, MealDishHint>()
+  for (const order of orders) {
+    if (!order.dish) continue
+    const key = order.dish.toLowerCase()
+    const hint = local.get(key)
+    if (!hint) local.set(key, { dish: order.dish, count: 1, price: order.price })
+    else {
+      hint.count += 1
+      if (order.price !== null) hint.price = order.price
+    }
+  }
+  const projectPrice = new Map(projectDishes.map((hint) => [hint.dish.toLowerCase(), hint.price]))
+  // sort устойчив: при равной частоте — порядок ввода.
+  const first = [...local.values()]
+    .sort((a, b) => b.count - a.count)
+    .map((hint) => (hint.price === null ? { ...hint, price: projectPrice.get(hint.dish.toLowerCase()) ?? null } : hint))
+  return [...first, ...projectDishes.filter((hint) => !local.has(hint.dish.toLowerCase()))]
+}
+
 // Экран обедов мероприятия: день и слот — в адресе (?day=YYYY-MM-DD&slot=…),
 // смена — replace, чтобы «назад» уводил на мероприятие, а не по дням (gotchas §7).
-// Кэша нет (план 3.3): обеды правят на бегу, база читается на каждом входе.
-// Шаг 2 — только чтение.
+// Кэша нет (план 3.3): обеды правят на бегу, база читается на каждом входе,
+// а после записи строка в списке заменяется ответом базы — без оптимистичной
+// записи: пока запрос летит, строка помечена «сохраняем…».
 export function MealsPage() {
   const navigate = useNavigate()
   const { tr, locale } = useLanguage()
@@ -85,6 +128,13 @@ export function MealsPage() {
   const [mealDay, setMealDay] = useState<(MealDay & { key: string }) | null>(null)
   const [dayFailedKey, setDayFailedKey] = useState<string | null>(null)
   const [dayReloadKey, setDayReloadKey] = useState(0)
+  // Подсказки блюд мероприятия — один раз на вход: после записи хватает
+  // локальных строк приёма (buildDishHints).
+  const [projectDishes, setProjectDishes] = useState<MealDishHint[]>([])
+  const [sheet, setSheet] = useState<SheetTarget | null>(null)
+  // Ключ — «день:слот|строка»: у человека состава ключ строки один на все дни.
+  const [pending, setPending] = useState<Record<string, RowPending>>({})
+  const sheetSessionRef = useRef(0)
 
   useDocumentTitle(project ? tr(`Обеды — ${project.name}`, `Ovqatlanish — ${project.name}`) : '')
 
@@ -112,6 +162,23 @@ export function MealsPage() {
       })
     return () => { isCurrent = false }
   }, [projectId, reloadKey])
+
+  // Подсказки — удобство, а не данные: отказ не валит страницу, чипов просто
+  // нет, блюдо вписывают руками (gotchas §11: здесь человеку всё равно). Отказ —
+  // в канал.
+  useEffect(() => {
+    if (!projectId) return
+    let isCurrent = true
+    setProjectDishes([])
+    fetchProjectDishes(projectId)
+      .then((hints) => {
+        if (isCurrent) setProjectDishes(hints)
+      })
+      .catch((error: unknown) => {
+        if (isCurrent) reportAppError(error, { scope: 'loader', route: ROUTE, detail: { source: 'meal-dishes' } })
+      })
+    return () => { isCurrent = false }
+  }, [projectId])
 
   const days = useMemo(() => periodDays(project?.date_from ?? null, project?.date_to ?? null), [project])
   // Дни с обедами вне периода (даты мероприятия сдвинули потом) — в конце ленты.
@@ -198,6 +265,155 @@ export function MealsPage() {
     }
   }
 
+  // Обед в расходах — ввод заперт (пара в базе: guard_meal_orders_locked).
+  const isLocked = Boolean(shown?.meal?.expense_id)
+  const dishHints = shown ? buildDishHints(shown.orders, projectDishes) : []
+
+  function setRowPending(key: string, value: RowPending | null) {
+    setPending((prev) => {
+      const next = { ...prev }
+      if (value) next[key] = value
+      else delete next[key]
+      return next
+    })
+  }
+
+  // Строка обеда дня — лениво, при первой записи (ensureMeal глотает гонку
+  // двух вкладок). Точка на ленте дней появляется сразу, без перечитывания.
+  async function mealForWrite(view: MealDay & { key: string }): Promise<ProjectMeal> {
+    if (view.meal) return view.meal
+    const meal = await ensureMeal(current.id, day, slot)
+    setMealDay((prev) => (prev?.key === view.key ? { ...prev, meal: prev.meal ?? meal } : prev))
+    setMealDays((marks) => (marks.some((mark) => mark.id === meal.id)
+      ? marks
+      : [...marks, { id: meal.id, meal_on: meal.meal_on, slot: meal.slot, status: meal.status }]))
+    return meal
+  }
+
+  // Ответ записи — в список приёма. Совпадение по id или по сотруднику: строку
+  // того же человека могла создать вторая вкладка, upsert вернул её id.
+  function putOrder(viewKey: string, saved: MealOrder) {
+    setMealDay((prev) => {
+      if (prev?.key !== viewKey) return prev
+      const index = prev.orders.findIndex((order) => order.id === saved.id || (saved.employee_id !== null && order.employee_id === saved.employee_id))
+      const orders = index === -1 ? [...prev.orders, saved] : prev.orders.map((order, position) => (position === index ? saved : order))
+      return { ...prev, orders }
+    })
+  }
+
+  // Человек состава — upsert по (обед, сотрудник); строка вне состава или
+  // гость — правка по id. Отказ: строка «не сохранено, повторить», текст отказа
+  // показывает лист (он ловит проброшенную ошибку).
+  async function writeRow(view: MealDay & { key: string }, row: PersonRow, input: MealOrderInput) {
+    const key = `${view.key}|${row.key}`
+    setRowPending(key, { state: 'saving' })
+    try {
+      let saved: MealOrder
+      if (row.note === null && row.employeeId) {
+        const meal = await mealForWrite(view)
+        saved = await saveStaffOrder(meal.id, row.employeeId, input)
+      } else if (row.order) {
+        saved = await updateOrder(row.order.id, input)
+      } else {
+        throw new Error('meal row: нет ни сотрудника состава, ни строки')
+      }
+      putOrder(view.key, saved)
+      setRowPending(key, null)
+    } catch (error) {
+      setRowPending(key, { state: 'failed', input })
+      reportAppError(error, { scope: 'loader', route: ROUTE, detail: { source: 'meal-order' } })
+      throw error
+    }
+  }
+
+  // Следующий неспрошенный после строки — по кругу, мимо тех, чья запись ещё
+  // летит. «Неспрошенный» бывает только в составе: у остальных строка есть.
+  function nextUnasked(fromKey: string): PersonRow | null {
+    const start = rows.findIndex((row) => row.key === fromKey)
+    const ordered = [...rows.slice(start + 1), ...rows.slice(0, Math.max(start, 0))]
+    return ordered.find((row) => row.order === null && pending[`${dayKey}|${row.key}`]?.state !== 'saving') ?? null
+  }
+
+  // Лист закрывается или сменяется, только если он всё ещё открыт на этой
+  // строке: его могли закрыть, пока летел запрос.
+  function leaveRowSheet(rowKey: string, next: PersonRow | null) {
+    setSheet((prev) => (prev?.kind === 'row' && prev.key === rowKey
+      ? (next ? { ...prev, key: next.key } : null)
+      : prev))
+  }
+
+  function openRow(row: PersonRow) {
+    if (pending[`${dayKey}|${row.key}`]?.state === 'saving') return
+    sheetSessionRef.current += 1
+    setSheet({ kind: 'row', key: row.key, session: sheetSessionRef.current })
+  }
+
+  const sheetRow = sheet?.kind === 'row' ? rows.find((row) => row.key === sheet.key) ?? null : null
+
+  function renderRowSheet(view: MealDay & { key: string }, row: PersonRow, session: number) {
+    const rowPending = pending[`${view.key}|${row.key}`]
+    const order = row.order
+    return (
+      <MealOrderSheet
+        key={`row-${session}`}
+        draftKey={row.key}
+        title={row.name}
+        order={order}
+        initialInput={rowPending?.state === 'failed' ? rowPending.input : null}
+        dishHints={dishHints}
+        hasNext={nextUnasked(row.key) !== null}
+        onSave={async (input, andNext) => {
+          await writeRow(view, row, input)
+          leaveRowSheet(row.key, andNext ? nextUnasked(row.key) : null)
+        }}
+        onNotEating={async () => {
+          await writeRow(view, row, NOT_EATING)
+          leaveRowSheet(row.key, null)
+        }}
+        // Человеку состава строку не удаляют — ему ставят «Не ест».
+        onDelete={row.note !== null && order
+          ? async () => {
+            try {
+              await deleteOrder(order.id)
+            } catch (error) {
+              reportAppError(error, { scope: 'loader', route: ROUTE, detail: { source: 'meal-order-delete' } })
+              throw error
+            }
+            setMealDay((prev) => (prev?.key === view.key ? { ...prev, orders: prev.orders.filter((item) => item.id !== order.id) } : prev))
+            setRowPending(`${view.key}|${row.key}`, null)
+            leaveRowSheet(row.key, null)
+          }
+          : undefined}
+        onRequestClose={() => setSheet(null)}
+      />
+    )
+  }
+
+  function renderGuestSheet(view: MealDay & { key: string }, session: number) {
+    return (
+      <MealOrderSheet
+        key={`guest-${session}`}
+        draftKey="guest"
+        title={tr('Новый гость', 'Yangi mehmon')}
+        order={null}
+        dishHints={dishHints}
+        hasNext={false}
+        guestNameEditable
+        onSave={async (input, _andNext, guestName) => {
+          try {
+            const meal = await mealForWrite(view)
+            putOrder(view.key, await saveGuestOrder(meal.id, guestName ?? '', input))
+          } catch (error) {
+            reportAppError(error, { scope: 'loader', route: ROUTE, detail: { source: 'meal-guest' } })
+            throw error
+          }
+          setSheet((prev) => (prev?.kind === 'guest' ? null : prev))
+        }}
+        onRequestClose={() => setSheet(null)}
+      />
+    )
+  }
+
   function chip(value: string, isOutside: boolean) {
     const date = parseDateValue(value)
     if (!date) return null
@@ -268,35 +484,42 @@ export function MealsPage() {
                 )
                 : !shown
                   ? <div className="meals-skeleton" role="status" aria-label={tr('Загружаем приём…', 'Ovqat yuklanmoqda…')}><span /><span /><span /></div>
-                  : rows.length === 0
-                    ? (
-                      <EmptyState
-                        icon={<CalendarRange size={27} />}
-                        title={tr('В составе никого', 'Tarkibda hech kim yo‘q')}
-                        text={tr('Добавьте людей в состав на странице мероприятия.', 'Tadbir sahifasida tarkibga odam qo‘shing.')}
-                        action={<Link className="button button--secondary" to={`/projects/${current.id}`}>{tr('К мероприятию', 'Tadbirga')}</Link>}
-                      />
-                    )
-                    : (
-                      <ul className="meal-rows">
-                        {rows.map((row) => (
-                          <li key={row.key} className="meal-row">
-                            <span className="meal-row__who">
-                              <strong>{row.name}</strong>
-                              {row.note === 'outside' && <small>{tr('вне состава', 'tarkibdan tashqari')}</small>}
-                              {row.note === 'guest' && <small>{tr('гость', 'mehmon')}</small>}
-                            </span>
-                            <span className={`meal-row__dish ${row.order?.dish ? '' : 'meal-row__dish--empty'}`}>
-                              {!row.order ? '—' : row.order.dish === null ? tr('Не ест', 'Ovqatlanmaydi') : row.order.dish}
-                              {row.order?.dish && row.order.qty > 1 && <em> ×{row.order.qty}</em>}
-                            </span>
-                            <span className="meal-row__price">
-                              {row.order?.dish && row.order.price !== null ? `${formatSum(row.order.price)} ${currency}` : ''}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                  : (
+                    <>
+                      {rows.length === 0
+                        ? (
+                          <EmptyState
+                            icon={<CalendarRange size={27} />}
+                            title={tr('В составе никого', 'Tarkibda hech kim yo‘q')}
+                            text={tr('Добавьте людей в состав на странице мероприятия.', 'Tadbir sahifasida tarkibga odam qo‘shing.')}
+                            action={<Link className="button button--secondary" to={`/projects/${current.id}`}>{tr('К мероприятию', 'Tadbirga')}</Link>}
+                          />
+                        )
+                        : (
+                          <ul className="meal-rows">
+                            {rows.map((row) => (
+                              <li key={row.key}>
+                                <MealPersonRow
+                                  name={row.name}
+                                  note={row.note}
+                                  order={row.order}
+                                  pending={pending[`${dayKey}|${row.key}`]?.state}
+                                  onClick={isLocked ? undefined : () => openRow(row)}
+                                />
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      {!isLocked && (
+                        <button type="button" className="meal-add" onClick={() => {
+                          sheetSessionRef.current += 1
+                          setSheet({ kind: 'guest', session: sheetSessionRef.current })
+                        }}>
+                          <Plus size={17} /> {tr('Гость', 'Mehmon')}
+                        </button>
+                      )}
+                    </>
+                  )}
             </section>
 
             {shown && (
@@ -305,10 +528,16 @@ export function MealsPage() {
                   `Заказано ${ordered} · не ест ${notEating} · не спрошены ${notAsked} · ${formatSum(total)} ${currency}`,
                   `Buyurtma ${ordered} · ovqatlanmaydi ${notEating} · so‘ralmagan ${notAsked} · ${formatSum(total)} ${currency}`,
                 )}
+                {isLocked && <small className="meals-bar__locked">{tr('В расходах — ввод закрыт', 'Xarajatlarda — kiritish yopiq')}</small>}
               </div>
             )}
           </>
         )}
+
+      <AnimatePresence>
+        {shown && !isLocked && sheet?.kind === 'guest' && renderGuestSheet(shown, sheet.session)}
+        {shown && !isLocked && sheet?.kind === 'row' && sheetRow && renderRowSheet(shown, sheetRow, sheet.session)}
+      </AnimatePresence>
     </>
   )
 }
