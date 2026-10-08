@@ -231,7 +231,9 @@ export function aimInside(ctx: WorldCtx, root: THREE.Object3D, now: number): Fli
   const pts = ((root.userData.view as THREE.Vector3[] | undefined) ?? []).map((p) => root.localToWorld(p.clone()))
   const v = viewPose(pts, INSIDE_DIR[root.userData.id as WorldInside], camera.fov, camera.aspect, ctx.limit)
   // Ближе minDistance нельзя: OrbitControls оттолкнул бы камеру первым же кадром после подъезда
-  const p1 = v.p.sub(v.t).setLength(Math.max(v.p.distanceTo(v.t), controls.minDistance)).add(v.t)
+  // Длину берём из v.dist: sub() правит v.p на месте, и distanceTo после него мерил бы
+  // уже не камеру, а её смещение от цели
+  const p1 = v.p.sub(v.t).setLength(Math.max(v.dist, controls.minDistance)).add(v.t)
   return { t0: now, dur: AIM_MS, p0: camera.position.clone(), t0v: controls.target.clone(), p1, t1: v.t }
 }
 
