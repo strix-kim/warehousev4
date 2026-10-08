@@ -1,0 +1,13 @@
+/* Дроверы действий мира (actions/). Пелена и ожидание хоста (.w-acts) — в hud/world-hud.css;
+   здесь только свои дроверы. Едет вместе с чанком StaffDrawer. */
+
+/* Дровер состава: блок «Состав» страницы мероприятия в раме DrawerFrame. Шапка рамы — две
+   колонки (фото нет). Блок свёрстан панелью страницы — в дровере он занимает тело целиком:
+   без рамки, тени и своего заголовка (его несёт шапка, число — строка «В составе»).
+   Селекторы на класс тяжелее правил projects.css и 04-data.css: порядок чанков не важен. */
+.drawer--world-staff .drawer__head, .sheet--world-staff .drawer__head { grid-template-columns: minmax(0, 1fr) auto; }
+.drawer.drawer--world-staff .drawer__body, .sheet.sheet--world-staff .drawer__body { gap: 0; padding: 0 0 12px; }
+.w-staff .project-section { margin: 0; border: 0; border-radius: 0; box-shadow: none; animation: none; }
+.w-staff .project-section__head { display: none; }
+/* Лист растёт по содержимому: с пустым составом выдаче поиска не хватило бы высоты */
+.sheet--world-staff .w-staff { min-height: 360px; }

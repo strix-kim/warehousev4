@@ -41,8 +41,9 @@ export function useWorldActions({ store, mock }: { store: WorldStore; mock: bool
   // Выбор и переход — один путь для вывески, клавиши и клика по зданию в сцене.
   // Движок к этому моменту pick уже поставил: повторная запись того же id стор не будит.
   // Участки и места — выбор без перехода: их показывают панели зон по pick из стора.
-  // «Плюс» пустой ячейки открывает дровер нового мероприятия прямо в мире; «плюсы»
-  // внутри участка пока ведут туда, где недостающее создаётся.
+  // «Плюс» пустой ячейки открывает дровер нового мероприятия прямо в мире. «Плюсы»
+  // внутри участка: план залов и состав — дроверы поверх сцены (plan-new, staff),
+  // список — интерьер редактора с возвратом в мир.
   const activate = (id: string) => {
     if (isAddId(id)) {
       const lot = parseLotId(id)
@@ -51,8 +52,8 @@ export function useWorldActions({ store, mock }: { store: WorldStore; mock: bool
       else if (id === ADD_LOT_ID || !lot || mock) navigate('/projects')
       // Параметр project читает ListEditorPage: новый список сразу на мероприятии
       else if (lot.part === 'addtruck') leaveTo(`/lists/new?project=${lot.venueId}`)
-      // HallPlansPage по new=1 открывает дровер нового плана с этим мероприятием
-      else navigate(`/halls?new=1&project=${lot.venueId}`)
+      else if (lot.part === 'addcrew') run({ kind: 'staff', lotId: lot.venueId })
+      else run({ kind: 'plan-new', lotId: lot.venueId })
       return
     }
     if (!WORLD_SITES.includes(id as WorldSiteId)) return

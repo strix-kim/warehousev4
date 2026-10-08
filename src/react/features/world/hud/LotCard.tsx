@@ -1,10 +1,11 @@
-import { ChevronRight, Lock, Pencil, Plus, X } from 'lucide-react'
+import { Check, ChevronRight, Lock, Pencil, Plus, X } from 'lucide-react'
 import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { formatDayRange, formatMonthShort, parseDateValue } from '../../../lib/date'
 import { useLanguage } from '../../../lib/i18n'
 import { formatProjectPeriod } from '../../projects/types'
 import type { WorldAction } from '../actions/useWorldActions'
+import { lotReadiness, type ReadinessKey } from '../data/readiness'
 import type { WorldLot } from '../data/types'
 import type { WorldLotPart, WorldStore } from '../worldStore'
 import { ruPlural } from './plural'
@@ -45,14 +46,19 @@ function SectionBody<T>({ section, retry, rows = 1, row = 44, children }: { sect
 }
 
 // Панель выбранного участка — рабочая карточка мероприятия: шапка (имя, «Изменить»),
-// реквизиты (заказчик, место, даты), переход на страницу мероприятия и секции.
-// Реквизиты правятся, не выходя из мира: «Изменить», «Указать площадку» и «Указать
-// даты» зовут onAction с project-edit — хост действий открывает дровер поверх сцены
-// (actions/useWorldActions.ts). Без onAction действий-кнопок нет, а площадка — прежняя
-// ссылка на страницу мероприятия. Каждый объект участка в сцене имеет здесь секцию с
-// действием-ссылкой: клик в сцене только отмечает секцию (is-on), а уводит со сцены
-// ссылка-интерьер — пальцу промах по сцене ничего не стоит, клавиатуре Tab проходит все
-// действия по порядку. Счётчики — из реестра мероприятий, строки секций — useLotDetails.
+// реквизиты (заказчик, место, даты), готовность «N из 4» с четырьмя пунктами, переход на
+// страницу мероприятия и секции. Каждый объект участка в сцене имеет здесь секцию с
+// действием: клик в сцене только отмечает секцию (is-on), а действует кнопка или ссылка
+// секции — пальцу промах по сцене ничего не стоит, клавиатуре Tab проходит все действия
+// по порядку.
+// Действий два рода (план world-game-s59, решение 2). Короткие формы открывает хост
+// (actions/useWorldActions.ts) дровером поверх сцены, через onAction: реквизиты
+// («Изменить», «Указать площадку», «Указать даты» — project-edit), новый план залов
+// (plan-new) и состав («Добавить состав», «Изменить состав» — staff). Тяжёлые экраны —
+// ссылки-интерьеры, уводящие со сцены: списки, матрица плана («Открыть план»), обеды.
+// Без onAction (макет ?mock=on: его мероприятий в базе нет) дроверов нет — на их месте
+// прежние ссылки: площадка и состав ведут на страницу мероприятия, план — в /halls.
+// Счётчики и готовность — из реестра мероприятий, строки секций — useLotDetails.
 // После записи мир пересобирает данные и lot приходит новым объектом с тем же id:
 // карточка не перемонтируется (key — id), секции перечитываются только по своим счётчикам.
 type Props = {
@@ -94,23 +100,29 @@ export function LotCard({ store, lot, part, onAction }: Props) {
   const leave = { from: pathname + search }
   const projectPath = `/projects/${lot.id}`
   const edit = onAction && (() => onAction({ kind: 'project-edit', lotId: lot.id }))
+  const newPlan = onAction && (() => onAction({ kind: 'plan-new', lotId: lot.id }))
+  const editStaff = onAction && (() => onAction({ kind: 'staff', lotId: lot.id }))
+  const ready = lotReadiness(lot)
+  const readyNames: Record<ReadinessKey, string> = { place: tr('Площадка', 'Maydon'), lists: tr('Список', 'Ro‘yxat'), plan: tr('План', 'Reja'), staff: tr('Состав', 'Tarkib') }
   const newListPath = `/lists/new?project=${lot.id}`
   const onClass = (...parts: WorldLotPart[]) => `w-vsec${parts.includes(part) ? ' is-on' : ''}`
   // Счётчик в заголовке: пока ответа нет — число реестра, пришёл — число строк из базы
   const listCount = lists.section.state === 'ready' ? lists.section.data.length : lot.lists
   const staffCount = staff.section.state === 'ready' ? staff.section.data.length : lot.staff
 
-  // Пустая секция: слова и одно действие. Она же — когда счётчик реестра устарел и
-  // база ответила нулём строк.
-  const empty = (note: string, action: string, to: string) => (
+  // Пустая секция: слова и одно действие — кнопка хоста (run) или, без неё, ссылка.
+  // Она же — когда счётчик реестра устарел и база ответила нулём строк.
+  const empty = (note: string, action: string, to: string, run?: () => void) => (
     <>
       <p className="w-vsec__note">{note}</p>
-      <Link className="button button--secondary" to={to} state={leave}>{action}</Link>
+      {run
+        ? <button type="button" className="button button--secondary" onClick={run}>{action}</button>
+        : <Link className="button button--secondary" to={to} state={leave}>{action}</Link>}
     </>
   )
   const noLists = empty(tr('Списков нет', 'Ro‘yxatlar yo‘q'), tr('Создать список', 'Ro‘yxat yaratish'), newListPath)
-  const noPlan = empty(tr('Плана нет', 'Reja yo‘q'), tr('Создать план', 'Reja yaratish'), `/halls?new=1&project=${lot.id}`)
-  const noStaff = empty(tr('Состав не указан', 'Tarkib ko‘rsatilmagan'), tr('Добавить состав', 'Tarkib qo‘shish'), projectPath)
+  const noPlan = empty(tr('Плана нет', 'Reja yo‘q'), tr('Создать план', 'Reja yaratish'), `/halls?new=1&project=${lot.id}`, newPlan)
+  const noStaff = empty(tr('Состав не указан', 'Tarkib ko‘rsatilmagan'), tr('Добавить состав', 'Tarkib qo‘shish'), projectPath, editStaff)
 
   return (
     <aside className="w-plaque w-vpanel" aria-labelledby={titleId} data-w-chrome="panel">
@@ -162,6 +174,18 @@ export function LotCard({ store, lot, part, onAction }: Props) {
             )}
           </div>
         </dl>
+        <div className="w-vready">
+          <b>{tr(`Готово ${ready.done} из ${ready.items.length}`, `${ready.items.length} tadan ${ready.done} tasi tayyor`)}</b>
+          <ul>
+            {ready.items.map((item) => (
+              <li key={item.key} className={item.done ? 'is-done' : undefined}>
+                <span className="w-vready__mark" aria-hidden="true">{item.done && <Check size={10} strokeWidth={3.5} />}</span>
+                {readyNames[item.key]}
+                <span className="w-vready__sr">{item.done ? tr(' — готово', ' — tayyor') : tr(' — нет', ' — yo‘q')}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
         <p className="w-vpanel__open">
           <Link className="button button--secondary" to={projectPath} state={leave}>{tr('Открыть мероприятие', 'Tadbirni ochish')}</Link>
         </p>
@@ -241,7 +265,7 @@ export function LotCard({ store, lot, part, onAction }: Props) {
           </ul>
         </section>
 
-        <section className="w-vsec">
+        <section className={onClass('crew', 'addcrew')}>
           <h3 className="w-vsec__head">
             <span>{tr('Состав', 'Tarkib')}</span>
             {staffCount > 0 && <span className="w-vsec__count">{count(staffCount, ['человек', 'человека', 'человек'], 'kishi')}</span>}
@@ -257,10 +281,17 @@ export function LotCard({ store, lot, part, onAction }: Props) {
               </SectionBody>
               <ul className="w-vrows">
                 <li>
-                  <Link className="w-vrow" to={projectPath} state={leave}>
-                    <span className="w-vrow__name">{tr('Открыть состав', 'Tarkibni ochish')}</span>
-                    <ChevronRight size={16} aria-hidden="true" />
-                  </Link>
+                  {editStaff ? (
+                    <button type="button" className="w-vrow" onClick={editStaff}>
+                      <span className="w-vrow__name">{tr('Изменить состав', 'Tarkibni o‘zgartirish')}</span>
+                      <Pencil size={16} aria-hidden="true" />
+                    </button>
+                  ) : (
+                    <Link className="w-vrow" to={projectPath} state={leave}>
+                      <span className="w-vrow__name">{tr('Открыть состав', 'Tarkibni ochish')}</span>
+                      <ChevronRight size={16} aria-hidden="true" />
+                    </Link>
+                  )}
                 </li>
               </ul>
             </>

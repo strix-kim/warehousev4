@@ -31,6 +31,15 @@
 .w-sign--lot.w-sign--sm .w-cell__unit { display: block; }
 /* Без даты в данных метка остаётся именем — иначе она пустая */
 .w-sign--lot.w-sign--sm .w-cell + .w-sign__name { display: none; }
+/* Готовность участка — четыре точки в конце доски, в порядке «площадка, список, план,
+   состав»: закрашенная — готово, контур — нет (не цветом: цвет у точек один, чернила
+   вывески). В компактной метке точки встают квадратом 2 × 2 — 14 px при высоте доски
+   22, шире она становится на 21 px. Словами — в имени кнопки. */
+.w-ready { flex: none; display: grid; grid-auto-flow: column; gap: 3px; }
+.w-ready i { box-sizing: border-box; width: 7px; height: 7px; border: 1.5px solid currentColor; border-radius: 50%; }
+.w-ready i.is-done { background: currentColor; }
+.w-sign--lot.w-sign--sm .w-ready { grid-auto-flow: row; grid-template-columns: repeat(2, 6px); gap: 2px; margin: 0 3px 0 4px; }
+.w-sign--lot.w-sign--sm .w-ready i { width: 6px; height: 6px; }
 
 /* Панель выбранного места — справа снизу: правый нижний угол кадра у зоны свободен
    (слева снизу — кнопка кампуса на земле, сверху — день и переключатель зон). Обвязка,
@@ -60,6 +69,17 @@
 /* Значение с действием в строке («Не указаны · Указать даты»): не влезло — действие
    уходит на вторую строку */
 .w-vpanel__facts dd.w-vpanel__gap { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; }
+/* Готовность под реквизитами: «Готово N из 4» и четыре пункта в строку. Готовый —
+   чернильный кружок с галочкой, неготовый — пустой контур и тихий текст; состояние
+   словами для скринридера — в скрытом хвосте пункта (w-vready__sr). */
+.w-vready { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line-2); }
+.w-vready b { font: 700 14px/18px var(--f-text); }
+.w-vready ul { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.w-vready li { display: flex; align-items: center; gap: 5px; color: var(--muted); font: 500 13px/18px var(--f-text); }
+.w-vready li.is-done { color: var(--ink); }
+.w-vready__mark { box-sizing: border-box; flex: none; width: 14px; height: 14px; display: grid; place-items: center; border: 1.5px solid var(--ctl); border-radius: 50%; }
+.w-vready li.is-done .w-vready__mark { border-color: var(--ink); background: var(--ink); color: var(--card); }
+.w-vready__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* Переход на страницу мероприятия — кнопка во всю ширину под реквизитами */
 .w-vpanel__open { margin: 12px 0 2px; display: grid; }
 .w-vpanel .button { text-decoration: none; }
@@ -86,6 +106,9 @@
 .w-vrow svg { flex: none; color: var(--muted); }
 /* «Добавить»: плюс слева, шеврона нет */
 .w-vrow--add { grid-template-columns: auto minmax(0, 1fr); }
+/* Строка-действие хоста (дровер поверх сцены) — кнопка в том же облике, что ссылка;
+   ширину добирает сама: кнопка, в отличие от ссылки-грида, не тянется на строку */
+button.w-vrow { width: calc(100% + 16px); border: 0; background-color: transparent; text-align: left; }
 /* Загрузка: тихая плашка высотой будущих строк (--rows × --row пишет LotCard) */
 .w-vsec__skel { margin: 0; height: calc(var(--rows, 1) * var(--row, 44px)); border-radius: var(--r-sm); background: var(--sunk); }
 .w-vsec.is-on .w-vsec__skel { background: var(--select); }
@@ -97,9 +120,9 @@
 /* Компактная сцена: лист снизу во всю ширину, сцена с участком остаётся видна над ним */
 .w-stage.is-sm .w-vpanel { left: 0; right: 0; bottom: 0; width: auto; max-width: none; max-height: 56%; border-width: 1px 0 0; border-radius: var(--r-lg) var(--r-lg) 0 0; }
 
-/* Таблички кафе и отеля у выбранного участка. Якорь .w-tag — точка 0×0 (свободная
-   подпись, раскладка её не двигает), табличка стоит над ним по центру. «Обеды» —
-   кнопка в цветах вывески (обе палитры), цель пальца добирает ::before до 44 px.
+/* Таблички кафе, бригады и отеля у выбранного участка. Якорь .w-tag — точка 0×0
+   (свободная подпись, раскладка её не двигает), табличка стоит над ним по центру.
+   «Обеды» и бригада (значок людей и число) — кнопки в цветах вывески (обе палитры), цель пальца добирает ::before до 44 px.
    Запертый отель — тихая пунктирная плашка в цветах чипа имени, мышь не ловит. Она
    висит от якоря влево (якорь — левый угол башни, venues.ts): правее стоит вывеска
    участка с ножкой, и по центру табличка ложилась под её доску. */

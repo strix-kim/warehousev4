@@ -83,6 +83,9 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
   // Новое мероприятие записано, реестр перечитан: id ждёт посадки (эффект ниже, после
   // setData). titleFor — участок, в заголовок карточки которого уйдёт фокус.
   const [landing, setLanding] = useState<string | null>(null)
+  // Запись по участку из дровера действия (план, состав) легла, реестр перечитан:
+  // участок ждёт возврата фокуса в свою карточку (эффект ниже, после setData)
+  const [settled, setSettled] = useState<string | null>(null)
   const [titleFor, setTitleFor] = useState<string | null>(null)
   const hover = useWorldState(store, (state) => state.hover)
   const zone = useWorldState(store, (state) => state.zone)
@@ -296,6 +299,23 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
     show(done)
   }, [landing, venues, setParams, show, tr])
 
+  // Запись по участку из дровера действия. Тем же порядком, что посадка: к этому месту
+  // мир уже пересобран. Камера не едет — человек и так смотрит на участок.
+  useEffect(() => {
+    if (settled === null) return
+    setSettled(null)
+    // Участка в сетке нет (мероприятие ушло из реестра или привязку сменили на то,
+    // что вне сетки) — карточки нет, фокус ставить некуда
+    if (!venues?.slice(0, LOT_MAX).some((lot) => lot.id === settled)) return
+    setParams((prev) => {
+      const query = new URLSearchParams(prev)
+      query.set('zone', 'venues')
+      query.set('lot', settled)
+      return query
+    }, { replace: true })
+    setTitleFor(settled)
+  }, [settled, venues, setParams])
+
   // Фокус после создания. «Плюс»-открыватель исчез вместе с якорями пересборки, и
   // useModalLayer дровера фокус вернуть не может — ставим его в заголовок карточки
   // участка. Карточка монтируется тем же проходом, которым стор отдаёт pick, и её
@@ -342,7 +362,7 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
         </>
       )}
       {/* Дроверы действий поверх сцены */}
-      <WorldActions store={store} action={action} onClose={close} reload={reload} onCreated={setLanding} onBuilding={setBuilding} toast={show} />
+      <WorldActions store={store} action={action} venues={data?.venues ?? null} onClose={close} reload={reload} onCreated={setLanding} onSettled={setSettled} onBuilding={setBuilding} toast={show} />
       {/* Скринридеру: имя здания под указателем или в фокусе клавиши */}
       <p className="w-live" aria-live="polite">{hover !== null && WORLD_SITES.includes(hover as WorldSiteId) ? names[hover as WorldSiteId] : ''}</p>
       {status === 'loading' && <p className="w-stage__state w-stage__loading" role="status">{tr('Загружаем мир…', 'Dunyo yuklanmoqda…')}</p>}

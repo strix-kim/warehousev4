@@ -13,10 +13,12 @@ export function Plus({ store, id, busy = false, onActivate }: { store: WorldStor
   // name — что произойдёт (скринридеру), cap — короткая подпись на плашке
   const [name, cap] = id === ADD_LOT_ID ? [tr('Добавить мероприятие', 'Tadbir qo‘shish'), tr('Новое мероприятие', 'Yangi tadbir')]
     : id.startsWith('addtruck:') ? [tr('Добавить список оборудования', 'Uskunalar ro‘yxatini qo‘shish'), tr('Список', 'Ro‘yxat')]
-      : [tr('Добавить план залов', 'Zallar rejasini qo‘shish'), tr('План залов', 'Zallar rejasi')]
-  // У выбранного участка подпись грузовика уходит от кружка влево, стола плана — вправо
-  // (world-hud.css): места стоят рядом, и подписи по центру якоря перекрывались
-  const side = id.startsWith('addtruck:') ? ' w-plus__btn--left' : ''
+      : id.startsWith('addcrew:') ? [tr('Добавить состав', 'Tarkib qo‘shish'), tr('Состав', 'Tarkib')]
+        : [tr('Добавить план залов', 'Zallar rejasini qo‘shish'), tr('План залов', 'Zallar rejasi')]
+  // У выбранного участка подписи трёх «плюсов» расходятся от кружков в разные стороны
+  // (world-hud.css): места стоят рядом, и подписи по центру якоря перекрывались.
+  // Грузовик спереди — влево, стол плана справа — вправо, бригада у входа — вверх.
+  const side = id.startsWith('addtruck:') ? ' w-plus__btn--left' : id.startsWith('addcrew:') ? ' w-plus__btn--up' : ''
   const enter = () => store.setState({ hover: id })
   const leave = () => { if (store.getState().hover === id) store.setState({ hover: null }) }
 

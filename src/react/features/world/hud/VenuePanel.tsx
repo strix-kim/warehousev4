@@ -1,8 +1,10 @@
-import { Lock, Utensils } from 'lucide-react'
+import { Lock, Users, Utensils } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../../../lib/i18n'
 import type { WorldAction } from '../actions/useWorldActions'
+import { lotReadiness } from '../data/readiness'
 import { LOT_MAX } from '../data/splitProjects'
 import type { WorldLot } from '../data/types'
 import { lotPartId, parseLotId, useWorldState, type WorldStore } from '../worldStore'
@@ -10,12 +12,15 @@ import { dateSpan, LotCard } from './LotCard'
 import { ruPlural } from './plural'
 import './world-venues.css'
 
-// Вывеска участка — одна на участок, над зданием: дата в ячейке и имя мероприятия. Рисуется
-// порталом в якорь движка (класс w-sign w-sign--lot). Якорю движок ставит is-hover и
-// is-selected только по точному id, а участок отвечает наведению и выбору любой своей
-// части (грузовик, план) — поэтому состояние ещё и классами на своих детях.
+// Вывеска участка — одна на участок, над зданием: дата в ячейке, имя мероприятия и
+// готовность четырьмя точками (площадка, список, план, состав — data/readiness.ts;
+// закрашенная — готово, контур — нет). Рисуется порталом в якорь движка (класс w-sign
+// w-sign--lot); точки лежат внутри доски, своего якоря у них нет — раскладка меряет
+// доску как есть. Якорю движок ставит is-hover и is-selected только по точному id, а
+// участок отвечает наведению и выбору любой своей части (грузовик, план) — поэтому
+// состояние ещё и классами на своих детях.
 function LotSign({ store, lot }: { store: WorldStore; lot: WorldLot }) {
-  const { locale } = useLanguage()
+  const { tr, locale } = useLanguage()
   const id = lotPartId('lot', lot.id)
   const anchor = useWorldState(store, (state) => state.labels.get(id))
   const hot = useWorldState(store, (state) => parseLotId(state.hover)?.venueId === lot.id)
@@ -23,6 +28,8 @@ function LotSign({ store, lot }: { store: WorldStore; lot: WorldLot }) {
   if (!anchor) return null
 
   const span = dateSpan(lot, locale)
+  const ready = lotReadiness(lot)
+  const readyText = tr(`готово ${ready.done} из ${ready.items.length}`, `${ready.items.length} tadan ${ready.done} tasi tayyor`)
   const enter = () => store.setState({ hover: id })
   // Уход снимает наведение, только если оно всё ещё наше — как у вывески здания
   const leave = () => { if (store.getState().hover === id) store.setState({ hover: null }) }
@@ -34,8 +41,9 @@ function LotSign({ store, lot }: { store: WorldStore; lot: WorldLot }) {
         type="button"
         className={`w-sign__board${hot ? ' is-hot' : ''}${on ? ' is-on' : ''}`}
         aria-pressed={on}
-        // Имя в вывеске обрезается, в компактной его нет вовсе — в имени кнопки оно целиком
-        aria-label={span ? `${lot.name}, ${span.text}` : lot.name}
+        // Имя в вывеске обрезается, в компактной его нет вовсе — в имени кнопки оно целиком;
+        // точки готовности — там же словами
+        aria-label={[lot.name, span?.text, readyText].filter(Boolean).join(', ')}
         onPointerEnter={enter}
         onPointerLeave={leave}
         onFocus={enter}
@@ -45,34 +53,51 @@ function LotSign({ store, lot }: { store: WorldStore; lot: WorldLot }) {
       >
         {span && <span className="w-cell"><b className="w-cell__num">{span.num}</b><span className="w-cell__unit">{span.unit}</span></span>}
         <span className="w-sign__name">{lot.name}</span>
+        <span className="w-ready" aria-hidden="true">
+          {ready.items.map((item) => <i key={item.key} className={item.done ? 'is-done' : undefined} />)}
+        </span>
       </button>
     </>,
     anchor,
   )
 }
 
-// Таблички кафе и отеля — только у выбранного участка: якоря (класс w-tag, свободная
-// подпись) движок ставит у каждого, текст кладём порталом. Кафе — кнопка: выбирает
-// свою часть, панель отмечает секцию «Обеды», а уводит со сцены ссылка в панели.
-// Отель заперт: надпись с замком, мышь не ловит и в tab-порядок не входит.
+// Таблички кафе, бригады и отеля — только у выбранного участка: якоря (класс w-tag,
+// свободная подпись) ставит движок, текст кладём порталом. Кафе и бригада — кнопки:
+// выбирают свою часть, панель отмечает секцию («Обеды», «Состав»), а действие — в
+// панели. Якорь бригады движок ставит, только когда в составе кто-то есть; фигурок в
+// сцене не больше CREW_MAX, число на табличке — весь состав. Отель заперт: надпись с
+// замком, мышь не ловит и в tab-порядок не входит.
 function LotTags({ store, lot }: { store: WorldStore; lot: WorldLot }) {
-  const { tr } = useLanguage()
-  const cafeId = lotPartId('cafe', lot.id)
+  const { tr, locale } = useLanguage()
+  const cafeId = lotPartId('cafe', lot.id), crewId = lotPartId('crew', lot.id)
   const cafe = useWorldState(store, (state) => state.labels.get(cafeId))
+  const crew = useWorldState(store, (state) => state.labels.get(crewId))
   const stay = useWorldState(store, (state) => state.labels.get(lotPartId('stay', lot.id)))
-  const on = useWorldState(store, (state) => state.pick === cafeId)
-  const enter = () => store.setState({ hover: cafeId })
-  const leave = () => { if (store.getState().hover === cafeId) store.setState({ hover: null }) }
+  const pick = useWorldState(store, (state) => state.pick)
+  // name — имя кнопки там, где на табличке одно число
+  const tag = (id: string, anchor: HTMLElement | undefined, body: ReactNode, name?: string) => anchor && createPortal(
+    <button
+      type="button"
+      className="w-tag__btn"
+      aria-label={name}
+      aria-pressed={pick === id}
+      onPointerEnter={() => store.setState({ hover: id })}
+      onPointerLeave={() => { if (store.getState().hover === id) store.setState({ hover: null }) }}
+      onFocus={() => store.setState({ hover: id })}
+      onBlur={() => { if (store.getState().hover === id) store.setState({ hover: null }) }}
+      onClick={() => store.setState({ pick: id })}
+    >
+      {body}
+    </button>,
+    anchor,
+  )
+  const people = lot.staff.toLocaleString(locale)
 
   return (
     <>
-      {cafe && createPortal(
-        <button type="button" className="w-tag__btn" aria-pressed={on} onPointerEnter={enter} onPointerLeave={leave} onFocus={enter} onBlur={leave} onClick={() => store.setState({ pick: cafeId })}>
-          <Utensils size={13} aria-hidden="true" />
-          {tr('Обеды', 'Ovqatlanish')}
-        </button>,
-        cafe,
-      )}
+      {tag(cafeId, cafe, <><Utensils size={13} aria-hidden="true" />{tr('Обеды', 'Ovqatlanish')}</>)}
+      {tag(crewId, crew, <><Users size={13} aria-hidden="true" />{people}</>, tr(`Состав: ${people} ${ruPlural(lot.staff, 'человек', 'человека', 'человек')}`, `Tarkib: ${people} kishi`))}
       {stay && createPortal(
         <span className="w-tag__lock"><Lock size={13} aria-hidden="true" />{tr('Расселение — скоро', 'Joylashtirish — tez orada')}</span>,
         stay,

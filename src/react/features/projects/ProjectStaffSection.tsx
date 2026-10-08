@@ -40,10 +40,14 @@ function employeeInitials(employee: EmployeeListItem) {
 // список в Excel. Данные блок грузит сам и НЕ кэширует: состав правят с двух
 // вкладок, а полные строки с паспортом приезжают только в момент выгрузки.
 // Каждая правка — сразу запись в базу, кнопки «Сохранить» у блока нет.
-export function ProjectStaffSection({ project }: {
+export function ProjectStaffSection({ project, onChanged }: {
   // Реквизиты нужны шапке документа; при правке мероприятия страница отдаёт
   // сюда уже обновлённую строку.
   project: Pick<Project, 'id' | 'name' | 'date_from' | 'date_to'>
+  // Состав в базе изменился: человека добавили или убрали. Зовётся после ответа
+  // базы, а не оптимистично. Страница мероприятия проп не передаёт; мир по нему
+  // перечитывает реестр (world/actions/StaffDrawer.tsx).
+  onChanged?: () => void
 }) {
   const { tr, locale } = useLanguage()
   const projectId = project.id
@@ -143,6 +147,7 @@ export function ProjectStaffSection({ project }: {
       const member = await addProjectStaffMember(projectId, employee.id)
       if (member) {
         setMembers((current) => (current.some((item) => item.id === member.id) ? current : sortStaff([...current, member])))
+        onChanged?.()
       } else {
         // Человека уже добавили из другой вкладки: не ошибка, но наш список
         // устарел — перечитываем его целиком.
@@ -167,6 +172,7 @@ export function ProjectStaffSection({ project }: {
     try {
       await removeProjectStaffMember(member.id)
       setMembers((current) => current.filter((item) => item.id !== member.id))
+      onChanged?.()
     } catch (error) {
       setNotice({ kind: 'error', text: projectStaffErrorText(error, tr) })
       // Ноль удалённых строк — список на экране разошёлся с базой.
