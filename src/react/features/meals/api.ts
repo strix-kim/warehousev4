@@ -194,6 +194,34 @@ export async function setMealStatus(mealId: string, status: MealStatus): Promise
   return row
 }
 
+// ─── Расходы (М2) ───────────────────────────────────────────────────────────
+
+export type MealExpenseInput = {
+  name: string
+  amount: number
+  spentBy: string | null
+  comment: string | null
+}
+
+// «В расходы» одной транзакцией в базе (create_meal_expense): расход ложится в
+// журнал ВЫЗЫВАЮЩЕГО аккаунта с датой обеда, ссылка ставится на обед, второй
+// вызов по тому же обеду получает meal_expense_exists. Сумму шлёт клиент
+// (раздел 1.5 плана). Кэш журнала расходов сбрасывает вызывающий экран через
+// invalidateExpensesCache() из expenses/api — здесь только запрос.
+export async function createMealExpense(mealId: string, input: MealExpenseInput): Promise<string> {
+  if (!supabase) throw new Error('Supabase не настроен')
+  const { data, error } = await supabase.rpc('create_meal_expense', {
+    p_meal_id: mealId,
+    p_name: input.name,
+    p_amount: input.amount,
+    p_spent_by: input.spentBy,
+    p_comment: input.comment,
+  })
+  if (error) throw error
+  if (typeof data !== 'string') throw new Error('create_meal_expense: id не пришёл')
+  return data
+}
+
 // Перевод отказа базы в человеческую фразу — по имени ограничения, как
 // projectStaffErrorText: под 23514 у строки заказа несколько разных CHECK.
 export function mealErrorText(error: unknown, tr: Tr): string {
@@ -229,6 +257,21 @@ export function mealErrorText(error: unknown, tr: Tr): string {
   }
   if (message.includes('project_meal_orders_price_check')) {
     return tr('Цена — от 1 до 10 000 000 сум за порцию.', 'Narx — porsiya uchun 1 dan 10 000 000 so‘mgacha.')
+  }
+  if (message.includes('project_meal_locked')) {
+    return tr('Обед уже внесён в расходы — ввод закрыт. Чтобы править, удалите расход в журнале.', 'Ovqat allaqachon xarajatlarga kiritilgan — kiritish yopiq. Tuzatish uchun jurnaldagi xarajatni o‘chiring.')
+  }
+  if (message.includes('meal_expense_exists')) {
+    return tr('Этот обед уже в расходах.', 'Bu ovqat allaqachon xarajatlarda.')
+  }
+  if (message.includes('meal_not_delivered')) {
+    return tr('В расходы — только после «Привезли».', 'Xarajatlarga — faqat «Olib kelindi» dan keyin.')
+  }
+  if (message.includes('meal_not_found')) {
+    return tr('Обед не найден — обновите страницу.', 'Ovqat topilmadi — sahifani yangilang.')
+  }
+  if (message.includes('project_meals_expense_status_check')) {
+    return tr('Обед в расходах: статус назад не вернуть.', 'Ovqat xarajatlarda: holatni orqaga qaytarib bo‘lmaydi.')
   }
   if (message.includes('project_meal_outside_period')) {
     return tr('Этот день вне периода мероприятия — проверьте даты мероприятия.', 'Bu kun tadbir davridan tashqarida — tadbir sanalarini tekshiring.')
