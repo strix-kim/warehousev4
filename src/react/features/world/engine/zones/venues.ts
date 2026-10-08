@@ -15,7 +15,7 @@ import { hitPlane, pickable } from '../pointer'
 import { kit, label } from '../primitives'
 import { makeFence, makePlus, type FencePlot } from '../selection'
 import { flat, mat } from '../style'
-import { LOT_TOP, VENUE_KINDS } from './venueKinds'
+import { LOT_SIGN_Y, LOT_TOP, VENUE_KINDS, VENUE_SCALE } from './venueKinds'
 
 type XZ = readonly [x: number, z: number]
 
@@ -28,8 +28,10 @@ const LOT_BLD: XZ = [0.5, -5], LOT_TRUCK: XZ = [2.6, 6.4], LOT_STAY: XZ = [-5.2,
 // проезд ряда. Калитка в переднем бордюре стоит против съезда грузовика к проезду.
 const PLOT: FencePlot = { hw: 8, z0: -11.4, z1: 9.8, curb: 0.4, gate: [3, 6] }
 const PLOT_D = PLOT.z1 - PLOT.z0, PLOT_ZC = (PLOT.z0 + PLOT.z1) / 2
+// Основание отеля расселения в чертеже (до масштаба VENUE_SCALE)
+const STAY_SIDE = 4.4
 // Пустые места под отель и стол плана: центр и размер основания
-const SLOTS = { addstay: [LOT_STAY, 4.4, 4.4], addplan: [LOT_PLAN, 3.2, 2.6] } as const
+const SLOTS = { addstay: [LOT_STAY, STAY_SIDE * VENUE_SCALE, STAY_SIDE * VENUE_SCALE], addplan: [LOT_PLAN, 3.2, 2.6] } as const
 
 // Грузовик на разгрузке — силуэт бортового Bongo с кейсами. Это знак «к месту привязан
 // список», а не машина из парка: какая машина везёт список, в данных места нет.
@@ -58,10 +60,19 @@ function block(ctx: WorldCtx, zone: THREE.Group, id: string, root: THREE.Group, 
 function buildLot(ctx: WorldCtx, zone: THREE.Group, venue: WorldVenue, X: number, Z: number) {
   const { style } = ctx, { P } = style, id = lotPartId('lot', venue.id)
   const g = new THREE.Group(), k = kit(ctx)
-  const [top, ax, az] = VENUE_KINDS[venue.kind]({ ctx, g, k, body: mat(style, P.wall), roofMass: mat(style, P.roofMass), x: LOT_BLD[0], z: LOT_BLD[1] })
+  // Здание — своей группой в размерах чертежа, уменьшенной целиком (VENUE_SCALE):
+  // контур и силуэт толщиной в пикселях, от масштаба не тоньше
+  const bld = new THREE.Group(), kb = kit(ctx)
+  bld.position.set(LOT_BLD[0], 0, LOT_BLD[1])
+  bld.scale.setScalar(VENUE_SCALE)
+  const [top, bx, bz] = VENUE_KINDS[venue.kind]({ ctx, g: bld, k: kb, body: mat(style, P.wall), roofMass: mat(style, P.roofMass), x: 0, z: 0 })
   // Вывески всех участков висят на одной высоте: соседние идут ровной лесенкой. У низкого
   // здания до этой высоты поднимается мачта — ножка вывески не висит в воздухе.
-  if (top < LOT_TOP) k(style.roles.dark, 0.2, LOT_TOP - top + 0.4, 0.2, ax, top - 0.4, az)
+  if (top < LOT_TOP) kb(style.roles.dark, 0.2, LOT_TOP - top + 0.4, 0.2, bx, top - 0.4, bz)
+  kb.into(bld)
+  g.add(bld)
+  // Точка над крышей — в осях участка
+  const ax = LOT_BLD[0] + bx * VENUE_SCALE, az = LOT_BLD[1] + bz * VENUE_SCALE
   if (venue.gearCount !== null) {
     // Площадка разгрузки: пятно асфальта под грузовиком и съезд к проезду
     const road = flat(style, P.road), [tx, tz] = LOT_TRUCK
@@ -76,14 +87,15 @@ function buildLot(ctx: WorldCtx, zone: THREE.Group, venue: WorldVenue, X: number
   hitPlane(ctx, g, LOT_W, PLOT_D + 1.6, 0, PLOT_ZC, id)
   // Ограда — после целей: её блоки в raycast не идут
   ctx.fences.set(id, makeFence(ctx, g, PLOT))
-  label(ctx, g, id, 'w-sign w-sign--lot', ax, LOT_TOP + 0.5, az)
+  label(ctx, g, id, 'w-sign w-sign--lot', ax, LOT_SIGN_Y + 0.5, az)
 }
 
 // Отель расселения — меньше и уже здания места: башенка с тёмными лентами окон и красным
-// кубом на крыше («здесь живут наши»)
+// кубом на крыше («здесь живут наши»). Уменьшен тем же VENUE_SCALE, что здание места.
 function buildStay(ctx: WorldCtx) {
   const g = new THREE.Group(), k = kit(ctx), { roof, door, signMark } = ctx.style.roles
-  k(mat(ctx.style, ctx.style.P.wall), 4.4, 6.4, 4.4, 0, 0, 0)
+  g.scale.setScalar(VENUE_SCALE)
+  k(mat(ctx.style, ctx.style.P.wall), STAY_SIDE, 6.4, STAY_SIDE, 0, 0, 0)
   k.slab(roof, 4.6, 0.3, 4.6, 0, 6.4, 0)
   for (const y of [2.6, 3.8, 5]) { k(door, 3.4, 0.6, 0.1, 0, y, 2.22); k(door, 0.1, 0.6, 3.4, 2.22, y, 0) }
   k(door, 1.4, 1.9, 0.14, 0, 0, 2.22)
@@ -152,7 +164,7 @@ export function buildVenues(ctx: WorldCtx, venues: WorldVenue[]) {
   const hw = LOT_W / 2 - 1, hd = LOT_D / 2 - 1
   g.userData.frame = Array.from({ length: LOT_MAX }, (_, i) => {
     const [X, Z] = lotAt(i)
-    return [[X - hw, 0, Z - hd], [X + hw, 0, Z - hd], [X - hw, 0, Z + hd], [X + hw, 0, Z + hd], [X + LOT_BLD[0], LOT_TOP + 3.5, Z + LOT_BLD[1]]]
+    return [[X - hw, 0, Z - hd], [X + hw, 0, Z - hd], [X - hw, 0, Z + hd], [X + hw, 0, Z + hd], [X + LOT_BLD[0], LOT_SIGN_Y + 3.5, Z + LOT_BLD[1]]]
   }).flat().map(([x = 0, y = 0, z = 0]) => new THREE.Vector3(x, y, z))
   return g
 }

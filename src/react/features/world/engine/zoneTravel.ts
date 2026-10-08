@@ -5,6 +5,7 @@ import { isAddId, WORLD_ZONES, type WorldZone } from '../worldStore'
 import { limitTo, placeCamera, startFlight } from './camera'
 import type { WorldCtx, WorldDeps } from './createWorld'
 import { still } from './ease'
+import { handOver } from './groundLabel'
 import type { HudLayout } from './hudLayout'
 import { zoneLabels } from './zones/layout'
 
@@ -20,12 +21,19 @@ type TravelEnv = {
 
 export function createZoneTravel(ctx: WorldCtx, deps: WorldDeps, env: TravelEnv) {
   // Камера встала на зону: позу покоя считаем заново (окно могло смениться), кнопки на
-  // земле — под новую зону, нажатая гаснет
+  // земле — под новую зону, нажатая гаснет. Её место в промежутке занимает двойник
+  // (кнопка обратно) — он перенимает вдавленное состояние и отжимается плавно.
   function land() {
     ctx.flight = null
     ctx.controls.enabled = true
     ctx.zoneShown = ctx.zone
-    for (const gate of ctx.gates.values()) gate.lit = false
+    const gates = [...ctx.gates.values()]
+    for (const gate of gates) {
+      if (!gate.lit) continue
+      const twin = gates.find((q) => q.gap === gate.gap && q !== gate)
+      if (twin) handOver(gate, twin)
+    }
+    for (const gate of gates) gate.lit = false
     ctx.userMoved = false
     placeCamera(ctx, env.isCompact())
     deps.store.setState({ flying: false })

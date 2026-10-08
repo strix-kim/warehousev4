@@ -148,6 +148,13 @@ export function makeGate(ctx: WorldCtx, parent: THREE.Object3D, id: string, to: 
   return gate
 }
 
+// В промежутке две кнопки в одной точке, видна одна (zones/layout.ts). На посадке
+// нажатая уходит, её двойник встаёт на её место: он принимает её подъём, тон и свет и
+// дальше сам плавно возвращается из вдавленного — иначе плита отскакивала бы скачком.
+export function handOver(from: Gate, to: Gate) {
+  for (const key of ['lift', 'tone', 'glow'] as const) Object.assign(to[key], from[key])
+}
+
 // Кадр кнопок: подъём, тон и свет. on(gate) — видна ли кнопка сейчас (решает раскладка
 // зон); hover — id под указателем или в фокусе дубля.
 export function tickGates(ctx: WorldCtx, now: number, hover: string | null, on: (gate: Gate) => boolean) {

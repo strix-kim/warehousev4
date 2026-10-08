@@ -13,6 +13,8 @@
   --sign-bg: var(--night); --sign-ink: var(--on-night); --sign-cell: var(--night-3); --sign-leg: var(--night-3);
   --key-line: var(--ctl); --key-rim: var(--ctl); --key-on: var(--night); --key-on-line: var(--night);
   --who-bg: var(--card); --who-ink: var(--ink-2); --who-ink-2: var(--muted); --who-line: var(--line);
+  /* Значок здания на вывеске: тёмная плашка — грани светлые, как у выбранной клавиши */
+  --sign-ico-top: var(--card); --sign-ico-front: var(--on-night-2); --sign-ico-side: var(--ctl); --sign-ico-flag: var(--red-night);
 }
 /* «Ночь»: тёмная вывеска теряется на тёмной земле — роли инвертированы: светлая
    плашка, чёрная ячейка; чип имени, наоборот, уходит в тёмное, чтобы остаться самым
@@ -21,6 +23,7 @@
   --sign-bg: var(--on-night); --sign-ink: var(--ink); --sign-cell: var(--night); --sign-leg: var(--on-night-2);
   --key-on: var(--night-3); --key-on-line: var(--on-night-2);
   --who-bg: var(--night-3); --who-ink: var(--on-night); --who-ink-2: var(--on-night-2); --who-line: var(--night-line);
+  --sign-ico-top: var(--soft); --sign-ico-front: var(--muted); --sign-ico-side: var(--ink); --sign-ico-flag: var(--red);
 }
 /* Кольцо фокуса ложится на тёмную землю — светлое. Только у HUD: запасные виды
    (.w-stage__state) в «Ночи» остаются светлыми. */
@@ -47,9 +50,13 @@
 .w-sign__leg { position: absolute; left: -1.5px; bottom: 0; width: 3px; height: calc(var(--leg) + var(--lift) + 6px); border-radius: 2px; background: var(--sign-leg); transition: background-color .16s var(--ease-out); }
 .w-sign__leg::after { content: ""; position: absolute; left: -2px; bottom: -3.5px; width: 7px; height: 7px; border-radius: 50%; background: inherit; }
 /* pointer-events: слой .w-labels мышь пропускает, плашка — ловит */
-.w-sign__board { position: absolute; z-index: 1; left: 0; bottom: var(--leg); translate: calc(-50% + var(--shift)) calc(var(--lift) * -1); width: max-content; height: 60px; display: flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px; border: 0; border-radius: var(--r-md); color: var(--sign-ink); background: var(--sign-bg); box-shadow: var(--shadow-sign); text-align: left; pointer-events: auto; -webkit-tap-highlight-color: transparent; transition: transform .16s var(--ease-out), box-shadow .16s var(--ease-out); }
+.w-sign__board { position: absolute; z-index: 1; left: 0; bottom: var(--leg); translate: calc(-50% + var(--shift)) calc(var(--lift) * -1); width: max-content; height: 60px; display: flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px; border: 0; border-radius: var(--r-md); color: var(--sign-ink); background: var(--sign-bg); box-shadow: var(--shadow-sign); text-align: left; pointer-events: auto; -webkit-tap-highlight-color: transparent; transition: transform .16s var(--ease-out), box-shadow .16s var(--ease-out);
+  --ico-top: var(--sign-ico-top); --ico-front: var(--sign-ico-front); --ico-side: var(--sign-ico-side); --ico-hole: var(--sign-bg); --ico-flag: var(--sign-ico-flag); }
 /* Без ячейки (числа нет) левое поле — как правое */
 .w-sign__board > .w-sign__name:first-child { margin-left: 8px; }
+/* Значок здания вплотную к имени; без ячейки он первый — поле слева как у имени */
+.w-sign__board > .w-ico + .w-sign__name { margin-left: -4px; }
+.w-sign__board > .w-ico:first-child { margin-left: 4px; }
 .w-sign__name { font: 700 16px/20px var(--f-display); white-space: nowrap; }
 /* Наведение и фокус: плашка приподнята на 3 px, тень глубже */
 .w-sign__board:hover, .w-sign.is-hover .w-sign__board { transform: translateY(-3px); box-shadow: var(--shadow-sign-up); }
@@ -66,12 +73,15 @@
 .w-sign--sm .w-cell__num { font-size: 20px; line-height: 22px; }
 .w-sign--sm .w-cell__unit { display: none; }
 .w-sign--sm .w-sign__name { font-size: 14px; line-height: 18px; }
+.w-sign--sm .w-sign__board > .w-ico + .w-sign__name { margin-left: -2px; }
 
 /* Чип имени над фигуркой — самый лёгкий уровень: без ножки и ячейки, мышь не ловит.
-   Фамилия — только у фигурки под указателем (is-near). Лёг бы на вывеску, обвязку
-   или соседа — гаснет. */
-.w-who { padding: 1px 7px 2px; border: 1px solid var(--who-line); border-radius: var(--r-sm); background: var(--who-bg); color: var(--who-ink); font: 600 13px/16px var(--f-text); white-space: nowrap; pointer-events: none; transition: opacity .2s var(--ease-out); }
+   Виден у каждой фигурки постоянно (прораб, с58) — поэтому мелкий: двенадцать чипов
+   кампуса не должны слипаться в полосу. Фигурка под указателем (is-near) — чип ярче и
+   с фамилией. */
+.w-who { padding: 0 5px 1px; border: 1px solid var(--who-line); border-radius: 6px; background: var(--who-bg); color: var(--who-ink); font: 600 11px/14px var(--f-text); white-space: nowrap; pointer-events: none; transition: opacity .2s var(--ease-out), border-color .16s var(--ease-out); }
 .w-who i { display: none; font-style: normal; font-weight: 500; color: var(--who-ink-2); }
+.w-who.is-near { border-color: var(--who-ink); }
 .w-who.is-near i { display: inline; }
 .w-who.is-away { opacity: 0; transition: opacity .15s var(--ease-in); }
 
@@ -117,6 +127,16 @@
 .w-ico--store i:nth-child(2) { --l: 1px; --bw: 8px; --bh: 18px; }
 .w-ico--garage i { --l: 1px; --bw: 21px; --bh: 13px; }
 .w-ico--garage b { left: 3px; bottom: 2px; width: 5px; height: 8px; border-radius: 1px 1px 0 0; background: var(--ico-hole); box-shadow: 6px 0 0 var(--ico-hole), 12px 0 0 var(--ico-hole); }
+/* Зоны карты (переключатель): зал места и три здания архива — формы макета s51 */
+.w-ico--hall i { --l: 1px; --bw: 20px; --bh: 10px; }
+.w-ico--hall b { left: 6px; bottom: 2px; width: 10px; height: 6px; border-radius: 1px 1px 0 0; background: var(--ico-hole); }
+.w-ico--arch i { --d: 3px; --bw: 6px; }
+.w-ico--arch i:nth-child(1) { --l: 1px; --bh: 9px; }
+.w-ico--arch i:nth-child(2) { --l: 10px; --bh: 18px; }
+.w-ico--arch i:nth-child(3) { --l: 19px; --bh: 13px; }
+/* Компактный значок (вывески, переключатель зон): рисунок 28 px уменьшен целиком,
+   в потоке занимает 20 × 20 — отрицательное поле съедает то, что ужал scale */
+.w-ico--sm { scale: .72; margin: -4px; }
 
 /* Живая область для скринридера: в потоке её нет, но в дереве доступности она есть.
    Общего утилитарного класса «визуально скрыто» в проекте нет — этот локальный. */
@@ -132,14 +152,18 @@
    Под ним — метка макетных данных (только dev-фикстуры). */
 .w-zones { position: absolute; z-index: 1; right: 16px; top: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .w-zones__row { height: 48px; display: flex; gap: 2px; padding: 3px; }
-.w-zones__row button { flex: 1 1 auto; min-width: 44px; padding: 0 12px; border: 0; border-radius: 15px; background: transparent; color: var(--ink); font: 600 14px/18px var(--f-text); white-space: nowrap; transition: background-color .16s var(--ease-out), color .16s var(--ease-out); }
-.w-zones__row button:hover { background: var(--hover); }
-.w-zones__row button[aria-current="true"] { background: var(--key-on); color: var(--card); cursor: default; }
+.w-zones__row button { flex: 1 1 auto; min-width: 44px; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 0 12px; border: 0; border-radius: 15px; background: transparent; color: var(--ink); font: 600 14px/18px var(--f-text); white-space: nowrap; transition: background-color .16s var(--ease-out), color .16s var(--ease-out);
+  --ico-top: var(--soft); --ico-front: var(--muted); --ico-side: var(--ink); --ico-hole: var(--card); --ico-flag: var(--red); }
+.w-zones__row button:hover { background: var(--hover); --ico-hole: var(--hover); }
+.w-zones__row button[aria-current="true"] { background: var(--key-on); color: var(--card); cursor: default;
+  --ico-top: var(--card); --ico-front: var(--on-night-2); --ico-side: var(--ctl); --ico-hole: var(--key-on); --ico-flag: var(--red-night); }
 .w-mock { margin: 0; padding: 2px 9px 3px; border: 1px dashed var(--warn-dot); border-radius: var(--r-sm); background: var(--warn-bg); color: var(--ink); font: 600 12px/16px var(--f-text); white-space: nowrap; }
 /* Компактный: во всю ширину под плашкой дня, цели 44 px */
 .w-stage.is-sm .w-zones { left: 8px; right: 8px; top: 63px; align-items: stretch; gap: 6px; }
 .w-stage.is-sm .w-zones__row { height: 46px; gap: 0; padding: 0; overflow: hidden; }
-.w-stage.is-sm .w-zones__row button { padding: 0 6px; border-radius: 0; font-size: 13px; }
+.w-stage.is-sm .w-zones__row button { gap: 4px; padding: 0 6px; border-radius: 0; font-size: 13px; }
+/* Три чипа во всю ширину 390: значок мельче, чтобы «Где работали» не упиралось в край */
+.w-stage.is-sm .w-zones__row .w-ico--sm { scale: .58; margin: -6px; }
 .w-stage.is-sm .w-zones__row button:focus-visible { outline-offset: -3px; }
 .w-stage.is-sm .w-mock { align-self: flex-start; }
 

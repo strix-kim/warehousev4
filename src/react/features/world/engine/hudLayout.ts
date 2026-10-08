@@ -5,8 +5,9 @@
       подъём на ступень → посадка на крышу без ножки → компактный вид → скрыта.
       Вернуться на ступень лучше можно только с запасом +10 px — без мерцания на границе
       при повороте камеры.
-   3. Чипы имён — ниже всех: не двигаются, а гаснут, если легли бы на обвязку, вывеску
-      или уже показанный чип. В компактном режиме скрыты все, кроме чипа под указателем.
+   3. Чипы имён — ниже всех: не двигаются и не гаснут — имя видно у каждой фигурки
+      активной зоны постоянно (прораб, с58). Чип под указателем (is-near) выделен и
+      раскрывает фамилию; у края кадра сдвигается внутрь.
    4. Свободные подписи (ни w-sign, ни w-who — «плюс» пустого места) раскладка не трогает.
    Подписи приглушённых зон сняты со слоя камеры (zones/layout.ts) — их как нет.
    Скрытая вывеска не теряет объект: у каждого здания есть клавиша.
@@ -49,8 +50,6 @@ export type HudLayout = {
   dirty: () => void
   dispose: () => void
 }
-
-const hits = (a: Rect, b: Rect, m: number) => a.x < b.x + b.w + m && a.x + a.w + m > b.x && a.y < b.y + b.h + m && a.y + a.h + m > b.y
 
 export function createHudLayout(ctx: WorldCtx, store: WorldStore, reduced: boolean): HudLayout {
   const scene = ctx.container, stage = scene.parentElement
@@ -177,16 +176,10 @@ export function createHudLayout(ctx: WorldCtx, store: WorldStore, reduced: boole
         s.el.classList.toggle('is-away', !fit)
       }
     }
-    const chips = items.filter((v) => v.chip).sort((a, b) => +(b.id === ctx.near) - +(a.id === ctx.near))
-    for (const s of chips) {
+    for (const s of items.filter((v) => v.chip)) {
       const near = s.id === ctx.near
-      let show = s.ok && (near || !sm), rect: Rect | null = null
-      if (show) {
-        const [cw, ch] = s.size![0], box = rect = { x: s.x - cw / 2, y: s.y - ch, w: cw, h: ch }
-        // Чип под указателем показываем всегда; остальным нужно свободное место (вернуться — с запасом)
-        if (!near) show = box.x > 0 && box.y > 0 && box.x + cw < w && box.y + ch < h && !taken.some((b) => hits(box, b, s.level && !s.fresh ? 8 : 3))
-      }
-      if (show && rect) taken.push(rect)
+      // Виден всегда, когда фигурка в кадре активной зоны: место не ищем, соседей не гасим
+      const show = s.ok
       if (s.level !== +!show) { s.level = +!show; s.el.classList.toggle('is-away', !show) }
       s.fresh = false
       if (s.near !== near) { s.near = near; s.el.classList.toggle('is-near', near); s.el.style.translate = ''; s.dx = 0 }

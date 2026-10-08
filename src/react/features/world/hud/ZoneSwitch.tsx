@@ -1,5 +1,6 @@
 import { useLanguage } from '../../../lib/i18n'
 import { gateId, useWorldState, type WorldStore, type WorldTexts, type WorldZone } from '../worldStore'
+import { ZoneIcon } from './icons'
 
 type Props = {
   store: WorldStore
@@ -38,6 +39,7 @@ export function ZoneSwitch({ store, texts, mockZones, onGo }: Props) {
               onBlur={current ? undefined : () => leave(id)}
               onClick={current ? undefined : () => onGo(id)}
             >
+              <ZoneIcon zone={id} />
               {name}
             </button>
           )

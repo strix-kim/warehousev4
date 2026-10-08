@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom'
 import { useLanguage } from '../../../lib/i18n'
 import { useWorldState, type WorldSiteId, type WorldStore } from '../worldStore'
+import { SiteIcon } from './icons'
 import { ruPlural } from './plural'
 
 type Tr = (ru: string, uz: string) => string
@@ -54,6 +55,7 @@ export function Sign({ store, id, name, count, onActivate }: Props) {
         {number !== null && (
           <span className="w-cell"><b className="w-cell__num">{number}</b><span className="w-cell__unit">{unit}</span></span>
         )}
+        <SiteIcon id={id} sm />
         <span className="w-sign__name">{name}</span>
       </button>
     </>,
