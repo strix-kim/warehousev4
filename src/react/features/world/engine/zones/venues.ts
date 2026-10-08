@@ -1,20 +1,22 @@
 // «Площадки» — зона карты справа от кампуса: сетка участков 3 × 2, ближний ряд слева
 // направо, потом дальний. Участок = мероприятие: здание места + грузовик у проезда (у
 // мероприятия есть списки) + стол с макетом залов справа перед зданием (есть план
-// залов). Грузовика или стола нет — пустое место с «плюсом». Всегда стоят кафе слева
+// залов) + бригада перед входом (в составе есть люди). Грузовика, стола или бригады
+// нет — пустое место с «плюсом». Всегда стоят кафе слева
 // спереди (обеды) и отель расселения слева от здания места: расселения в базе нет,
 // отель заперт — окна тёмные, вход за шлагбаумом. У кафе и отеля — якоря табличек
-// (w-tag), текст в них кладёт оболочка. После последнего участка — одна пустая ячейка
+// (w-tag), как и у бригады; текст в них кладёт оболочка. После последнего участка — одна пустая ячейка
 // «Новое мероприятие».
 // Колец на участках нет: наведение и выбор показывает ограда надела (selection.ts).
 // Числа — из макета voxel-world-s51.html, раздел «Площадки (с50): квадрат мира».
 import * as THREE from 'three'
 import { LOT_MAX } from '../../data/splitProjects'
 import type { WorldCar, WorldLot } from '../../data/types'
-import { ADD_LOT_ID, lotPartId } from '../../worldStore'
+import { ADD_LOT_ID, CREW_MAX, lotPartId } from '../../worldStore'
 import { makeCar } from '../cars'
 import type { WorldCtx } from '../createWorld'
 import { CAMPUS_HALF, ground } from '../ground'
+import { makeExtra } from '../people'
 import { hitPlane, pickable } from '../pointer'
 import { kit, label } from '../primitives'
 import { makeFence, makePlus, type FencePlot } from '../selection'
@@ -35,8 +37,19 @@ const LOT_CAFE: XZ = [-4.9, 5.4], LOT_STAY: XZ = [-5.9, -3.6]
 // проезд ряда. Калитка в переднем бордюре стоит против съезда грузовика к проезду.
 const PLOT: FencePlot = { hw: 8, z0: -11.4, z1: 9.8, curb: 0.4, gate: [3, 6] }
 const PLOT_D = PLOT.z1 - PLOT.z0, PLOT_ZC = (PLOT.z0 + PLOT.z1) / 2
-// Пустые места под грузовик и стол плана: центр и размер основания
-const SLOTS = { addtruck: [LOT_TRUCK, 5.4, 2.6], addplan: [LOT_PLAN, 3.2, 2.6] } as const
+// Бригада — перед входом здания, в свободном пятне между порталом (самый выдвинутый, у
+// арены, кончается на z = −0,6), площадкой разгрузки (от z = 4,5), кафе (до x = −3,2) и
+// столом плана (от x = 4,3). От кафе отодвинута вправо: табличка над головами не садится
+// на его табличку. Здание сзади, стол ниже голов — с рабочего ракурса её ничто не закрывает.
+const LOT_CREW: XZ = [1.2, 1.2]
+// Пятно бригады: в нём стоят все места, оно же — цель указателя и контур «плюса»
+const CREW_W = 3.4, CREW_D = 2.2
+// Места фигурок в осях бригады, [x, z, поворот]: два ряда вразбежку, лицом к зрителю.
+// Заполняются по порядку, от середины: новый человек встаёт на следующее место и прежних
+// не двигает (появление по одному — appear.ts). Мест не меньше CREW_MAX.
+const CREW_SPOTS = [[-0.2, 0.55, 0.75], [-0.95, -0.55, 0.45], [0.85, 0.5, 0.95], [0.2, -0.6, 0.6], [-1.3, 0.6, 0.35], [1.3, -0.5, 1.05]] as const
+// Пустые места под грузовик, стол плана и бригаду: центр и размер основания
+const SLOTS = { addtruck: [LOT_TRUCK, 5.4, 2.6], addplan: [LOT_PLAN, 3.2, 2.6], addcrew: [LOT_CREW, CREW_W, CREW_D] } as const
 
 // Грузовик на разгрузке — силуэт бортового Bongo с кейсами. Это знак «у мероприятия
 // есть списки», а не машина из парка: связи машин с мероприятиями в схеме нет.
@@ -107,6 +120,16 @@ function buildPlan(ctx: WorldCtx) {
   k(white, 1.7, 0.25, 0.6, 0.35, 1.1, 0.6)
   k(signMark, 0.36, 0.36, 0.36, -1.05, 1.1, 0.65)
   k.into(g)
+  return g
+}
+
+// Бригада — серые фигурки без имён, по одной на человека в составе, не больше CREW_MAX:
+// сколько людей на самом деле, говорит табличка. userData.crew — фигурки по порядку мест.
+function buildCrew(ctx: WorldCtx, id: string, staff: number) {
+  const g = new THREE.Group(), spots = CREW_SPOTS.slice(0, Math.min(staff, CREW_MAX))
+  g.userData.crew = spots.map(([x, z, rot]) => makeExtra(ctx, g, x, z, rot))
+  // Якорь таблички — над головами, посередине стоящих
+  label(ctx, g, id, 'w-tag', spots.reduce((sum, [x]) => sum + x, 0) / spots.length, 2.4, 0)
   return g
 }
 
@@ -186,9 +209,16 @@ export function buildVenues(ctx: WorldCtx, venues: WorldLot[]) {
     label(ctx, cafe, lotPartId('cafe', lot.id), 'w-tag', 0, 2.8, -0.9)
     block(ctx, g, lotPartId('stay', lot.id), stay, X + LOT_STAY[0], Z + LOT_STAY[1])
     label(ctx, stay, lotPartId('stay', lot.id), 'w-tag', ...STAY_TAG)
-    // Грузовика или стола у мероприятия нет — пустое место с «плюсом»
-    for (const part of ['addtruck', 'addplan'] as const) {
-      if (part === 'addtruck' ? lot.lists > 0 : lot.hasPlan) continue
+    if (lot.staff > 0) {
+      const crewId = lotPartId('crew', lot.id), crew = buildCrew(ctx, crewId, lot.staff)
+      block(ctx, g, crewId, crew, X + LOT_CREW[0], Z + LOT_CREW[1])
+      // Пятно целиком — цель: мимо фигурки указатель не проваливается на участок
+      hitPlane(ctx, crew, CREW_W, CREW_D, 0, 0, crewId, 0.08)
+    }
+    // Грузовика, стола или бригады у мероприятия нет — пустое место с «плюсом»
+    const filled = { addtruck: lot.lists > 0, addplan: lot.hasPlan, addcrew: lot.staff > 0 }
+    for (const part of ['addtruck', 'addplan', 'addcrew'] as const) {
+      if (filled[part]) continue
       const [[x, z], w, d] = SLOTS[part]
       makePlus(ctx, g, lotPartId(part, lot.id), X + x, Z + z, w, d)
     }

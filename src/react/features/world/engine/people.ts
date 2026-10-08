@@ -30,6 +30,10 @@ export function makePerson(ctx: WorldCtx, parent: THREE.Object3D, x: number, z: 
   return g
 }
 
+// Человек бригады на участке «Площадок»: одежда серая, имени и чипа у него нет
+export const makeExtra = (ctx: WorldCtx, parent: THREE.Object3D, x: number, z: number, rot: number) =>
+  makePerson(ctx, parent, x, z, rot, ctx.style.P.steel)
+
 // Поза шага в момент t: фигурка подпрыгивает и покачивается; t = 0 — стоит ровно
 export function pose(person: THREE.Object3D, t: number) {
   const a = Math.sin(t * 9), inner = person.userData.inner as THREE.Group

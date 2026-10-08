@@ -2,7 +2,10 @@
 // целиком, поэтому «новое» узнаём сравнением: id корней (ctx.roots) против множества уже
 // виденных (worldMemory.ts — уровень модуля, переживает пересоздание мира: вернулся из
 // редактора списка — грузовик подъезжает). Новое здание, стол, кафе поднимается из земли,
-// грузовик въезжает на разгрузку вдоль своей оси.
+// грузовик въезжает на разгрузку вдоль своей оси, бригада выходит от здания по одному.
+// У бригады id один на блок, а людей в ней прибывает: новичка узнаём по номеру места —
+// ключ `<id>#<место>` живёт только в множестве виденных, в корни, подписи и цели указателя
+// не попадает. Состав вырос с двух до трёх — выходит один третий.
 // Без движения — только пометка: первый мир сессии (множество пусто); зона, из которой
 // ещё ничего не видели (реестр ответил после первого кадра — вся зона «новая», и расти ей
 // разом незачем); неподвижный мир; плоское (пустые места, кварталы) и кнопки зон.
@@ -15,11 +18,15 @@ import { hasSeen, markSeen, seenIds } from '../worldMemory'
 import { isAddId, parseLotId, type WorldZone } from '../worldStore'
 import type { WorldCtx } from './createWorld'
 import { clamp01, easeOut } from './ease'
+import { pose } from './people'
 import { zoneOf } from './zoneTravel'
 
 const RISE_MS = 520
 // Въезд короткий: дальше 3,6 м позади грузовика стоят столики кафе своего участка
 const DRIVE_MS = 700, DRIVE_M = 3.6
+// Выход бригады: шаг от здания (−z осей блока) к своему месту, следующий — с задержкой.
+// WALK_SWING — фаза покачивания на старте: к месту фигурка приходит ровно в стойку.
+const WALK_MS = 560, WALK_M = 1.4, WALK_GAP_MS = 80, WALK_SWING = 0.7
 // Подъём с лёгким перелётом (≈ 5 % выше роста) и возвратом
 const BACK = 1.2
 const overshoot = (k: number) => 1 + (BACK + 1) * (k - 1) ** 3 + BACK * (k - 1) ** 2
@@ -34,12 +41,35 @@ export function appear(ctx: WorldCtx) {
   const known = new Set<WorldZone | null>()
   for (const [id, root] of ctx.roots) if (hasSeen(id)) known.add(zoneOf(root))
 
-  const steps: Array<{ dur: number; step: (k: number) => void }> = []
+  const steps: Array<{ dur: number; wait?: number; step: (k: number) => void }> = []
   for (const [id, root] of ctx.roots) {
+    const zone = zoneOf(root)
+    const still = first || ctx.reduced || !zone || !known.has(zone) || !grows(ctx, id)
+    const crew = root.userData.crew as THREE.Object3D[] | undefined
+    if (crew) {
+      // Блок целиком не растёт: движется каждая новая фигурка, табличка стоит на месте
+      let queue = 0
+      crew.forEach((person, i) => {
+        const key = `${id}#${i}`
+        if (hasSeen(key)) return
+        markSeen(key)
+        if (still) return
+        // Ноль в масштаб не ставим — фигурка тоже цель указателя (см. ниже)
+        const home = person.position.z
+        const step = (k: number) => {
+          const left = 1 - easeOut(k)
+          person.position.z = home - WALK_M * left
+          person.scale.setScalar(Math.max(0.001, Math.min(1, k * 4)))
+          pose(person, left * WALK_SWING)
+        }
+        steps.push({ dur: WALK_MS, wait: queue++ * WALK_GAP_MS, step })
+      })
+      markSeen(id)
+      continue
+    }
     if (hasSeen(id)) continue
     markSeen(id)
-    const zone = zoneOf(root)
-    if (first || ctx.reduced || !zone || !known.has(zone) || !grows(ctx, id)) continue
+    if (still) continue
     if (parseLotId(id)?.part === 'truck') {
       // Перёд машины — +z её осей (cars.ts): старт позади, на своей оси
       const home = root.position.clone(), nose = new THREE.Vector3(0, 0, 1).applyQuaternion(root.quaternion)
@@ -65,7 +95,7 @@ export function appear(ctx: WorldCtx) {
     if (frame === 2) t0 = now
     let live = false
     for (const a of steps) {
-      const k = clamp01((now - t0) / a.dur)
+      const k = clamp01((now - t0 - (a.wait ?? 0)) / a.dur)
       a.step(k)
       live ||= k < 1
     }

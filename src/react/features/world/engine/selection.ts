@@ -92,7 +92,7 @@ export function createSelection(ctx: WorldCtx, store: WorldStore, reduced: boole
       fence.hovOn = on(hover)
       selectFence(ctx, fence, on(pick), performance.now())
       // «Плюсы» выбранного участка — с подписью, что добавляется
-      for (const part of ['addtruck', 'addplan'] as const) ctx.labels.get(lotPartId(part, lot.venueId))?.element.classList.toggle('w-plus--cap', on(pick))
+      for (const part of ['addtruck', 'addplan', 'addcrew'] as const) ctx.labels.get(lotPartId(part, lot.venueId))?.element.classList.toggle('w-plus--cap', on(pick))
     }
   }
 
