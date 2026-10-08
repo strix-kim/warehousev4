@@ -4,16 +4,8 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './AuthProvider'
 import { ArgoDots } from '../../components/ArgoDots'
 import { LanguageSwitcher, useLanguage } from '../../lib/i18n'
+import { readReturnPath } from '../../lib/returnTo'
 import { isSupabaseConfigured } from '../../lib/supabase'
-
-// Путь, за которым пришёл неавторизованный пользователь: его кладёт в state
-// гейт сессии (LoginRedirect в App.tsx). State истории правится из консоли, так
-// что здесь он перепроверяется заново — уводить после входа можно только внутрь
-// приложения, и `//host` внутренним не считается.
-function readReturnPath(value: unknown) {
-  if (typeof value !== 'string') return null
-  return value.startsWith('/') && !value.startsWith('//') ? value : null
-}
 
 export function LoginPage() {
   const { session, signIn, signOutReason } = useAuth()

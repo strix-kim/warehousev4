@@ -14,6 +14,7 @@ import { compressPhoto } from '../../lib/compressPhoto'
 import { parseDateValue } from '../../lib/date'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import { useReturnTo } from '../../lib/returnTo'
 import { useUnsavedGuard } from '../../lib/useUnsavedGuard'
 
 const emptyDraft: EmployeeInput = {
@@ -192,6 +193,9 @@ export function EmployeeFormPage() {
 
   const canSave = Boolean(draft.last_name.trim() && draft.first_name.trim())
   const backTarget = employeeId ? `/employees?employee=${employeeId}` : '/employees'
+  // Стрелка шапки: из мира — обратно в мир, иначе на backTarget (lib/returnTo).
+  // Уход после сохранения по-прежнему ведёт на backTarget.
+  const back = useReturnTo(backTarget, isEditing ? tr('Назад к карточке', 'Kartaga qaytish') : tr('Назад к сотрудникам', 'Xodimlarga qaytish'))
   const saveLabel = isSaving
     ? tr('Сохраняем…', 'Saqlanmoqda…')
     : isEditing ? tr('Сохранить изменения', 'O‘zgarishlarni saqlash') : tr('Сохранить', 'Saqlash')
@@ -391,7 +395,7 @@ export function EmployeeFormPage() {
   return (
     <form onSubmit={handleSubmit}>
       <header className="editor-header">
-        <button type="button" className="icon-button icon-button--bordered" onClick={() => navigate(backTarget)} aria-label={isEditing ? tr('Назад к карточке', 'Kartaga qaytish') : tr('Назад к сотрудникам', 'Xodimlarga qaytish')}>
+        <button type="button" className="icon-button icon-button--bordered" onClick={back.goBack} aria-label={back.label}>
           <ArrowLeft size={18} />
         </button>
         <div>

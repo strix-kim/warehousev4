@@ -21,6 +21,7 @@ import {
 import { translateEquipmentTaxonomy } from '../../lib/equipmentTaxonomy'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import { useReturnTo } from '../../lib/returnTo'
 import { useUnsavedGuard } from '../../lib/useUnsavedGuard'
 
 // 'batch' — та же серийная запись, но много сразу: U34-L. Отдельный режим, а не
@@ -105,6 +106,8 @@ export function EquipmentCreatePage() {
   const routeLocation = useLocation()
   const catalogSearch = (routeLocation.state as { catalogSearch?: string } | null)?.catalogSearch ?? ''
   const { tr, language } = useLanguage()
+  // Стрелка шапки: из мира — обратно в мир, иначе в выборку каталога (lib/returnTo).
+  const back = useReturnTo({ pathname: '/equipment', search: catalogSearch }, tr('Назад к каталогу', 'Katalogga qaytish'))
   const [kind, setKind] = useState<RecordKind>('serialized')
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
@@ -369,7 +372,7 @@ export function EquipmentCreatePage() {
             фильтры и страницу. Кнопка «Открыть каталог» на экране успеха ведёт
             на ЧИСТЫЙ каталог намеренно — под старым фильтром только что заведённая
             позиция могла бы не показаться, и человек решил бы, что не сохранилось. */}
-        <button type="button" className="icon-button icon-button--bordered" onClick={() => navigate({ pathname: '/equipment', search: catalogSearch })} aria-label={tr('Назад к каталогу', 'Katalogga qaytish')}>
+        <button type="button" className="icon-button icon-button--bordered" onClick={back.goBack} aria-label={back.label}>
           <ArrowLeft size={18} />
         </button>
         <div>

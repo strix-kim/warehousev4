@@ -1,7 +1,7 @@
 import { ArrowLeft, CalendarRange, CircleAlert, ClipboardList, Plus } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { deleteOrder, ensureMeal, fetchMealDay, fetchProjectDishes, fetchProjectMealDays, mealErrorText, saveGuestOrder, saveStaffOrder, setMealStatus, updateOrder, type MealDay, type MealDayMark, type MealDishHint } from './api'
 import { MealExpenseDrawer } from './MealExpenseDrawer'
 import { MealOrderSheet } from './MealOrderSheet'
@@ -20,6 +20,7 @@ import { formatProjectPeriod, type ProjectWithVenue } from '../projects/types'
 import { formatDayMonth, parseDateValue, todayDateValue } from '../../lib/date'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import { useReturnTo } from '../../lib/returnTo'
 import './meals.css'
 
 const ROUTE = '/projects/:projectId/meals'
@@ -127,6 +128,11 @@ export function MealsPage() {
   const currency = tr('сум', 'so‘m')
   const { projectId } = useParams<{ projectId: string }>()
   const [params, setParams] = useSearchParams()
+  // Стрелка шапки: из мира — обратно в мир, иначе к мероприятию (lib/returnTo).
+  // Хук стоит до ранних выходов, поэтому адрес собран из параметра маршрута —
+  // это тот же id, что у загруженного мероприятия.
+  const location = useLocation()
+  const back = useReturnTo(`/projects/${projectId ?? ''}`, tr('Назад к мероприятию', 'Tadbirga qaytish'))
   const [project, setProject] = useState<ProjectWithVenue | null>(null)
   const [staff, setStaff] = useState<ProjectStaffMember[]>([])
   const [mealDays, setMealDays] = useState<MealDayMark[]>([])
@@ -262,13 +268,15 @@ export function MealsPage() {
   const current = project
 
   // Смена дня или слота — replace: история не копит каждый тап по ленте.
+  // state едет с заменой записи: в нём возврат в мир (lib/returnTo), а
+  // setParams без state его стёр бы.
   function selectView(nextDay: string, nextSlot: MealSlot) {
     setParams((prev) => {
       const next = new URLSearchParams(prev)
       next.set('day', nextDay)
       next.set('slot', nextSlot)
       return next
-    }, { replace: true })
+    }, { replace: true, state: location.state })
   }
 
   // Итог плашки — простым проходом по строкам (план 1.6: UX, не деньги).
@@ -484,7 +492,7 @@ export function MealsPage() {
   return (
     <>
       <header className="editor-header meals-header">
-        <button type="button" className="icon-button icon-button--bordered" onClick={() => navigate(`/projects/${current.id}`)} aria-label={tr('Назад к мероприятию', 'Tadbirga qaytish')}>
+        <button type="button" className="icon-button icon-button--bordered" onClick={back.goBack} aria-label={back.label}>
           <ArrowLeft size={18} />
         </button>
         <div>

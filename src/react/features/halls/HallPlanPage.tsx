@@ -14,6 +14,7 @@ import { formatPlanPeriod } from './types'
 import { employeeDisplayName } from '../employees/types'
 import { formatTime } from '../../lib/date'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
+import { useReturnTo } from '../../lib/returnTo'
 import './halls.css'
 
 // Редактор плана: матрица «позиции × залы» (с20, по образцу прораба). Кнопки
@@ -25,6 +26,8 @@ export function HallPlanPage() {
   const { planId } = useParams<{ planId: string }>()
   const editor = useHallPlanEditor(planId)
   const [isMetaOpen, setMetaOpen] = useState(false)
+  // Стрелка шапки: из мира — обратно в мир, иначе к реестру планов (lib/returnTo).
+  const back = useReturnTo('/halls', tr('Назад к планам', 'Rejalarga qaytish'))
 
   // Имя плана в заголовке вкладки. Это не украшение: из document.title браузер
   // берёт колонтитул печатного листа и подставляет его в имя файла при
@@ -93,7 +96,7 @@ export function HallPlanPage() {
           возврат кнопкой-стрелкой — тот же приём, что у форм машины и сотрудника.
           Период стоит в надстрочнике: h1 здесь однострочный с многоточием. */}
       <header className="editor-header editor-header--hall">
-        <button type="button" className="icon-button icon-button--bordered" onClick={() => navigate('/halls')} aria-label={tr('Назад к планам', 'Rejalarga qaytish')}>
+        <button type="button" className="icon-button icon-button--bordered" onClick={back.goBack} aria-label={back.label}>
           <ArrowLeft size={18} />
         </button>
         <div>

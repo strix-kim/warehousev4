@@ -1,10 +1,11 @@
 import { Save } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ErrorState } from '../../components/ErrorState'
 import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import { useReturnTo } from '../../lib/returnTo'
 import { fetchProject } from '../projects/api'
 import {
   clearListDraft,
@@ -61,6 +62,9 @@ export function ListEditorPage() {
   const [searchParams] = useSearchParams()
   const linkedProjectId = listId ? null : searchParams.get('project')
   const { tr, language, locale } = useLanguage()
+  // Стрелка шапки: из мира — обратно в мир, иначе к реестру (lib/returnTo).
+  const location = useLocation()
+  const back = useReturnTo('/lists', tr('Назад к спискам', 'Ro‘yxatlarga qaytish'))
   // Реквизиты стартуют пустыми: подставленный текст пользователь принимал за свой
   // и увозил в документ и в базу.
   //
@@ -401,8 +405,10 @@ export function ListEditorPage() {
       clearListDraft(listId)
       setDraftNotice(null)
       // После создания источник правды — listId из URL: следующее «Сохранить» обновит эту же запись, а не заведёт вторую.
+      // state едет с заменой записи: в нём возврат в мир (lib/returnTo), а
+      // navigate без state его стёр бы.
       if (isCreating) {
-        navigate(`/lists/${saved.id}/edit`, { replace: true })
+        navigate(`/lists/${saved.id}/edit`, { replace: true, state: location.state })
       }
     } catch (saveError: unknown) {
       reportAppError(saveError, { scope: 'loader', route: listId ? '/lists/:id/edit' : '/lists/new', detail: { source: 'save-list' } })
@@ -523,7 +529,8 @@ export function ListEditorPage() {
         statusDot={statusDot}
         statusBody={statusBody}
         actions={<>{saveButton}<span className="editor-save-note">{tr('необязательно', 'ixtiyoriy')}</span></>}
-        onBack={() => navigate('/lists')}
+        backLabel={back.label}
+        onBack={back.goBack}
       />
 
       {openError && <ErrorState inline className="editor-open-error" title={tr('Список не открыт', 'Ro‘yxat ochilmadi')} text={tr('Не удалось открыть сохранённый список. Проверьте интернет и откройте его из реестра ещё раз — сам список не изменился.', 'Saqlangan ro‘yxatni ochib bo‘lmadi. Internetni tekshiring va uni reestrdan qayta oching — ro‘yxatning o‘zi o‘zgarmadi.')} action={<button className="button button--secondary" onClick={() => navigate('/lists')}>{tr('Вернуться к спискам', 'Ro‘yxatlarga qaytish')}</button>} />}

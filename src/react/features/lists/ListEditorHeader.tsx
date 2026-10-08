@@ -9,19 +9,21 @@ export type EditorStatusDot = 'warning' | 'success' | 'neutral' | null
 
 // Липкая шапка редактора. Строка состояния считается на странице: тот же узел
 // стоит и в подвале выборки на телефоне.
-export function ListEditorHeader({ title, statusTone, statusDot, statusBody, actions, onBack }: {
+export function ListEditorHeader({ title, statusTone, statusDot, statusBody, actions, backLabel, onBack }: {
   title: string
   statusTone: string
   statusDot: EditorStatusDot
   statusBody: ReactNode
   actions: ReactNode
+  // Подпись стрелки считает страница: из мира она «Назад в мир» (lib/returnTo).
+  backLabel: string
   onBack: () => void
 }) {
   const { tr } = useLanguage()
 
   return (
     <header className="editor-header editor-header--quick">
-      <button className="icon-button icon-button--bordered" onClick={onBack} aria-label={tr('Назад к спискам', 'Ro‘yxatlarga qaytish')}>
+      <button className="icon-button icon-button--bordered" onClick={onBack} aria-label={backLabel}>
         <ArrowLeft size={18} />
       </button>
       <div>

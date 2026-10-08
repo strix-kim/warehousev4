@@ -11,6 +11,7 @@ import { ErrorState, RetryButton } from '../../components/ErrorState'
 import { formatDateTime } from '../../lib/date'
 import { useDocumentTitle, useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
+import { useReturnTo } from '../../lib/returnTo'
 import { useArmedAction } from '../../lib/useArmedAction'
 import './projects.css'
 
@@ -35,6 +36,8 @@ export function ProjectPage() {
   // ошибки) и живёт до следующей попытки.
   const [deleteErrorText, setDeleteErrorText] = useState('')
   const armed = useArmedAction()
+  // Стрелка шапки: из мира — обратно в мир, иначе к реестру (lib/returnTo).
+  const back = useReturnTo('/projects', tr('Назад к мероприятиям', 'Tadbirlarga qaytish'))
 
   useDocumentTitle(project ? tr(`${project.name} — мероприятие`, `${project.name} — tadbir`) : '')
 
@@ -107,7 +110,7 @@ export function ProjectPage() {
   return (
     <>
       <header className="editor-header editor-header--project">
-        <button type="button" className="icon-button icon-button--bordered" onClick={() => navigate('/projects')} aria-label={tr('Назад к мероприятиям', 'Tadbirlarga qaytish')}>
+        <button type="button" className="icon-button icon-button--bordered" onClick={back.goBack} aria-label={back.label}>
           <ArrowLeft size={18} />
         </button>
         <div>
