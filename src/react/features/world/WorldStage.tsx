@@ -33,7 +33,7 @@ import { loadWorld } from './loadWorld'
 import type { WorldLook } from './settings'
 import { hasWebGL2, prefersReducedMotion } from './support'
 import { savePose, takePose } from './worldMemory'
-import { ADD_LOT_ID, createWorldStore, isAddId, isWorldZone, lotPartId, parseLotId, useWorldState, WORLD_SITES, type CameraPose, type WorldSiteId, type WorldTexts, type WorldZone } from './worldStore'
+import { ADD_LOT_ID, CREW_MAX, createWorldStore, isAddId, isWorldZone, lotPartId, parseLotId, useWorldState, WORLD_SITES, type CameraPose, type WorldSiteId, type WorldTexts, type WorldZone } from './worldStore'
 
 // unsupported — WebGL2 нет; failed — чанк не приехал или мир не собрался;
 // lost — браузер отобрал контекст у живого мира
@@ -384,6 +384,8 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
         <Sign key={id} store={store} id={id} name={names[id]} count={data?.sites[id] ?? null} onActivate={activate} />
       ))}
       {data?.people.map((person) => <NameChip key={person.id} store={store} person={person} />)}
+      {/* День мероприятия: состав стоит на своём участке поимённо. Якоря есть только у тех, кто встал в сцену */}
+      {data?.venues?.flatMap((lot) => (lot.crew ?? []).slice(0, CREW_MAX).map((person) => <NameChip key={`${lot.id}:${person.id}`} store={store} person={person} short />))}
       {[...labels.keys()].filter(isAddId).map((id) => <Plus key={id} store={store} id={id} busy={building && id === ADD_LOT_ID} onActivate={activate} />)}
       {/* HUD зоны живёт, пока камера стоит на ней; якоря чужих зон движок прячет сам.
           Макетных мероприятий (?mock=on) в базе нет — действий у панели участка тоже нет */}

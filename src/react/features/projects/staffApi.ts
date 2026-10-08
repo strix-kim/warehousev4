@@ -50,6 +50,37 @@ export async function fetchProjectStaff(projectId: string): Promise<ProjectStaff
   }
 }
 
+// Состав нескольких мероприятий одним запросом — для мира (world/data/placePeople.ts):
+// фигурке нужны имя и отдел, поэтому ни телефона, ни документов здесь нет. Ключ есть у
+// КАЖДОГО запрошенного мероприятия: пустой массив — «в составе никого», а не «не
+// спрашивали». `.in()` здесь по id мероприятий, а не людей: их единицы, длина адреса
+// не страдает. Порядок людей задаёт потребитель.
+export type StaffPerson = { id: string; firstName: string; lastName: string; department: string }
+export type StaffByProject = Map<string, Array<{ projectId: string; employee: StaffPerson }>>
+
+export async function fetchStaffOfProjects(projectIds: readonly string[]): Promise<StaffByProject> {
+  const staff: StaffByProject = new Map(projectIds.map((id) => [id, []]))
+  if (staff.size === 0) return staff
+  if (!supabase) throw new Error('Supabase не настроен')
+  const ids = [...staff.keys()]
+  for (let from = 0; ; from += BATCH_SIZE) {
+    const { data, error } = await supabase
+      .from('project_staff')
+      .select('id, project_id, employee:employees(id, first_name, last_name, department)')
+      .in('project_id', ids)
+      .order('created_at')
+      .order('id')
+      .range(from, from + BATCH_SIZE - 1)
+    if (error) throw error
+    const batch = data ?? []
+    for (const row of batch) {
+      const { employee } = row
+      staff.get(row.project_id)?.push({ projectId: row.project_id, employee: { id: employee.id, firstName: employee.first_name, lastName: employee.last_name, department: employee.department } })
+    }
+    if (batch.length < BATCH_SIZE) return staff
+  }
+}
+
 // ПОЛНЫЕ строки людей состава — для сборки документа, в момент нажатия и мимо
 // кэша (тот же довод, что у fetchEmployeesByIds). Тем же embed-ом и теми же
 // батчами; порядок строк в документе задаёт сам генератор.

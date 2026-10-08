@@ -2,7 +2,9 @@
 // главную и реестры. Своих ключей persistentCache не заводит и ничего не пишет —
 // владельцы значений остаются в своих фичах (home, lists, vehicles, employees,
 // projects). Участки и архив — из реестра мероприятий (projects:list): его сбрасывают
-// записи мероприятий, списков, состава и планов залов.
+// записи мероприятий, списков, состава и планов залов. Состав поимённо (project_staff)
+// читается из базы на каждый ответ реестра и только для участков, где мероприятие идёт
+// сегодня или начинается завтра; в кэш он не ложится (правило projects/staffApi.ts).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { todayDateValue } from '../../../lib/date'
 import { reportAppError } from '../../../lib/reportAppError'
@@ -10,8 +12,10 @@ import { fetchEmployeeList, readCachedEmployeeList } from '../../employees/api'
 import { fetchHomeSummary, readCachedHomeSummary } from '../../home/api'
 import { fetchEquipmentLists, preferredListsPageSize, readCachedEquipmentLists } from '../../lists/api'
 import { fetchProjects, readCachedProjects } from '../../projects/api'
+import { fetchStaffOfProjects, type StaffByProject } from '../../projects/staffApi'
 import { fetchVehicles, readCachedVehicles } from '../../vehicles/api'
 import type { VehicleWithDrivers } from '../../vehicles/types'
+import { crewLotIds, placePeople, sameCrews } from './placePeople'
 import { splitProjects } from './splitProjects'
 import type { WorldArchivePlace, WorldData, WorldLot } from './types'
 
@@ -42,6 +46,11 @@ export function useWorldData(): { data: WorldData | null; reload: () => Promise<
   const [summary, setSummary] = useState(cachedSummary)
   const [lists, setLists] = useState(cachedLists)
   const [projects, setProjects] = useState(cachedProjects)
+  // Сколько раз реестр мероприятий ответил с сервера (вход и reload): на каждый ответ
+  // состав читается заново. Ноль — на экране кэш, состав ещё не спрашивали
+  const [registryAnswers, setRegistryAnswers] = useState(0)
+  // null — состав не ответил (или спрашивать некого): фигурки на участках серые
+  const [staff, setStaff] = useState<StaffByProject | null>(null)
   // Машины и люди — наполнение сцены, и приходят одним обновлением (см. ниже)
   const [crowd, setCrowd] = useState({ vehicles: cachedVehicles, employees: cachedEmployees })
   // Площадки и архив — из реестра мероприятий. Макет худшего случая (fixtures.dev.ts)
@@ -73,7 +82,11 @@ export function useWorldData(): { data: WorldData | null; reload: () => Promise<
     void fetchEquipmentLists({ ...listsQuery, bypassCache: Boolean(cachedLists) })
       .then((value) => { if (isCurrent) setLists(value) }, failed('lists', Boolean(cachedLists)))
     void fetchProjects({ bypassCache: Boolean(cachedProjects) })
-      .then((value) => { if (isCurrent) setProjects(value) }, failed('projects', Boolean(cachedProjects)))
+      .then((value) => {
+        if (!isCurrent) return
+        setProjects(value)
+        setRegistryAnswers((count) => count + 1)
+      }, failed('projects', Boolean(cachedProjects)))
     // Каждый новый состав машин или людей — пересборка сцены. Ждём оба ответа, чтобы
     // мир с холодным кэшем пересобрался один раз, а не дважды подряд.
     void Promise.all([
@@ -101,28 +114,65 @@ export function useWorldData(): { data: WorldData | null; reload: () => Promise<
   // живой записи кэша отказ сети сюда не доходит вовсе — cachedQuery отдаёт прежнее
   // значение (gotchas §4), и мир так же остаётся прежним.
   const reload = useCallback(() => fetchProjects({ bypassCache: true }).then(
-    (value) => { if (isMounted.current) setProjects(value) },
+    (value) => {
+      if (!isMounted.current) return
+      setProjects(value)
+      setRegistryAnswers((count) => count + 1)
+    },
     (error: unknown) => { reportAppError(error, { scope: 'loader', route: window.location.pathname, detail: { source: 'world-projects-reload' } }) },
   ), [])
+
+  // Состав — после ответа реестра и заново после reload(): запись состава из мира должна
+  // дойти до фигурок. Нет идущих сегодня и завтрашних — запроса нет. Ответ устаревшего
+  // запроса отбрасывается (gotchas §6); отказ оставляет прежний состав и след в журнале.
+  const crewIds = useMemo(() => (split ? crewLotIds(split.lots, today) : []), [split, today])
+  useEffect(() => {
+    if (registryAnswers === 0 || crewIds.length === 0) return
+    let isCurrent = true
+    void fetchStaffOfProjects(crewIds).then(
+      (value) => { if (isCurrent) setStaff(value) },
+      (error: unknown) => { reportAppError(error, { scope: 'loader', route: window.location.pathname, detail: { source: 'world-staff', servedFromCache: false } }) },
+    )
+    return () => { isCurrent = false }
+  }, [crewIds, registryAnswers])
+
+  // Только штат: наёмные в «Сотрудники» не входят (решение прораба с53, п. 11)
+  const { employees } = crowd
+  const campus = useMemo(
+    () => (employees ?? []).filter((row) => row.department === 'staff').map((row) => ({ id: row.id, firstName: row.first_name, lastName: row.last_name, packing: false })),
+    [employees],
+  )
+  // Расстановка людей (placePeople.ts). Участки с составом — новый массив на каждый
+  // расчёт, а движок сверяет venues ссылкой: пока реестр тот же и расклад по участкам
+  // не изменился, отдаём прежний массив — иначе сцену пересобирал бы каждый ответ
+  // сотрудников и каждое перечитывание состава. Фикстуры макета идут как есть.
+  const lastLots = useRef<{ source: WorldLot[]; lots: WorldLot[] } | null>(null)
+  const placed = useMemo(() => {
+    if (!split || mock) return { people: campus, lots: split?.lots ?? null }
+    const next = placePeople(campus, split.lots, staff, today)
+    const last = lastLots.current
+    if (last && last.source === split.lots && sameCrews(last.lots, next.lots)) return { people: next.people, lots: last.lots }
+    lastLots.current = { source: split.lots, lots: next.lots }
+    return next
+  }, [campus, mock, split, staff, today])
 
   const data = useMemo(() => {
     const { vehicles, employees } = crowd
     if (!summary && !lists && !vehicles && !employees && !split && !mock) return null
     return {
       // Реестр не ответил и в кэше пусто — зон нет, один кампус: выдумывать нечего
-      venues: mock?.venues ?? split?.lots ?? null,
+      venues: mock?.venues ?? placed.lots,
       archive: mock?.archive ?? split?.archive ?? null,
       mock: mock !== null,
       cars: (vehicles ?? []).map((row) => ({ id: row.id, brand: row.brand, model: row.model, color: row.color, plate: row.plate_number, drivers: row.drivers.length })),
-      // Только штат: наёмные в «Сотрудники» не входят (решение прораба с53, п. 11)
-      people: (employees ?? []).filter((row) => row.department === 'staff').map((row) => ({ id: row.id, firstName: row.first_name, lastName: row.last_name, packing: false })),
+      people: placed.people,
       sites: {
         office: lists?.total ?? null,
         warehouse: summary?.equipment.units ?? null,
         garage: summary?.vehicles.count ?? null,
       },
     }
-  }, [crowd, lists, mock, split, summary])
+  }, [crowd, lists, mock, placed, split, summary])
 
   const expiries = summary?.employees.expiries ?? null
   const { vehicles } = crowd

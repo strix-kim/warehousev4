@@ -85,6 +85,11 @@
 .w-who.is-near { border-color: var(--who-ink); }
 .w-who.is-near i { display: inline; }
 .w-who.is-away { opacity: 0; transition: opacity .15s var(--ease-in); }
+/* Чип на участке «Площадок» (день мероприятия). В компактной сцене пятно бригады
+   (≈ 2,6 м) на экране уже одного чипа, шесть имён легли бы стопкой — имена скрыты,
+   остаётся табличка «Состав: N». visibility, а не display: раскладке нужен размер чипа,
+   подпись без размера она перемеряет каждый кадр (hudLayout.ts). */
+.w-stage.is-sm .w-who--lot { visibility: hidden; }
 
 /* Плашка дня — слева сверху, ширина по содержимому */
 .w-day { position: absolute; left: 16px; top: 16px; height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 16px; }

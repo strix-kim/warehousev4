@@ -12,11 +12,11 @@
 import * as THREE from 'three'
 import { LOT_MAX } from '../../data/splitProjects'
 import type { WorldCar, WorldLot } from '../../data/types'
-import { ADD_LOT_ID, CREW_MAX, lotPartId } from '../../worldStore'
+import { ADD_LOT_ID, CREW_MAX, lotPartId, whoLabelId } from '../../worldStore'
 import { makeCar } from '../cars'
 import type { WorldCtx } from '../createWorld'
 import { CAMPUS_HALF, ground } from '../ground'
-import { makeExtra } from '../people'
+import { makeExtra, makePerson } from '../people'
 import { hitPlane, pickable } from '../pointer'
 import { kit, label } from '../primitives'
 import { makeFence, makePlus, type FencePlot } from '../selection'
@@ -123,11 +123,25 @@ function buildPlan(ctx: WorldCtx) {
   return g
 }
 
-// Бригада — серые фигурки без имён, по одной на человека в составе, не больше CREW_MAX:
-// сколько людей на самом деле, говорит табличка. userData.crew — фигурки по порядку мест.
-function buildCrew(ctx: WorldCtx, id: string, staff: number) {
-  const g = new THREE.Group(), spots = CREW_SPOTS.slice(0, Math.min(staff, CREW_MAX))
-  g.userData.crew = spots.map(([x, z, rot]) => makeExtra(ctx, g, x, z, rot))
+// Бригада — по фигурке на человека в составе, не больше CREW_MAX: сколько людей на самом
+// деле, говорит табличка. До дня мероприятия — серые без имён по счётчику lot.staff; в день
+// мероприятия (lot.crew) — в цветной одежде, цвет от места, и с чипом имени (w-who--lot:
+// только имя, world-hud.css). Состав ответил пустым при непустом счётчике — серые по
+// счётчику: гонку не дорисовываем. userData.crew — фигурки по порядку мест (appear.ts).
+function buildCrew(ctx: WorldCtx, id: string, lot: WorldLot) {
+  const named = lot.crew?.length ? lot.crew.slice(0, CREW_MAX) : null
+  const g = new THREE.Group(), spots = CREW_SPOTS.slice(0, named ? named.length : Math.min(lot.staff, CREW_MAX)), { cloth } = ctx.style.P
+  g.userData.crew = spots.map(([x, z, rot], i) => {
+    const person = named?.[i]
+    if (!person) return makeExtra(ctx, g, x, z, rot)
+    const figure = makePerson(ctx, g, x, z, rot, cloth[i % cloth.length]!)
+    figure.userData.id = person.id
+    // Человек стоит в мире один раз (data/types.ts). Пришёл дважды — второй якорь затёр бы
+    // первый в ctx.labels, и элемент первого остался бы в слое подписей навсегда
+    const who = whoLabelId(person.id)
+    if (!ctx.labels.has(who)) label(ctx, figure, who, 'w-who w-who--lot', 0, 2.5, 0).element.setAttribute('aria-hidden', 'true')
+    return figure
+  })
   // Якорь таблички — над головами, посередине стоящих
   label(ctx, g, id, 'w-tag', spots.reduce((sum, [x]) => sum + x, 0) / spots.length, 2.4, 0)
   return g
@@ -209,14 +223,16 @@ export function buildVenues(ctx: WorldCtx, venues: WorldLot[]) {
     label(ctx, cafe, lotPartId('cafe', lot.id), 'w-tag', 0, 2.8, -0.9)
     block(ctx, g, lotPartId('stay', lot.id), stay, X + LOT_STAY[0], Z + LOT_STAY[1])
     label(ctx, stay, lotPartId('stay', lot.id), 'w-tag', ...STAY_TAG)
-    if (lot.staff > 0) {
-      const crewId = lotPartId('crew', lot.id), crew = buildCrew(ctx, crewId, lot.staff)
+    // Счётчик реестра мог отстать от состава, который уже ответил поимённо
+    const manned = lot.staff > 0 || !!lot.crew?.length
+    if (manned) {
+      const crewId = lotPartId('crew', lot.id), crew = buildCrew(ctx, crewId, lot)
       block(ctx, g, crewId, crew, X + LOT_CREW[0], Z + LOT_CREW[1])
       // Пятно целиком — цель: мимо фигурки указатель не проваливается на участок
       hitPlane(ctx, crew, CREW_W, CREW_D, 0, 0, crewId, 0.08)
     }
     // Грузовика, стола или бригады у мероприятия нет — пустое место с «плюсом»
-    const filled = { addtruck: lot.lists > 0, addplan: lot.hasPlan, addcrew: lot.staff > 0 }
+    const filled = { addtruck: lot.lists > 0, addplan: lot.hasPlan, addcrew: manned }
     for (const part of ['addtruck', 'addplan', 'addcrew'] as const) {
       if (filled[part]) continue
       const [[x, z], w, d] = SLOTS[part]
