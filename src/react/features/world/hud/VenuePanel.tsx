@@ -113,6 +113,9 @@ type Props = {
   // Действие дровером поверх сцены (хост — WorldStage); не передан — карточка участка
   // работает одними ссылками
   onAction?: (action: WorldAction) => void
+  // id мероприятий с делом про обед на сегодня (data/quests.ts, meal-missing и
+  // meal-collecting): над их кафе стоит маркер «!»
+  mealAlerts?: ReadonlySet<string>
 }
 
 // HUD «Площадок»: вывески участков (порталами в якоря движка), таблички и панель
