@@ -4,22 +4,32 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { Quest } from '../data/quests'
-import { ADD_LOT_ID, isAddId, parseLotId, WORLD_SITES, type WorldSiteId, type WorldStore } from '../worldStore'
+import { ADD_CAR_ID, ADD_LOT_ID, carId, isAddId, parseLotId, WORLD_SITES, type WorldSiteId, type WorldStore } from '../worldStore'
 
 // Дровер действия поверх сцены. null — дровера нет. Живёт локальным состоянием, не в
 // адресе (решение 7). Рисует его хост — actions/WorldActions.tsx.
+// lotId — id мероприятия, carId — id машины (строки vehicles, без префикса объекта сцены).
 export type WorldAction = {
   kind: 'project-new' | 'project-edit' | 'plan-new' | 'staff' | 'expense' | 'car'
   lotId?: string
   carId?: string
 } | null
 
-// Раздел продукта за каждым зданием
-const SITE_ROUTES: Record<WorldSiteId, string> = { office: '/lists', warehouse: '/equipment', garage: '/vehicles' }
+// Раздел продукта за зданием. Гаража здесь нет: он открывается изнутри, в мире
+const SITE_ROUTES: Record<Exclude<WorldSiteId, 'garage'>, string> = { office: '/lists', warehouse: '/equipment' }
 
-// mock — мир наполнен макетом (?mock=on): его мероприятий в базе нет.
-// today — «сегодня» мира (useWorldData): день, на котором открывается интерьер обедов
-export function useWorldActions({ store, mock, today }: { store: WorldStore; mock: boolean; today: string }) {
+type Input = {
+  store: WorldStore
+  // Мир наполнен макетом (?mock=on): его мероприятий в базе нет
+  mock: boolean
+  // «Сегодня» мира (useWorldData): день, на котором открывается интерьер обедов
+  today: string
+  // Войти в гараж (hud/useGarage.ts): пишет ?in=garage; pick — объект, который будет
+  // выбран по прибытии
+  onGarage: (pick?: string) => void
+}
+
+export function useWorldActions({ store, mock, today, onGarage }: Input) {
   const navigate = useNavigate()
   const location = useLocation()
   const [action, setAction] = useState<WorldAction>(null)
@@ -47,11 +57,13 @@ export function useWorldActions({ store, mock, today }: { store: WorldStore; moc
   // Участки и места — выбор без перехода: их показывают панели зон по pick из стора.
   // «Плюс» пустой ячейки открывает дровер нового мероприятия прямо в мире. «Плюсы»
   // внутри участка: план залов и состав — дроверы поверх сцены (plan-new, staff),
-  // список — интерьер редактора с возвратом в мир.
+  // список — интерьер редактора с возвратом в мир. «Плюс» свободного проёма гаража —
+  // интерьер новой машины; машины макет не подменяет, поэтому mock здесь не спрашиваем.
   const activate = (id: string) => {
     if (isAddId(id)) {
       const lot = parseLotId(id)
-      if (id === ADD_LOT_ID && !mock) run({ kind: 'project-new' })
+      if (id === ADD_CAR_ID) leaveTo('/vehicles/new')
+      else if (id === ADD_LOT_ID && !mock) run({ kind: 'project-new' })
       // Макетного мероприятия (?mock=on) в базе нет — вести некуда, кроме реестра
       else if (id === ADD_LOT_ID || !lot || mock) navigate('/projects')
       // Параметр project читает ListEditorPage: новый список сразу на мероприятии
@@ -62,7 +74,13 @@ export function useWorldActions({ store, mock, today }: { store: WorldStore; moc
     }
     if (!WORLD_SITES.includes(id as WorldSiteId)) return
     store.setState({ pick: id })
-    navigate(SITE_ROUTES[id as WorldSiteId])
+    // Гараж открывается в мире: камера подъезжает внутрь (контракт — worldStore.ts,
+    // «Гараж»). Только с кампуса: вывески и клавиши зданий стоят на нём же.
+    if (id === 'garage') {
+      if (store.getState().zone === 'campus') onGarage()
+      return
+    }
+    navigate(SITE_ROUTES[id as Exclude<WorldSiteId, 'garage'>])
   }
 
   // Действие дела — строка доски «Дела» (hud/QuestBoard.tsx). Те же действия, что у
@@ -71,8 +89,11 @@ export function useWorldActions({ store, mock, today }: { store: WorldStore; moc
   const runQuest = (quest: Quest, back?: string) => {
     const { kind, lot } = quest
     if (!lot) {
+      // Машина без водителя: вход в гараж, по прибытии она выбрана — действие (назначить
+      // водителя) человек берёт в её карточке. Дровера нет.
+      if (kind === 'car-no-driver') { if (quest.car) onGarage(carId(quest.car.id)) }
       // Сроки документов — в реестре сотрудников (там же их пилюли)
-      if (kind === 'docs-expired' || kind === 'docs-soon') leaveTo('/employees', back)
+      else if (kind === 'docs-expired' || kind === 'docs-soon') leaveTo('/employees', back)
       else if (mock) navigate('/projects')
       else run({ kind: 'project-new' })
       return

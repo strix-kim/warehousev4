@@ -161,8 +161,10 @@ export function VehicleFormPage() {
   const canSave = Boolean(draft.brand.trim() && draft.plate_number.trim())
   const backTarget = vehicleId ? `/vehicles?vehicle=${vehicleId}` : '/vehicles'
   // Стрелка шапки: из мира — обратно в мир, иначе на backTarget (lib/returnTo).
-  // Уход после сохранения по-прежнему ведёт на backTarget.
   const back = useReturnTo(backTarget, isEditing ? tr('Назад к карточке', 'Kartaga qaytish') : tr('Назад к машинам', 'Mashinalarga qaytish'))
+  // Уход после сохранения правки: пришли из мира (гараж) — туда же и возвращаемся, там
+  // машина уже отвечает на запись (водитель снят — «!» над ней); иначе в карточку реестра.
+  const leaveSaved = () => { if (back.fromWorld) back.goBack(); else navigate(backTarget) }
   const saveLabel = isSaving
     ? tr('Сохраняем…', 'Saqlanmoqda…')
     : isEditing ? tr('Сохранить изменения', 'O‘zgarishlarni saqlash') : tr('Сохранить', 'Saqlash')
@@ -275,7 +277,7 @@ export function VehicleFormPage() {
         // оборвала бы очередь на середине.
         const results = queue.length > 0 ? await runUploads(vehicleId, queue) : []
         if (results.every((item) => item.status === 'done')) {
-          navigate(backTarget)
+          leaveSaved()
           return
         }
         // Часть фото не легла — со страницы не уходим: карточка уже сохранена,
@@ -309,7 +311,7 @@ export function VehicleFormPage() {
     const failed = uploads.filter((item) => item.status === 'failed')
     if (failed.length === 0) return
     const results = await runUploads(vehicleId, failed)
-    if (results.every((item) => item.status === 'done')) navigate(backTarget)
+    if (results.every((item) => item.status === 'done')) leaveSaved()
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {

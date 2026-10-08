@@ -11,13 +11,16 @@ import { useLanguage } from '../../lib/i18n'
 import { reportAppError } from '../../lib/reportAppError'
 import { useModalLayer } from '../../lib/useModalLayer'
 
-export function VehicleDrawer({ vehicle, photoUrl, onClose }: {
+export function VehicleDrawer({ vehicle, photoUrl, onClose, onEdit }: {
   vehicle: VehicleWithDrivers
   // Подписанная ссылка на главное фото — та же, что показывает строка списка:
   // шапка не ждёт круга сети (с26). В проде vehicle_files пуста, поэтому обычное
   // состояние сегодня — плейсхолдер, и он обязан выглядеть намеренным.
   photoUrl?: string
   onClose: () => void
+  // «Редактировать» ведёт не страница, а тот, кто открыл карточку: мир уходит в форму
+  // интерьером с возвратом (lib/returnTo.ts). Не передан — обычный переход в форму.
+  onEdit?: () => void
 }) {
   const { tr } = useLanguage()
   const navigate = useNavigate()
@@ -89,7 +92,7 @@ export function VehicleDrawer({ vehicle, photoUrl, onClose }: {
           onClose={onClose}
         />
       }
-      foot={<button className="button button--secondary" onClick={() => navigate(`/vehicles/${vehicle.id}/edit`)}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>}
+      foot={<button className="button button--secondary" onClick={onEdit ?? (() => navigate(`/vehicles/${vehicle.id}/edit`))}><Pencil size={16} /> {tr('Редактировать', 'Tahrirlash')}</button>}
     >
       {hasPhotosBlock && (
         <section className="profile-section">

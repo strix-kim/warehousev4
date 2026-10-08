@@ -11,6 +11,7 @@ import { fetchHomeSummary, readCachedHomeSummary } from '../../home/api'
 import { fetchEquipmentLists, preferredListsPageSize, readCachedEquipmentLists } from '../../lists/api'
 import { fetchProjects, readCachedProjects } from '../../projects/api'
 import { fetchVehicles, readCachedVehicles } from '../../vehicles/api'
+import type { VehicleWithDrivers } from '../../vehicles/types'
 import { splitProjects } from './splitProjects'
 import type { WorldArchivePlace, WorldData, WorldLot } from './types'
 
@@ -23,7 +24,10 @@ type Mock = { venues: WorldLot[]; archive: WorldArchivePlace[] }
 // expiries — сроки документов сотрудников из сводки главной (голые даты) для доски
 // «Дела»; null — сводка не ответила. В WorldData их нет: это вход движка, а сроки
 // сцена не рисует. today — «сегодня» мира, одно на зоны, дела и обеды.
-export function useWorldData(): { data: WorldData | null; reload: () => Promise<void>; expiries: string[] | null; today: string } {
+// vehicles — строки выдачи машин как есть (тот же ключ кэша, что питает cars): из них
+// карточка машины в гараже берёт водителей по именам, а хост действий — строку для
+// VehicleDrawer. null — выдача не ответила и в кэше пусто.
+export function useWorldData(): { data: WorldData | null; reload: () => Promise<void>; expiries: string[] | null; today: string; vehicles: VehicleWithDrivers[] | null } {
   // Первый кадр — из кэша, затем свежий ответ (как на главной). Запрос списков —
   // тот же, что у плитки главной и первой страницы /lists: общий ключ и то же число.
   const [listsQuery] = useState(() => ({ page: 1, search: '', pageSize: preferredListsPageSize() }))
@@ -121,5 +125,6 @@ export function useWorldData(): { data: WorldData | null; reload: () => Promise<
   }, [crowd, lists, mock, split, summary])
 
   const expiries = summary?.employees.expiries ?? null
-  return useMemo(() => ({ data, reload, expiries, today }), [data, reload, expiries, today])
+  const { vehicles } = crowd
+  return useMemo(() => ({ data, reload, expiries, today, vehicles }), [data, reload, expiries, today, vehicles])
 }

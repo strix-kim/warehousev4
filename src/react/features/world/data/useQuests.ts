@@ -3,7 +3,7 @@
 // дровера reload приносит новый venues, и строка уходит сама.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { questsOf, type Quest } from './quests'
-import type { WorldLot } from './types'
+import type { WorldCar, WorldLot } from './types'
 import { useMealsToday } from './useMealsToday'
 
 type Input = {
@@ -11,13 +11,15 @@ type Input = {
   venues: readonly WorldLot[] | null
   // Макет (?mock=on): его мероприятий в базе нет — обеды не спрашиваем
   mock: boolean
+  // Машины гаража; null — выдача машин не ответила. Макет их не подменяет
+  cars: readonly WorldCar[] | null
   expiries: readonly string[] | null
   today: string
 }
 
-export function useQuests({ venues, mock, expiries, today }: Input) {
+export function useQuests({ venues, mock, cars, expiries, today }: Input) {
   const meals = useMealsToday(mock ? null : venues, today)
-  const quests = useMemo<Quest[]>(() => questsOf({ lots: venues, meals, expiries, today }), [venues, meals, expiries, today])
+  const quests = useMemo<Quest[]>(() => questsOf({ lots: venues, meals, cars, expiries, today }), [venues, meals, cars, expiries, today])
   // Мероприятия с делом про обед на сегодня: над их кафе панель участка ставит «!»
   const mealAlerts = useMemo<ReadonlySet<string>>(() => {
     const ids = new Set<string>()

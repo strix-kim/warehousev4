@@ -9,7 +9,7 @@ import type { MealDayMark } from '../../meals/api'
 import type { WorldLotPart } from '../worldStore'
 import { lotReadiness, type ReadinessKey } from './readiness'
 import { LOT_MAX } from './splitProjects'
-import type { WorldLot } from './types'
+import type { WorldCar, WorldLot } from './types'
 
 export type QuestKind =
   // Впереди нет ни одного мероприятия
@@ -18,11 +18,13 @@ export type QuestKind =
   | 'no-place' | 'no-dates' | 'no-lists' | 'no-plan' | 'no-staff'
   // Мероприятие идёт сегодня, в составе есть люди: обеда на сегодня нет / заказы собираются
   | 'meal-missing' | 'meal-collecting'
+  // За машиной не закреплён ни один водитель (WorldCar.drivers === 0)
+  | 'car-no-driver'
   // Документы сотрудников (сводка главной): срок позади / истекает скоро
   | 'docs-expired' | 'docs-soon'
 
 export type Quest = {
-  // Устойчивый ключ строки доски: `<kind>` или `<kind>:<id мероприятия>`
+  // Устойчивый ключ строки доски: `<kind>`, `<kind>:<id мероприятия>` или `<kind>:<id машины>`
   id: string
   kind: QuestKind
   // Мероприятие дела; null — дело не про участок (no-lots, документы)
@@ -33,6 +35,8 @@ export type Quest = {
   part: WorldLotPart | null
   // Сколько (документов); у остальных дел числа нет
   count?: number
+  // Машина дела (car-no-driver): строка доски ведёт в гараж и выбирает её
+  car?: WorldCar
 }
 
 // Обед на сегодня у одного мероприятия. Смотрим только слот lunch (план с59): ужин —
@@ -70,6 +74,8 @@ export type QuestInput = {
   // Метки обедов по id мероприятия — только для тех, по кому пришёл ответ. Мероприятия
   // без записи (запрос ещё идёт или упал) дела про обед не дают: молчание честнее догадки
   meals: ReadonlyMap<string, readonly Pick<MealDayMark, 'meal_on' | 'slot' | 'status'>[]>
+  // Машины гаража (WorldData.cars); null — выдача машин не ответила: дел про машины нет
+  cars: readonly WorldCar[] | null
   // Сроки документов сотрудников, голые даты (HomeSummary.employees.expiries); null —
   // сводка не ответила
   expiries: readonly string[] | null
@@ -78,9 +84,9 @@ export type QuestInput = {
 }
 
 // Порядок — порядок строк доски: сначала горящее сегодня (обеды), затем участки по
-// дате начала (у каждого — пункты в порядке готовности, перед ними даты), в конце —
-// документы.
-export function questsOf({ lots, meals, expiries, today }: QuestInput): Quest[] {
+// дате начала (у каждого — пункты в порядке готовности, перед ними даты), за ними —
+// машины без водителя (в порядке выдачи), в конце — документы.
+export function questsOf({ lots, meals, cars, expiries, today }: QuestInput): Quest[] {
   const urgent: Quest[] = []
   const rest: Quest[] = []
 
@@ -103,6 +109,10 @@ export function questsOf({ lots, meals, expiries, today }: QuestInput): Quest[] 
         if (!item.done) push(rest, READINESS_QUEST[item.key].kind, READINESS_QUEST[item.key].part)
       }
     })
+  }
+
+  for (const car of cars ?? []) {
+    if (car.drivers === 0) rest.push({ id: `car-no-driver:${car.id}`, kind: 'car-no-driver', lot: null, part: null, car })
   }
 
   if (expiries) {

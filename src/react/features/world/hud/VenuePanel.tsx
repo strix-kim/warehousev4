@@ -64,15 +64,16 @@ function LotSign({ store, lot }: { store: WorldStore; lot: WorldLot }) {
 
 // Кнопка-табличка в якоре движка (класс w-tag, свободная подпись): выбирает свою часть
 // участка — панель отмечает секцию, а действие в панели. name — имя кнопки там, где
-// слов на табличке нет или их мало (число, «!»).
-function TagButton({ store, id, anchor, name, alert, children }: { store: WorldStore; id: string; anchor: HTMLElement; name?: string; alert?: boolean; children: ReactNode }) {
+// слов на табличке нет или их мало (число, «!»). Ею же стоят номера машин в гараже
+// (GaragePanel.tsx): plate — моноширинный текст, как на знаке.
+export function TagButton({ store, id, anchor, name, alert, plate, children }: { store: WorldStore; id: string; anchor: HTMLElement; name?: string; alert?: boolean; plate?: boolean; children: ReactNode }) {
   const pressed = useWorldState(store, (state) => state.pick === id)
   const enter = () => store.setState({ hover: id })
   const leave = () => { if (store.getState().hover === id) store.setState({ hover: null }) }
   return createPortal(
     <button
       type="button"
-      className={`w-tag__btn${alert ? ' w-tag__btn--alert' : ''}`}
+      className={`w-tag__btn${alert ? ' w-tag__btn--alert' : ''}${plate ? ' w-tag__btn--plate' : ''}`}
       aria-label={name}
       aria-pressed={pressed}
       onPointerEnter={enter}

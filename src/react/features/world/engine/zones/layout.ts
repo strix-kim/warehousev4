@@ -5,7 +5,7 @@
 // Зона без источника данных не строится вовсе (решение 6 плана world-s51).
 import * as THREE from 'three'
 import type { WorldData } from '../../data/types'
-import { gateId, WORLD_ZONES, type WorldTexts, type WorldZone } from '../../worldStore'
+import { gateId, WORLD_ZONES, type WorldInside, type WorldTexts, type WorldZone } from '../../worldStore'
 import type { WorldCtx } from '../createWorld'
 import { glide, glideStep } from '../ease'
 import { GATE_MIN_WIDTH, makeGate, tickGates, type Gate } from '../groundLabel'
@@ -92,11 +92,15 @@ export function buildMap(ctx: WorldCtx, data: WorldData, texts: WorldTexts) {
 }
 
 // Подписи неактивных зон уходят со слоя камеры (CSS2DRenderer сверяет layers и ставит
-// им display: none): группы зон остаются видимыми. Зовётся после сборки и смены зоны.
+// им display: none): группы зон остаются видимыми. Так же прячутся подписи, которые живут
+// только «внутри» здания (userData.inside — якоря машин и «плюс» гаража), пока камера не
+// там; им же по контракту пишется is-away. Зовётся после сборки, смены зоны и ctx.inside.
 export function zoneLabels(ctx: WorldCtx) {
   for (const o of ctx.labels.values()) {
-    const zone = zoneOfObject(o)
-    o.layers.set(!zone || zone === ctx.zone ? 0 : 1)
+    const zone = zoneOfObject(o), inside = o.userData.inside as WorldInside | undefined
+    const on = (!zone || zone === ctx.zone) && (!inside || inside === ctx.inside)
+    o.layers.set(on ? 0 : 1)
+    if (inside) o.element.classList.toggle('is-away', !on)
   }
 }
 

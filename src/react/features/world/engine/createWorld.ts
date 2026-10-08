@@ -11,6 +11,7 @@ import { aimAt, createLimit, fit, framePoints, limitTo, placeCamera, pullIn, rea
 import { still, type Glide } from './ease'
 import type { Gate } from './groundLabel'
 import { createHudLayout } from './hudLayout'
+import { createInside } from './inside'
 import { createPanelShift } from './panelShift'
 import { bindPointer } from './pointer'
 import { createSelection, type Fence, type Plus, type Ring } from './selection'
@@ -56,6 +57,8 @@ export type WorldCtx = {
   zone: WorldZone
   zones: WorldZone[]
   zoneRoots: Map<WorldZone, THREE.Group>
+  // Камера стоит у здания «внутри» (engine/inside.ts); зеркало — WorldState.inside
+  inside: WorldInside | null
   // Зона, под которую показаны кнопки на земле: в переезде — прежняя
   zoneShown: WorldZone
   // Уровень приглушения каждой зоны: 0 — яркая, 1 — приглушена
@@ -211,6 +214,7 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     zone: 'campus',
     zones: ['campus'],
     zoneRoots: new Map(),
+    inside: null,
     zoneShown: 'campus',
     zoneDim: { campus: still(0), venues: still(1), archive: still(1) },
     flight: null,
@@ -228,15 +232,23 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
   // Подводка к объекту (focus): aim — камера едет к нему; aimNext — id объекта, к которому
   // она подъедет, когда встанет на зону (объект в другой зоне или переезд ещё идёт)
   let aim: Flight | null = null, aimNext: string | null = null
+  // Чем подводка кончается (подъезд к гаражу — прибытием «внутрь»): зовётся, когда камера
+  // встала, и когда подводку оборвали — тогда камера остаётся, где застали
+  let aimDone: (() => void) | null = null
+  const dropAim = () => {
+    const done = aimDone
+    aim = aimDone = null
+    done?.()
+  }
   // Человек взял камеру сам — подводка отпускает её там, где застал
-  controls.addEventListener('start', () => { ctx.userMoved = true; aim = null })
+  controls.addEventListener('start', () => { dropAim(); ctx.userMoved = true })
 
   const tmp = new THREE.Vector3()
   let seenFrame = false
   const render = (now: number) => {
     if (ctx.flight) {
       // Переезд: камерой правит анимация, OrbitControls выключены
-      aim = null
+      aim = aimDone = null
       if (tickFlight(ctx, ctx.flight, now)) land()
     } else if (aim) {
       if (tickFlight(ctx, aim, now)) endAim()
@@ -277,12 +289,14 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
   // «своя», как после руки человека: ресайз не возвращает рабочий ракурс зоны.
   const endAim = () => {
     if (!aim) return
+    const done = aimDone
     camera.position.copy(aim.p1)
     controls.target.copy(aim.t1)
-    aim = null
+    aim = aimDone = null
     controls.update()
     ctx.userMoved = true
     hud.dirty()   // он же просит кадр неподвижному миру
+    done?.()
   }
   const focus = (id: string) => {
     if (disposed) return
@@ -297,19 +311,31 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
       return
     }
     if (ctx.flight) { aimNext = id; return }
+    dropAim()
     aim = aimAt(ctx, root, performance.now())
     if (deps.reducedMotion || !seenFrame) endAim()
   }
-  // Заглушка контракта Э4 (с61): подъезд к гаражу пишет кодер движка
-  const goInside = (site: WorldInside | null) => { void site }
-  // Камера встала на зону: отложенная подводка — если объект ещё есть и зона его
+  // Гараж изнутри: подъезд и отъезд — те же подводки
+  const inside = createInside(ctx, deps, {
+    hud, isCompact, disposed: () => disposed,
+    fly(flight, done) {
+      aim = flight
+      aimDone = done
+      if (deps.reducedMotion || !seenFrame) endAim()
+    },
+    halt() { aim = aimDone = null },
+  })
+  // Камера встала на зону: отложенная подводка — если объект ещё есть и зона его; просьба
+  // «внутрь», ждавшая посадки, идёт после и её перекрывает — иначе адрес (?in) остался бы
+  // без ответа
   const landed = () => {
     const id = aimNext
     aimNext = null
     if (id && zoneOf(ctx.roots.get(id)) === ctx.zone) focus(id)
+    inside.landed()
   }
 
-  const travel = createZoneTravel(ctx, deps, { hud, isCompact, seenFrame: () => seenFrame, placed: () => placed, disposed: () => disposed, landed })
+  const travel = createZoneTravel(ctx, deps, { hud, isCompact, seenFrame: () => seenFrame, placed: () => placed, disposed: () => disposed, landed, leaving: inside.zone })
   const { land, goZone } = travel
 
   const onContextLost = () => deps.onContextLost?.()
@@ -353,7 +379,7 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     ctx.roots.clear()
     clearFill()
     ctx.framePts.length = 0
-    deps.store.setState({ hover: null, pick: null, flying: false, labels: new Map() })
+    deps.store.setState({ hover: null, pick: null, flying: false, inside: null, labels: new Map() })
     renderer.dispose()
     // Без этого контекст живёт до сборки мусора, а браузер держит их около шестнадцати
     renderer.forceContextLoss()
@@ -462,5 +488,5 @@ export function createWorld(container: HTMLElement, deps: WorldDeps): World {
     throw error
   }
 
-  return { store: deps.store, getPose: () => readPose(ctx), setStyle, setData, setTexts, goZone, focus, goInside, dispose }
+  return { store: deps.store, getPose: () => readPose(ctx), setStyle, setData, setTexts, goZone, focus, goInside: inside.go, dispose }
 }

@@ -18,12 +18,14 @@ import { useWorldData } from './data/useWorldData'
 import { ArchivePanel } from './hud/ArchivePanel'
 import { DayCap } from './hud/DayCap'
 import { Dock } from './hud/Dock'
+import { GaragePanel } from './hud/GaragePanel'
 import { NameChip } from './hud/NameChip'
 import { Plus } from './hud/Plus'
 import { QuestBoard } from './hud/QuestBoard'
 import { ruPlural } from './hud/plural'
 import { Sign } from './hud/Sign'
 import { Toast, useWorldToast } from './hud/Toast'
+import { useGarage } from './hud/useGarage'
 import { VenuePanel } from './hud/VenuePanel'
 import { ZoneSwitch } from './hud/ZoneSwitch'
 import type { World } from './engine/createWorld'
@@ -80,10 +82,15 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
   const [store] = useState(createWorldStore)
   // Одна ссылка и движку, и HUD: машины в сцене, числа вывесок и имена — из одного
   // объекта. null — данных нет, вывески стоят без чисел.
-  const { data, reload, expiries, today } = useWorldData()
-  const { action, run, close, activate, runQuest, building, setBuilding } = useWorldActions({ store, mock: data?.mock ?? false, today })
+  const { data, reload, expiries, today, vehicles } = useWorldData()
+  const worldRef = useRef<Pick<World, 'setStyle' | 'setData' | 'setTexts' | 'goZone' | 'focus' | 'goInside' | 'dispose'> | null>(null)
+  // Гараж изнутри — третий параметр адреса (?in=garage); адрес ↔ движок ведёт hud/useGarage.ts
+  const garage = useGarage({ store, worldRef, campus: wantedZone === 'campus' })
+  const garageRef = useRef(garage)
+  useEffect(() => { garageRef.current = garage })
+  const { action, run, close, leaveTo, activate, runQuest, building, setBuilding } = useWorldActions({ store, mock: data?.mock ?? false, today, onGarage: garage.enter })
   // Дела доски и маркеры обедов — из тех же данных, что участки (data/useQuests.ts)
-  const { quests, mealAlerts, said: questsSaid } = useQuests({ venues: data?.venues ?? null, mock: data?.mock ?? false, expiries, today })
+  const { quests, mealAlerts, said: questsSaid } = useQuests({ venues: data?.venues ?? null, mock: data?.mock ?? false, cars: data?.cars ?? null, expiries, today })
   const { toast, show, hide } = useWorldToast()
   // Новое мероприятие записано, реестр перечитан: id ждёт посадки (эффект ниже, после
   // setData). titleFor — участок, в заголовок карточки которого уйдёт фокус.
@@ -113,7 +120,6 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
   const lookRef = useRef<WorldLook>({ palette, ink })
   // То же с данными: к моменту сборки мира они могли прийти, а могли и нет
   const dataRef = useRef(data)
-  const worldRef = useRef<Pick<World, 'setStyle' | 'setData' | 'setTexts' | 'goZone' | 'focus' | 'dispose'> | null>(null)
   const wantedRef = useRef(wantedZone)
 
   // Текстовый путь вместо сцены в запасных состояниях: участки мира — это мероприятия
@@ -135,13 +141,15 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
   const textsRef = useRef(texts)
   // Зона — в адрес через replace: переезды по карте историю не плодят, «назад» уводит
   // со страницы мира, а не по зонам (gotchas §7). Участок остаётся на «Площадках»:
-  // с ним в адресе камера с них не уехала бы.
+  // с ним в адресе камера с них не уехала бы. Гараж переезд закрывает всегда — и на
+  // кампус тоже: «Кампус» в переключателе изнутри гаража значит «выйти».
   const goZone = (next: WorldZone) => {
     setParams((prev) => {
       const query = new URLSearchParams(prev)
       if (next === 'campus') query.delete('zone')
       else query.set('zone', next)
       if (next !== 'venues') query.delete('lot')
+      query.delete('in')
       return query
     }, { replace: true })
   }
@@ -167,7 +175,7 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
     const writeLot = (id: string | null) => setParams((prev) => {
       const query = new URLSearchParams(prev)
       if (id === null) query.delete('lot')
-      else { query.set('zone', 'venues'); query.set('lot', id) }
+      else { query.set('zone', 'venues'); query.set('lot', id); query.delete('in') }
       return query
     }, { replace: true })
     if (picked) {
@@ -231,6 +239,8 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
         dispose = world.dispose
         getPose = world.getPose
         worldRef.current = world
+        // Гараж из адреса: эффект адреса отработал раньше, чем приехал чанк
+        garageRef.current.attach()
       } catch (error) {
         reportAppError(error, { scope: 'loader', route: window.location.pathname, detail: { batch: 'world-create' } })
         setStatus('failed')
@@ -379,6 +389,8 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
           Макетных мероприятий (?mock=on) в базе нет — действий у панели участка тоже нет */}
       {zone === 'venues' && data?.venues && <VenuePanel store={store} venues={data.venues} onAction={data.mock ? undefined : run} mealAlerts={mealAlerts} />}
       {zone === 'archive' && data?.archive && <ArchivePanel store={store} places={data.archive} />}
+      {/* Гараж изнутри: таблички машин, выход и карточка выбранной — по прибытии камеры */}
+      {garage.wanted && data && <GaragePanel store={store} cars={data.cars} vehicles={vehicles} onAction={run} onLeave={garage.leave} />}
       {status === 'ready' && (
         <>
           <DayCap />
@@ -386,13 +398,13 @@ export function WorldStage({ look, onFirstFrame, onUnavailable }: Props) {
           {/* Один кампус (зон нет) — переключать нечего */}
           {zones.length > 1 && <ZoneSwitch store={store} texts={texts} mockZones={data?.mock ? MOCK_ZONES : NO_ZONES} onGo={goZone} />}
           {/* Клавиши — дубли зданий кампуса */}
-          {zone === 'campus' && <Dock store={store} names={names} onActivate={activate} />}
+          {zone === 'campus' && !garage.inside && <Dock store={store} names={names} onActivate={activate} />}
           {/* Доска «Дела» — на всех зонах; пока реестр не ответил, дел про участки нет и доски нет */}
           {data?.venues && <QuestBoard store={store} quests={quests} onQuest={openQuest} />}
         </>
       )}
       {/* Дроверы действий поверх сцены */}
-      <WorldActions store={store} action={action} venues={data?.venues ?? null} onClose={close} reload={reload} onCreated={setLanding} onSettled={setSettled} onBuilding={setBuilding} toast={show} />
+      <WorldActions store={store} action={action} venues={data?.venues ?? null} vehicles={vehicles} onClose={close} onLeave={leaveTo} reload={reload} onCreated={setLanding} onSettled={setSettled} onBuilding={setBuilding} toast={show} />
       {/* Скринридеру: имя здания под указателем или в фокусе клавиши */}
       <p className="w-live" aria-live="polite">{hover !== null && WORLD_SITES.includes(hover as WorldSiteId) ? names[hover as WorldSiteId] : ''}</p>
       {/* Число дел при его смене — своей областью: имя здания выше оно не затирает */}

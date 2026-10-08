@@ -3,8 +3,6 @@
 // остальные здания — игрушки того же калибра: склад ≤ 1,5 офиса, гараж шириной с офис.
 // Здание — 8–20 объёмов, окна — 1–3 широкие ленты --select. Сомневаешься в детали — убрать.
 import * as THREE from 'three'
-import type { WorldCar } from '../data/types'
-import { carLength, makeCar } from './cars'
 import type { WorldCtx } from './createWorld'
 import { POS, crate, tree } from './ground'
 import { kit } from './primitives'
@@ -79,10 +77,8 @@ export function buildWarehouse(ctx: WorldCtx) {
 export const bayX = (b: number) => -3.8 + b * 3.8
 
 // Гараж: коробка шириной с офис, 3 проёма, односкатная крыша ступенями, мезонин.
-// cars — до пяти машин: первые три стоят в проёмах передками наружу (остальное прячет
-// коробка), ещё две — на площадке перед левым и средним проёмом. Место перед правым —
-// за фургоном, его ставит кампус.
-export function buildGarage(ctx: WorldCtx, cars: readonly WorldCar[]) {
+// Машины в проёмы и на площадку ставит zones/garage.ts.
+export function buildGarage(ctx: WorldCtx) {
   const [X, Z] = POS.garage, { g, body, roofMass, k } = building(ctx, 'garage', X, Z)
   const { band, door, sign, signMark } = ctx.style.roles
   k(body, 12, 4, 7, 0, 0, 0)
@@ -96,12 +92,6 @@ export function buildGarage(ctx: WorldCtx, cars: readonly WorldCar[]) {
   for (const dx of [-0.6, 0.4]) k(signMark, 0.55, 0.55, 0.2, -2.5 + dx, 4.8, 0.75)
   k(mat(ctx.style, ctx.style.P.pad), 12, 0.03, 5, 0, 0, 6)   // площадка перед гаражом
   k.into(g)
-  cars.slice(0, 5).forEach((car, i) => {
-    const v = makeCar(ctx, car)
-    if (i < 3) v.position.set(bayX(i), 0, 4.7 - carLength(car) / 2)
-    else v.position.set(bayX(i - 3), 0, 6.6)
-    g.add(v)
-  })
   g.userData.top = 7
   g.userData.ring = [X, Z + 1, Math.hypot(12, 9) / 2 + 1]
   return g

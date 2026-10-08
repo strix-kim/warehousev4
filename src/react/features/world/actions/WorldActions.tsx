@@ -9,6 +9,7 @@ import { reportAppError } from '../../../lib/reportAppError'
 import type { HallPlanInput } from '../../halls/api'
 import { createProject, fetchProject, updateProject } from '../../projects/api'
 import type { ProjectInput, ProjectWithVenue } from '../../projects/types'
+import type { VehicleWithDrivers } from '../../vehicles/types'
 import type { WorldLot } from '../data/types'
 import { ruPlural } from '../hud/plural'
 import type { WorldStore } from '../worldStore'
@@ -51,6 +52,8 @@ const StaffDrawer = lazyDrawer('world-staff-drawer', () => Promise.all([
   import('./StaffDrawer'),
   import('../../projects/projects.css'),
 ]).then(([module]) => module.StaffDrawer))
+// Карточка машины: её стили (05-profile.css) общие и уже в приложении
+const CarDrawer = lazyDrawer('world-car-drawer', () => import('./CarDrawer').then((module) => module.CarDrawer))
 
 // Серия правок состава — одна пересборка сцены: реестр перечитывается, когда после
 // последней записи прошло столько миллисекунд
@@ -77,7 +80,11 @@ type Props = {
   action: WorldAction
   // Участки реестра (WorldData.venues): дровер состава берёт реквизиты мероприятия отсюда
   venues: WorldLot[] | null
+  // Выдача машин (useWorldData): карточка машины берёт строку отсюда, своего запроса нет
+  vehicles: VehicleWithDrivers[] | null
   onClose: () => void
+  // Уйти в интерьер с возвратом в мир (useWorldActions.leaveTo)
+  onLeave: (path: string) => void
   // Перечитать реестр мероприятий мимо кэша (useWorldData): мир узнаёт о записи явно
   reload: () => Promise<void>
   // Новое мероприятие записано и реестр перечитан: посадку (адрес, камера, фокус, тост)
@@ -91,7 +98,7 @@ type Props = {
   toast: (text: string, opts?: { link?: { to: string; label: string } }) => void
 }
 
-export function WorldActions({ store, action, venues, onClose, reload, onCreated, onSettled, onBuilding, toast }: Props) {
+export function WorldActions({ store, action, venues, vehicles, onClose, onLeave, reload, onCreated, onSettled, onBuilding, toast }: Props) {
   const { tr, locale } = useLanguage()
   // Колбэки и язык меняются между рендерами, а запрос строки, заглушка чанка и таймер
   // состава из-за них перезапускаться не должны — читают свежее через ref
@@ -142,7 +149,8 @@ export function WorldActions({ store, action, venues, onClose, reload, onCreated
     const { tr } = live
     const lotId = live.action?.lotId
     const form = tr('Форма не загрузилась. Проверьте интернет.', 'Shakl yuklanmadi. Internetni tekshiring.')
-    if (live.action?.kind === 'plan-new' && lotId) live.toast(form, { link: { to: `/halls?new=1&project=${lotId}`, label: tr('Планы залов', 'Zallar rejalari') } })
+    if (live.action?.kind === 'car') live.toast(tr('Карточка не загрузилась. Проверьте интернет.', 'Karta yuklanmadi. Internetni tekshiring.'), { link: { to: live.action.carId ? `/vehicles?vehicle=${live.action.carId}` : '/vehicles', label: tr('Автомобили', 'Avtomobillar') } })
+    else if (live.action?.kind === 'plan-new' && lotId) live.toast(form, { link: { to: `/halls?new=1&project=${lotId}`, label: tr('Планы залов', 'Zallar rejalari') } })
     else if (live.action?.kind === 'staff' && lotId) live.toast(tr('Состав не загрузился. Проверьте интернет.', 'Tarkib yuklanmadi. Internetni tekshiring.'), { link: { to: `/projects/${lotId}`, label: tr('Открыть мероприятие', 'Tadbirni ochish') } })
     else live.toast(form, { link: { to: '/projects', label: tr('Мероприятия', 'Tadbirlar') } })
     live.onClose()
@@ -199,6 +207,14 @@ export function WorldActions({ store, action, venues, onClose, reload, onCreated
     if (staffId && !staffLot) liveRef.current.onClose()
   }, [staffId, staffLot])
 
+  // Карточка машины: строка — из выдачи машин мира. Машины нет (выдача сменилась, пока
+  // человек выбирал) — открывать нечего
+  const carId = action?.kind === 'car' ? action.carId ?? null : null
+  const car = carId ? vehicles?.find((row) => row.id === carId) ?? null : null
+  useEffect(() => {
+    if (action?.kind === 'car' && !car) liveRef.current.onClose()
+  }, [action, car])
+
   // Перечитывание реестра после правок состава. Таймер живёт в хосте, а не в дровере:
   // закрытие дровера его не теряет. touched — участок, состав которого меняли с момента
   // открытия: после закрытия сцена вернёт фокус в его карточку.
@@ -252,6 +268,8 @@ export function WorldActions({ store, action, venues, onClose, reload, onCreated
           )}
           {/* При записи не закрывается: людей набирают подряд */}
           {staffLot && <StaffDrawer key={`staff:${staffLot.id}`} lot={staffLot} onClose={onClose} onChanged={staffChanged} onDown={down} />}
+          {/* «Редактировать» уводит в форму машины интерьером: страница мира уходит целиком */}
+          {car && <CarDrawer key={`car:${car.id}`} vehicle={car} onClose={onClose} onEdit={() => onLeave(`/vehicles/${car.id}/edit`)} onDown={down} />}
         </AnimatePresence>
       </Suspense>
       <p className="w-live" aria-live="polite">

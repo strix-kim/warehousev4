@@ -1,9 +1,10 @@
-import { CalendarDays, CalendarPlus, CheckCheck, ChevronDown, ChevronRight, ClipboardList, FileClock, FileWarning, LayoutGrid, ListChecks, MapPin, Users, Utensils, X, type LucideIcon } from 'lucide-react'
+import { CalendarDays, CalendarPlus, CarFront, CheckCheck, ChevronDown, ChevronRight, ClipboardList, FileClock, FileWarning, LayoutGrid, ListChecks, MapPin, Users, Utensils, X, type LucideIcon } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { BottomSheet } from '../../../components/BottomSheet'
 import { useLanguage } from '../../../lib/i18n'
 import { useModalLayer } from '../../../lib/useModalLayer'
+import { vehicleTitle } from '../../vehicles/types'
 import type { Quest, QuestKind } from '../data/quests'
 import { useWorldState, type WorldStore } from '../worldStore'
 import { ruPlural } from './plural'
@@ -38,14 +39,15 @@ const ICONS: Record<QuestKind, LucideIcon> = {
   'no-staff': Users,
   'meal-missing': Utensils,
   'meal-collecting': Utensils,
+  'car-no-driver': CarFront,
   'docs-expired': FileWarning,
   'docs-soon': FileClock,
 }
 // Тон значка: горит сегодня или уже просрочено — bad, в работе или скоро — warn.
 // Смысл несёт текст строки, тон его только подчёркивает.
-const TONES: Partial<Record<QuestKind, 'bad' | 'warn'>> = { 'meal-missing': 'bad', 'docs-expired': 'bad', 'meal-collecting': 'warn', 'docs-soon': 'warn' }
+const TONES: Partial<Record<QuestKind, 'bad' | 'warn'>> = { 'meal-missing': 'bad', 'docs-expired': 'bad', 'meal-collecting': 'warn', 'car-no-driver': 'warn', 'docs-soon': 'warn' }
 
-// Строки дел — кнопки: текст дела и подстрочник (мероприятие либо раздел, куда ведёт дело).
+// Строки дел — кнопки: текст дела и подстрочник (мероприятие, машина либо раздел, куда ведёт дело).
 // Одни и те же в раскрытой доске и в листе телефона.
 function QuestRows({ quests, onPick }: { quests: readonly Quest[]; onPick: (quest: Quest) => void }) {
   const { tr, locale } = useLanguage()
@@ -63,10 +65,13 @@ function QuestRows({ quests, onPick }: { quests: readonly Quest[]; onPick: (ques
     'no-staff': () => tr('Состав не указан', 'Tarkib ko‘rsatilmagan'),
     'meal-missing': () => tr('Обед не заказан', 'Tushlik buyurtma qilinmagan'),
     'meal-collecting': () => tr('Собираем заказы на обед', 'Tushlik buyurtmalari yig‘ilmoqda'),
+    'car-no-driver': () => tr('Водитель не назначен', 'Haydovchi tayinlanmagan'),
     'docs-expired': (quest) => docs(quest.count ?? 0, ['истёк', 'истекли', 'истекли'], 'o‘tgan'),
     'docs-soon': (quest) => docs(quest.count ?? 0, ['истекает', 'истекают', 'истекают'], 'tugayapti'),
   }
-  const sub = (quest: Quest) => quest.lot?.name ?? (quest.kind === 'no-lots' ? tr('Создать мероприятие', 'Tadbir yaratish') : tr('Сотрудники', 'Xodimlar'))
+  // У машины — номер и марка с моделью: по ним её узнают в гараже
+  const sub = (quest: Quest) => quest.car ? `${quest.car.plate} · ${vehicleTitle(quest.car.brand, quest.car.model)}`
+    : quest.lot?.name ?? (quest.kind === 'no-lots' ? tr('Создать мероприятие', 'Tadbir yaratish') : tr('Сотрудники', 'Xodimlar'))
 
   return (
     <ul className="w-quests__rows">

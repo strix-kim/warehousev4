@@ -12,7 +12,8 @@ const NEAR_PX = 26
 const NEAR_TOUCH_MS = 2400
 
 // Кликабельное — только меши зданий; рёбра и силуэт (userData.hull), кольца и земля
-// в raycast не идут. Машины в проёмах — дети гаража и отвечают его id.
+// в raycast не идут. Машины парка — дети гаража и отвечают его id; «внутри» гаража цель —
+// машина (userData.car, zones/garage.ts), это разбирает pickAt.
 export function collectPicks(ctx: WorldCtx) {
   for (const id of WORLD_SITES) {
     const root = ctx.roots.get(id)
@@ -71,6 +72,8 @@ export function bindPointer(ctx: WorldCtx, deps: PointerDeps) {
     // Приглушённая зона целиком — цель своей кнопки на земле; пустая земля своей зоны — не цель
     if (zone && zone !== ctx.zone) return gateId(zone, ctx.zone)
     if (id.startsWith('zone:')) return null
+    // Внутри гаража цель — машина, а само здание — нет
+    if (id === ctx.inside) return (hit.object.userData.car as string | undefined) ?? null
     // Пальцем и в компактной сцене грузовик, отель и план в 44 px не помещаются: цель — весь участок
     const coarse = e.pointerType !== 'mouse' || store.getState().hudCompact
     const lot = parseLotId(id)
@@ -140,8 +143,9 @@ export function bindPointer(ctx: WorldCtx, deps: PointerDeps) {
     if (!from || ctx.flight || store.getState().modal || Math.hypot(e.clientX - from[0], e.clientY - from[1]) > CLICK_SLOP) return
     const id = pickAt(e)
     if (id) ctx.activate(id)
-    // Клик по пустой земле снимает выбор участка или места; у кампуса выбор — переход в раздел
-    else if (ctx.zone !== 'campus') store.setState({ pick: null })
+    // Клик по пустой земле снимает выбор участка, места или машины в гараже; у кампуса
+    // выбор — переход в раздел
+    else if (ctx.zone !== 'campus' || ctx.inside) store.setState({ pick: null })
   }
   const onCancel = () => { down = null; setPress(null) }
 

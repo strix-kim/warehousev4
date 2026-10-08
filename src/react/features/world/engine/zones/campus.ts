@@ -2,19 +2,15 @@
 // и фигурки сотрудников с чипами имён.
 // Пока статично: движение (фургон, бригада, прохожие) придёт своим модулем.
 import * as THREE from 'three'
-import { carKind } from '../../data/carKinds'
 import type { WorldData } from '../../data/types'
-import { bayX, buildGarage, buildOffice, buildWarehouse } from '../buildings'
-import { makeCar } from '../cars'
+import { buildGarage, buildOffice, buildWarehouse } from '../buildings'
 import type { WorldCtx } from '../createWorld'
 import { CAMPUS_HALF, POS, ROAD_Z, ground, roads } from '../ground'
 import { makePerson } from '../people'
 import { kit, label } from '../primitives'
 import { makeRing } from '../selection'
 import { WORLD_SITES, whoLabelId } from '../../worldStore'
-
-// Мест у гаража без фургона: три проёма и два на площадке
-const PARKED = 5
+import { fillGarage } from './garage'
 
 // Место фигурки: [x, z, поворот, номер цвета одежды, с кейсом]
 type Spot = readonly [x: number, z: number, rot: number, cloth: number, withCase: boolean]
@@ -50,13 +46,10 @@ export function buildCampus(ctx: WorldCtx, data: WorldData) {
   roads(ctx, k)
   k.into(g)
 
-  // Фургон мероприятия — бортовой Bongo: стоит на площадке перед правым проёмом носом
-  // к дороге, с кейсами на платформе. Нет его в парке — место занимает шестая машина.
-  // Машины сверх шести на кампусе не стоят: весь парк — в гараже.
-  const cars = [...data.cars]
-  const vanAt = cars.findIndex((car) => carKind(car.brand, car.model) === 'bongo')
-  const van = vanAt >= 0 ? cars.splice(vanAt, 1)[0] : cars[PARKED]
-  g.add(buildOffice(ctx), buildWarehouse(ctx), buildGarage(ctx, cars.slice(0, PARKED)))
+  const garage = buildGarage(ctx)
+  g.add(buildOffice(ctx), buildWarehouse(ctx), garage)
+  // Парк: машины в проёмах и на площадке, место под новую
+  fillGarage(ctx, g, garage, data.cars)
   for (const id of WORLD_SITES) {
     const root = ctx.roots.get(id)
     if (!root) continue
@@ -65,11 +58,6 @@ export function buildCampus(ctx: WorldCtx, data: WorldData) {
     // Кольцо лежит в группе кампуса, а не в здании
     const [x, z, r] = root.userData.ring as [number, number, number]
     ctx.rings.set(id, makeRing(ctx, g, r, x, z))
-  }
-  if (van) {
-    const [GX, GZ] = POS.garage, v = makeCar(ctx, van, true)
-    v.position.set(GX + bayX(2), 0, GZ + 6.9)
-    g.add(v)
   }
 
   const { cloth } = ctx.style.P

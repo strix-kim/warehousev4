@@ -1,7 +1,7 @@
 // Камера: рабочий ракурс под окно, пределы цели, переезд между зонами, поза между
 // пересозданиями мира.
 import * as THREE from 'three'
-import { WORLD_SITES, WORLD_ZONES, type CameraPose, type WorldZone } from '../worldStore'
+import { WORLD_SITES, WORLD_ZONES, type CameraPose, type WorldInside, type WorldZone } from '../worldStore'
 import type { WorldCtx } from './createWorld'
 import { INK_WIDTH } from './style'
 import { zoneFrame, zoneOffset } from './zones/layout'
@@ -48,8 +48,8 @@ const corners = (b: THREE.Box3) => Array.from({ length: 8 }, (_, i) => new THREE
 // добавляет placeCamera: оно задано в пикселях, а не в метрах. Край сетки на дороге
 // (в макете там выезд и карточка события) в рамку вернётся вместе с «Сегодня»: пока
 // там пустая земля, он только мельчит кампус.
-// Машины в проёмах и на площадке — дети гаража и входят в его габарит; фургон и фигурки
-// рамку не двигают.
+// Машины парка — дети гаража и входят в его габарит (zones/garage.ts); фигурки рамку
+// не двигают.
 export function framePoints(ctx: WorldCtx) {
   const pts: THREE.Vector3[] = []
   for (const id of WORLD_SITES) {
@@ -167,16 +167,9 @@ export function placeCamera(ctx: WorldCtx, compact: boolean) {
 export type Flight = { t0: number; dur: number; p0: THREE.Vector3; t0v: THREE.Vector3; p1: THREE.Vector3; t1: THREE.Vector3 }
 
 export function startFlight(ctx: WorldCtx, from: WorldZone, compact: boolean, now: number) {
-  const { camera, controls } = ctx
-  const p0 = camera.position.clone(), t0v = controls.target.clone()
-  placeCamera(ctx, compact)
-  const p1 = camera.position.clone(), t1 = controls.target.clone()
-  camera.position.copy(p0)
-  controls.target.copy(t0v)
-  camera.lookAt(t0v)
-  controls.enabled = false
   const far = Math.abs(WORLD_ZONES.indexOf(from) - WORLD_ZONES.indexOf(ctx.zone)) > 1
-  ctx.flight = { t0: now, dur: far ? 900 : 700, p0, t0v, p1, t1 }
+  ctx.controls.enabled = false
+  ctx.flight = { ...aimHome(ctx, compact, now), dur: far ? 900 : 700 }
 }
 
 // Кадр переезда; true — приехали (позу покоя и управление возвращает вызывающий)
@@ -210,6 +203,36 @@ export function aimAt(ctx: WorldCtx, root: THREE.Object3D, now: number): Flight 
   const p1 = p0.clone().sub(t0v).normalize().multiplyScalar(dist).add(t1)
   pullIn(ctx.limit, t1, p1)
   return { t0: now, dur: AIM_MS, p0, t0v, p1, t1 }
+}
+
+// Возврат к рабочему ракурсу зоны под камерой: отъезд из гаража (engine/inside.ts) и цель
+// переезда между зонами
+export function aimHome(ctx: WorldCtx, compact: boolean, now: number): Flight {
+  const { camera, controls } = ctx
+  const p0 = camera.position.clone(), t0v = controls.target.clone()
+  placeCamera(ctx, compact)
+  const p1 = camera.position.clone(), t1 = controls.target.clone()
+  camera.position.copy(p0)
+  controls.target.copy(t0v)
+  camera.lookAt(t0v)
+  return { t0: now, dur: AIM_MS, p0, t0v, p1, t1 }
+}
+
+// Ракурс «внутри» здания кампуса: спереди и ниже рабочего — проёмы и машины перед ними
+// крупно, табличкам над машинами есть место
+const INSIDE_DIR: Record<WorldInside, [number, number, number]> = { garage: sph(60, 30) }
+
+// Подъезд «внутрь» (World.goInside): направление задано, кадр — точки userData.view
+// здания (в его осях; гаражу их считает zones/garage.ts). Кадр — тот же tickFlight.
+export function aimInside(ctx: WorldCtx, root: THREE.Object3D, now: number): Flight {
+  const { camera, controls } = ctx
+  // Сразу после пересборки матрицы предков ещё не считаны — кадра не было
+  root.updateWorldMatrix(true, false)
+  const pts = ((root.userData.view as THREE.Vector3[] | undefined) ?? []).map((p) => root.localToWorld(p.clone()))
+  const v = viewPose(pts, INSIDE_DIR[root.userData.id as WorldInside], camera.fov, camera.aspect, ctx.limit)
+  // Ближе minDistance нельзя: OrbitControls оттолкнул бы камеру первым же кадром после подъезда
+  const p1 = v.p.sub(v.t).setLength(Math.max(v.p.distanceTo(v.t), controls.minDistance)).add(v.t)
+  return { t0: now, dur: AIM_MS, p0: camera.position.clone(), t0v: controls.target.clone(), p1, t1: v.t }
 }
 
 export function readPose(ctx: WorldCtx): CameraPose {

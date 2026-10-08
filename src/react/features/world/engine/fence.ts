@@ -1,7 +1,7 @@
 // Ограда участка и «плюс» пустого места — отклик «Площадок» на наведение и выбор.
 // Состояние (hovOn, selOn) ведёт selection.ts по стору; здесь — сборка и кадр.
 import * as THREE from 'three'
-import { ADD_LOT_ID } from '../worldStore'
+import { ADD_CAR_ID, ADD_LOT_ID } from '../worldStore'
 import type { WorldCtx } from './createWorld'
 import { clamp01, easeOut, glide, glideStep, still, type Glide } from './ease'
 import { hitPlane } from './pointer'
@@ -179,7 +179,9 @@ export function makePlus(ctx: WorldCtx, parent: THREE.Object3D, id: string, x: n
   dashRect(k, dash, w, d, tile, thick)
   k.into(root)
   hitPlane(ctx, root, w, d, 0, 0, id, 0.08)
-  label(ctx, root, id, lot ? 'w-plus' : 'w-plus w-plus--in', 0, 0.3, 0).center.set(0.5, 0.5)
+  // Место внутри участка — малый «плюс» (w-plus--in): раскрывается у выбранного участка.
+  // Новый участок и место под машину в гараже стоят сами по себе — полный
+  label(ctx, root, id, lot || id === ADD_CAR_ID ? 'w-plus' : 'w-plus w-plus--in', 0, 0.3, 0).center.set(0.5, 0.5)
   const plus: Plus = { root, hovOn: false, dash, base: new THREE.Color(P.mark), hot: new THREE.Color(P.gate), h: still(), idle: true }
   ctx.roots.set(id, root)
   ctx.pluses.set(id, plus)

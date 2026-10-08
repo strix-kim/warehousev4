@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom'
 import { useLanguage } from '../../../lib/i18n'
-import { ADD_LOT_ID, useWorldState, type WorldStore } from '../worldStore'
+import { ADD_CAR_ID, ADD_LOT_ID, useWorldState, type WorldStore } from '../worldStore'
 
 // «Плюс» над пустым местом — кнопка в якоре движка (класс w-plus, свободная подпись):
 // она же дубль цели в сцене для клавиатуры и скринридера. Подпись — по виду места.
@@ -12,6 +12,7 @@ export function Plus({ store, id, busy = false, onActivate }: { store: WorldStor
   if (!anchor) return null
   // name — что произойдёт (скринридеру), cap — короткая подпись на плашке
   const [name, cap] = id === ADD_LOT_ID ? [tr('Добавить мероприятие', 'Tadbir qo‘shish'), tr('Новое мероприятие', 'Yangi tadbir')]
+    : id === ADD_CAR_ID ? [tr('Добавить машину', 'Mashina qo‘shish'), tr('Новая машина', 'Yangi mashina')]
     : id.startsWith('addtruck:') ? [tr('Добавить список оборудования', 'Uskunalar ro‘yxatini qo‘shish'), tr('Список', 'Ro‘yxat')]
       : id.startsWith('addcrew:') ? [tr('Добавить состав', 'Tarkib qo‘shish'), tr('Состав', 'Tarkib')]
         : [tr('Добавить план залов', 'Zallar rejasini qo‘shish'), tr('План залов', 'Zallar rejasi')]

@@ -1,0 +1,37 @@
+/* HUD гаража изнутри (hud/GaragePanel.tsx, hud/CarCard.tsx). Только токены 01-tokens.css,
+   все селекторы — с префиксом w-. Облик берётся у соседей: таблички машин — .w-tag__btn
+   и бейдж .w-tag__bang, карточка — .w-vpanel (world-venues.css; его тянет VenuePanel, а
+   VenuePanel — сцена, так что он в том же чанке). С .w-vpanel карточке достаются и лист
+   снизу в компактной сцене, и сдвиг переключателя зон левее панели (world-hud.css):
+   ширина у неё та же, 336 px. Порядок файлов в бандле не закреплён — свои правила
+   тяжелее соседских на класс. */
+
+/* Табличка машины — госномер: моноширинный, как на знаке (.plate) */
+.w-tag__btn.w-tag__btn--plate { font-family: var(--f-mono); letter-spacing: .02em; }
+
+/* «К кампусу» — выход из гаража, на месте клавиш кампуса (их внутри нет). Та же плита
+   с кромкой, что у клавиши: наведение приподнимает, нажатие вдавливает. */
+.w-stage .w-gback { position: absolute; z-index: 1; left: 16px; bottom: 16px; height: 56px; display: flex; align-items: center; gap: 8px; padding: 0 20px 0 16px; border: 1.5px solid var(--key-line); border-radius: 20px; box-shadow: 0 3px 0 var(--key-rim), var(--shadow-card); font: 700 15px/20px var(--f-display); white-space: nowrap; -webkit-tap-highlight-color: transparent; transition: background-color .16s var(--ease-out), transform .14s var(--ease-out), box-shadow .14s var(--ease-out); }
+.w-stage .w-gback:hover { background: var(--hover); transform: translateY(-2px); box-shadow: 0 5px 0 var(--key-rim), var(--shadow-card); }
+.w-stage .w-gback:active { background: var(--select); transform: translateY(2px); box-shadow: 0 1px 0 var(--key-rim), var(--shadow-card); }
+.w-gback svg { flex: none; color: var(--muted); }
+/* Плашка стоит на земле сцены: в «Ночи» кольцо фокуса светлое */
+.w-stage.is-dark .w-gback { --focus: var(--on-night); }
+/* Доска «Дела» встаёт над выходом, как над клавишами (world-quests.css) */
+.w-stage:not(.is-sm):has(.w-gback) .w-quests { --q-bottom: 88px; }
+/* Компактная сцена: слева снизу — «Дела», выход — справа, где стояли клавиши. Под
+   листом выбранной машины его нет: лист закрывают крестиком, выход возвращается. */
+.w-stage.is-sm .w-gback { left: auto; right: 8px; bottom: 8px; height: 48px; padding: 0 16px 0 12px; }
+.w-stage.is-sm:has([data-w-chrome="panel"]) .w-gback { display: none; }
+
+/* Карточка машины: заголовок — знак госномера, «Изменить» — ссылка в облике кнопки шапки */
+.w-vpanel--car .w-vpanel__name { display: flex; }
+a.w-vpanel__edit { text-decoration: none; }
+.w-cdrivers { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.w-cnone { color: var(--warn); }
+/* «Все машины» — тихая ссылка под кнопкой, по центру; цель 44 px добирает .w-vlink */
+.w-cmore { margin: 14px 0 0; display: flex; justify-content: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .w-stage .w-gback { transform: none !important; }
+}

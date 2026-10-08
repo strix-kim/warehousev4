@@ -2,7 +2,7 @@
 // createWorld.ts: посадка камеры, смена зоны, просьба оболочки (goZone), клик по
 // объекту сцены и кнопке на земле (ctx.activate).
 import type { Object3D } from 'three'
-import { isAddId, WORLD_ZONES, type WorldZone } from '../worldStore'
+import { isAddId, parseCarId, WORLD_ZONES, type WorldZone } from '../worldStore'
 import { limitTo, placeCamera, startFlight } from './camera'
 import type { WorldCtx, WorldDeps } from './createWorld'
 import { still } from './ease'
@@ -20,6 +20,8 @@ type TravelEnv = {
   disposed: () => boolean
   // Камера встала на зону — после переезда или сразу: отложенная подводка (World.focus)
   landed: () => void
+  // Камера уходит на зону to: с кампуса — значит, и из гаража (engine/inside.ts)
+  leaving: (to: WorldZone) => void
 }
 
 // Зона объекта — по группе зоны среди предков (userData.zone ставит buildMap); у общего
@@ -61,6 +63,7 @@ export function createZoneTravel(ctx: WorldCtx, deps: WorldDeps, env: TravelEnv)
     if (ctx.flight) land()
     ctx.zone = to
     limitTo(ctx.limit, to)
+    env.leaving(to)
     zoneLabels(ctx)
     deps.store.setState({ zone: to, hover: null, pick: null, flying: fly })
     if (fly) startFlight(ctx, from, env.isCompact(), performance.now())
@@ -88,6 +91,8 @@ export function createZoneTravel(ctx: WorldCtx, deps: WorldDeps, env: TravelEnv)
     if (!gate) {
       // «Плюс» — действие, а не выбор
       if (!isAddId(id)) deps.store.setState({ pick: id })
+      // Машина в гараже только выбирается: карточку по pick рисует оболочка
+      if (parseCarId(id) !== null) return
       deps.onActivate?.(id)
       return
     }
