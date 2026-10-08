@@ -221,6 +221,7 @@ export function aimHome(ctx: WorldCtx, compact: boolean, now: number): Flight {
 // Ракурс «внутри» здания кампуса: спереди и ниже рабочего — проёмы и машины перед ними
 // крупно, табличкам над машинами есть место
 const INSIDE_DIR: Record<WorldInside, [number, number, number]> = { garage: sph(60, 30) }
+const INSIDE_ROOM = 1.3
 
 // Подъезд «внутрь» (World.goInside): направление задано, кадр — точки userData.view
 // здания (в его осях; гаражу их считает zones/garage.ts). Кадр — тот же tickFlight.
@@ -232,8 +233,11 @@ export function aimInside(ctx: WorldCtx, root: THREE.Object3D, now: number): Fli
   const v = viewPose(pts, INSIDE_DIR[root.userData.id as WorldInside], camera.fov, camera.aspect, ctx.limit)
   // Ближе minDistance нельзя: OrbitControls оттолкнул бы камеру первым же кадром после подъезда
   // Длину берём из v.dist: sub() правит v.p на месте, и distanceTo после него мерил бы
-  // уже не камеру, а её смещение от цели
-  const p1 = v.p.sub(v.t).setLength(Math.max(v.dist, controls.minDistance)).add(v.t)
+  // уже не камеру, а её смещение от цели. Кадр впритык (v.dist) на широкой сцене уводит
+  // левую машину под доску «Дела», а верхний ряд табличек — под переключатель зон:
+  // отступаем на INSIDE_ROOM. На телефоне обвязка стоит сверху и снизу, кадр — по ширине.
+  const room = ctx.container.clientWidth <= PHONE_WIDTH ? 1 : INSIDE_ROOM
+  const p1 = v.p.sub(v.t).setLength(Math.max(v.dist * room, controls.minDistance)).add(v.t)
   return { t0: now, dur: AIM_MS, p0: camera.position.clone(), t0v: controls.target.clone(), p1, t1: v.t }
 }
 
