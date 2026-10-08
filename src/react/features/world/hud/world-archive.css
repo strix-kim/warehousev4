@@ -55,7 +55,7 @@
 /* Панель — справа под переключателем зон и его меткой; сцена остаётся под ней.
    В компактной сцене — лист снизу во всю ширину, не выше 62 % сцены: выбранное
    здание остаётся в кадре над листом. */
-.w-plaque.w-apanel { position: absolute; right: 16px; top: 108px; width: min(360px, calc(100% - 32px)); max-height: calc(100% - 124px); display: flex; flex-direction: column; overflow: hidden; animation: w-apanel-in .2s var(--ease-out); }
+.w-plaque.w-apanel { position: absolute; right: 16px; top: 16px; width: min(360px, calc(100% - 32px)); max-height: calc(100% - 32px); display: flex; flex-direction: column; overflow: hidden; animation: w-apanel-in .2s var(--ease-out); }
 @keyframes w-apanel-in { from { opacity: 0; transform: translateX(12px); } }
 @keyframes w-apanel-up { from { opacity: 0; transform: translateY(16px); } }
 .w-stage.is-sm .w-plaque.w-apanel { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; max-height: min(calc(100% - 125px), 62%); animation-name: w-apanel-up; }

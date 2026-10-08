@@ -159,6 +159,15 @@
 .w-zones__row button[aria-current="true"] { background: var(--key-on); color: var(--card); cursor: default;
   --ico-top: var(--card); --ico-front: var(--on-night-2); --ico-side: var(--ctl); --ico-hole: var(--key-on); --ico-flag: var(--red-night); }
 .w-mock { margin: 0; padding: 2px 9px 3px; border: 1px dashed var(--warn-dot); border-radius: var(--r-sm); background: var(--warn-bg); color: var(--ink); font: 600 12px/16px var(--f-text); white-space: nowrap; }
+/* Открыта панель выбранного (участок, место): переключатель встаёт левее неё, и панель
+   берёт всю высоту сцены — под переключателем от карточки оставалась треть (находка
+   прораба с61). Сдвиг = ширина панели + её отступ + зазор. В узкой десктопной сцене
+   рядом с плашкой дня места нет: соседние зоны остаются значками (имя — в aria-label). */
+.w-stage:not(.is-sm):has(.w-vpanel) .w-zones { right: 368px; }
+.w-stage:not(.is-sm):has(.w-apanel) .w-zones { right: 392px; }
+@media (max-width: 1180px) {
+  .w-stage:not(.is-sm):has([data-w-chrome="panel"]) .w-zones__row button:not([aria-current="true"]) { gap: 0; font-size: 0; }
+}
 /* Компактный: во всю ширину под плашкой дня, цели 44 px */
 .w-stage.is-sm .w-zones { left: 8px; right: 8px; top: 63px; align-items: stretch; gap: 6px; }
 .w-stage.is-sm .w-zones__row { height: 46px; gap: 0; padding: 0; overflow: hidden; }

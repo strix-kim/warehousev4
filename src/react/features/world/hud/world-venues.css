@@ -45,7 +45,7 @@
    (слева снизу — кнопка кампуса на земле, сверху — день и переключатель зон). Обвязка,
    белая в обеих палитрах; вывески её обходят (data-w-chrome). Высота — по содержимому,
    но не выше окна под переключателем: дальше прокрутка внутри. */
-.w-stage .w-vpanel { position: absolute; z-index: 1; right: 16px; bottom: 16px; width: 336px; max-width: calc(100% - 32px); max-height: calc(100% - 120px); display: flex; flex-direction: column; overflow: hidden; animation: w-vpanel-in .2s var(--ease-out); }
+.w-stage .w-vpanel { position: absolute; z-index: 1; right: 16px; bottom: 16px; width: 336px; max-width: calc(100% - 32px); max-height: calc(100% - 32px); display: flex; flex-direction: column; overflow: hidden; animation: w-vpanel-in .2s var(--ease-out); }
 @keyframes w-vpanel-in { from { opacity: 0; translate: 0 8px; } }
 .w-vpanel__head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; padding: 14px 8px 12px 16px; border-bottom: 1px solid var(--line-2); }
 .w-vpanel__name { margin: 0; font: 800 18px/22px var(--f-display); letter-spacing: -.02em; overflow-wrap: anywhere; }
